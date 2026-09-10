@@ -1,0 +1,17 @@
+[package]
+name = "lekhani-core"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core typing engine for Lekhani supporting Avro Phonetic, fixed layouts, Trie dictionary, Bijoy converter, and autocorrect"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+hashbrown.workspace = true
+rayon.workspace = true
+edit-distance.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+rupantor = "0.3"
