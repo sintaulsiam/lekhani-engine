@@ -175,6 +175,13 @@ impl InputSession {
         }
     }
 
+    pub fn is_prediction_navigated(&self) -> bool {
+        match self.active_layout_type {
+            ActiveLayoutType::Phonetic => self.phonetic.is_prediction_navigated,
+            ActiveLayoutType::Fixed => false,
+        }
+    }
+
     pub fn populate_predictions(&mut self) -> bool {
         match self.active_layout_type {
             ActiveLayoutType::Phonetic => self.phonetic.populate_predictions(),
@@ -203,6 +210,21 @@ mod tests {
     #[test]
     fn test_zero_preedit_next_word_predictions() {
         let mut session = InputSession::new();
+        let layout_candidates = [
+            std::path::Path::new("../../data/layouts/avrophonetic.json"),
+            std::path::Path::new("data/layouts/avrophonetic.json"),
+            std::path::Path::new("../data/layouts/avrophonetic.json"),
+        ];
+        for p in layout_candidates {
+            if p.exists() {
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    if let Ok(json) = serde_json::from_str(&content) {
+                        session.set_layout(ActiveLayoutType::Phonetic, &json);
+                        break;
+                    }
+                }
+            }
+        }
         // Type "ami" (VC_A=30, VC_M=50, VC_I=23)
         session.process_key(VC_A, 0);
         session.process_key(VC_M, 0);

@@ -21,6 +21,7 @@ pub struct PhoneticMethod {
     pub recent_context: Vec<String>,
     pub stats: UserStats,
     pub is_prediction_mode: bool,
+    pub is_prediction_navigated: bool,
 }
 
 impl PhoneticMethod {
@@ -37,6 +38,7 @@ impl PhoneticMethod {
             recent_context: Vec::with_capacity(8),
             stats: UserStats::new(),
             is_prediction_mode: false,
+            is_prediction_navigated: false,
         }
     }
 
@@ -56,10 +58,12 @@ impl PhoneticMethod {
                 self.current_candidates = preds;
                 self.selected_index = 0;
                 self.is_prediction_mode = true;
+                self.is_prediction_navigated = false;
                 return true;
             }
         }
         self.is_prediction_mode = false;
+        self.is_prediction_navigated = false;
         self.current_candidates.clear();
         false
     }
@@ -132,12 +136,18 @@ impl PhoneticMethod {
     }
 
     pub fn select_next(&mut self) {
+        if self.is_prediction_mode {
+            self.is_prediction_navigated = true;
+        }
         if !self.current_candidates.is_empty() {
             self.selected_index = (self.selected_index + 1) % self.current_candidates.len();
         }
     }
 
     pub fn select_prev(&mut self) {
+        if self.is_prediction_mode {
+            self.is_prediction_navigated = true;
+        }
         if !self.current_candidates.is_empty() {
             if self.selected_index == 0 {
                 self.selected_index = self.current_candidates.len() - 1;
@@ -179,6 +189,7 @@ impl PhoneticMethod {
         self.current_candidates.clear();
         self.selected_index = 0;
         self.is_prediction_mode = false;
+        self.is_prediction_navigated = false;
     }
 
     pub fn clear_context(&mut self) {
