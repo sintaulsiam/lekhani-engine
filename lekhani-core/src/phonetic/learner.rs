@@ -48,7 +48,7 @@ impl AutonomousLearner {
 
         for word in morphemes {
             // Only learn valid Bengali non-trivial terms
-            if word.chars().count() < 2 || word.chars().all(|c| c.is_ascii()) {
+            if word.chars().count() < 2 || word.is_ascii() {
                 continue;
             }
 

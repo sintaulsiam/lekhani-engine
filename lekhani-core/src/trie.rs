@@ -26,10 +26,21 @@ impl PrefixTrie {
         self.insert_weighted(candidate, 100);
     }
 
-    /// Insert a word with an explicit frequency weight
+    /// Insert a word with an explicit frequency weight maintaining sorted order
     pub fn insert_weighted(&mut self, candidate: String, frequency: u32) {
-        self.entries.push((candidate, frequency));
-        self.is_sorted = false;
+        if !self.is_sorted {
+            self.ensure_sorted();
+        }
+        match self.entries.binary_search_by(|e| e.0.as_str().cmp(candidate.as_str())) {
+            Ok(idx) => {
+                if frequency > self.entries[idx].1 {
+                    self.entries[idx].1 = frequency;
+                }
+            }
+            Err(idx) => {
+                self.entries.insert(idx, (candidate, frequency));
+            }
+        }
     }
 
     /// Bulk insert words with default frequencies
