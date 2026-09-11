@@ -16,7 +16,7 @@ pub use converter::{bijoy_to_unicode, unicode_to_bijoy};
 pub use emojis::EmojiMap;
 pub use fixed::{FixedLayoutParser, FixedMethod};
 pub use keycodes::*;
-pub use ngram::{NGramPredictor, UserStats};
+pub use ngram::UserStats;
 pub use phonetic::{AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion};
 pub use session::{ActiveLayoutType, InputSession};
 pub use snippets::SnippetManager;

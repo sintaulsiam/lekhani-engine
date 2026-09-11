@@ -49,6 +49,22 @@ impl InputSession {
         self.phonetic.suggestion_engine.database.save_user_learned(path)
     }
 
+    pub fn load_stats<P: AsRef<std::path::Path>>(&mut self, path: P) {
+        self.phonetic.stats = crate::ngram::UserStats::load_from_path(path);
+    }
+
+    pub fn save_stats<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), std::io::Error> {
+        self.phonetic.stats.save_to_path(path)
+    }
+
+    pub fn get_stats(&self) -> &crate::ngram::UserStats {
+        &self.phonetic.stats
+    }
+
+    pub fn get_stats_mut(&mut self) -> &mut crate::ngram::UserStats {
+        &mut self.phonetic.stats
+    }
+
     pub fn set_layout(&mut self, layout_type: ActiveLayoutType, layout_json: &Value) {
         self.active_layout_type = layout_type;
         match layout_type {
@@ -125,6 +141,7 @@ impl InputSession {
             ActiveLayoutType::Fixed => {
                 let committed = self.fixed.commit();
                 if !committed.is_empty() {
+                    self.phonetic.stats.record_commit(committed.len(), &committed);
                     Some(committed)
                 } else {
                     None
