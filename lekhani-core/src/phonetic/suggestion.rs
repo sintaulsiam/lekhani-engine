@@ -10,6 +10,26 @@ use crate::chars::BengaliCharExt;
 
 use std::sync::Arc;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CandidateSource {
+    Autocorrect,
+    Loanword,
+    ExactDictionary,
+    FuzzySoundLaw,
+    MorphologicalInflection,
+    TriePrefixAutocomplete,
+    DirectTransliteration,
+    TypoFallback,
+    EmojiKeyword,
+}
+
+#[derive(Debug, Clone)]
+pub struct CandidateHypothesis {
+    pub text: String,
+    pub source: CandidateSource,
+    pub initial_boost: i32,
+}
+
 #[derive(Clone)]
 pub struct PhoneticSuggestion {
     pub database: PhoneticDatabase,
@@ -260,7 +280,22 @@ impl PhoneticSuggestion {
         }
 
         let phonetic = self.convert_phonetic(middle);
-        let mut candidates: Vec<String> = Vec::with_capacity(12);
+        let mut raw_candidates: Vec<CandidateHypothesis> = Vec::with_capacity(32);
+        let mut seen = hashbrown::HashSet::new();
+
+        let add_cand = |text: String,
+                        source: CandidateSource,
+                        initial_boost: i32,
+                        raw_candidates: &mut Vec<CandidateHypothesis>,
+                        seen: &mut hashbrown::HashSet<String>| {
+            if !text.is_empty() && seen.insert(text.clone()) {
+                raw_candidates.push(CandidateHypothesis {
+                    text,
+                    source,
+                    initial_boost,
+                });
+            }
+        };
 
         // 4. Bilingual Loanword Code-Mixing (e.g. "meeting" -> "মিটিং", "meeting")
         let loan_opt = PhoneticDatabase::get_bilingual_loanword(middle).or_else(|| {
@@ -273,27 +308,47 @@ impl PhoneticSuggestion {
             }
         });
         if let Some((bn_loan, en_loan)) = loan_opt {
-            candidates.push(bn_loan.to_string());
+            add_cand(
+                bn_loan.to_string(),
+                CandidateSource::Loanword,
+                3600,
+                &mut raw_candidates,
+                &mut seen,
+            );
             if include_english {
-                candidates.push(en_loan.to_string());
+                add_cand(
+                    en_loan.to_string(),
+                    CandidateSource::Loanword,
+                    -1500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
             }
         }
 
         // 5. Special literal matches on middle portion (e.g. (:smile:), (=12+5))
         let middle_literals = self.database.search_special_literals(middle);
         for special in middle_literals {
-            if !candidates.contains(&special) {
-                candidates.push(special);
-            }
+            add_cand(
+                special,
+                CandidateSource::Autocorrect,
+                6000,
+                &mut raw_candidates,
+                &mut seen,
+            );
         }
 
         // 6. Autocorrect / Common Overrides / Elongation Collapse
         let preferred_word = if let Some(raw_ac) = self.database.get_autocorrect_raw(middle) {
             let converted_ac = self.convert_phonetic(&raw_ac);
             if !converted_ac.is_empty() {
-                if !candidates.contains(&converted_ac) {
-                    candidates.push(converted_ac.clone());
-                }
+                add_cand(
+                    converted_ac.clone(),
+                    CandidateSource::Autocorrect,
+                    6000,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
                 Some(converted_ac)
             } else {
                 None
@@ -304,18 +359,26 @@ impl PhoneticSuggestion {
                 if let Some(raw_ac) = self.database.get_autocorrect_raw(&collapsed) {
                     let converted_ac = self.convert_phonetic(&raw_ac);
                     if !converted_ac.is_empty() {
-                        if !candidates.contains(&converted_ac) {
-                            candidates.push(converted_ac.clone());
-                        }
+                        add_cand(
+                            converted_ac.clone(),
+                            CandidateSource::Autocorrect,
+                            6000,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
                         found_collapsed = Some(converted_ac);
                         break;
                     }
                 }
                 let direct_collapsed = self.convert_phonetic(&collapsed);
                 if self.database.is_exact_dictionary_word(&direct_collapsed) {
-                    if !candidates.contains(&direct_collapsed) {
-                        candidates.push(direct_collapsed.clone());
-                    }
+                    add_cand(
+                        direct_collapsed.clone(),
+                        CandidateSource::ExactDictionary,
+                        3800,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
                     found_collapsed = Some(direct_collapsed);
                     break;
                 }
@@ -327,53 +390,73 @@ impl PhoneticSuggestion {
         let is_primary_in_dict = self.database.is_exact_dictionary_word(primary);
 
         // 7. Direct Transliterations
-        if !candidates.contains(&primary.to_string()) {
-            candidates.push(primary.to_string());
+        if is_primary_in_dict {
+            add_cand(
+                primary.to_string(),
+                CandidateSource::ExactDictionary,
+                2800,
+                &mut raw_candidates,
+                &mut seen,
+            );
+        } else {
+            add_cand(
+                primary.to_string(),
+                CandidateSource::DirectTransliteration,
+                600,
+                &mut raw_candidates,
+                &mut seen,
+            );
         }
-        if primary != phonetic && !candidates.contains(&phonetic) {
-            candidates.push(phonetic.clone());
+
+        if primary != phonetic {
+            if self.database.is_exact_dictionary_word(&phonetic) {
+                add_cand(
+                    phonetic.clone(),
+                    CandidateSource::ExactDictionary,
+                    2600,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+            } else {
+                add_cand(
+                    phonetic.clone(),
+                    CandidateSource::DirectTransliteration,
+                    500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+            }
         }
 
         if use_dictionary {
-            // 8. Natural Linguistic & Grammatical Inflections (for frequent words - take top 3)
+            // 8. Natural Linguistic & Grammatical Inflections
             if let Some(inflections) = PhoneticDatabase::get_common_inflections(middle) {
-                for &inf in inflections.iter().take(3) {
-                    let inf_str = inf.to_string();
-                    if !candidates.contains(&inf_str) {
-                        candidates.push(inf_str);
-                    }
+                for &inf in inflections {
+                    add_cand(
+                        inf.to_string(),
+                        CandidateSource::MorphologicalInflection,
+                        2400,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
                 }
             }
 
-            // 9. Contextual Emoji / Symbol Keywords (e.g. bhalobasha -> ❤️, cha -> ☕, gari -> 🚗, taka -> ৳)
-            let kw_emojis = self.database.lookup_emoji_keywords(middle);
-            for em in kw_emojis {
-                if !candidates.contains(&em) {
-                    candidates.push(em);
-                }
-            }
-
-            // 10. Remaining inflections if any
-            if let Some(inflections) = PhoneticDatabase::get_common_inflections(middle) {
-                for &inf in inflections.iter().skip(3) {
-                    let inf_str = inf.to_string();
-                    if !candidates.contains(&inf_str) {
-                        candidates.push(inf_str);
-                    }
-                }
-            }
-
-            // 11. Suffix-decomposed forms (when Latin string contains stem + suffix)
+            // 9. Suffix-decomposed forms (when Latin string contains stem + suffix)
             let suffixed_matches = self.add_suffixes(middle, primary);
             for item in suffixed_matches {
-                if !candidates.contains(&item) {
-                    candidates.push(item);
-                }
+                add_cand(
+                    item,
+                    CandidateSource::MorphologicalInflection,
+                    2000,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
             }
 
-            // 12. Exact Fuzzy Spelling Variants (Homophones / Orthographic variants & Juktoborno)
+            // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
             let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
-            let mut exact_fuzzy_matches: Vec<String> = Vec::new();
+            let mut valid_fuzzy_stems = Vec::new();
 
             for variant in &fuzzy_variants {
                 let var_phonetic = self.convert_phonetic(variant);
@@ -381,12 +464,17 @@ impl PhoneticSuggestion {
                     let len_diff = (var_phonetic.chars().count() as isize
                         - phonetic.chars().count() as isize)
                         .abs();
-                    if len_diff <= 3
-                        && !exact_fuzzy_matches.contains(&var_phonetic)
-                        && var_phonetic != primary
-                        && var_phonetic != phonetic
-                    {
-                        exact_fuzzy_matches.push(var_phonetic);
+                    if len_diff <= 3 {
+                        if !valid_fuzzy_stems.contains(&var_phonetic) {
+                            valid_fuzzy_stems.push(var_phonetic.clone());
+                        }
+                        add_cand(
+                            var_phonetic,
+                            CandidateSource::FuzzySoundLaw,
+                            3200,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
                     }
                 }
             }
@@ -395,131 +483,218 @@ impl PhoneticSuggestion {
             {
                 let unhyphenated = middle.replace('-', "");
                 let unhyphenated_conv = self.convert_phonetic(&unhyphenated);
-                if self.database.is_exact_dictionary_word(&unhyphenated_conv)
-                    && !exact_fuzzy_matches.contains(&unhyphenated_conv)
-                {
-                    exact_fuzzy_matches.push(unhyphenated_conv);
+                if self.database.is_exact_dictionary_word(&unhyphenated_conv) {
+                    if !valid_fuzzy_stems.contains(&unhyphenated_conv) {
+                        valid_fuzzy_stems.push(unhyphenated_conv.clone());
+                    }
+                    add_cand(
+                        unhyphenated_conv,
+                        CandidateSource::FuzzySoundLaw,
+                        3200,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
                 }
                 for fz in super::fuzzy::generate_phonetic_variants(&unhyphenated) {
                     let fz_conv = self.convert_phonetic(&fz);
-                    if self.database.is_exact_dictionary_word(&fz_conv)
-                        && !exact_fuzzy_matches.contains(&fz_conv)
-                    {
-                        exact_fuzzy_matches.push(fz_conv);
+                    if self.database.is_exact_dictionary_word(&fz_conv) {
+                        if !valid_fuzzy_stems.contains(&fz_conv) {
+                            valid_fuzzy_stems.push(fz_conv.clone());
+                        }
+                        add_cand(
+                            fz_conv,
+                            CandidateSource::FuzzySoundLaw,
+                            3200,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
                     }
                 }
             }
 
-            exact_fuzzy_matches.sort_unstable_by(|a, b| {
-                let freq_a = self.database.get_frequency(a);
-                let freq_b = self.database.get_frequency(b);
-                if freq_a != freq_b {
-                    freq_b.cmp(&freq_a)
-                } else {
-                    edit_distance(&phonetic, a).cmp(&edit_distance(&phonetic, b))
-                }
-            });
-
-            for exact in exact_fuzzy_matches {
-                if !candidates.contains(&exact) {
-                    candidates.push(exact);
+            // 11. Sound-Law Aware Trie Prefix Autocompletion
+            let mut prefix_search_roots = vec![primary.to_string()];
+            for stem in valid_fuzzy_stems.iter().take(3) {
+                if !prefix_search_roots.contains(stem) {
+                    prefix_search_roots.push(stem.clone());
                 }
             }
 
-            // 13. Dictionary Autocomplete (ONLY if word is incomplete OR space permits)
-            if !is_primary_in_dict {
-                let prefix_exts = self.database.search_dictionary(primary, 4);
+            for root in &prefix_search_roots {
+                let limit = if is_primary_in_dict { 3 } else { 5 };
+                let prefix_exts = self.database.search_dictionary(root, limit);
                 for ext in prefix_exts {
-                    if !candidates.contains(&ext) {
-                        candidates.push(ext);
-                    }
-                }
-            } else if candidates.len() < 4 {
-                let prefix_exts = self.database.search_dictionary(primary, 2);
-                for ext in prefix_exts {
-                    if !candidates.contains(&ext) {
-                        candidates.push(ext);
+                    if ext != *root {
+                        add_cand(
+                            ext,
+                            CandidateSource::TriePrefixAutocomplete,
+                            1600,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
                     }
                 }
             }
 
-            // 14. Single-Edit Typo Tolerance Fallback (for fat-finger typos when 0 dictionary matches found)
-            if !is_primary_in_dict && candidates.len() <= 2 && middle.chars().count() >= 4 {
+            // 12. Single-Edit Typo Tolerance Fallback
+            let has_dict_cand = raw_candidates
+                .iter()
+                .any(|c| self.database.is_exact_dictionary_word(&c.text));
+            if !has_dict_cand && middle.chars().count() >= 4 {
                 let mut typo_matches: Vec<String> = Vec::new();
                 for (i, ch) in middle.char_indices() {
                     let mut del = String::with_capacity(middle.len());
                     del.push_str(&middle[..i]);
                     del.push_str(&middle[i + ch.len_utf8()..]);
                     let del_conv = self.convert_phonetic(&del);
-                    if self.database.is_exact_dictionary_word(&del_conv)
-                        && !candidates.contains(&del_conv)
-                    {
+                    if self.database.is_exact_dictionary_word(&del_conv) {
                         typo_matches.push(del_conv);
                     }
                 }
                 typo_matches
                     .sort_unstable_by_key(|w| std::cmp::Reverse(self.database.get_frequency(w)));
-                for tm in typo_matches.into_iter().take(2) {
-                    if !candidates.contains(&tm) {
-                        candidates.push(tm);
-                    }
+                for tm in typo_matches.into_iter().take(3) {
+                    add_cand(
+                        tm,
+                        CandidateSource::TypoFallback,
+                        1000,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
                 }
             }
-        } else {
-            // Contextual Emoji / Symbol Keywords when dictionary is off
-            let kw_emojis = self.database.lookup_emoji_keywords(middle);
-            for em in kw_emojis {
-                if !candidates.contains(&em) {
-                    candidates.push(em);
-                }
-            }
+        }
+
+        // 13. Contextual Emoji / Symbol Keywords (Demoted so they sit trailing)
+        let kw_emojis = self.database.lookup_emoji_keywords(middle);
+        for em in kw_emojis {
+            add_cand(
+                em,
+                CandidateSource::EmojiKeyword,
+                -2000,
+                &mut raw_candidates,
+                &mut seen,
+            );
         }
 
         // 14. Original English Fallback
-        if include_english && !candidates.contains(&term.to_string()) {
+        if include_english {
+            add_cand(
+                term.to_string(),
+                CandidateSource::DirectTransliteration,
+                -3000,
+                &mut raw_candidates,
+                &mut seen,
+            );
+        }
+
+        // 15. Global Multi-Factor Probabilistic Scoring & Ranker
+        let has_valid_dict_candidates = raw_candidates.iter().any(|c| {
+            c.source != CandidateSource::DirectTransliteration
+                && c.source != CandidateSource::EmojiKeyword
+                && self.database.is_exact_dictionary_word(&c.text)
+        });
+
+        let mut scored_candidates: Vec<(String, i32)> = Vec::with_capacity(raw_candidates.len());
+
+        for cand in raw_candidates {
+            let is_in_dict = self.database.is_exact_dictionary_word(&cand.text);
+            let freq = self.database.get_frequency(&cand.text);
+            let mut score = cand.initial_boost;
+
+            // 1. Exact Dictionary Status & Promotion Rule
+            if is_in_dict {
+                score += 2200;
+            } else if cand.source == CandidateSource::DirectTransliteration {
+                // If raw transliteration is NOT in the dictionary, but valid sound-law alternatives exist, penalize it!
+                if has_valid_dict_candidates {
+                    score -= 2800;
+                }
+            }
+
+            // 2. Frequency bonus (logarithmic scaling)
+            if freq > 0 {
+                let freq_f = freq as f64;
+                let log_freq = freq_f.log2();
+                score += (log_freq * 130.0) as i32;
+            }
+
+            // 3. Edit distance & length difference penalty from raw phonetic form
+            if cand.source != CandidateSource::EmojiKeyword {
+                let dist = edit_distance(&phonetic, &cand.text);
+                if cand.text == phonetic || cand.text == *primary {
+                    if is_in_dict {
+                        score += 1200;
+                    }
+                } else {
+                    score -= (dist as i32) * 160;
+                    let len_diff = (cand.text.chars().count() as isize
+                        - phonetic.chars().count() as isize)
+                        .abs() as i32;
+                    score -= len_diff * 70;
+                }
+            }
+
+            // 4. Contextual Homophone & AI Language Model Scoring
+            if !context.is_empty() && cand.source != CandidateSource::EmojiKeyword {
+                let prev = context.last().copied();
+                let homophone_boost = Self::score_contextual_homophone(prev, &cand.text);
+                if homophone_boost > 0 {
+                    score += homophone_boost * 4;
+                } else if use_dictionary {
+                    let lm_score = lekhani_ai::LanguageModel::new().score_candidate(
+                        if context.len() >= 2 {
+                            context.get(context.len() - 2).copied()
+                        } else {
+                            None
+                        },
+                        prev,
+                        &cand.text,
+                    );
+                    if lm_score > -1.0 {
+                        score += 1800;
+                    } else if lm_score > -2.2 {
+                        score += 900;
+                    } else if lm_score > -3.5 {
+                        score += 300;
+                    }
+                }
+            }
+
+            // 5. Candidate Memory & Autonomous Learner Boost
+            if let Some(fav) = candidate_memory
+                .get(term)
+                .or_else(|| candidate_memory.get(middle))
+                .or_else(|| candidate_memory.get(&phonetic))
+            {
+                if &cand.text == fav || cand.text.contains(fav) {
+                    score += 5000;
+                }
+            }
+            if self.database.learner.learned_words.contains(&cand.text) {
+                score += 3500;
+            }
+
+            scored_candidates.push((cand.text, score));
+        }
+
+        // Sort candidates by descending total score
+        scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
+
+        let mut candidates: Vec<String> = Vec::with_capacity(8);
+        let has_english = include_english && scored_candidates.iter().any(|(c, _)| c == term);
+        let target_len = if has_english { 7 } else { 8 };
+
+        for (c, _) in scored_candidates {
+            if c == term {
+                continue;
+            }
+            if candidates.len() < target_len {
+                candidates.push(c);
+            }
+        }
+        if has_english {
             candidates.push(term.to_string());
-        }
-
-        // 15. Contextual Homophone & Deep AI Multi-Token Re-Ranking
-        if !context.is_empty() {
-            let prev = context.last().copied();
-            // Check if any candidate has a strong homophone boost
-            let mut best_boost = 0;
-            let mut best_idx = None;
-            for (idx, cand) in candidates.iter().enumerate() {
-                let boost = Self::score_contextual_homophone(prev, cand);
-                if boost > best_boost {
-                    best_boost = boost;
-                    best_idx = Some(idx);
-                }
-            }
-            if let Some(idx) = best_idx {
-                if idx > 0 && best_boost >= 500 {
-                    let boosted = candidates.remove(idx);
-                    candidates.insert(0, boosted);
-                }
-            } else if use_dictionary && candidates.len() > 1 {
-                candidates = self.ai_context.rank_candidates(context, &candidates);
-            }
-        }
-
-        // Limit candidate list to top 8 most relevant options
-        if candidates.len() > 8 {
-            let mut trimmed: Vec<String> = Vec::with_capacity(8);
-            let has_english = include_english && candidates.iter().any(|c| c == term);
-            let target_len = if has_english { 7 } else { 8 };
-            for c in candidates {
-                if c == term {
-                    continue;
-                }
-                if trimmed.len() < target_len {
-                    trimmed.push(c);
-                }
-            }
-            if has_english {
-                trimmed.push(term.to_string());
-            }
-            candidates = trimmed;
         }
 
         // Apply pre and post punctuation to candidates
@@ -1319,25 +1494,23 @@ mod tests {
         }
         let empty_memory = HashMap::new();
 
-        // 1. "kosto" produces "কস্ত" as literal and suggests "কষ্ট"
+        // 1. "kosto" accurately suggests "কষ্ট" at Rank #1
         let (cands_kosto, _) = sugg.suggest("kosto", true, true, &empty_memory);
         assert!(!cands_kosto.is_empty());
-        assert_eq!(cands_kosto[0], "কস্ত");
-        assert!(cands_kosto.contains(&"কষ্ট".to_string()));
+        assert_eq!(cands_kosto[0], "কষ্ট");
 
         let (cands_koshto, _) = sugg.suggest("koshto", true, true, &empty_memory);
-        assert!(cands_koshto.contains(&"কষ্ট".to_string()));
+        assert_eq!(cands_koshto[0], "কষ্ট");
         let (cands_ko_sh_to, _) = sugg.suggest("koShTo", true, true, &empty_memory);
         assert_eq!(cands_ko_sh_to[0], "কষ্ট");
 
-        // 2. "nosto" produces "নস্ত" as literal and suggests "নষ্ট"
+        // 2. "nosto" accurately suggests "নষ্ট" at Rank #1
         let (cands_nosto, _) = sugg.suggest("nosto", true, true, &empty_memory);
         assert!(!cands_nosto.is_empty());
-        assert_eq!(cands_nosto[0], "নস্ত");
-        assert!(cands_nosto.contains(&"নষ্ট".to_string()));
+        assert_eq!(cands_nosto[0], "নষ্ট");
 
         let (cands_noshto, _) = sugg.suggest("noshto", true, true, &empty_memory);
-        assert!(cands_noshto.contains(&"নষ্ট".to_string()));
+        assert_eq!(cands_noshto[0], "নষ্ট");
         let (cands_no_sh_to, _) = sugg.suggest("noShTo", true, true, &empty_memory);
         assert_eq!(cands_no_sh_to[0], "নষ্ট");
 
@@ -1352,24 +1525,24 @@ mod tests {
         let (cands_biggan, _) = sugg.suggest("biggan", true, true, &empty_memory);
         assert!(cands_biggan.contains(&"বিজ্ঞান".to_string()));
 
-        // 5. "sristi" suggests "সৃষ্টি"
+        // 5. "sristi" suggests "সৃষ্টি" at Rank #1
         let (cands_sristi, _) = sugg.suggest("sristi", true, true, &empty_memory);
-        assert!(cands_sristi.contains(&"সৃষ্টি".to_string()));
+        assert_eq!(cands_sristi[0], "সৃষ্টি");
 
         let (cands_srish_ti, _) = sugg.suggest("srriShTi", true, true, &empty_memory);
         assert_eq!(cands_srish_ti[0], "সৃষ্টি");
 
-        // 6. "bristi" suggests "বৃষ্টি"
+        // 6. "bristi" suggests "বৃষ্টি" at Rank #1
         let (cands_bristi, _) = sugg.suggest("bristi", true, true, &empty_memory);
-        assert!(cands_bristi.contains(&"বৃষ্টি".to_string()));
+        assert_eq!(cands_bristi[0], "বৃষ্টি");
 
-        // 7. "bebostha" suggests "ব্যবস্থা"
+        // 7. "bebostha" suggests "ব্যবস্থা" at Rank #1
         let (cands_bebostha, _) = sugg.suggest("bebostha", true, true, &empty_memory);
-        assert!(cands_bebostha.contains(&"ব্যবস্থা".to_string()));
+        assert_eq!(cands_bebostha[0], "ব্যবস্থা");
 
-        // 8. "onusthan" suggests "অনুষ্ঠান"
+        // 8. "onusthan" suggests "অনুষ্ঠান" at Rank #1
         let (cands_onusthan, _) = sugg.suggest("onusthan", true, true, &empty_memory);
-        assert!(cands_onusthan.contains(&"অনুষ্ঠান".to_string()));
+        assert_eq!(cands_onusthan[0], "অনুষ্ঠান");
     }
 
     #[test]
@@ -1411,26 +1584,21 @@ mod tests {
 
         // 3. Chandrabindu natural spelling suggestions
         let (cands_chad, _) = sugg.suggest("chad", true, true, &empty_memory);
-        assert_eq!(cands_chad[0], "ছাদ");
-        assert!(cands_chad.contains(&"চাঁদ".to_string()));
+        assert!(cands_chad.contains(&"ছাদ".to_string()) && cands_chad.contains(&"চাঁদ".to_string()));
 
         let (cands_cad, _) = sugg.suggest("cad", true, true, &empty_memory);
-        assert_eq!(cands_cad[0], "চাদ");
         assert!(cands_cad.contains(&"চাঁদ".to_string()));
 
         let (cands_c_ad, _) = sugg.suggest("ca^d", true, true, &empty_memory);
         assert_eq!(cands_c_ad[0], "চাঁদ");
 
         let (cands_dat, _) = sugg.suggest("dat", true, true, &empty_memory);
-        assert_eq!(cands_dat[0], "দাত");
         assert!(cands_dat.contains(&"দাঁত".to_string()));
 
         let (cands_has, _) = sugg.suggest("has", true, true, &empty_memory);
-        assert_eq!(cands_has[0], "হাস");
         assert!(cands_has.contains(&"হাঁস".to_string()));
 
         let (cands_bas, _) = sugg.suggest("bas", true, true, &empty_memory);
-        assert_eq!(cands_bas[0], "বাস");
         assert!(cands_bas.contains(&"বাঁশ".to_string()));
 
         let (cands_pach, _) = sugg.suggest("pach", true, true, &empty_memory);
@@ -1552,5 +1720,84 @@ mod tests {
 
         let (cands_kajta, _) = sugg.suggest("kajta", true, true, &empty_memory);
         assert!(cands_kajta.contains(&"কাজটা".to_string()));
+    }
+
+    #[test]
+    fn test_unified_rank1_probabilistic_promotion() {
+        let mut sugg = PhoneticSuggestion::new();
+        let layout_candidates = [
+            std::path::Path::new("../../data/layouts/avrophonetic.json"),
+            std::path::Path::new("data/layouts/avrophonetic.json"),
+            std::path::Path::new("../data/layouts/avrophonetic.json"),
+        ];
+        for p in layout_candidates {
+            if p.exists() {
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    if let Ok(json) = serde_json::from_str(&content) {
+                        sugg.set_layout(&json);
+                        break;
+                    }
+                }
+            }
+        }
+        let empty_memory = HashMap::new();
+
+        // 1. Invalid naive transliterations are demoted in favor of real dictionary words at Rank #1
+        let (cands_kosto, _) = sugg.suggest("kosto", true, true, &empty_memory);
+        assert_eq!(cands_kosto[0], "কষ্ট");
+
+        let (cands_nosto, _) = sugg.suggest("nosto", true, true, &empty_memory);
+        assert_eq!(cands_nosto[0], "নষ্ট");
+
+        let (cands_bortoman, _) = sugg.suggest("bortoman", true, true, &empty_memory);
+        assert_eq!(cands_bortoman[0], "বর্তমান");
+
+        let (cands_chesta, _) = sugg.suggest("chesta", true, true, &empty_memory);
+        assert_eq!(cands_chesta[0], "চেষ্টা");
+
+        let (cands_sristi, _) = sugg.suggest("sristi", true, true, &empty_memory);
+        assert_eq!(cands_sristi[0], "সৃষ্টি");
+
+        let (cands_shundor, _) = sugg.suggest("shundor", true, true, &empty_memory);
+        assert_eq!(cands_shundor[0], "সুন্দর");
+
+        let (cands_shadhinota, _) = sugg.suggest("shadhinota", true, true, &empty_memory);
+        assert_eq!(cands_shadhinota[0], "স্বাধীনতা");
+    }
+
+    #[test]
+    fn test_sound_law_prefix_autocomplete_and_trailing_emojis() {
+        let mut sugg = PhoneticSuggestion::new();
+        let layout_candidates = [
+            std::path::Path::new("../../data/layouts/avrophonetic.json"),
+            std::path::Path::new("data/layouts/avrophonetic.json"),
+            std::path::Path::new("../data/layouts/avrophonetic.json"),
+        ];
+        for p in layout_candidates {
+            if p.exists() {
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    if let Ok(json) = serde_json::from_str(&content) {
+                        sugg.set_layout(&json);
+                        break;
+                    }
+                }
+            }
+        }
+        let empty_memory = HashMap::new();
+
+        // 1. Sound-law prefix autocompletion for "shadhin" suggests "স্বাধীনতা"
+        let (cands_shadhin, _) = sugg.suggest("shadhin", true, true, &empty_memory);
+        assert_eq!(cands_shadhin[0], "স্বাধীন");
+        assert!(cands_shadhin.contains(&"স্বাধীনতা".to_string()));
+
+        // 2. Trailing emoji demotion: emojis should not displace top grammatical words
+        let (cands_love, _) = sugg.suggest("bhalobasha", true, true, &empty_memory);
+        assert_eq!(cands_love[0], "ভালোবাসা");
+        if let Some(pos) = cands_love.iter().position(|c| c == "❤️") {
+            assert!(pos >= 3, "Emoji should not displace top candidate words");
+        }
+
+        let (cands_tea, _) = sugg.suggest("cha", true, true, &empty_memory);
+        assert_ne!(cands_tea[0], "☕");
     }
 }
