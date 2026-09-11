@@ -37,12 +37,10 @@ impl SnippetManager {
 
         // 1. Direct key prefix match
         for (key, val) in &self.user_snippets {
-            if key.to_lowercase().starts_with(&q) {
-                if !results.contains(val) {
-                    results.push(val.clone());
-                    if results.len() >= limit {
-                        return results;
-                    }
+            if key.to_lowercase().starts_with(&q) && !results.contains(val) {
+                results.push(val.clone());
+                if results.len() >= limit {
+                    return results;
                 }
             }
         }
@@ -52,12 +50,10 @@ impl SnippetManager {
             let stem = &q[1..];
             for (key, val) in &self.user_snippets {
                 let key_stem = key.trim_start_matches('!');
-                if key_stem.to_lowercase().starts_with(stem) {
-                    if !results.contains(val) {
-                        results.push(val.clone());
-                        if results.len() >= limit {
-                            return results;
-                        }
+                if key_stem.to_lowercase().starts_with(stem) && !results.contains(val) {
+                    results.push(val.clone());
+                    if results.len() >= limit {
+                        return results;
                     }
                 }
             }
@@ -337,7 +333,7 @@ fn format_with_commas(n: i64) -> String {
     for (i, c) in s.chars().enumerate() {
         res.push(c);
         let rem = len - 1 - i;
-        if rem > 0 && rem % 3 == 0 {
+        if rem > 0 && rem.is_multiple_of(3) {
             res.push(',');
         }
     }
@@ -583,8 +579,8 @@ fn gregorian_to_bongabdo(year: i32, month: u32, day: u32) -> (u32, usize, i32) {
 
     // Day of year (1-indexed)
     let mut day_of_year = day;
-    for m in 0..(month - 1) as usize {
-        day_of_year += days_in_greg_months[m];
+    for &days in days_in_greg_months.iter().take((month - 1) as usize) {
+        day_of_year += days;
     }
 
     // April 14 is the start of Boishakh (day 104 or 105 in leap year)
@@ -658,7 +654,7 @@ mod tests {
     fn test_dynamic_macros() {
         let mgr = SnippetManager::new();
         let tarikh = mgr.expand("#tarikh").expect("tarikh should expand");
-        assert!(tarikh.contains("২০") || tarikh.chars().any(|c| c >= '০' && c <= '৯'));
+        assert!(tarikh.contains("২০") || tarikh.chars().any(|c| ('০'..='৯').contains(&c)));
 
         let shomoy = mgr.expand("#shomoy").expect("shomoy should expand");
         assert!(shomoy.contains(':'));

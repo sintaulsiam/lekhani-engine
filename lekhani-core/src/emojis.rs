@@ -330,12 +330,10 @@ impl EmojiMap {
 
         // 1. Direct prefix matches
         for (key, val) in &self.sorted_entries {
-            if key.starts_with(&q) {
-                if !results.contains(val) {
-                    results.push(val.clone());
-                    if results.len() >= limit {
-                        return results;
-                    }
+            if key.starts_with(&q) && !results.contains(val) {
+                results.push(val.clone());
+                if results.len() >= limit {
+                    return results;
                 }
             }
         }
@@ -345,12 +343,10 @@ impl EmojiMap {
             let stem = &q[1..];
             for (key, val) in &self.sorted_entries {
                 let key_inner = key.trim_matches(|c| c == ':' || c == '*');
-                if key_inner.starts_with(stem) {
-                    if !results.contains(val) {
-                        results.push(val.clone());
-                        if results.len() >= limit {
-                            return results;
-                        }
+                if key_inner.starts_with(stem) && !results.contains(val) {
+                    results.push(val.clone());
+                    if results.len() >= limit {
+                        return results;
                     }
                 }
             }

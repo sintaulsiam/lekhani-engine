@@ -242,7 +242,7 @@ impl PhoneticSuggestion {
         if !candidates.contains(&primary.to_string()) {
             candidates.push(primary.to_string());
         }
-        if primary != &phonetic && !candidates.contains(&phonetic) {
+        if primary != phonetic && !candidates.contains(&phonetic) {
             candidates.push(phonetic.clone());
         }
 
@@ -293,7 +293,7 @@ impl PhoneticSuggestion {
                     let len_diff = (var_phonetic.chars().count() as isize - phonetic.chars().count() as isize).abs();
                     if len_diff <= 1
                         && !exact_fuzzy_matches.contains(&var_phonetic)
-                        && &var_phonetic != primary
+                        && var_phonetic != primary
                         && var_phonetic != phonetic
                     {
                         exact_fuzzy_matches.push(var_phonetic);
@@ -675,7 +675,7 @@ impl PhoneticSuggestion {
         let mut result = String::with_capacity(text.len() * 2);
         let mut opt_idx = 0;
 
-        for (_idx, (is_word, tok)) in tokens.into_iter().enumerate() {
+        for (is_word, tok) in tokens {
             if is_word {
                 if let Some(decoded) = optimal_path.get(opt_idx) {
                     result.push_str(decoded);
@@ -725,10 +725,11 @@ impl PhoneticSuggestion {
                             }
                         }
                         word.push_str(suffix);
-                        if self.database.is_exact_dictionary_word(&word) {
-                            if !list.iter().any(|item| item == &word) && word != phonetic {
-                                list.push(word);
-                            }
+                        if self.database.is_exact_dictionary_word(&word)
+                            && !list.iter().any(|item| item == &word)
+                            && word != phonetic
+                        {
+                            list.push(word);
                         }
                     }
                 }

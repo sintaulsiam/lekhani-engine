@@ -84,7 +84,7 @@ impl BeamSearchDecoder {
         beams
             .first()
             .map(|b| b.path.clone())
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 }
 
