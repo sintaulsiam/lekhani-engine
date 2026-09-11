@@ -258,4 +258,17 @@ mod tests {
         method.insert_old_style_reph();
         assert_eq!(method.buffer, "কর্ত");
     }
+
+    #[test]
+    fn test_unijoy_layout() {
+        let unijoy_raw = include_str!("../../../../data/layouts/Unijoy.json");
+        let val: serde_json::Value = serde_json::from_str(unijoy_raw).expect("Unijoy JSON parse failed");
+        let mut method = FixedMethod::with_layout(&val);
+
+        // 'h' = ব, 'f' = া, 'v' = র, 'f' = া (বাংলা / বারা)
+        assert_eq!(method.process_key(VC_H, 0), Some("ব".to_string()));
+        assert_eq!(method.process_key(VC_F, 0), Some("বা".to_string()));
+        assert_eq!(method.process_key(VC_J, 0), Some("বাক".to_string()));
+        assert_eq!(method.commit(), "বাক");
+    }
 }
