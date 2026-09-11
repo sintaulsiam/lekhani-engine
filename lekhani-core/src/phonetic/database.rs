@@ -235,6 +235,7 @@ impl PhoneticDatabase {
             "network" => Some(("নেটওয়ার্ক", "network")),
             "system" => Some(("সিস্টেম", "system")),
             "file" => Some(("ফাইল", "file")),
+            "typing" => Some(("টাইপিং", "typing")),
             _ => None,
         }
     }

@@ -259,7 +259,15 @@ impl PhoneticSuggestion {
         let mut candidates: Vec<String> = Vec::with_capacity(12);
 
         // 4. Bilingual Loanword Code-Mixing (e.g. "meeting" -> "মিটিং", "meeting")
-        if let Some((bn_loan, en_loan)) = PhoneticDatabase::get_bilingual_loanword(middle) {
+        let loan_opt = PhoneticDatabase::get_bilingual_loanword(middle).or_else(|| {
+            if middle.contains('-') && middle.len() >= 3 && !middle.split('-').all(|p| p.len() <= 1) {
+                let unhyphenated = middle.replace('-', "");
+                PhoneticDatabase::get_bilingual_loanword(&unhyphenated)
+            } else {
+                None
+            }
+        });
+        if let Some((bn_loan, en_loan)) = loan_opt {
             candidates.push(bn_loan.to_string());
             if include_english {
                 candidates.push(en_loan.to_string());
