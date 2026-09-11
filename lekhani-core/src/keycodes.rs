@@ -285,4 +285,3 @@ impl KeycodeMapper {
         self.map.get(&keyval).copied().unwrap_or(VC_UNKNOWN)
     }
 }
-

@@ -38,15 +38,27 @@ impl InputSession {
     }
 
     pub fn load_user_autocorrect<P: AsRef<std::path::Path>>(&mut self, path: P) {
-        self.phonetic.suggestion_engine.database.load_user_autocorrect(path);
+        self.phonetic
+            .suggestion_engine
+            .database
+            .load_user_autocorrect(path);
     }
 
     pub fn load_user_learned<P: AsRef<std::path::Path>>(&mut self, path: P) {
-        self.phonetic.suggestion_engine.database.load_user_learned(path);
+        self.phonetic
+            .suggestion_engine
+            .database
+            .load_user_learned(path);
     }
 
-    pub fn save_user_learned<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), std::io::Error> {
-        self.phonetic.suggestion_engine.database.save_user_learned(path)
+    pub fn save_user_learned<P: AsRef<std::path::Path>>(
+        &self,
+        path: P,
+    ) -> Result<(), std::io::Error> {
+        self.phonetic
+            .suggestion_engine
+            .database
+            .save_user_learned(path)
     }
 
     pub fn load_stats<P: AsRef<std::path::Path>>(&mut self, path: P) {
@@ -93,12 +105,12 @@ impl InputSession {
 
     pub fn get_preedit_text(&self) -> String {
         match self.active_layout_type {
-            ActiveLayoutType::Phonetic => {
-                self.phonetic.get_current_candidate().unwrap_or("").to_string()
-            }
-            ActiveLayoutType::Fixed => {
-                self.fixed.get_buffer().to_string()
-            }
+            ActiveLayoutType::Phonetic => self
+                .phonetic
+                .get_current_candidate()
+                .unwrap_or("")
+                .to_string(),
+            ActiveLayoutType::Fixed => self.fixed.get_buffer().to_string(),
         }
     }
 
@@ -141,7 +153,9 @@ impl InputSession {
             ActiveLayoutType::Fixed => {
                 let committed = self.fixed.commit();
                 if !committed.is_empty() {
-                    self.phonetic.stats.record_commit(committed.len(), &committed);
+                    self.phonetic
+                        .stats
+                        .record_commit(committed.len(), &committed);
                     Some(committed)
                 } else {
                     None

@@ -41,13 +41,24 @@ impl NextWordPredictor {
             predictions.sort_by(|a, b| {
                 let score_a = self.lm.score_candidate(Some(prev2), Some(prev1), a);
                 let score_b = self.lm.score_candidate(Some(prev2), Some(prev1), b);
-                score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+                score_b
+                    .partial_cmp(&score_a)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
         }
 
         if predictions.len() < limit {
             let fallbacks = [
-                "হবে", "আছে", "করব", "যাব", "ভালো", "চাই", "কথা", "দেখা", "ছিল", "করছি",
+                "হবে",
+                "আছে",
+                "করব",
+                "যাব",
+                "ভালো",
+                "চাই",
+                "কথা",
+                "দেখা",
+                "ছিল",
+                "করছি",
             ];
             for fb in fallbacks {
                 if predictions.len() >= limit {

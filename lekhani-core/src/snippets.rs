@@ -11,8 +11,14 @@ pub struct SnippetManager {
 impl SnippetManager {
     pub fn new() -> Self {
         let mut user_snippets = HashMap::new();
-        user_snippets.insert("!shubhechha".to_string(), "আন্তরিক শুভেচ্ছা ও অভিনন্দন".to_string());
-        user_snippets.insert("!dhonnobad".to_string(), "আপনাকে অনেক অনেক ধন্যবাদ".to_string());
+        user_snippets.insert(
+            "!shubhechha".to_string(),
+            "আন্তরিক শুভেচ্ছা ও অভিনন্দন".to_string(),
+        );
+        user_snippets.insert(
+            "!dhonnobad".to_string(),
+            "আপনাকে অনেক অনেক ধন্যবাদ".to_string(),
+        );
         user_snippets.insert("!shagotom".to_string(), "স্বাগতম".to_string());
         user_snippets.insert("!aborton".to_string(), "🔄".to_string());
         Self { user_snippets }
@@ -109,8 +115,14 @@ impl SnippetManager {
 
         // 4. Built-in Dynamic Real-Time Macros
         match word {
-            "#tarikh" | "#date" => vec![format_current_bengali_date(), Local::now().format("%Y-%m-%d").to_string()],
-            "#shomoy" | "#time" => vec![format_current_bengali_time_12h(), format_current_bengali_time_24h()],
+            "#tarikh" | "#date" => vec![
+                format_current_bengali_date(),
+                Local::now().format("%Y-%m-%d").to_string(),
+            ],
+            "#shomoy" | "#time" => vec![
+                format_current_bengali_time_12h(),
+                format_current_bengali_time_24h(),
+            ],
             "#shomoy24" | "#time24" => vec![format_current_bengali_time_24h()],
             "#din" | "#day" => vec![format_current_bengali_day()],
             "#mash" | "#month" => vec![format_current_bengali_month()],
@@ -350,7 +362,7 @@ fn format_with_commas(n: i64) -> String {
 
 fn eval_unit_or_currency(input: &str) -> Option<Vec<String>> {
     let clean = input.to_lowercase();
-    
+
     // Extract number and unit
     let (num, unit) = extract_num_and_unit(&clean)?;
 
@@ -509,7 +521,12 @@ pub fn format_current_bengali_time_12h() -> String {
     let hour = format!("{:02}", hour_num);
     let minute = format!("{:02}", now.minute());
     let period = if pm { "PM" } else { "AM" };
-    format!("{}:{} {}", to_bengali_digits_str(&hour), to_bengali_digits_str(&minute), period)
+    format!(
+        "{}:{} {}",
+        to_bengali_digits_str(&hour),
+        to_bengali_digits_str(&minute),
+        period
+    )
 }
 
 /// Returns current 24-hour time formatted in Bengali (e.g., "১৬:৫০")
@@ -517,7 +534,11 @@ pub fn format_current_bengali_time_24h() -> String {
     let now = Local::now();
     let hour = format!("{:02}", now.hour());
     let minute = format!("{:02}", now.minute());
-    format!("{}:{}", to_bengali_digits_str(&hour), to_bengali_digits_str(&minute))
+    format!(
+        "{}:{}",
+        to_bengali_digits_str(&hour),
+        to_bengali_digits_str(&minute)
+    )
 }
 
 /// Returns current day of week in Bengali (e.g., "শুক্রবার")
@@ -545,11 +566,26 @@ pub fn format_current_bongabdo() -> String {
     let now = Local::now();
     let (b_day, b_month_idx, b_year) = gregorian_to_bongabdo(now.year(), now.month(), now.day());
     let bengali_months = [
-        "বৈশাখ", "জ্যৈষ্ঠ", "আষাঢ়", "শ্রাবণ", "ভাদ্র", "আশ্বিন",
-        "কার্তিক", "অগ্রহায়ণ", "পৌষ", "মাঘ", "ফাল্গুন", "চৈত্র",
+        "বৈশাখ",
+        "জ্যৈষ্ঠ",
+        "আষাঢ়",
+        "শ্রাবণ",
+        "ভাদ্র",
+        "আশ্বিন",
+        "কার্তিক",
+        "অগ্রহায়ণ",
+        "পৌষ",
+        "মাঘ",
+        "ফাল্গুন",
+        "চৈত্র",
     ];
     let month_name = bengali_months.get(b_month_idx).unwrap_or(&"বৈশাখ");
-    format!("{} {} {} বঙ্গাব্দ", to_bengali_digits(b_day), month_name, to_bengali_digits(b_year as u32))
+    format!(
+        "{} {} {} বঙ্গাব্দ",
+        to_bengali_digits(b_day),
+        month_name,
+        to_bengali_digits(b_year as u32)
+    )
 }
 
 fn get_bengali_gregorian_month(month: u32) -> &'static str {
@@ -574,7 +610,18 @@ fn get_bengali_gregorian_month(month: u32) -> &'static str {
 fn gregorian_to_bongabdo(year: i32, month: u32, day: u32) -> (u32, usize, i32) {
     let is_leap_year = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
     let days_in_greg_months = [
-        31, if is_leap_year { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
+        31,
+        if is_leap_year { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
     ];
 
     // Day of year (1-indexed)
@@ -593,11 +640,27 @@ fn gregorian_to_bongabdo(year: i32, month: u32, day: u32) -> (u32, usize, i32) {
         let prev_leap = (prev_year % 4 == 0 && prev_year % 100 != 0) || (prev_year % 400 == 0);
         let days_in_prev_year = if prev_leap { 366 } else { 365 };
         let prev_boishakh = if prev_leap { 105 } else { 104 };
-        (year - 594, days_in_prev_year - prev_boishakh + 1 + day_of_year)
+        (
+            year - 594,
+            days_in_prev_year - prev_boishakh + 1 + day_of_year,
+        )
     };
 
     // Bengali month lengths (Revised Bangladeshi standard: 5x31, 7x30 / Falgun 29 or 30)
-    let b_month_lengths = [31, 31, 31, 31, 31, 30, 30, 30, 30, 30, if is_leap_year { 30 } else { 29 }, 30];
+    let b_month_lengths = [
+        31,
+        31,
+        31,
+        31,
+        31,
+        30,
+        30,
+        30,
+        30,
+        30,
+        if is_leap_year { 30 } else { 29 },
+        30,
+    ];
 
     let mut remaining_days = day_in_bengali_year;
     let mut b_month_idx = 0;
@@ -672,4 +735,3 @@ mod tests {
         assert!(p_shub.contains(&"স্বাগতম".to_string()));
     }
 }
-

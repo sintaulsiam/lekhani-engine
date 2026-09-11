@@ -50,7 +50,8 @@ impl BeamSearchDecoder {
 
         // Iterate through remaining tokens
         for token_cands in sequence_candidates.iter().skip(1) {
-            let mut next_beams: Vec<BeamCandidate> = Vec::with_capacity(beams.len() * token_cands.len());
+            let mut next_beams: Vec<BeamCandidate> =
+                Vec::with_capacity(beams.len() * token_cands.len());
 
             for beam in &beams {
                 let prev1 = beam.path.last().map(|s| s.as_str());
@@ -76,15 +77,16 @@ impl BeamSearchDecoder {
             }
 
             // Prune to top beam_width
-            next_beams.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            next_beams.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             next_beams.truncate(self.beam_width);
             beams = next_beams;
         }
 
-        beams
-            .first()
-            .map(|b| b.path.clone())
-            .unwrap_or_default()
+        beams.first().map(|b| b.path.clone()).unwrap_or_default()
     }
 }
 

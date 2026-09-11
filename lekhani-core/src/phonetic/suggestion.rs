@@ -82,8 +82,9 @@ impl PhoneticSuggestion {
         }
         if text.is_ascii() {
             if text.contains('-') && text.len() >= 3 && text.split('-').all(|p| p.len() <= 2) {
-                let parts: Vec<String> = text.split('-').map(|part| {
-                    match part {
+                let parts: Vec<String> = text
+                    .split('-')
+                    .map(|part| match part {
                         "o" => "ও".to_string(),
                         "a" => "আ".to_string(),
                         "i" => "ই".to_string(),
@@ -97,8 +98,8 @@ impl PhoneticSuggestion {
                             }
                         }
                         _ => String::new(),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 return parts.join("-");
             }
             if let Some(ref parser) = self.phonetic_parser {
@@ -164,7 +165,10 @@ impl PhoneticSuggestion {
                 .get(term)
                 .or_else(|| candidate_memory.get(&cache_key))
             {
-                cached.iter().position(|c| c == fav || c.contains(fav)).unwrap_or(0)
+                cached
+                    .iter()
+                    .position(|c| c == fav || c.contains(fav))
+                    .unwrap_or(0)
             } else {
                 0
             };
@@ -260,7 +264,8 @@ impl PhoneticSuggestion {
 
         // 4. Bilingual Loanword Code-Mixing (e.g. "meeting" -> "মিটিং", "meeting")
         let loan_opt = PhoneticDatabase::get_bilingual_loanword(middle).or_else(|| {
-            if middle.contains('-') && middle.len() >= 3 && !middle.split('-').all(|p| p.len() <= 1) {
+            if middle.contains('-') && middle.len() >= 3 && !middle.split('-').all(|p| p.len() <= 1)
+            {
                 let unhyphenated = middle.replace('-', "");
                 PhoneticDatabase::get_bilingual_loanword(&unhyphenated)
             } else {
@@ -373,7 +378,9 @@ impl PhoneticSuggestion {
             for variant in &fuzzy_variants {
                 let var_phonetic = self.convert_phonetic(variant);
                 if self.database.is_exact_dictionary_word(&var_phonetic) {
-                    let len_diff = (var_phonetic.chars().count() as isize - phonetic.chars().count() as isize).abs();
+                    let len_diff = (var_phonetic.chars().count() as isize
+                        - phonetic.chars().count() as isize)
+                        .abs();
                     if len_diff <= 3
                         && !exact_fuzzy_matches.contains(&var_phonetic)
                         && var_phonetic != primary
@@ -384,15 +391,20 @@ impl PhoneticSuggestion {
                 }
             }
 
-            if middle.contains('-') && middle.len() >= 3 && !middle.split('-').all(|p| p.len() <= 1) {
+            if middle.contains('-') && middle.len() >= 3 && !middle.split('-').all(|p| p.len() <= 1)
+            {
                 let unhyphenated = middle.replace('-', "");
                 let unhyphenated_conv = self.convert_phonetic(&unhyphenated);
-                if self.database.is_exact_dictionary_word(&unhyphenated_conv) && !exact_fuzzy_matches.contains(&unhyphenated_conv) {
+                if self.database.is_exact_dictionary_word(&unhyphenated_conv)
+                    && !exact_fuzzy_matches.contains(&unhyphenated_conv)
+                {
                     exact_fuzzy_matches.push(unhyphenated_conv);
                 }
                 for fz in super::fuzzy::generate_phonetic_variants(&unhyphenated) {
                     let fz_conv = self.convert_phonetic(&fz);
-                    if self.database.is_exact_dictionary_word(&fz_conv) && !exact_fuzzy_matches.contains(&fz_conv) {
+                    if self.database.is_exact_dictionary_word(&fz_conv)
+                        && !exact_fuzzy_matches.contains(&fz_conv)
+                    {
                         exact_fuzzy_matches.push(fz_conv);
                     }
                 }
@@ -439,11 +451,14 @@ impl PhoneticSuggestion {
                     del.push_str(&middle[..i]);
                     del.push_str(&middle[i + ch.len_utf8()..]);
                     let del_conv = self.convert_phonetic(&del);
-                    if self.database.is_exact_dictionary_word(&del_conv) && !candidates.contains(&del_conv) {
+                    if self.database.is_exact_dictionary_word(&del_conv)
+                        && !candidates.contains(&del_conv)
+                    {
                         typo_matches.push(del_conv);
                     }
                 }
-                typo_matches.sort_unstable_by_key(|w| std::cmp::Reverse(self.database.get_frequency(w)));
+                typo_matches
+                    .sort_unstable_by_key(|w| std::cmp::Reverse(self.database.get_frequency(w)));
                 for tm in typo_matches.into_iter().take(2) {
                     if !candidates.contains(&tm) {
                         candidates.push(tm);
@@ -551,7 +566,13 @@ impl PhoneticSuggestion {
         use_dictionary: bool,
         candidate_memory: &HashMap<String, String>,
     ) -> (Vec<String>, usize) {
-        self.suggest_with_multi_context(term, &[], include_english, use_dictionary, candidate_memory)
+        self.suggest_with_multi_context(
+            term,
+            &[],
+            include_english,
+            use_dictionary,
+            candidate_memory,
+        )
     }
 
     /// Convenience forwarder for single previous word context
@@ -564,9 +585,21 @@ impl PhoneticSuggestion {
         candidate_memory: &HashMap<String, String>,
     ) -> (Vec<String>, usize) {
         if let Some(p) = previous_word {
-            self.suggest_with_multi_context(term, &[p], include_english, use_dictionary, candidate_memory)
+            self.suggest_with_multi_context(
+                term,
+                &[p],
+                include_english,
+                use_dictionary,
+                candidate_memory,
+            )
         } else {
-            self.suggest_with_multi_context(term, &[], include_english, use_dictionary, candidate_memory)
+            self.suggest_with_multi_context(
+                term,
+                &[],
+                include_english,
+                use_dictionary,
+                candidate_memory,
+            )
         }
     }
 
@@ -579,70 +612,146 @@ impl PhoneticSuggestion {
 
         let rule_score = match candidate {
             "পড়া" | "পড়ছি" | "পড়ব" | "পড়াশোনা" => {
-                if matches!(prev, "বই" | "বইটি" | "বইয়ের" | "বইগুলো" | "পত্রিকা" | "লেখা" | "ক্লাস" | "স্কুল" | "কলেজ" | "পরীক্ষা" | "পাঠ" | "মন" | "নোট") {
+                if matches!(
+                    prev,
+                    "বই" | "বইটি"
+                        | "বইয়ের"
+                        | "বইগুলো"
+                        | "পত্রিকা"
+                        | "লেখা"
+                        | "ক্লাস"
+                        | "স্কুল"
+                        | "কলেজ"
+                        | "পরীক্ষা"
+                        | "পাঠ"
+                        | "মন"
+                        | "নোট"
+                ) {
                     1000
                 } else {
                     0
                 }
             }
             "পরা" | "পরছি" | "পরব" => {
-                if matches!(prev, "শার্ট" | "প্যান্ট" | "জামা" | "কাপড়" | "জুতো" | "জুতা" | "ঘড়ি" | "চশমা" | "পোশাক" | "শাল" | "শাড়ি") {
+                if matches!(
+                    prev,
+                    "শার্ট"
+                        | "প্যান্ট"
+                        | "জামা"
+                        | "কাপড়"
+                        | "জুতো"
+                        | "জুতা"
+                        | "ঘড়ি"
+                        | "চশমা"
+                        | "পোশাক"
+                        | "শাল"
+                        | "শাড়ি"
+                ) {
                     1000
                 } else {
                     0
                 }
             }
             "ভাষা" | "ভাষায়" | "ভাষার" => {
-                if matches!(prev, "বাংলা" | "ইংরেজি" | "মাতৃভাষা" | "কথ্য" | "রাষ্ট্র" | "আমাদের" | "সুন্দর" | "আন্তর্জাতিক") {
+                if matches!(
+                    prev,
+                    "বাংলা"
+                        | "ইংরেজি"
+                        | "মাতৃভাষা"
+                        | "কথ্য"
+                        | "রাষ্ট্র"
+                        | "আমাদের"
+                        | "সুন্দর"
+                        | "আন্তর্জাতিক"
+                ) {
                     1000
                 } else {
                     0
                 }
             }
             "ভাসা" | "ভাসছে" => {
-                if matches!(prev, "পানিতে" | "জলে" | "নদীতে" | "সাগরে" | "ভেসে" | "রক্তে" | "চোখের") {
+                if matches!(
+                    prev,
+                    "পানিতে"
+                        | "জলে"
+                        | "নদীতে"
+                        | "সাগরে"
+                        | "ভেসে"
+                        | "রক্তে"
+                        | "চোখের"
+                ) {
                     1000
                 } else {
                     0
                 }
             }
             "জাতি" | "জাতির" => {
-                if matches!(prev, "বাঙালি" | "মুসলিম" | "হিন্দু" | "উন্নত" | "মানব" | "বিশ্ব" | "পুরো") {
+                if matches!(
+                    prev,
+                    "বাঙালি"
+                        | "মুসলিম"
+                        | "হিন্দু"
+                        | "উন্নত"
+                        | "মানব"
+                        | "বিশ্ব"
+                        | "পুরো"
+                ) {
                     1000
                 } else {
                     0
                 }
             }
             "কুল" => {
-                if matches!(prev, "বংশ" | "উচ্চ" | "মান" | "মর্যাদা") {
+                if matches!(prev, "বংশ" | "উচ্চ" | "মান" | "মর্যাদা")
+                {
                     1000
                 } else {
                     0
                 }
             }
             "কূল" => {
-                if matches!(prev, "নদী" | "নদীর" | "সাগর" | "সাগরের" | "উপকূল" | "তীর") {
+                if matches!(prev, "নদী" | "নদীর" | "সাগর" | "সাগরের" | "উপকূল" | "তীর")
+                {
                     1000
                 } else {
                     0
                 }
             }
             "লক্ষ্য" => {
-                if matches!(prev, "জীবনের" | "মূল" | "প্রধান" | "উদ্দেশ্য" | "আমাদের" | "চূড়ান্ত") {
+                if matches!(
+                    prev,
+                    "জীবনের"
+                        | "মূল"
+                        | "প্রধান"
+                        | "উদ্দেশ্য"
+                        | "আমাদের"
+                        | "চূড়ান্ত"
+                ) {
                     1000
                 } else {
                     0
                 }
             }
             "লক্ষ" => {
-                if matches!(prev, "এক" | "দুই" | "তিন" | "চার" | "পাঁচ" | "দশ" | "কোটি" | "টাকা" | "মানুষ") {
+                if matches!(
+                    prev,
+                    "এক" | "দুই"
+                        | "তিন"
+                        | "চার"
+                        | "পাঁচ"
+                        | "দশ"
+                        | "কোটি"
+                        | "টাকা"
+                        | "মানুষ"
+                ) {
                     1000
                 } else {
                     0
                 }
             }
             "কাঁচা" => {
-                if matches!(prev, "আম" | "ফল" | "মরিচ" | "রাস্তা" | "টাকা" | "বয়স") {
+                if matches!(prev, "আম" | "ফল" | "মরিচ" | "রাস্তা" | "টাকা" | "বয়স")
+                {
                     1000
                 } else {
                     0
@@ -656,23 +765,43 @@ impl PhoneticSuggestion {
                 }
             }
             "স্বত্ব" => {
-                if matches!(prev, "কপিরাইট" | "মালিকানা" | "গ্রন্থ" | "প্রকাশক") {
+                if matches!(prev, "কপিরাইট" | "মালিকানা" | "গ্রন্থ" | "প্রকাশক")
+                {
                     1000
                 } else {
                     0
                 }
             }
             "সত্য" => {
-                if matches!(prev, "বলা" | "চিরন্তন" | "কথা" | "সবসময়" | "পরম" | "প্রকৃত") {
+                if matches!(prev, "বলা" | "চিরন্তন" | "কথা" | "সবসময়" | "পরম" | "প্রকৃত")
+                {
                     1000
                 } else {
                     0
                 }
             }
             "দিন" => {
-                if matches!(prev, "আজকের" | "শুভ" | "প্রতি" | "সারাদিন" | "কয়েক" | "ভালো" | "খারাপ") {
+                if matches!(
+                    prev,
+                    "আজকের"
+                        | "শুভ"
+                        | "প্রতি"
+                        | "সারাদিন"
+                        | "কয়েক"
+                        | "ভালো"
+                        | "খারাপ"
+                ) {
                     500
-                } else if matches!(prev, "আমাকে" | "তাকে" | "একটু" | "দয়া" | "টাকা" | "বইটি" | "করে") {
+                } else if matches!(
+                    prev,
+                    "আমাকে"
+                        | "তাকে"
+                        | "একটু"
+                        | "দয়া"
+                        | "টাকা"
+                        | "বইটি"
+                        | "করে"
+                ) {
                     800
                 } else {
                     0
@@ -684,7 +813,8 @@ impl PhoneticSuggestion {
         if rule_score > 0 {
             rule_score
         } else {
-            let score = lekhani_ai::LanguageModel::new().score_candidate(None, Some(prev), candidate);
+            let score =
+                lekhani_ai::LanguageModel::new().score_candidate(None, Some(prev), candidate);
             if score > -1.0 {
                 1000
             } else if score > -2.0 {
@@ -773,13 +903,8 @@ impl PhoneticSuggestion {
 
         for (idx, (is_word, tok)) in tokens.iter().enumerate() {
             if *is_word {
-                let (cands, _) = self.suggest_with_multi_context(
-                    tok,
-                    &[],
-                    false,
-                    true,
-                    &empty_memory,
-                );
+                let (cands, _) =
+                    self.suggest_with_multi_context(tok, &[], false, true, &empty_memory);
                 if !cands.is_empty() {
                     word_cands.push(cands);
                 } else {
@@ -836,7 +961,9 @@ impl PhoneticSuggestion {
 
                     for base in &base_candidates {
                         let mut word = base.clone();
-                        if let (Some(base_rmc), Some(suffix_lmc)) = (base.chars().last(), suffix.chars().next()) {
+                        if let (Some(base_rmc), Some(suffix_lmc)) =
+                            (base.chars().last(), suffix.chars().next())
+                        {
                             if base_rmc.is_vowel() && suffix_lmc.is_kar() {
                                 word.push('য়');
                             } else if base_rmc == 'ৎ' {
@@ -952,7 +1079,9 @@ mod tests {
         // Prefix emoji search :sm
         let (cands_prefix, _) = sugg.suggest(":sm", true, true, &empty_memory);
         assert!(!cands_prefix.is_empty());
-        assert!(cands_prefix.contains(&"😊".to_string()) || cands_prefix.contains(&"😃".to_string()));
+        assert!(
+            cands_prefix.contains(&"😊".to_string()) || cands_prefix.contains(&"😃".to_string())
+        );
 
         // Prefix symbol search *t
         let (cands_sym, _) = sugg.suggest("*t", true, true, &empty_memory);
@@ -1057,7 +1186,9 @@ mod tests {
         let (cands_gari, _) = sugg.suggest("gari", true, true, &empty_memory);
         assert!(cands_gari.contains(&"গাড়ি".to_string()));
         assert!(cands_gari.contains(&"🚗".to_string()));
-        assert!(cands_gari.contains(&"গাড়িতে".to_string()) || cands_gari.contains(&"গাড়ির".to_string()));
+        assert!(
+            cands_gari.contains(&"গাড়িতে".to_string()) || cands_gari.contains(&"গাড়ির".to_string())
+        );
 
         // 3. "taka" should suggest Taka symbol and "টাকা"
         let (cands_taka, _) = sugg.suggest("taka", true, true, &empty_memory);
@@ -1094,15 +1225,18 @@ mod tests {
         let empty_memory = HashMap::new();
 
         // When previous word is "বই", "pora" should rank "পড়া" first
-        let (cands_book, _) = sugg.suggest_with_context("pora", Some("বই"), true, true, &empty_memory);
+        let (cands_book, _) =
+            sugg.suggest_with_context("pora", Some("বই"), true, true, &empty_memory);
         assert_eq!(cands_book[0], "পড়া");
 
         // When previous word is "শার্ট", "pora" should rank "পরা" first
-        let (cands_shirt, _) = sugg.suggest_with_context("pora", Some("শার্ট"), true, true, &empty_memory);
+        let (cands_shirt, _) =
+            sugg.suggest_with_context("pora", Some("শার্ট"), true, true, &empty_memory);
         assert_eq!(cands_shirt[0], "পরা");
 
         // When previous word is "বাংলা", "bhasha" ranks "ভাষা"
-        let (cands_lang, _) = sugg.suggest_with_context("bhasha", Some("বাংলা"), true, true, &empty_memory);
+        let (cands_lang, _) =
+            sugg.suggest_with_context("bhasha", Some("বাংলা"), true, true, &empty_memory);
         assert_eq!(cands_lang[0], "ভাষা");
     }
 
@@ -1116,7 +1250,9 @@ mod tests {
 
         let next_thanks = sugg.suggest_next_words("ধন্যবাদ");
         assert!(!next_thanks.is_empty());
-        assert!(next_thanks.contains(&"ভাই".to_string()) || next_thanks.contains(&"আপনাকে".to_string()));
+        assert!(
+            next_thanks.contains(&"ভাই".to_string()) || next_thanks.contains(&"আপনাকে".to_string())
+        );
     }
 
     #[test]
@@ -1151,7 +1287,8 @@ mod tests {
         let empty_memory = HashMap::new();
 
         // 1. Multi-token context suggestion
-        let (cands_multi, _) = sugg.suggest_with_multi_context("khacchi", &["আমি", "ভাত"], true, true, &empty_memory);
+        let (cands_multi, _) =
+            sugg.suggest_with_multi_context("khacchi", &["আমি", "ভাত"], true, true, &empty_memory);
         assert!(!cands_multi.is_empty());
         assert_eq!(cands_multi[0], "খাচ্ছি");
 
@@ -1365,10 +1502,15 @@ mod tests {
         assert!(cands_tottho.contains(&"তথ্য".to_string()));
 
         let (cands_biddaloy, _) = sugg.suggest("biddaloy", true, true, &empty_memory);
-        assert!(cands_biddaloy.contains(&"বিদ্যালয়".to_string()) || cands_biddaloy.contains(&"বিদ্যালয়".to_string()));
+        assert!(
+            cands_biddaloy.contains(&"বিদ্যালয়".to_string())
+                || cands_biddaloy.contains(&"বিদ্যালয়".to_string())
+        );
 
         let (cands_jonne, _) = sugg.suggest("jonne", true, true, &empty_memory);
-        assert!(cands_jonne.contains(&"জন্য".to_string()) || cands_jonne.contains(&"জন্যে".to_string()));
+        assert!(
+            cands_jonne.contains(&"জন্য".to_string()) || cands_jonne.contains(&"জন্যে".to_string())
+        );
 
         // 4. Motion Verbs & Antastha-Ja
         let (cands_jacchi, _) = sugg.suggest("jacchi", true, true, &empty_memory);
@@ -1382,7 +1524,10 @@ mod tests {
 
         // 5. Verb Inflections
         let (cands_korchhen, _) = sugg.suggest("korchhen", true, true, &empty_memory);
-        assert!(cands_korchhen.contains(&"করছেন".to_string()) || cands_korchhen.contains(&"করছেন".to_string()));
+        assert!(
+            cands_korchhen.contains(&"করছেন".to_string())
+                || cands_korchhen.contains(&"করছেন".to_string())
+        );
 
         // 6. Sibilants
         let (cands_shadhinota, _) = sugg.suggest("shadhinota", true, true, &empty_memory);

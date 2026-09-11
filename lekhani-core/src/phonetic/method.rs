@@ -161,7 +161,9 @@ impl PhoneticMethod {
         if self.is_prediction_mode {
             None
         } else {
-            self.current_candidates.get(self.selected_index).map(|s| s.as_str())
+            self.current_candidates
+                .get(self.selected_index)
+                .map(|s| s.as_str())
         }
     }
 
@@ -170,9 +172,12 @@ impl PhoneticMethod {
         if let Some(ref committed) = text {
             let typed_len = self.buffer.len();
             if self.selected_index != index && !self.buffer.is_empty() {
-                self.candidate_memory.insert(self.buffer.clone(), committed.clone());
+                self.candidate_memory
+                    .insert(self.buffer.clone(), committed.clone());
             }
-            self.suggestion_engine.database.observe_committed_word(committed);
+            self.suggestion_engine
+                .database
+                .observe_committed_word(committed);
             self.stats.record_commit(typed_len, committed);
             self.recent_context.push(committed.clone());
             if self.recent_context.len() > 6 {

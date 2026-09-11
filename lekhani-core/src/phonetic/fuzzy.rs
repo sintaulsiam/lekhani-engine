@@ -88,7 +88,6 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("sf", &["Shf", "sf", "shf"]),
     ("shf", &["Shf", "sf"]),
     ("str", &["sTr", "ShTr", "str"]),
-
     // 2. Dental & Retroflex Stops (ত/ট, থ/ঠ, দ/ড, ধ/ঢ, খণ্ড-ত ৎ)
     ("th", &["Th", "t"]),
     ("Th", &["th", "T"]),
@@ -104,7 +103,6 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("tto", &["tZ", "tt"]),
     ("dd", &["d", "dZ", "ddh"]),
     ("ddh", &["dd", "dh"]),
-
     // 3. Rhotics, Flaps, Ri-kar & Reph (র, ড়, ঢ়, ঋ/ৃ, র্)
     ("rrh", &["rh", "R", "r"]),
     ("rr", &["r", "R"]),
@@ -141,7 +139,6 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("rdh", &["rrdh", "rrDh"]),
     ("rg", &["rrg"]),
     ("rgh", &["rrgh"]),
-
     // 4. Affricates, Semivowels & Ja-fala (জ, য, য়, ওয়, ঝ, জ্ঞ, ক্ষ)
     ("z", &["j", "y"]),
     ("j", &["z", "jh", "y"]),
@@ -160,7 +157,6 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("kkh", &["kSh", "x", "ks"]),
     ("x", &["kkh", "kSh"]),
     ("ks", &["kkh", "x"]),
-
     // 5. Aspirated vs Unaspirated Stops (ক/খ, গ/ঘ, চ/ছ, প/ফ, ব/ভ)
     ("kh", &["k"]),
     ("k", &["kh"]),
@@ -177,7 +173,6 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("bh", &["v", "b"]),
     ("v", &["bh", "b", "w"]),
     ("b", &["bh", "v"]),
-
     // 6. Vowel Height, Diphthongs & Nasals (ই/ঈ, উ/ঊ, ও/ো, ঐ/ৈ, ঔ/ৌ, ন/ণ/ঙ/ং/ঁ)
     ("ee", &["i", "I", "ii"]),
     ("ii", &["ee", "I", "i"]),
@@ -205,7 +200,6 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("ng", &["n", "Ng"]),
     ("n", &["N", "ng"]),
     ("N", &["n"]),
-
     // 7. Ja-fala & Geminate Reductions (দ্য, থ্য, ক্য, ব্য, ন্য, ল্য, ম্য, শ্য, স্য)
     ("bya", &["bZa", "bZ", "by", "be"]),
     ("byo", &["bZo", "bZ", "by", "bo"]),
@@ -235,7 +229,6 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("ddh", &["dhZ", "dhy", "dd", "dh"]),
     ("tth", &["thZ", "thy", "tt"]),
     ("tt", &["tZ", "ty", "t``", "t"]),
-
     // 8. Chandrabindu Nasalization Equivalences (চাঁদ, হাঁস, দাঁত, বাঁশ, পাঁচ)
     ("ad", &["a^d", "ad"]),
     ("as", &["a^s", "a^sh", "as"]),
@@ -340,15 +333,21 @@ mod tests {
     #[test]
     fn test_phonetic_sound_laws() {
         let s_variants = generate_phonetic_variants("shundor");
-        assert!(s_variants.iter().any(|v| v.contains("sundor") || v.contains("Shundor")));
+        assert!(s_variants
+            .iter()
+            .any(|v| v.contains("sundor") || v.contains("Shundor")));
 
         let t_variants = generate_phonetic_variants("bortoman");
-        assert!(t_variants.iter().any(|v| v.contains("borrtoman") || v.contains("borToman")));
+        assert!(t_variants
+            .iter()
+            .any(|v| v.contains("borrtoman") || v.contains("borToman")));
 
         let z_variants = generate_phonetic_variants("juddho");
         assert!(z_variants.iter().any(|v| v.contains("zuddho")));
 
         let ch_variants = generate_phonetic_variants("chesta");
-        assert!(ch_variants.iter().any(|v| v.contains("c") || v.contains("ceShTa") || v.contains("ceshTa")));
+        assert!(ch_variants
+            .iter()
+            .any(|v| v.contains("c") || v.contains("ceShTa") || v.contains("ceshTa")));
     }
 }

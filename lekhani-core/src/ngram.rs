@@ -41,7 +41,10 @@ impl UserStats {
             self.keystrokes_saved += (committed_char_count - typed_len) as u64;
         }
 
-        *self.top_words.entry(committed_text.to_string()).or_insert(0) += 1;
+        *self
+            .top_words
+            .entry(committed_text.to_string())
+            .or_insert(0) += 1;
     }
 
     /// Calculate percentage of keystrokes saved via suggestions and smart snippets
@@ -72,9 +75,8 @@ impl UserStats {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let data = serde_json::to_string_pretty(self).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-        })?;
+        let data = serde_json::to_string_pretty(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
         std::fs::write(path, data)
     }
 

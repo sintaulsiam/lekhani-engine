@@ -490,15 +490,14 @@ impl LanguageModel {
 
         for &((w1, w2), p) in BIGRAM_TRANSITIONS {
             bigrams.insert((w1, w2), p);
-            next_word_map
-                .entry(w1)
-                .or_default()
-                .push((w2, p));
+            next_word_map.entry(w1).or_default().push((w2, p));
         }
 
         // Sort next words by highest probability
         for list in next_word_map.values_mut() {
-            list.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            list.sort_unstable_by(|a, b| {
+                b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+            });
         }
 
         let mut trigrams = HashMap::with_capacity(TRIGRAM_TRANSITIONS.len() + 50);
@@ -520,11 +519,52 @@ impl LanguageModel {
 
     /// Calculate interpolated conditional probability P(word | w_t-2, w_t-1) with 0 allocations
     pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
-        let clean_word = word.trim_matches(|c: char| c.is_ascii_punctuation() || c == '।' || c == '—' || c == '‘' || c == '’' || c == '“' || c == '”' || c == '\'' || c == '"' || c == ',');
-        let clean_w1 = prev1.map(|w| w.trim_matches(|c: char| c.is_ascii_punctuation() || c == '।' || c == '—' || c == '‘' || c == '’' || c == '“' || c == '”' || c == '\'' || c == '"' || c == ','));
-        let clean_w2 = prev2.map(|w| w.trim_matches(|c: char| c.is_ascii_punctuation() || c == '।' || c == '—' || c == '‘' || c == '’' || c == '“' || c == '”' || c == '\'' || c == '"' || c == ','));
+        let clean_word = word.trim_matches(|c: char| {
+            c.is_ascii_punctuation()
+                || c == '।'
+                || c == '—'
+                || c == '‘'
+                || c == '’'
+                || c == '“'
+                || c == '”'
+                || c == '\''
+                || c == '"'
+                || c == ','
+        });
+        let clean_w1 = prev1.map(|w| {
+            w.trim_matches(|c: char| {
+                c.is_ascii_punctuation()
+                    || c == '।'
+                    || c == '—'
+                    || c == '‘'
+                    || c == '’'
+                    || c == '“'
+                    || c == '”'
+                    || c == '\''
+                    || c == '"'
+                    || c == ','
+            })
+        });
+        let clean_w2 = prev2.map(|w| {
+            w.trim_matches(|c: char| {
+                c.is_ascii_punctuation()
+                    || c == '।'
+                    || c == '—'
+                    || c == '‘'
+                    || c == '’'
+                    || c == '“'
+                    || c == '”'
+                    || c == '\''
+                    || c == '"'
+                    || c == ','
+            })
+        });
 
-        let unigram_p = self.unigrams.get(clean_word).copied().unwrap_or(self.unigram_floor);
+        let unigram_p = self
+            .unigrams
+            .get(clean_word)
+            .copied()
+            .unwrap_or(self.unigram_floor);
         let mut score = self.lambda1 * (10.0f32.powf(unigram_p));
 
         if let Some(w1) = clean_w1 {
@@ -545,7 +585,10 @@ impl LanguageModel {
     /// Query the most likely continuations given previous word
     pub fn get_next_words(&self, previous_word: &str, limit: usize) -> Vec<String> {
         if let Some(list) = self.next_word_map.get(previous_word) {
-            list.iter().take(limit).map(|(w, _)| (*w).to_string()).collect()
+            list.iter()
+                .take(limit)
+                .map(|(w, _)| (*w).to_string())
+                .collect()
         } else {
             Vec::new()
         }

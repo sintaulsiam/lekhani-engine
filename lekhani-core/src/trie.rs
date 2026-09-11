@@ -31,7 +31,10 @@ impl PrefixTrie {
         if !self.is_sorted {
             self.ensure_sorted();
         }
-        match self.entries.binary_search_by(|e| e.0.as_str().cmp(candidate.as_str())) {
+        match self
+            .entries
+            .binary_search_by(|e| e.0.as_str().cmp(candidate.as_str()))
+        {
             Ok(idx) => {
                 if frequency > self.entries[idx].1 {
                     self.entries[idx].1 = frequency;
@@ -59,7 +62,8 @@ impl PrefixTrie {
     /// Ensure internal word list is sorted and deduplicated (keeping highest frequency)
     pub fn ensure_sorted(&mut self) {
         if !self.is_sorted {
-            self.entries.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| b.1.cmp(&a.1)));
+            self.entries
+                .sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| b.1.cmp(&a.1)));
             self.entries.dedup_by(|a, b| a.0 == b.0);
             self.is_sorted = true;
         }
@@ -85,7 +89,9 @@ impl PrefixTrie {
 
     /// Check if dictionary contains exact word
     pub fn contains_exact(&self, key: &str) -> bool {
-        self.entries.binary_search_by(|e| e.0.as_str().cmp(key)).is_ok()
+        self.entries
+            .binary_search_by(|e| e.0.as_str().cmp(key))
+            .is_ok()
     }
 
     /// Find all candidates whose key starts with the given prefix, prioritized by frequency and length
@@ -119,7 +125,11 @@ impl PrefixTrie {
                 .then_with(|| a.0.cmp(&b.0))
         });
 
-        matched.into_iter().take(limit).map(|e| e.0.clone()).collect()
+        matched
+            .into_iter()
+            .take(limit)
+            .map(|e| e.0.clone())
+            .collect()
     }
 
     pub fn len(&self) -> usize {

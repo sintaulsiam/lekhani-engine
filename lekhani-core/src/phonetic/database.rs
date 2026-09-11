@@ -1,11 +1,11 @@
 //! Phonetic Database & Trie Dictionary Engine
 
-use hashbrown::HashMap;
-use std::path::Path;
 use crate::emojis::EmojiMap;
 use crate::phonetic::AutonomousLearner;
 use crate::snippets::SnippetManager;
 use crate::trie::PrefixTrie;
+use hashbrown::HashMap;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct PhoneticDatabase {
@@ -81,21 +81,30 @@ impl PhoneticDatabase {
     }
 
     /// Load database from a directory containing dictionary.json, suffix.json, autocorrect.json
-    pub fn load_from_dir<P: AsRef<Path>>(&mut self, dir: P) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn load_from_dir<P: AsRef<Path>>(
+        &mut self,
+        dir: P,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let dir = dir.as_ref();
-        
+
         // 1. Fast Flat Binary Dictionary (or JSON fallback)
         let dict_bin_path = dir.join("dictionary.bin");
         if dict_bin_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&dict_bin_path) {
-                let words: Vec<String> = content.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+                let words: Vec<String> = content
+                    .lines()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
                 self.trie.insert_bulk(words);
             }
         } else {
             let dict_path = dir.join("dictionary.json");
             if dict_path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&dict_path) {
-                    if let Ok(raw_map) = serde_json::from_str::<HashMap<String, Vec<String>>>(&content) {
+                    if let Ok(raw_map) =
+                        serde_json::from_str::<HashMap<String, Vec<String>>>(&content)
+                    {
                         let mut words = Vec::with_capacity(160000);
                         for (_k, v_list) in raw_map {
                             words.extend(v_list);
@@ -145,6 +154,17 @@ impl PhoneticDatabase {
                 }
             }
         }
+    }
+
+    /// Save user-specific autocorrect file
+    pub fn save_user_autocorrect<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let json = serde_json::to_string_pretty(&self.user_autocorrect)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        std::fs::write(path, json)
     }
 
     /// Load user-learned vocabulary
@@ -393,7 +413,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("ওকে", 9100),
     ("কিভাবে", 8600),
     ("কবে", 8500),
-
     // Pronoun Inflections
     ("আমাকে", 9300),
     ("আমার", 9500),
@@ -411,7 +430,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("কারো", 8700),
     ("সবার", 8900),
     ("সবাইকে", 8900),
-
     // Common Verbs & Conjugations
     ("পড়া", 9000),
     ("পরা", 8800),
@@ -501,7 +519,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("পরা", 9100),
     ("পরছি", 9000),
     ("পরব", 9000),
-
     // Common Nouns
     ("বাংলাদেশ", 9800),
     ("ঢাকা", 9500),
@@ -648,7 +665,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("বিড়াল", 8700),
     ("কুকুর", 8600),
     ("পাখি", 8900),
-
     // Adjectives, Adverbs, Connectives & Particles
     ("ভালো", 9600),
     ("সুন্দর", 9400),
@@ -695,7 +711,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("স্বাগতম", 8900),
     ("শুভেচ্ছা", 9000),
     ("অভিনন্দন", 8800),
-
     // High-Frequency Conjuncts (যুক্তবর্ণ)
     ("কষ্ট", 9500),
     ("নষ্ট", 9300),
@@ -757,7 +772,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("পরিষ্কার", 9400),
     ("পুরস্কার", 9400),
     ("আবিষ্কার", 9300),
-
     // Chandrabindu Words (ঁ)
     ("চাঁদ", 9400),
     ("দাঁত", 9300),
@@ -771,7 +785,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("ঝাঁঝ", 8900),
     ("গাঁজা", 8900),
     ("কাঁচ", 9000),
-
     // Khanda-Ta & Hasanta (ৎ)
     ("হঠাৎ", 9400),
     ("উৎসব", 9300),
@@ -782,7 +795,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("বিখ্যাত", 9200),
     ("সৎ", 9100),
     ("তৎপর", 9000),
-
     // Bengali Glide & Frequent Verb Endings
     ("খাওয়া", 9400),
     ("দেওয়া", 9400),
@@ -800,7 +812,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("আপু", 9300),
     ("ভাবি", 9100),
     ("শুভ", 9400),
-
     // Reph & Motion Verbs
     ("বর্তমান", 9500),
     ("অর্থনৈতিক", 9400),
@@ -846,7 +857,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("অনুযায়ী", 9400),
     ("অনুযায়ী", 9400),
     ("যোগ্য", 9300),
-
     // Geminates & Ja-fala
     ("বিদ্যালয়", 9400),
     ("বিদ্যালয়", 9400),
@@ -858,7 +868,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("জন্য", 9600),
     ("জন্যে", 9500),
     ("ক্ষেত্র", 9400),
-
     // Science, Environment & Law
     ("কৃত্রিম", 9300),
     ("মাতৃভূমি", 9300),
@@ -885,7 +894,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("উল্টো", 9200),
     ("ঘণ্টা", 9300),
     ("ঘন্টা", 9300),
-
     // Sibilant Standard (Bangla Academy প্রমিত স)
     ("সরকার", 9600),
     ("সরকারি", 9500),
@@ -920,7 +928,6 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("অবলোকন", 9100),
     ("বিশেষজ্ঞ", 9300),
     ("বিশেষজ্ঞরা", 9300),
-
     // Suffix-inflected forms
     ("বইটা", 9300),
     ("বইটি", 9300),

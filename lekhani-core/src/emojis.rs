@@ -40,7 +40,11 @@ impl EmojiMap {
         add_emoji!("$$", "৳");
         add_emoji!("*dari*", "।", ["dari", "darhi", "দাড়ি", "দাড়ি"]);
         add_emoji!("*ddari*", "॥");
-        add_emoji!("*hasant*", "্", ["hasant", "hasanta", "hosonto", "hoshonto", "হসন্ত"]);
+        add_emoji!(
+            "*hasant*",
+            "্",
+            ["hasant", "hasanta", "hosonto", "hoshonto", "হসন্ত"]
+        );
         add_emoji!("*hosonto*", "্");
         add_emoji!("*hoshonto*", "্");
         add_emoji!("*hasanta*", "্");
@@ -50,18 +54,30 @@ impl EmojiMap {
         add_emoji!("*khandata*", "ৎ");
         add_emoji!("*khanda_ta*", "ৎ");
         add_emoji!("*khandota*", "ৎ");
-        add_emoji!("*anusvara*", "ং", ["anusvara", "anushbar", "onushbar", "অনুস্বার"]);
+        add_emoji!(
+            "*anusvara*",
+            "ং",
+            ["anusvara", "anushbar", "onushbar", "অনুস্বার"]
+        );
         add_emoji!("*anusvar*", "ং");
         add_emoji!("*anushbar*", "ং");
         add_emoji!("*onushbar*", "ং");
         add_emoji!("*onushor*", "ং");
         add_emoji!("*anushar*", "ং");
-        add_emoji!("*visarga*", "ঃ", ["visarga", "bishorgo", "bisharga", "বিসর্গ"]);
+        add_emoji!(
+            "*visarga*",
+            "ঃ",
+            ["visarga", "bishorgo", "bisharga", "বিসর্গ"]
+        );
         add_emoji!("*visarg*", "ঃ");
         add_emoji!("*bishorgo*", "ঃ");
         add_emoji!("*bisharga*", "ঃ");
         add_emoji!("*bisarga*", "ঃ");
-        add_emoji!("*candrabindu*", "ঁ", ["candrabindu", "chandrabindu", "chondrobindu", "চন্দ্রবিন্দু"]);
+        add_emoji!(
+            "*candrabindu*",
+            "ঁ",
+            ["candrabindu", "chandrabindu", "chondrobindu", "চন্দ্রবিন্দু"]
+        );
         add_emoji!("*chandrabindu*", "ঁ");
         add_emoji!("*chondrobindu*", "ঁ");
         add_emoji!("*chandra*", "ঁ");
@@ -73,10 +89,26 @@ impl EmojiMap {
         add_emoji!("*ganda*", "𑜰");
 
         // 2. Bengali Named Words & Cultural Expressions
-        add_emoji!(":bhalobasha:", "❤️", ["bhalobasha", "valobasha", "bhalobasa", "ভালোবাসা", "ভালবাসা", "love", "heart"]);
+        add_emoji!(
+            ":bhalobasha:",
+            "❤️",
+            [
+                "bhalobasha",
+                "valobasha",
+                "bhalobasa",
+                "ভালোবাসা",
+                "ভালবাসা",
+                "love",
+                "heart"
+            ]
+        );
         add_emoji!(":valobasha:", "❤️");
         add_emoji!(":prem:", "💖", ["prem", "প্রেম", "crush"]);
-        add_emoji!(":pranam:", "🙏", ["pranam", "প্রণাম", "adab", "আদাব", "namaskar", "নমস্কার", "pray"]);
+        add_emoji!(
+            ":pranam:",
+            "🙏",
+            ["pranam", "প্রণাম", "adab", "আদাব", "namaskar", "নমস্কার", "pray"]
+        );
         add_emoji!(":salam:", "🤝", ["salam", "সালাম", "handshake"]);
         add_emoji!(":adab:", "🙏");
         add_emoji!(":shurjo:", "☀️", ["shurjo", "surjo", "সূর্য", "sun", "sunny"]);
@@ -91,11 +123,39 @@ impl EmojiMap {
         add_emoji!(":agun:", "🔥");
         add_emoji!(":hasukhi:", "😊", ["hasukhi", "khushi", "খুশি", "happy"]);
         add_emoji!(":hashi:", "😄", ["hashi", "hasi", "হাসি", "smile", "laugh"]);
-        add_emoji!(":kanna:", "😭", ["kanna", "কান্না", "dukkho", "দুঃখ", "cry", "sob"]);
+        add_emoji!(
+            ":kanna:",
+            "😭",
+            ["kanna", "কান্না", "dukkho", "দুঃখ", "cry", "sob"]
+        );
         add_emoji!(":thik:", "✅", ["thik", "ঠিক", "yes", "correct", "check"]);
         add_emoji!(":bhul:", "❌", ["bhul", "ভুল", "no", "wrong", "cross"]);
-        add_emoji!(":shabash:", "👍", ["shabash", "sabash", "সাবাশ", "bhalo", "like", "good", "thumbsup"]);
-        add_emoji!(":durbar:", "⚡", ["durbar", "duronto", "দুর্বার", "bijli", "বিজলী", "zap", "flash"]);
+        add_emoji!(
+            ":shabash:",
+            "👍",
+            [
+                "shabash",
+                "sabash",
+                "সাবাশ",
+                "bhalo",
+                "like",
+                "good",
+                "thumbsup"
+            ]
+        );
+        add_emoji!(
+            ":durbar:",
+            "⚡",
+            [
+                "durbar",
+                "duronto",
+                "দুর্বার",
+                "bijli",
+                "বিজলী",
+                "zap",
+                "flash"
+            ]
+        );
         add_emoji!(":bijli:", "⚡");
         add_emoji!(":chokh:", "👀", ["chokh", "চোখ", "eyes", "look"]);
         add_emoji!(":machh:", "🐟", ["mach", "machh", "মাছ", "fish"]);
@@ -114,7 +174,11 @@ impl EmojiMap {
         add_emoji!(":dudh:", "🥛", ["dudh", "দুধ", "milk"]);
         add_emoji!(":mishti:", "🍬", ["mishti", "মিষ্টি", "sweet", "candy"]);
         add_emoji!(":boishakh:", "🎭", ["boishakh", "বৈশাখ", "mela", "মেলা"]);
-        add_emoji!(":potaka:", "🇧🇩", ["potaka", "পতাকা", "bangladesh", "বাংলাদেশ", "bd", "flag_bd"]);
+        add_emoji!(
+            ":potaka:",
+            "🇧🇩",
+            ["potaka", "পতাকা", "bangladesh", "বাংলাদেশ", "bd", "flag_bd"]
+        );
         add_emoji!(":bangladesh:", "🇧🇩");
         add_emoji!(":bd:", "🇧🇩");
         add_emoji!(":biral:", "🐱", ["biral", "বিড়াল", "বিড়াল", "cat", "kitty"]);
@@ -126,7 +190,11 @@ impl EmojiMap {
         add_emoji!(":alo:", "💡", ["alo", "আলো", "bulb", "idea", "light"]);
         add_emoji!(":ghori:", "⏰", ["ghori", "ঘড়ি", "ঘড়ি", "clock", "time"]);
         add_emoji!(":phone:", "📱", ["phone", "ফোন", "mobile", "মোবাইল"]);
-        add_emoji!(":daktar:", "🩺", ["daktar", "ডাক্তার", "doctor", "hospital", "হাসপাতাল"]);
+        add_emoji!(
+            ":daktar:",
+            "🩺",
+            ["daktar", "ডাক্তার", "doctor", "hospital", "হাসপাতাল"]
+        );
         add_emoji!(":khela:", "⚽", ["khela", "খেলা", "football", "soccer"]);
         add_emoji!(":cricket:", "🏏", ["cricket", "ক্রিকেট"]);
         add_emoji!(":gaan:", "🎵", ["gan", "gaan", "গান", "music", "song"]);
@@ -280,7 +348,8 @@ impl EmojiMap {
         add_emoji!("O:)", "😇");
         add_emoji!("B-)", "😎");
 
-        let mut sorted_entries: Vec<(String, String)> = map.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        let mut sorted_entries: Vec<(String, String)> =
+            map.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         sorted_entries.sort_by(|a, b| a.0.cmp(&b.0));
 
         Self {

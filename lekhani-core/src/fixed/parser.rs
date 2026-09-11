@@ -17,13 +17,21 @@ impl FixedLayoutParser {
         Self::default()
     }
 
-    pub fn from_json(json: &Value) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn from_json(json: &Value) -> Self {
         let mut parser = Self::new();
-        
+
         if let Some(info) = json.get("info") {
             if let Some(layout_info) = info.get("layout") {
-                parser.name = layout_info.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
-                parser.version = layout_info.get("version").and_then(|v| v.as_str()).unwrap_or("1.0").to_string();
+                parser.name = layout_info
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown")
+                    .to_string();
+                parser.version = layout_info
+                    .get("version")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("1.0")
+                    .to_string();
             }
         }
 
@@ -34,13 +42,15 @@ impl FixedLayoutParser {
                         continue;
                     }
                     if let Some((keycode, modifier)) = parse_key_str(key_str) {
-                        parser.table.insert((keycode, modifier), val_str.to_string());
+                        parser
+                            .table
+                            .insert((keycode, modifier), val_str.to_string());
                     }
                 }
             }
         }
 
-        Ok(parser)
+        parser
     }
 
     pub fn get_char(&self, keycode: u16, modifier: KeyModifier) -> Option<&str> {

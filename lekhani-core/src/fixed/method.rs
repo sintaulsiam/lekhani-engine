@@ -34,16 +34,12 @@ impl FixedMethod {
 
     pub fn with_layout(layout: &Value) -> Self {
         let mut m = Self::new();
-        if let Ok(parser) = FixedLayoutParser::from_json(layout) {
-            m.parser = parser;
-        }
+        m.parser = FixedLayoutParser::from_json(layout);
         m
     }
 
     pub fn set_layout(&mut self, layout: &Value) {
-        if let Ok(parser) = FixedLayoutParser::from_json(layout) {
-            self.parser = parser;
-        }
+        self.parser = FixedLayoutParser::from_json(layout);
     }
 
     pub fn process_key(&mut self, keycode: u16, modifier_mask: u8) -> Option<String> {
@@ -53,7 +49,10 @@ impl FixedMethod {
             KeyModifier::Normal
         };
 
-        let val = self.parser.get_char(keycode, modifier).map(|s| s.to_string())
+        let val = self
+            .parser
+            .get_char(keycode, modifier)
+            .map(|s| s.to_string())
             .or_else(|| {
                 if self.numberpad {
                     match keycode {
@@ -104,7 +103,9 @@ impl FixedMethod {
         if let Some(first_char) = value.chars().next() {
             // 3. Kar insertion & Automatic Vowel Forming
             if first_char.is_kar() {
-                if self.auto_vowel && (self.buffer.is_empty() || rmc.is_vowel() || MARKS.contains(rmc)) {
+                if self.auto_vowel
+                    && (self.buffer.is_empty() || rmc.is_vowel() || MARKS.contains(rmc))
+                {
                     match first_char {
                         B_AA_KAR => self.buffer.push(B_AA),
                         B_I_KAR => self.buffer.push(B_I),
@@ -126,20 +127,53 @@ impl FixedMethod {
                     return;
                 } else if rmc == B_HASANTA {
                     match first_char {
-                        B_AA_KAR => { self.buffer.pop(); self.buffer.push(B_AA); }
-                        B_I_KAR => { self.buffer.pop(); self.buffer.push(B_I); }
-                        B_II_KAR => { self.buffer.pop(); self.buffer.push(B_II); }
-                        B_U_KAR => { self.buffer.pop(); self.buffer.push(B_U); }
-                        B_UU_KAR => { self.buffer.pop(); self.buffer.push(B_UU); }
-                        B_RRI_KAR => { self.buffer.pop(); self.buffer.push(B_RRI); }
-                        B_E_KAR => { self.buffer.pop(); self.buffer.push(B_E); }
-                        B_OI_KAR => { self.buffer.pop(); self.buffer.push(B_OI); }
-                        B_O_KAR => { self.buffer.pop(); self.buffer.push(B_O); }
-                        B_OU_KAR => { self.buffer.pop(); self.buffer.push(B_OU); }
+                        B_AA_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_AA);
+                        }
+                        B_I_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_I);
+                        }
+                        B_II_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_II);
+                        }
+                        B_U_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_U);
+                        }
+                        B_UU_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_UU);
+                        }
+                        B_RRI_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_RRI);
+                        }
+                        B_E_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_E);
+                        }
+                        B_OI_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_OI);
+                        }
+                        B_O_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_O);
+                        }
+                        B_OU_KAR => {
+                            self.buffer.pop();
+                            self.buffer.push(B_OU);
+                        }
                         _ => self.buffer.push(first_char),
                     }
                     return;
-                } else if self.traditional_kar && rmc.is_pure_consonant() && is_ligature_kar(first_char) {
+                } else if self.traditional_kar
+                    && rmc.is_pure_consonant()
+                    && is_ligature_kar(first_char)
+                {
                     self.buffer.push(ZWNJ);
                     self.buffer.push(first_char);
                     return;
@@ -204,7 +238,12 @@ impl FixedMethod {
         }
 
         let suffix: String = self.buffer.chars().skip(len - step).collect();
-        let truncate_len = self.buffer.chars().take(len - step).map(|c| c.len_utf8()).sum();
+        let truncate_len = self
+            .buffer
+            .chars()
+            .take(len - step)
+            .map(|c| c.len_utf8())
+            .sum();
         self.buffer.truncate(truncate_len);
         self.buffer.push(B_R);
         self.buffer.push(B_HASANTA);
@@ -262,7 +301,8 @@ mod tests {
     #[test]
     fn test_unijoy_layout() {
         let unijoy_raw = include_str!("../../../../data/layouts/Unijoy.json");
-        let val: serde_json::Value = serde_json::from_str(unijoy_raw).expect("Unijoy JSON parse failed");
+        let val: serde_json::Value =
+            serde_json::from_str(unijoy_raw).expect("Unijoy JSON parse failed");
         let mut method = FixedMethod::with_layout(&val);
 
         // 'h' = ব, 'f' = া, 'v' = র, 'f' = া (বাংলা / বারা)

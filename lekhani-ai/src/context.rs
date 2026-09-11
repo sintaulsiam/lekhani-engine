@@ -15,11 +15,7 @@ impl ContextScorer {
     }
 
     /// Score and re-rank candidate list based on multi-token preceding context
-    pub fn rank_candidates(
-        &self,
-        context: &[&str],
-        candidates: &[String],
-    ) -> Vec<String> {
+    pub fn rank_candidates(&self, context: &[&str], candidates: &[String]) -> Vec<String> {
         if candidates.is_empty() {
             return Vec::new();
         }
@@ -48,11 +44,12 @@ impl ContextScorer {
             .collect();
 
         // Sort by total score descending, preserving stable order on close ties
-        scored_candidates.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1).unwrap_or(a.2.cmp(&b.2))
-        });
+        scored_candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(a.2.cmp(&b.2)));
 
-        scored_candidates.into_iter().map(|(cand, _, _)| cand).collect()
+        scored_candidates
+            .into_iter()
+            .map(|(cand, _, _)| cand)
+            .collect()
     }
 
     /// Compute context score boost for homophone pairs

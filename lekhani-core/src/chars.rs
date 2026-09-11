@@ -121,16 +121,43 @@ impl BengaliCharExt for char {
     fn is_vowel(&self) -> bool {
         matches!(
             *self,
-            B_A | B_AA | B_I | B_II | B_U | B_UU | B_RRI | B_E | B_OI | B_O | B_OU |
-            B_AA_KAR | B_I_KAR | B_II_KAR | B_U_KAR | B_UU_KAR | B_RRI_KAR | B_E_KAR | B_OI_KAR | B_O_KAR | B_OU_KAR
+            B_A | B_AA
+                | B_I
+                | B_II
+                | B_U
+                | B_UU
+                | B_RRI
+                | B_E
+                | B_OI
+                | B_O
+                | B_OU
+                | B_AA_KAR
+                | B_I_KAR
+                | B_II_KAR
+                | B_U_KAR
+                | B_UU_KAR
+                | B_RRI_KAR
+                | B_E_KAR
+                | B_OI_KAR
+                | B_O_KAR
+                | B_OU_KAR
         )
     }
 
     fn is_kar(&self) -> bool {
         matches!(
             *self,
-            B_AA_KAR | B_I_KAR | B_II_KAR | B_U_KAR | B_UU_KAR | B_RRI_KAR |
-            B_VOCALIC_RR | B_E_KAR | B_OI_KAR | B_O_KAR | B_OU_KAR
+            B_AA_KAR
+                | B_I_KAR
+                | B_II_KAR
+                | B_U_KAR
+                | B_UU_KAR
+                | B_RRI_KAR
+                | B_VOCALIC_RR
+                | B_E_KAR
+                | B_OI_KAR
+                | B_O_KAR
+                | B_OU_KAR
         )
     }
 

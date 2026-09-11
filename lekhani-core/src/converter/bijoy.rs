@@ -181,11 +181,13 @@ fn post_process_bijoy_to_unicode(input: &str) -> String {
     let mut i = 0;
     while i + 1 < chars.len() {
         // Fix misplaced E-Kar / I-Kar (if kar is before consonant, swap them)
-        if (chars[i] == 'ি' || chars[i] == 'ে' || chars[i] == 'ৈ') && is_consonant(chars[i + 1]) {
+        if (chars[i] == 'ি' || chars[i] == 'ে' || chars[i] == 'ৈ') && is_consonant(chars[i + 1])
+        {
             chars.swap(i, i + 1);
         }
         // Fix Ref (্ + র at end of consonant)
-        if chars[i] == '©' { // Bijoy Reph
+        if chars[i] == '©' {
+            // Bijoy Reph
             chars[i] = 'র';
             chars.insert(i + 1, '্');
         }
