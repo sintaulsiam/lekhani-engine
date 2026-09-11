@@ -252,10 +252,10 @@ pub const TRIGRAM_TRANSITIONS: &[((&str, &str, &str), f32)] = &[
 
 #[derive(Debug, Clone)]
 pub struct LanguageModel {
-    unigrams: HashMap<String, f32>,
-    bigrams: HashMap<(String, String), f32>,
-    trigrams: HashMap<(String, String, String), f32>,
-    next_word_map: HashMap<String, Vec<(String, f32)>>,
+    unigrams: HashMap<&'static str, f32>,
+    bigrams: HashMap<(&'static str, &'static str), f32>,
+    trigrams: HashMap<(&'static str, &'static str, &'static str), f32>,
+    next_word_map: HashMap<&'static str, Vec<(&'static str, f32)>>,
     lambda1: f32,
     lambda2: f32,
     lambda3: f32,
@@ -272,18 +272,18 @@ impl LanguageModel {
     pub fn new() -> Self {
         let mut unigrams = HashMap::with_capacity(UNIGRAM_LOG_PROBS.len() + 100);
         for &(w, p) in UNIGRAM_LOG_PROBS {
-            unigrams.insert(w.to_string(), p);
+            unigrams.insert(w, p);
         }
 
         let mut bigrams = HashMap::with_capacity(BIGRAM_TRANSITIONS.len() + 100);
-        let mut next_word_map: HashMap<String, Vec<(String, f32)>> = HashMap::new();
+        let mut next_word_map: HashMap<&'static str, Vec<(&'static str, f32)>> = HashMap::new();
 
         for &((w1, w2), p) in BIGRAM_TRANSITIONS {
-            bigrams.insert((w1.to_string(), w2.to_string()), p);
+            bigrams.insert((w1, w2), p);
             next_word_map
-                .entry(w1.to_string())
+                .entry(w1)
                 .or_default()
-                .push((w2.to_string(), p));
+                .push((w2, p));
         }
 
         // Sort next words by highest probability
@@ -293,7 +293,7 @@ impl LanguageModel {
 
         let mut trigrams = HashMap::with_capacity(TRIGRAM_TRANSITIONS.len() + 50);
         for &((w1, w2, w3), p) in TRIGRAM_TRANSITIONS {
-            trigrams.insert((w1.to_string(), w2.to_string(), w3.to_string()), p);
+            trigrams.insert((w1, w2, w3), p);
         }
 
         Self {
@@ -308,18 +308,18 @@ impl LanguageModel {
         }
     }
 
-    /// Calculate interpolated conditional probability P(word | w_t-2, w_t-1)
+    /// Calculate interpolated conditional probability P(word | w_t-2, w_t-1) with 0 allocations
     pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
         let unigram_p = self.unigrams.get(word).copied().unwrap_or(self.unigram_floor);
         let mut score = self.lambda1 * (10.0f32.powf(unigram_p));
 
         if let Some(w1) = prev1 {
-            if let Some(&bi_p) = self.bigrams.get(&(w1.to_string(), word.to_string())) {
+            if let Some(&bi_p) = self.bigrams.get(&(w1, word)) {
                 score += self.lambda2 * (10.0f32.powf(bi_p));
             }
 
             if let Some(w2) = prev2 {
-                if let Some(&tri_p) = self.trigrams.get(&(w2.to_string(), w1.to_string(), word.to_string())) {
+                if let Some(&tri_p) = self.trigrams.get(&(w2, w1, word)) {
                     score += self.lambda3 * (10.0f32.powf(tri_p));
                 }
             }
@@ -331,7 +331,7 @@ impl LanguageModel {
     /// Query the most likely continuations given previous word
     pub fn get_next_words(&self, previous_word: &str, limit: usize) -> Vec<String> {
         if let Some(list) = self.next_word_map.get(previous_word) {
-            list.iter().take(limit).map(|(w, _)| w.clone()).collect()
+            list.iter().take(limit).map(|(w, _)| (*w).to_string()).collect()
         } else {
             Vec::new()
         }
