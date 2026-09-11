@@ -168,6 +168,20 @@ impl InputSession {
         self.fixed.reset();
     }
 
+    pub fn is_prediction_mode(&self) -> bool {
+        match self.active_layout_type {
+            ActiveLayoutType::Phonetic => self.phonetic.is_prediction_mode,
+            ActiveLayoutType::Fixed => false,
+        }
+    }
+
+    pub fn populate_predictions(&mut self) -> bool {
+        match self.active_layout_type {
+            ActiveLayoutType::Phonetic => self.phonetic.populate_predictions(),
+            ActiveLayoutType::Fixed => false,
+        }
+    }
+
     pub fn reset(&mut self) {
         self.phonetic.reset();
         self.fixed.reset();
@@ -178,5 +192,38 @@ impl InputSession {
             ActiveLayoutType::Phonetic => self.phonetic.is_active(),
             ActiveLayoutType::Fixed => self.fixed.is_active(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::keycodes::*;
+
+    #[test]
+    fn test_zero_preedit_next_word_predictions() {
+        let mut session = InputSession::new();
+        // Type "ami" (VC_A=30, VC_M=50, VC_I=23)
+        session.process_key(VC_A, 0);
+        session.process_key(VC_M, 0);
+        session.process_key(VC_I, 0);
+        assert!(session.is_active());
+
+        // Commit "আমি"
+        let committed = session.commit(0);
+        assert_eq!(committed, Some("আমি".to_string()));
+
+        // Populate next-word predictions in zero-preedit state
+        let has_preds = session.populate_predictions();
+        assert!(has_preds);
+        assert!(session.is_prediction_mode());
+        assert!(session.is_active());
+        let cands = session.get_candidates();
+        assert!(!cands.is_empty());
+
+        // Selecting candidate index 1 (e.g. "তোমাকে") commits it
+        let next_committed = session.commit(1);
+        assert!(next_committed.is_some());
+        assert!(!session.is_prediction_mode());
     }
 }

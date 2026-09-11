@@ -20,6 +20,7 @@ pub struct PhoneticMethod {
     pub last_committed_word: Option<String>,
     pub recent_context: Vec<String>,
     pub stats: UserStats,
+    pub is_prediction_mode: bool,
 }
 
 impl PhoneticMethod {
@@ -35,6 +36,7 @@ impl PhoneticMethod {
             last_committed_word: None,
             recent_context: Vec::with_capacity(8),
             stats: UserStats::new(),
+            is_prediction_mode: false,
         }
     }
 
@@ -44,7 +46,30 @@ impl PhoneticMethod {
         m
     }
 
+    pub fn populate_predictions(&mut self) -> bool {
+        if !self.buffer.is_empty() {
+            return false;
+        }
+        if let Some(ref last) = self.last_committed_word {
+            let preds = self.suggestion_engine.suggest_next_words(last);
+            if !preds.is_empty() {
+                self.current_candidates = preds;
+                self.selected_index = 0;
+                self.is_prediction_mode = true;
+                return true;
+            }
+        }
+        self.is_prediction_mode = false;
+        self.current_candidates.clear();
+        false
+    }
+
     pub fn process_key(&mut self, key: u16, _modifier: u8) -> bool {
+        if self.is_prediction_mode {
+            self.is_prediction_mode = false;
+            self.current_candidates.clear();
+            self.selected_index = 0;
+        }
         if let Some(ch) = keycode_to_char(key) {
             self.buffer.push(ch);
             self.update_suggestions();
@@ -55,6 +80,12 @@ impl PhoneticMethod {
     }
 
     pub fn process_backspace(&mut self) -> bool {
+        if self.is_prediction_mode {
+            self.is_prediction_mode = false;
+            self.current_candidates.clear();
+            self.selected_index = 0;
+            return false;
+        }
         if !self.buffer.is_empty() {
             self.buffer.pop();
             if !self.buffer.is_empty() {
@@ -117,7 +148,11 @@ impl PhoneticMethod {
     }
 
     pub fn get_current_candidate(&self) -> Option<&str> {
-        self.current_candidates.get(self.selected_index).map(|s| s.as_str())
+        if self.is_prediction_mode {
+            None
+        } else {
+            self.current_candidates.get(self.selected_index).map(|s| s.as_str())
+        }
     }
 
     pub fn commit(&mut self, index: usize) -> Option<String> {
@@ -143,6 +178,7 @@ impl PhoneticMethod {
         self.buffer.clear();
         self.current_candidates.clear();
         self.selected_index = 0;
+        self.is_prediction_mode = false;
     }
 
     pub fn clear_context(&mut self) {
@@ -152,7 +188,7 @@ impl PhoneticMethod {
     }
 
     pub fn is_active(&self) -> bool {
-        !self.buffer.is_empty()
+        !self.buffer.is_empty() || self.is_prediction_mode
     }
 }
 
