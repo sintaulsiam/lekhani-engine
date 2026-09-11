@@ -91,11 +91,11 @@ impl PhoneticSuggestion {
         }
     }
 
-    /// Generate ranked candidates for typed term with optional previous word context
-    pub fn suggest_with_context(
+    /// Generate ranked candidates for typed term with multi-token preceding context
+    pub fn suggest_with_multi_context(
         &mut self,
         term: &str,
-        previous_word: Option<&str>,
+        context: &[&str],
         include_english: bool,
         use_dictionary: bool,
         candidate_memory: &HashMap<String, String>,
@@ -108,7 +108,7 @@ impl PhoneticSuggestion {
         let cache_key = format!(
             "{}:{}:{}:{}",
             term,
-            previous_word.unwrap_or(""),
+            context.join(" "),
             include_english,
             use_dictionary
         );
@@ -342,13 +342,14 @@ impl PhoneticSuggestion {
             candidates.push(term.to_string());
         }
 
-        // 15. Contextual Homophone Re-Ranking
-        if let Some(prev) = previous_word {
+        // 15. Contextual Homophone & Deep AI Multi-Token Re-Ranking
+        if !context.is_empty() {
+            let prev = context.last().copied();
             // Check if any candidate has a strong homophone boost
             let mut best_boost = 0;
             let mut best_idx = None;
             for (idx, cand) in candidates.iter().enumerate() {
-                let boost = Self::score_contextual_homophone(Some(prev), cand);
+                let boost = Self::score_contextual_homophone(prev, cand);
                 if boost > best_boost {
                     best_boost = boost;
                     best_idx = Some(idx);
@@ -359,6 +360,8 @@ impl PhoneticSuggestion {
                     let boosted = candidates.remove(idx);
                     candidates.insert(0, boosted);
                 }
+            } else if use_dictionary && candidates.len() > 1 {
+                candidates = self.ai_context.rank_candidates(context, &candidates);
             }
         }
 
@@ -425,7 +428,23 @@ impl PhoneticSuggestion {
         use_dictionary: bool,
         candidate_memory: &HashMap<String, String>,
     ) -> (Vec<String>, usize) {
-        self.suggest_with_context(term, None, include_english, use_dictionary, candidate_memory)
+        self.suggest_with_multi_context(term, &[], include_english, use_dictionary, candidate_memory)
+    }
+
+    /// Convenience forwarder for single previous word context
+    pub fn suggest_with_context(
+        &mut self,
+        term: &str,
+        previous_word: Option<&str>,
+        include_english: bool,
+        use_dictionary: bool,
+        candidate_memory: &HashMap<String, String>,
+    ) -> (Vec<String>, usize) {
+        if let Some(p) = previous_word {
+            self.suggest_with_multi_context(term, &[p], include_english, use_dictionary, candidate_memory)
+        } else {
+            self.suggest_with_multi_context(term, &[], include_english, use_dictionary, candidate_memory)
+        }
     }
 
     /// Score homophone pairs based on semantic preceding context
@@ -542,8 +561,14 @@ impl PhoneticSuggestion {
         if rule_score > 0 {
             rule_score
         } else {
-            let ai = lekhani_ai::ContextScorer::new();
-            ai.score_homophone_boost(&[prev], candidate)
+            let score = lekhani_ai::LanguageModel::new().score_candidate(None, Some(prev), candidate);
+            if score > -1.0 {
+                1000
+            } else if score > -2.0 {
+                500
+            } else {
+                0
+            }
         }
     }
 
@@ -594,54 +619,72 @@ impl PhoneticSuggestion {
         list
     }
 
-    /// Transliterate a full phrase or sentence, resolving phonetics, snippets, symbols, math, macros, and punctuation
+    /// Transliterate a full phrase or sentence using global AI Beam Search sequence decoding
     pub fn transliterate_phrase_or_sentence(&mut self, text: &str) -> String {
         if text.is_empty() {
             return String::new();
         }
 
-        let mut result = String::with_capacity(text.len() * 2);
-        let mut current_token = String::new();
-        let mut prev_word: Option<String> = None;
-        let empty_memory = HashMap::new();
+        // Tokenize by word while preserving delimiters
+        let mut tokens = Vec::new();
+        let mut cur_word = String::new();
 
         for ch in text.chars() {
             if ch.is_whitespace() {
-                if !current_token.is_empty() {
-                    let (cands, _) = self.suggest_with_context(
-                        &current_token,
-                        prev_word.as_deref(),
-                        false,
-                        true,
-                        &empty_memory,
-                    );
-                    let chosen = if let Some(first) = cands.first() {
-                        first.clone()
-                    } else {
-                        self.convert_phonetic(&current_token)
-                    };
-                    result.push_str(&chosen);
-                    prev_word = Some(chosen);
-                    current_token.clear();
+                if !cur_word.is_empty() {
+                    tokens.push((true, cur_word.clone()));
+                    cur_word.clear();
                 }
-                result.push(ch);
+                tokens.push((false, ch.to_string()));
             } else {
-                current_token.push(ch);
+                cur_word.push(ch);
+            }
+        }
+        if !cur_word.is_empty() {
+            tokens.push((true, cur_word));
+        }
+
+        let empty_memory = HashMap::new();
+        let mut word_cands: Vec<Vec<String>> = Vec::new();
+        let mut word_indices: Vec<usize> = Vec::new();
+
+        for (idx, (is_word, tok)) in tokens.iter().enumerate() {
+            if *is_word {
+                let (cands, _) = self.suggest_with_multi_context(
+                    tok,
+                    &[],
+                    false,
+                    true,
+                    &empty_memory,
+                );
+                if !cands.is_empty() {
+                    word_cands.push(cands);
+                } else {
+                    word_cands.push(vec![self.convert_phonetic(tok)]);
+                }
+                word_indices.push(idx);
             }
         }
 
-        if !current_token.is_empty() {
-            let (cands, _) = self.suggest_with_context(
-                &current_token,
-                prev_word.as_deref(),
-                false,
-                true,
-                &empty_memory,
-            );
-            if let Some(first) = cands.first() {
-                result.push_str(first);
+        let optimal_path = if !word_cands.is_empty() {
+            self.ai_decoder.decode(&word_cands)
+        } else {
+            Vec::new()
+        };
+
+        let mut result = String::with_capacity(text.len() * 2);
+        let mut opt_idx = 0;
+
+        for (_idx, (is_word, tok)) in tokens.into_iter().enumerate() {
+            if is_word {
+                if let Some(decoded) = optimal_path.get(opt_idx) {
+                    result.push_str(decoded);
+                } else {
+                    result.push_str(&self.convert_phonetic(&tok));
+                }
+                opt_idx += 1;
             } else {
-                result.push_str(&self.convert_phonetic(&current_token));
+                result.push_str(&tok);
             }
         }
 
@@ -950,5 +993,37 @@ mod tests {
         assert!(!cands_meet.is_empty());
         assert!(cands_meet.contains(&"মিটিং".to_string()));
         assert!(cands_meet.contains(&"meeting".to_string()));
+    }
+
+    #[test]
+    fn test_multi_token_context_and_beam_transliteration() {
+        let mut sugg = PhoneticSuggestion::new();
+        let layout_candidates = [
+            std::path::Path::new("../../data/layouts/avrophonetic.json"),
+            std::path::Path::new("data/layouts/avrophonetic.json"),
+            std::path::Path::new("../data/layouts/avrophonetic.json"),
+        ];
+        for p in layout_candidates {
+            if p.exists() {
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    if let Ok(json) = serde_json::from_str(&content) {
+                        sugg.set_layout(&json);
+                        break;
+                    }
+                }
+            }
+        }
+        let empty_memory = HashMap::new();
+
+        // 1. Multi-token context suggestion
+        let (cands_multi, _) = sugg.suggest_with_multi_context("khacchi", &["আমি", "ভাত"], true, true, &empty_memory);
+        assert!(!cands_multi.is_empty());
+        assert_eq!(cands_multi[0], "খাচ্ছি");
+
+        // 2. Full sentence beam search decoding
+        let sentence = sugg.transliterate_phrase_or_sentence("ami banglay gaan gai");
+        assert!(sentence.contains("বাংলায়") || sentence.contains("বাংলা"));
+        assert!(sentence.contains("গান"));
+        assert!(sentence.contains("গাই"));
     }
 }

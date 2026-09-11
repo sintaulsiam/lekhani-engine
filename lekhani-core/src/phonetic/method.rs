@@ -6,6 +6,8 @@ use serde_json::Value;
 use super::suggestion::PhoneticSuggestion;
 use crate::keycodes::*;
 
+use crate::ngram::UserStats;
+
 #[derive(Debug, Clone, Default)]
 pub struct PhoneticMethod {
     buffer: String,
@@ -16,6 +18,8 @@ pub struct PhoneticMethod {
     pub use_dictionary: bool,
     pub include_english: bool,
     pub last_committed_word: Option<String>,
+    pub recent_context: Vec<String>,
+    pub stats: UserStats,
 }
 
 impl PhoneticMethod {
@@ -29,6 +33,8 @@ impl PhoneticMethod {
             use_dictionary: true,
             include_english: true,
             last_committed_word: None,
+            recent_context: Vec::with_capacity(8),
+            stats: UserStats::new(),
         }
     }
 
@@ -64,9 +70,10 @@ impl PhoneticMethod {
     }
 
     pub fn update_suggestions(&mut self) {
-        let (candidates, selected) = self.suggestion_engine.suggest_with_context(
+        let ctx_refs: Vec<&str> = self.recent_context.iter().map(|s| s.as_str()).collect();
+        let (candidates, selected) = self.suggestion_engine.suggest_with_multi_context(
             &self.buffer,
-            self.last_committed_word.as_deref(),
+            &ctx_refs,
             self.include_english,
             self.use_dictionary,
             &self.candidate_memory,
@@ -116,10 +123,16 @@ impl PhoneticMethod {
     pub fn commit(&mut self, index: usize) -> Option<String> {
         let text = self.current_candidates.get(index).cloned();
         if let Some(ref committed) = text {
+            let typed_len = self.buffer.len();
             if self.selected_index != index && !self.buffer.is_empty() {
                 self.candidate_memory.insert(self.buffer.clone(), committed.clone());
             }
             self.suggestion_engine.database.observe_committed_word(committed);
+            self.stats.record_commit(typed_len, committed);
+            self.recent_context.push(committed.clone());
+            if self.recent_context.len() > 6 {
+                self.recent_context.remove(0);
+            }
             self.last_committed_word = Some(committed.clone());
         }
         self.reset();
@@ -134,6 +147,7 @@ impl PhoneticMethod {
 
     pub fn clear_context(&mut self) {
         self.last_committed_word = None;
+        self.recent_context.clear();
         self.reset();
     }
 
