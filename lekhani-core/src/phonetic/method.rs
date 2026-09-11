@@ -15,6 +15,7 @@ pub struct PhoneticMethod {
     selected_index: usize,
     pub use_dictionary: bool,
     pub include_english: bool,
+    pub last_committed_word: Option<String>,
 }
 
 impl PhoneticMethod {
@@ -27,6 +28,7 @@ impl PhoneticMethod {
             selected_index: 0,
             use_dictionary: true,
             include_english: true,
+            last_committed_word: None,
         }
     }
 
@@ -62,8 +64,9 @@ impl PhoneticMethod {
     }
 
     pub fn update_suggestions(&mut self) {
-        let (candidates, selected) = self.suggestion_engine.suggest(
+        let (candidates, selected) = self.suggestion_engine.suggest_with_context(
             &self.buffer,
+            self.last_committed_word.as_deref(),
             self.include_english,
             self.use_dictionary,
             &self.candidate_memory,
@@ -116,6 +119,8 @@ impl PhoneticMethod {
             if self.selected_index != index && !self.buffer.is_empty() {
                 self.candidate_memory.insert(self.buffer.clone(), committed.clone());
             }
+            self.suggestion_engine.database.observe_committed_word(committed);
+            self.last_committed_word = Some(committed.clone());
         }
         self.reset();
         text
@@ -125,6 +130,11 @@ impl PhoneticMethod {
         self.buffer.clear();
         self.current_candidates.clear();
         self.selected_index = 0;
+    }
+
+    pub fn clear_context(&mut self) {
+        self.last_committed_word = None;
+        self.reset();
     }
 
     pub fn is_active(&self) -> bool {

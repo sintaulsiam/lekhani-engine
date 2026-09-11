@@ -16,3 +16,4 @@ thiserror.workspace = true
 tracing.workspace = true
 rupantor = "0.3"
 chrono.workspace = true
+lekhani-ai = { path = "../lekhani-ai" }

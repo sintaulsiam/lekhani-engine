@@ -41,6 +41,14 @@ impl InputSession {
         self.phonetic.suggestion_engine.database.load_user_autocorrect(path);
     }
 
+    pub fn load_user_learned<P: AsRef<std::path::Path>>(&mut self, path: P) {
+        self.phonetic.suggestion_engine.database.load_user_learned(path);
+    }
+
+    pub fn save_user_learned<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), std::io::Error> {
+        self.phonetic.suggestion_engine.database.save_user_learned(path)
+    }
+
     pub fn set_layout(&mut self, layout_type: ActiveLayoutType, layout_json: &Value) {
         self.active_layout_type = layout_type;
         match layout_type {
@@ -123,6 +131,24 @@ impl InputSession {
                 }
             }
         }
+    }
+
+    pub fn get_next_word_predictions(&self) -> Vec<String> {
+        match self.active_layout_type {
+            ActiveLayoutType::Phonetic => {
+                if let Some(ref last) = self.phonetic.last_committed_word {
+                    self.phonetic.suggestion_engine.suggest_next_words(last)
+                } else {
+                    Vec::new()
+                }
+            }
+            ActiveLayoutType::Fixed => Vec::new(),
+        }
+    }
+
+    pub fn clear_context(&mut self) {
+        self.phonetic.clear_context();
+        self.fixed.reset();
     }
 
     pub fn reset(&mut self) {

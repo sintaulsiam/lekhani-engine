@@ -1,79 +1,99 @@
-//! High-Performance Flat Prefix Store & Dictionary Engine
+//! High-Performance Frequency-Weighted Prefix Store & Dictionary Engine
 
 #[derive(Debug, Clone, Default)]
 pub struct PrefixTrie {
-    words: Vec<String>,
+    entries: Vec<(String, u32)>,
     is_sorted: bool,
 }
 
 impl PrefixTrie {
     pub fn new() -> Self {
         Self {
-            words: Vec::new(),
+            entries: Vec::new(),
             is_sorted: true,
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            words: Vec::with_capacity(capacity),
+            entries: Vec::with_capacity(capacity),
             is_sorted: true,
         }
     }
 
-    /// Insert a key/candidate representation
+    /// Insert a word with default frequency weight (100)
     pub fn insert(&mut self, _key: &str, candidate: String) {
-        self.words.push(candidate);
+        self.insert_weighted(candidate, 100);
+    }
+
+    /// Insert a word with an explicit frequency weight
+    pub fn insert_weighted(&mut self, candidate: String, frequency: u32) {
+        self.entries.push((candidate, frequency));
         self.is_sorted = false;
     }
 
-    /// Bulk insert words and sort in a single fast pass
-    pub fn insert_bulk(&mut self, mut new_words: Vec<String>) {
-        self.words.append(&mut new_words);
+    /// Bulk insert words with default frequencies
+    pub fn insert_bulk(&mut self, new_words: Vec<String>) {
+        let weighted: Vec<(String, u32)> = new_words.into_iter().map(|w| (w, 100)).collect();
+        self.insert_bulk_weighted(weighted);
+    }
+
+    /// Bulk insert words with specific frequency weights
+    pub fn insert_bulk_weighted(&mut self, mut new_entries: Vec<(String, u32)>) {
+        self.entries.append(&mut new_entries);
         self.is_sorted = false;
         self.ensure_sorted();
     }
 
-    /// Ensure internal word list is sorted and deduplicated
+    /// Ensure internal word list is sorted and deduplicated (keeping highest frequency)
     pub fn ensure_sorted(&mut self) {
         if !self.is_sorted {
-            self.words.sort_unstable();
-            self.words.dedup();
+            self.entries.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| b.1.cmp(&a.1)));
+            self.entries.dedup_by(|a, b| a.0 == b.0);
             self.is_sorted = true;
         }
     }
 
     /// Exact lookup for a key
-    pub fn get_exact(&self, key: &str) -> Option<&[String]> {
-        if let Ok(idx) = self.words.binary_search_by(|w| w.as_str().cmp(key)) {
-            Some(&self.words[idx..=idx])
+    pub fn get_exact(&self, key: &str) -> Option<&(String, u32)> {
+        if let Ok(idx) = self.entries.binary_search_by(|e| e.0.as_str().cmp(key)) {
+            Some(&self.entries[idx])
         } else {
             None
         }
     }
 
-    /// Check if dictionary contains exact word
-    pub fn contains_exact(&self, key: &str) -> bool {
-        self.words.binary_search_by(|w| w.as_str().cmp(key)).is_ok()
+    /// Get frequency weight of a word (defaults to 10 if unindexed)
+    pub fn get_frequency(&self, key: &str) -> u32 {
+        if let Ok(idx) = self.entries.binary_search_by(|e| e.0.as_str().cmp(key)) {
+            self.entries[idx].1
+        } else {
+            10
+        }
     }
 
-    /// Find all candidates whose key starts with the given prefix, prioritized by length
+    /// Check if dictionary contains exact word
+    pub fn contains_exact(&self, key: &str) -> bool {
+        self.entries.binary_search_by(|e| e.0.as_str().cmp(key)).is_ok()
+    }
+
+    /// Find all candidates whose key starts with the given prefix, prioritized by frequency and length
     pub fn find_prefix_matches(&self, prefix: &str, limit: usize) -> Vec<String> {
-        if prefix.is_empty() || self.words.is_empty() {
+        if prefix.is_empty() || self.entries.is_empty() {
             return Vec::new();
         }
 
         // Find starting index using binary search
-        let start_idx = match self.words.binary_search_by(|w| w.as_str().cmp(prefix)) {
+        let start_idx = match self.entries.binary_search_by(|e| e.0.as_str().cmp(prefix)) {
             Ok(idx) => idx,
             Err(idx) => idx,
         };
 
-        let mut matched: Vec<&String> = Vec::with_capacity(limit * 2);
-        for w in &self.words[start_idx..] {
-            if w.starts_with(prefix) {
-                matched.push(w);
-                if matched.len() >= limit * 4 {
+        let mut matched: Vec<&(String, u32)> = Vec::with_capacity(limit * 4);
+        for entry in &self.entries[start_idx..] {
+            if entry.0.starts_with(prefix) {
+                matched.push(entry);
+                if matched.len() >= limit * 8 {
                     break;
                 }
             } else {
@@ -81,17 +101,22 @@ impl PrefixTrie {
             }
         }
 
-        // Sort matches by length (shorter root words first) and then alphabetical
-        matched.sort_unstable_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)));
-        matched.into_iter().take(limit).cloned().collect()
+        // Sort matches: High frequency first -> Shorter length -> Alphabetical
+        matched.sort_unstable_by(|a, b| {
+            b.1.cmp(&a.1)
+                .then_with(|| a.0.len().cmp(&b.0.len()))
+                .then_with(|| a.0.cmp(&b.0))
+        });
+
+        matched.into_iter().take(limit).map(|e| e.0.clone()).collect()
     }
 
     pub fn len(&self) -> usize {
-        self.words.len()
+        self.entries.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.words.is_empty()
+        self.entries.is_empty()
     }
 }
 
@@ -102,19 +127,21 @@ mod tests {
     #[test]
     fn test_prefix_trie() {
         let mut trie = PrefixTrie::new();
-        trie.insert("bangla", "বাংলা".to_string());
-        trie.insert("bangladesh", "বাংলাদেশ".to_string());
-        trie.insert("bangladeshi", "বাংলাদেশী".to_string());
-        trie.insert("boi", "বই".to_string());
+        trie.insert_weighted("বাংলা".to_string(), 9000);
+        trie.insert_weighted("বাংলাদেশ".to_string(), 9500);
+        trie.insert_weighted("বাংলাদেশী".to_string(), 2000);
+        trie.insert_weighted("বাংলানিউজ".to_string(), 500);
+        trie.insert_weighted("বই".to_string(), 8000);
         trie.ensure_sorted();
 
         assert!(trie.get_exact("বাংলা").is_some());
         assert_eq!(trie.get_exact("unknown"), None);
+        assert_eq!(trie.get_frequency("বাংলাদেশ"), 9500);
 
         let matches = trie.find_prefix_matches("বাং", 10);
-        assert_eq!(matches.len(), 3);
-        assert_eq!(matches[0], "বাংলা"); // Shorter root word first!
-        assert!(matches.contains(&"বাংলাদেশ".to_string()));
-        assert!(matches.contains(&"বাংলাদেশী".to_string()));
+        assert_eq!(matches.len(), 4);
+        // "বাংলাদেশ" has highest frequency (9500), then "বাংলা" (9000)
+        assert_eq!(matches[0], "বাংলাদেশ");
+        assert_eq!(matches[1], "বাংলা");
     }
 }

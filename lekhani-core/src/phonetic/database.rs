@@ -3,17 +3,19 @@
 use hashbrown::HashMap;
 use std::path::Path;
 use crate::emojis::EmojiMap;
+use crate::phonetic::AutonomousLearner;
 use crate::snippets::SnippetManager;
 use crate::trie::PrefixTrie;
 
 #[derive(Debug, Clone)]
 pub struct PhoneticDatabase {
-    trie: PrefixTrie,
+    pub trie: PrefixTrie,
     suffix: HashMap<String, String>,
     autocorrect: HashMap<String, String>,
     user_autocorrect: HashMap<String, String>,
     emojis: EmojiMap,
     snippets: SnippetManager,
+    pub learner: AutonomousLearner,
 }
 
 impl Default for PhoneticDatabase {
@@ -31,6 +33,7 @@ impl PhoneticDatabase {
             user_autocorrect: HashMap::new(),
             emojis: EmojiMap::new(),
             snippets: SnippetManager::new(),
+            learner: AutonomousLearner::new(),
         }
     }
 
@@ -80,6 +83,12 @@ impl PhoneticDatabase {
             }
         }
 
+        // Inject core high-frequency weights into trie
+        for &(word, freq) in CORE_BENGALI_FREQUENCIES {
+            self.trie.insert_weighted(word.to_string(), freq);
+        }
+        self.trie.ensure_sorted();
+
         Ok(())
     }
 
@@ -93,6 +102,24 @@ impl PhoneticDatabase {
                 }
             }
         }
+    }
+
+    /// Load user-learned vocabulary
+    pub fn load_user_learned<P: AsRef<Path>>(&mut self, path: P) {
+        self.learner = AutonomousLearner::load_from_path(path);
+        for word in &self.learner.learned_words {
+            self.trie.insert_weighted(word.clone(), 9500);
+        }
+    }
+
+    /// Save user-learned vocabulary
+    pub fn save_user_learned<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
+        self.learner.save_to_path(path)
+    }
+
+    /// Observe committed word and auto-learn new vocabulary / root stems
+    pub fn observe_committed_word(&mut self, word: &str) -> Vec<String> {
+        self.learner.observe_and_learn(word, &mut self.trie)
     }
 
     /// Add custom user autocorrect entry
@@ -118,9 +145,55 @@ impl PhoneticDatabase {
         self.trie.find_prefix_matches(prefix, limit)
     }
 
+    /// Get corpus frequency of a word
+    pub fn get_frequency(&self, word: &str) -> u32 {
+        self.trie.get_frequency(word)
+    }
+
     /// Check if word is an exact valid dictionary word
     pub fn is_exact_dictionary_word(&self, word: &str) -> bool {
         self.trie.contains_exact(word)
+    }
+
+    /// Bilingual loanwords for natural code-mixing (English -> Transliteration, English Word)
+    pub fn get_bilingual_loanword(term: &str) -> Option<(&'static str, &'static str)> {
+        match term {
+            "meeting" => Some(("মিটিং", "meeting")),
+            "laptop" => Some(("ল্যাপটপ", "laptop")),
+            "password" => Some(("পাসওয়ার্ড", "password")),
+            "office" => Some(("অফিস", "office")),
+            "message" | "msg" => Some(("মেসেজ", "message")),
+            "link" => Some(("লিংক", "link")),
+            "call" => Some(("কল", "call")),
+            "problem" => Some(("প্রবলেম", "problem")),
+            "doctor" => Some(("ডাক্তার", "doctor")),
+            "phone" => Some(("ফোন", "phone")),
+            "mobile" => Some(("মোবাইল", "mobile")),
+            "group" => Some(("গ্রুপ", "group")),
+            "class" => Some(("ক্লাস", "class")),
+            "time" => Some(("টাইম", "time")),
+            "code" => Some(("কোড", "code")),
+            "school" => Some(("স্কুল", "school")),
+            "college" => Some(("কলেজ", "college")),
+            "university" | "varsity" => Some(("ভার্সিটি", "university")),
+            "bus" => Some(("বাস", "bus")),
+            "train" => Some(("ট্রেন", "train")),
+            "ticket" => Some(("টিকিট", "ticket")),
+            "post" => Some(("পোস্ট", "post")),
+            "share" => Some(("শেয়ার", "share")),
+            "comment" => Some(("কমেন্ট", "comment")),
+            "shirt" => Some(("শার্ট", "shirt")),
+            "t-shirt" | "tshirt" => Some(("টি-শার্ট", "t-shirt")),
+            "pant" | "pants" => Some(("প্যান্ট", "pant")),
+            "shoe" | "shoes" => Some(("জুতো", "shoes")),
+            "video" => Some(("ভিডিও", "video")),
+            "photo" => Some(("ছবি", "photo")),
+            "online" => Some(("অনলাইন", "online")),
+            "network" => Some(("নেটওয়ার্ক", "network")),
+            "system" => Some(("সিস্টেম", "system")),
+            "file" => Some(("ফাইল", "file")),
+            _ => None,
+        }
     }
 
     /// Lookup contextual emojis by keyword
@@ -180,7 +253,18 @@ impl PhoneticDatabase {
             "dhonnobad" => Some("ধন্যবাদ"),
             "shotti" => Some("সত্যি"),
             "shob" => Some("সব"),
+            "bhasha" | "bhasa" | "vasa" => Some("ভাষা"),
+            "desh" => Some("দেশ"),
+            "manush" => Some("মানুষ"),
+            "shikhok" | "sikkhok" => Some("শিক্ষক"),
+            "shikkha" | "sikkha" => Some("শিক্ষা"),
+            "shorkar" | "sorkar" => Some("সরকার"),
             "shokal" => Some("সকাল"),
+            "jibon" => Some("জীবন"),
+            "jibone" => Some("জীবনে"),
+            "jiboner" => Some("জীবনের"),
+            "nodi" => Some("নদী"),
+            "nodir" => Some("নদীর"),
             "shondha" | "shondhya" => Some("সন্ধ্যা"),
             "shomoy" => Some("সময়"),
             _ => None,
@@ -287,3 +371,258 @@ impl PhoneticDatabase {
         self.snippets.search_prefix(query, limit)
     }
 }
+
+/// Core high-frequency Bengali unigrams with ranking weights
+pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
+    // Pronouns & Demonstratives
+    ("আমি", 10000),
+    ("তুমি", 9500),
+    ("আপনি", 9200),
+    ("সে", 9400),
+    ("তিনি", 8800),
+    ("আমরা", 9100),
+    ("তোমরা", 8700),
+    ("আপনারা", 8600),
+    ("তারা", 8900),
+    ("তাঁরা", 8400),
+    ("এটা", 9300),
+    ("ওটা", 8500),
+    ("এই", 9400),
+    ("সেই", 8900),
+    ("যা", 8600),
+    ("তা", 8700),
+    ("কে", 9000),
+    ("কি", 9200),
+    ("কী", 9000),
+    ("কেন", 9100),
+    ("কেমন", 8900),
+    ("কোথায়", 8800),
+    ("কখন", 8700),
+    ("কিভাবে", 8600),
+    ("কবে", 8500),
+
+    // Pronoun Inflections
+    ("আমাকে", 9300),
+    ("আমার", 9500),
+    ("আমাদের", 9400),
+    ("তোমাকে", 9200),
+    ("তোমার", 9400),
+    ("তোমাদের", 9100),
+    ("আপনাকে", 9100),
+    ("আপনার", 9300),
+    ("আপনাদের", 9000),
+    ("তাকে", 9200),
+    ("তার", 9400),
+    ("তাদের", 9200),
+    ("কাউকে", 8700),
+    ("কারো", 8700),
+    ("সবার", 8900),
+    ("সবাইকে", 8900),
+
+    // Common Verbs & Conjugations
+    ("পড়া", 9000),
+    ("পরা", 8800),
+    ("পড়ছি", 8900),
+    ("পড়ব", 8800),
+    ("পড়াশোনা", 8900),
+    ("করা", 9500),
+    ("করব", 9200),
+    ("করছি", 9100),
+    ("করছে", 9100),
+    ("করেছি", 9100),
+    ("করেছে", 9200),
+    ("করবেন", 9100),
+    ("করলাম", 8900),
+    ("বলা", 9200),
+    ("বলি", 8900),
+    ("বলছি", 9000),
+    ("বলেছি", 9000),
+    ("বলবেন", 8900),
+    ("হওয়া", 9400),
+    ("হলো", 9200),
+    ("হবে", 9300),
+    ("হচ্ছে", 9100),
+    ("হয়েছে", 9200),
+    ("যাওয়া", 9300),
+    ("যাব", 9100),
+    ("যাচ্ছি", 9000),
+    ("যাবেন", 9000),
+    ("গেছে", 9100),
+    ("গেল", 9000),
+    ("আসা", 9200),
+    ("আসছি", 9000),
+    ("আসবে", 9000),
+    ("আসবেন", 8900),
+    ("এসেছে", 9000),
+    ("খাওয়া", 9100),
+    ("খাব", 9000),
+    ("খাচ্ছি", 8900),
+    ("খেয়েছি", 8900),
+    ("নেওয়া", 9000),
+    ("নেব", 8800),
+    ("নিচ্ছি", 8800),
+    ("দেওয়া", 9200),
+    ("দেখা", 9100),
+    ("দেখছি", 8900),
+    ("দেখব", 8900),
+    ("শোনা", 8900),
+    ("জানা", 9000),
+    ("জানি", 9100),
+    ("জানেন", 8900),
+    ("বোঝা", 8800),
+    ("বুঝতে", 8900),
+    ("থাকা", 9100),
+    ("আছি", 9300),
+    ("আছো", 9200),
+    ("আছেন", 9200),
+    ("থাকব", 8900),
+    ("রাখা", 8800),
+    ("চাওয়া", 8900),
+    ("চাই", 9200),
+    ("চাও", 8900),
+    ("চান", 8900),
+    ("পারা", 9100),
+    ("পারি", 9000),
+    ("পারব", 8900),
+    ("পারবেন", 8900),
+    ("লাগা", 8800),
+    ("লাগে", 9000),
+    ("লাগল", 8800),
+    ("চলা", 8700),
+    ("লেখা", 8900),
+    ("লিখছি", 8800),
+    ("লিখব", 8800),
+    ("শেখা", 8700),
+    ("পাঠানো", 8600),
+    ("পাঠিয়েছি", 8600),
+    ("জানানো", 8500),
+    ("বানানো", 8500),
+    ("ভালোবাসা", 9200),
+    ("ভালোবাসি", 9300),
+    ("ভালোবাসব", 9000),
+
+    // Common Nouns
+    ("বাংলাদেশ", 9800),
+    ("ঢাকা", 9500),
+    ("বাংলা", 9600),
+    ("মানুষ", 9400),
+    ("দেশ", 9300),
+    ("ভাষা", 9200),
+    ("কথা", 9400),
+    ("কাজ", 9300),
+    ("সময়", 9300),
+    ("দিন", 9200),
+    ("রাত", 9000),
+    ("বছর", 9100),
+    ("মাস", 8900),
+    ("সপ্তাহ", 8700),
+    ("সকাল", 9000),
+    ("দুপুর", 8700),
+    ("বিকেল", 8800),
+    ("সন্ধ্যা", 8800),
+    ("বাড়ি", 9200),
+    ("ঘর", 8900),
+    ("রাস্তা", 8800),
+    ("গাড়ি", 9000),
+    ("বই", 9300),
+    ("শার্ট", 8600),
+    ("জামা", 8500),
+    ("কাপড়", 8600),
+    ("কলম", 8700),
+    ("খাতা", 8600),
+    ("কাগজ", 8500),
+    ("পানি", 9200),
+    ("জল", 8900),
+    ("ভাত", 9100),
+    ("রুটি", 8700),
+    ("চা", 9200),
+    ("কফি", 8600),
+    ("দুধ", 8700),
+    ("চিনি", 8600),
+    ("মিষ্টি", 8800),
+    ("ফল", 8800),
+    ("মাছ", 9000),
+    ("মাংস", 8800),
+    ("ডিম", 8900),
+    ("টাকা", 9300),
+    ("পয়সা", 8400),
+    ("ব্যাংক", 8800),
+    ("অফিস", 9000),
+    ("স্কুল", 9100),
+    ("কলেজ", 8900),
+    ("বিশ্ববিদ্যালয়", 9000),
+    ("হাসপাতাল", 8800),
+    ("ডাক্তার", 9000),
+    ("শিক্ষক", 8900),
+    ("বন্ধু", 9200),
+    ("ভাই", 9100),
+    ("বোন", 9000),
+    ("মা", 9500),
+    ("বাবা", 9400),
+    ("ছেলে", 9200),
+    ("মেয়ে", 9100),
+    ("সন্তান", 8700),
+    ("পরিবার", 9100),
+    ("সমাজ", 8800),
+    ("সরকার", 9000),
+    ("পৃথিবী", 8900),
+    ("আকাশ", 9000),
+    ("বাতাস", 8800),
+    ("নদী", 9000),
+    ("সাগর", 8800),
+    ("বৃষ্টি", 9000),
+    ("রোদ", 8700),
+    ("আলো", 8900),
+    ("ফুল", 9000),
+    ("গাছ", 8900),
+    ("বিড়াল", 8700),
+    ("কুকুর", 8600),
+    ("পাখি", 8900),
+
+    // Adjectives, Adverbs, Connectives & Particles
+    ("ভালো", 9600),
+    ("সুন্দর", 9400),
+    ("বড়", 9300),
+    ("ছোট", 9200),
+    ("নতুন", 9100),
+    ("পুরনো", 8700),
+    ("খারাপ", 9000),
+    ("সহজ", 9000),
+    ("কঠিন", 8800),
+    ("অনেক", 9400),
+    ("অল্প", 8800),
+    ("বেশি", 9300),
+    ("কম", 9000),
+    ("খুব", 9400),
+    ("দারুণ", 8900),
+    ("চমৎকার", 8800),
+    ("প্রিয়", 8900),
+    ("সব", 9300),
+    ("সবাই", 9200),
+    ("সবকিছু", 9100),
+    ("কিছু", 9200),
+    ("কোনো", 9100),
+    ("একটু", 9200),
+    ("একদম", 9000),
+    ("অবশ্যই", 9100),
+    ("সত্যি", 9100),
+    ("ঠিক", 9300),
+    ("ভুল", 9000),
+    ("সাথে", 9400),
+    ("সঙ্গে", 9100),
+    ("ছাড়া", 9000),
+    ("মতো", 9200),
+    ("জন্য", 9500),
+    ("কারণ", 9200),
+    ("কিন্তু", 9400),
+    ("এবং", 9400),
+    ("অথবা", 9000),
+    ("তবে", 9100),
+    ("আর", 9500),
+    ("তাই", 9300),
+    ("যদি", 9200),
+    ("ধন্যবাদ", 9200),
+    ("স্বাগতম", 8900),
+    ("শুভেচ্ছা", 9000),
+    ("অভিনন্দন", 8800),
+];

@@ -109,12 +109,15 @@ impl EmojiMap {
         add_emoji!(":brishti:", "🌧️", ["brishti", "বৃষ্টি", "rain", "rainy"]);
         add_emoji!(":megh:", "☁️", ["megh", "মেঘ", "cloud"]);
         add_emoji!(":cha:", "☕", ["cha", "চা", "tea", "coffee"]);
+        add_emoji!(":pani:", "💧", ["pani", "পানি", "jol", "জল", "water"]);
+        add_emoji!(":vath:", "🍚", ["bhat", "ভাত", "rice"]);
+        add_emoji!(":dudh:", "🥛", ["dudh", "দুধ", "milk"]);
         add_emoji!(":mishti:", "🍬", ["mishti", "মিষ্টি", "sweet", "candy"]);
         add_emoji!(":boishakh:", "🎭", ["boishakh", "বৈশাখ", "mela", "মেলা"]);
         add_emoji!(":potaka:", "🇧🇩", ["potaka", "পতাকা", "bangladesh", "বাংলাদেশ", "bd", "flag_bd"]);
         add_emoji!(":bangladesh:", "🇧🇩");
         add_emoji!(":bd:", "🇧🇩");
-        add_emoji!(":biral:", "🐱", ["biral", "বিড়াল", "cat", "kitty"]);
+        add_emoji!(":biral:", "🐱", ["biral", "বিড়াল", "বিড়াল", "cat", "kitty"]);
         add_emoji!(":kukur:", "🐶", ["kukur", "কুকুর", "dog", "puppy"]);
         add_emoji!(":gari:", "🚗", ["gari", "গাড়ি", "গাড়ি", "car"]);
         add_emoji!(":boi:", "📖", ["boi", "বই", "book", "read"]);
@@ -122,6 +125,8 @@ impl EmojiMap {
         add_emoji!(":bari:", "🏠", ["bari", "বাড়ি", "বাড়ি", "home", "house"]);
         add_emoji!(":alo:", "💡", ["alo", "আলো", "bulb", "idea", "light"]);
         add_emoji!(":ghori:", "⏰", ["ghori", "ঘড়ি", "ঘড়ি", "clock", "time"]);
+        add_emoji!(":phone:", "📱", ["phone", "ফোন", "mobile", "মোবাইল"]);
+        add_emoji!(":daktar:", "🩺", ["daktar", "ডাক্তার", "doctor", "hospital", "হাসপাতাল"]);
         add_emoji!(":khela:", "⚽", ["khela", "খেলা", "football", "soccer"]);
         add_emoji!(":cricket:", "🏏", ["cricket", "ক্রিকেট"]);
         add_emoji!(":gaan:", "🎵", ["gan", "gaan", "গান", "music", "song"]);

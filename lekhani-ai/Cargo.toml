@@ -1,0 +1,15 @@
+[package]
+name = "lekhani-ai"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pure Rust On-Device AI & Contextual Language Model for Lekhani Bengali Input Method"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+hashbrown.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true

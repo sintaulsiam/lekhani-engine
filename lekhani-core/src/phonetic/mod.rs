@@ -2,9 +2,12 @@
 
 pub mod database;
 pub mod fuzzy;
+pub mod learner;
 pub mod method;
+pub mod morphology;
 pub mod suggestion;
 
 pub use database::PhoneticDatabase;
+pub use learner::AutonomousLearner;
 pub use method::PhoneticMethod;
 pub use suggestion::PhoneticSuggestion;
