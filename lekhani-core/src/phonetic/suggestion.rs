@@ -778,273 +778,35 @@ impl PhoneticSuggestion {
         }
     }
 
-    /// Score homophone pairs based on semantic preceding context
+    /// Score homophone pairs based on semantic preceding context using the statistical language model
     pub fn score_contextual_homophone(previous_word: Option<&str>, candidate: &str) -> i32 {
         let prev = match previous_word {
             Some(p) if !p.trim().is_empty() => p.trim(),
             _ => return 0,
         };
 
-        let rule_score = match candidate {
-            "পড়া" | "পড়ছি" | "পড়ব" | "পড়াশোনা" => {
-                if matches!(
-                    prev,
-                    "বই" | "বইটি"
-                        | "বইয়ের"
-                        | "বইগুলো"
-                        | "পত্রিকা"
-                        | "লেখা"
-                        | "ক্লাস"
-                        | "স্কুল"
-                        | "কলেজ"
-                        | "পরীক্ষা"
-                        | "পাঠ"
-                        | "মন"
-                        | "নোট"
-                ) {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "পরা" | "পরছি" | "পরব" => {
-                if matches!(
-                    prev,
-                    "শার্ট"
-                        | "প্যান্ট"
-                        | "জামা"
-                        | "কাপড়"
-                        | "জুতো"
-                        | "জুতা"
-                        | "ঘড়ি"
-                        | "চশমা"
-                        | "পোশাক"
-                        | "শাল"
-                        | "শাড়ি"
-                ) {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "ভাষা" | "ভাষায়" | "ভাষার" => {
-                if matches!(
-                    prev,
-                    "বাংলা"
-                        | "ইংরেজি"
-                        | "মাতৃভাষা"
-                        | "কথ্য"
-                        | "রাষ্ট্র"
-                        | "আমাদের"
-                        | "সুন্দর"
-                        | "আন্তর্জাতিক"
-                ) {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "ভাসা" | "ভাসছে" => {
-                if matches!(
-                    prev,
-                    "পানিতে"
-                        | "জলে"
-                        | "নদীতে"
-                        | "সাগরে"
-                        | "ভেসে"
-                        | "রক্তে"
-                        | "চোখের"
-                ) {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "জাতি" | "জাতির" => {
-                if matches!(
-                    prev,
-                    "বাঙালি"
-                        | "মুসলিম"
-                        | "হিন্দু"
-                        | "উন্নত"
-                        | "মানব"
-                        | "বিশ্ব"
-                        | "পুরো"
-                ) {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "কুল" => {
-                if matches!(prev, "বংশ" | "উচ্চ" | "মান" | "মর্যাদা")
-                {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "কূল" => {
-                if matches!(prev, "নদী" | "নদীর" | "সাগর" | "সাগরের" | "উপকূল" | "তীর")
-                {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "লক্ষ্য" => {
-                if matches!(
-                    prev,
-                    "জীবনের"
-                        | "মূল"
-                        | "প্রধান"
-                        | "উদ্দেশ্য"
-                        | "আমাদের"
-                        | "চূড়ান্ত"
-                ) {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "লক্ষ" => {
-                if matches!(
-                    prev,
-                    "এক" | "দুই"
-                        | "তিন"
-                        | "চার"
-                        | "পাঁচ"
-                        | "দশ"
-                        | "কোটি"
-                        | "টাকা"
-                        | "মানুষ"
-                ) {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "কাঁচা" => {
-                if matches!(prev, "আম" | "ফল" | "মরিচ" | "রাস্তা" | "টাকা" | "বয়স")
-                {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "কাচা" => {
-                if matches!(prev, "কাপড়" | "জামা" | "ধোয়া") {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "স্বত্ব" => {
-                if matches!(prev, "কপিরাইট" | "মালিকানা" | "গ্রন্থ" | "প্রকাশক")
-                {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "সত্য" => {
-                if matches!(prev, "বলা" | "চিরন্তন" | "কথা" | "সবসময়" | "পরম" | "প্রকৃত")
-                {
-                    1000
-                } else {
-                    0
-                }
-            }
-            "দিন" => {
-                if matches!(
-                    prev,
-                    "আজকের"
-                        | "শুভ"
-                        | "প্রতি"
-                        | "সারাদিন"
-                        | "কয়েক"
-                        | "ভালো"
-                        | "খারাপ"
-                ) {
-                    500
-                } else if matches!(
-                    prev,
-                    "আমাকে"
-                        | "তাকে"
-                        | "একটু"
-                        | "দয়া"
-                        | "টাকা"
-                        | "বইটি"
-                        | "করে"
-                ) {
-                    800
-                } else {
-                    0
-                }
-            }
-            _ => 0,
-        };
-
-        if rule_score > 0 {
-            rule_score
+        let score = lekhani_ai::LanguageModel::new().score_candidate(None, Some(prev), candidate);
+        if score > -0.5 {
+            1200
+        } else if score > -1.0 {
+            1000
+        } else if score > -2.0 {
+            600
+        } else if score > -3.0 {
+            250
         } else {
-            let score =
-                lekhani_ai::LanguageModel::new().score_candidate(None, Some(prev), candidate);
-            if score > -1.0 {
-                1000
-            } else if score > -2.0 {
-                500
-            } else {
-                0
-            }
+            0
         }
     }
 
-    /// Predict next probable Bengali words for zero-preedit state
+    /// Predict next probable Bengali words for zero-preedit state using the statistical language model
     pub fn suggest_next_words(&self, previous_word: &str) -> Vec<String> {
         let prev = previous_word.trim();
         if prev.is_empty() {
             return Vec::new();
         }
 
-        let words: &[&str] = match prev {
-            "আমি" => &["ভালো", "তোমাকে", "যাব", "করব", "চাই", "আছি", "এখন", "বলছি"],
-            "তুমি" => &["কেমন", "কোথায়", "কী", "কবে", "যাবে", "খাবে", "আছো", "বলো"],
-            "আপনি" => &["কেমন", "কোথায়", "কী", "কবে", "যাবেন", "আছেন", "বলুন"],
-            "আমরা" => &["সবাই", "একসাথে", "যাব", "করব", "চাই", "আছি", "বাংলাদেশী"],
-            "ধন্যবাদ" => &["ভাই", "আপনাকে", "তোমাকে", "অনেক", "স্যার", "জানাই"],
-            "শুভ" => &["সকাল", "রাত্রি", "সন্ধ্যা", "কামনা", "নববর্ষ", "জন্মদিন", "বিকেল"],
-            "অনেক" => &["ধন্যবাদ", "ভালো", "সুন্দর", "দিন", "টাকা", "মানুষ", "কষ্ট"],
-            "খুব" => &["ভালো", "সুন্দর", "খারাপ", "কঠিন", "সহজ", "তাড়াতাড়ি", "দ্রুত"],
-            "কেমন" => &["আছো", "আছেন", "হলো", "লাগল", "লাগে", "চলছে"],
-            "ভালো" => &["আছি", "থাকবেন", "থাকো", "বাসি", "লাগে", "লাগল", "হবে"],
-            "বাংলাদেশ" => &["আমার", "একটি", "জিন্দাবাদ", "ক্রিকেট", "সরকার"],
-            "বই" => &["পড়া", "পড়ছি", "পড়ব", "মেলা", "কিনেছি"],
-            "চা" => &["খাবেন", "খাব", "বানাও", "পান", "গরম"],
-            "কি" | "কী" => &["খবর", "করছ", "করছেন", "হয়েছে", "হলো", "চাও", "চান"],
-            "কোথায়" => &["আছো", "আছেন", "যাবে", "যাবেন", "গেলে"],
-            "কেন" => &["এমন", "করছ", "করছেন", "হলো", "গেলে"],
-            "ইনশাআল্লাহ" => &["হবে", "যাব", "দেখা", "ভালো"],
-            "মাশাল্লাহ" => &["অনেক", "সুন্দর", "খুব"],
-            "আলহামদুলিল্লাহ" => &["ভালো", "আমি", "সব"],
-            "আমার" => &["দেশ", "সোনার", "বন্ধু", "নাম", "জীবন", "মন"],
-            "তোমার" => &["নাম", "বাড়ি", "খবর", "কথা", "মন"],
-            "আপনার" => &["নাম", "অফিস", "খবর", "দয়া", "কথা"],
-            "আজ" => &["সকালে", "রাতে", "বৃষ্টি", "ছুটি", "কেমন"],
-            "কাল" => &["দেখা", "হবে", "যাব", "আসবে"],
-            _ => &[],
-        };
-
-        let mut list: Vec<String> = words.iter().map(|s| s.to_string()).collect();
-
-        // Query AI neural transition language model for additional predictions
-        for pred in self.ai_predictor.predict_next(&[prev], 6) {
-            if !list.contains(&pred) {
-                list.push(pred);
-            }
-        }
-
-        list
+        self.ai_predictor.predict_next(&[prev], 8)
     }
 
     /// Transliterate a full phrase or sentence using global AI Beam Search sequence decoding
