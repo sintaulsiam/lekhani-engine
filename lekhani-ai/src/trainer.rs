@@ -87,7 +87,9 @@ impl CorpusTrainer {
                     .collect();
 
                 let trimmed = clean_word.trim();
-                if !trimmed.is_empty() && trimmed.chars().any(crate::trainer::chars::is_bengali_char) {
+                if !trimmed.is_empty()
+                    && trimmed.chars().any(crate::trainer::chars::is_bengali_char)
+                {
                     words.push(trimmed.to_string());
                 }
             }
