@@ -8,11 +8,13 @@ pub mod beam;
 pub mod context;
 pub mod lm;
 pub mod prediction;
+pub mod trainer;
 
 pub use beam::BeamSearchDecoder;
 pub use context::ContextScorer;
 pub use lm::LanguageModel;
 pub use prediction::NextWordPredictor;
+pub use trainer::{CorpusTrainer, TrainedLanguageModelData};
 
 #[cfg(test)]
 mod tests {
