@@ -33,6 +33,14 @@ impl InputSession {
         }
     }
 
+    pub fn load_database<P: AsRef<std::path::Path>>(&mut self, dir: P) {
+        let _ = self.phonetic.suggestion_engine.database.load_from_dir(dir);
+    }
+
+    pub fn load_user_autocorrect<P: AsRef<std::path::Path>>(&mut self, path: P) {
+        self.phonetic.suggestion_engine.database.load_user_autocorrect(path);
+    }
+
     pub fn set_layout(&mut self, layout_type: ActiveLayoutType, layout_json: &Value) {
         self.active_layout_type = layout_type;
         match layout_type {

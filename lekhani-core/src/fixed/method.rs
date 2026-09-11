@@ -53,7 +53,28 @@ impl FixedMethod {
             KeyModifier::Normal
         };
 
-        let val = self.parser.get_char(keycode, modifier).map(|s| s.to_string());
+        let val = self.parser.get_char(keycode, modifier).map(|s| s.to_string())
+            .or_else(|| {
+                if self.numberpad {
+                    match keycode {
+                        VC_KP_0 => Some("০".to_string()),
+                        VC_KP_1 => Some("১".to_string()),
+                        VC_KP_2 => Some("২".to_string()),
+                        VC_KP_3 => Some("৩".to_string()),
+                        VC_KP_4 => Some("৪".to_string()),
+                        VC_KP_5 => Some("৫".to_string()),
+                        VC_KP_6 => Some("৬".to_string()),
+                        VC_KP_7 => Some("৭".to_string()),
+                        VC_KP_8 => Some("৮".to_string()),
+                        VC_KP_9 => Some("৯".to_string()),
+                        VC_KP_DECIMAL => Some(".".to_string()),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            });
+
         if let Some(val) = val {
             self.process_value(&val);
             Some(self.buffer.clone())

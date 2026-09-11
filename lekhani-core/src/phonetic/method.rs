@@ -236,6 +236,23 @@ fn keycode_to_char(key: u16) -> Option<char> {
         VC_SLASH => Some('/'),
         VC_QUESTION => Some('?'),
 
+        // NumPad
+        VC_KP_0 => Some('0'),
+        VC_KP_1 => Some('1'),
+        VC_KP_2 => Some('2'),
+        VC_KP_3 => Some('3'),
+        VC_KP_4 => Some('4'),
+        VC_KP_5 => Some('5'),
+        VC_KP_6 => Some('6'),
+        VC_KP_7 => Some('7'),
+        VC_KP_8 => Some('8'),
+        VC_KP_9 => Some('9'),
+        VC_KP_DECIMAL => Some('.'),
+        VC_KP_DIVIDE => Some('/'),
+        VC_KP_MULTIPLY => Some('*'),
+        VC_KP_SUBTRACT => Some('-'),
+        VC_KP_ADD => Some('+'),
+
         _ => None,
     }
 }
