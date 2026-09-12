@@ -324,6 +324,82 @@ impl PhoneticSuggestion {
                     &mut seen,
                 );
             }
+        } else {
+            // Suffix decomposition on loanwords (e.g. "computere" -> "কম্পিউটার" + "ে" -> "কম্পিউটারে", "fileti" -> "ফাইলটি")
+            const LOANWORD_SUFFIXES: &[(&str, &str)] = &[
+                ("guloteo", "গুলোতেও"),
+                ("gulateo", "গুলাতেও"),
+                ("gulotei", "গুলোতেই"),
+                ("gulatei", "গুলাতেই"),
+                ("derkeo", "দেরকেও"),
+                ("derkei", "দেরকেই"),
+                ("gulote", "গুলোতে"),
+                ("gulate", "গুলাতে"),
+                ("gulor", "গুলোর"),
+                ("gular", "গুলার"),
+                ("derke", "দেরকে"),
+                ("titeo", "টিতেও"),
+                ("tateo", "টাতেও"),
+                ("titei", "টিতেই"),
+                ("tatei", "টাতেই"),
+                ("tiro", "টিরও"),
+                ("taro", "টারও"),
+                ("gulo", "গুলো"),
+                ("gula", "গুলা"),
+                ("guli", "গুলি"),
+                ("deri", "দেরই"),
+                ("dero", "দেরও"),
+                ("der", "দের"),
+                ("tai", "টাই"),
+                ("tao", "টাও"),
+                ("tio", "টিও"),
+                ("tii", "টিই"),
+                ("tay", "টায়"),
+                ("ete", "েতে"),
+                ("ero", "েরও"),
+                ("eri", "েরই"),
+                ("tei", "তেই"),
+                ("rei", "রেই"),
+                ("ta", "টা"),
+                ("ti", "টি"),
+                ("te", "তে"),
+                ("er", "ের"),
+                ("re", "রে"),
+                ("ke", "কে"),
+                ("ei", "েই"),
+                ("eo", "েও"),
+                ("ey", "েই"),
+                ("ye", "য়ে"),
+                ("ay", "ায়"),
+                ("e", "ে"),
+                ("r", "র"),
+            ];
+
+            for &(suf_en, suf_bn) in LOANWORD_SUFFIXES {
+                if middle.len() > suf_en.len() && middle.ends_with(suf_en) {
+                    let base_en = &middle[..middle.len() - suf_en.len()];
+                    if let Some((bn_loan, en_loan)) = PhoneticDatabase::get_bilingual_loanword(base_en) {
+                        let combined_bn = super::morphology::apply_sandhi_join(bn_loan, suf_bn);
+                        add_cand(
+                            combined_bn,
+                            CandidateSource::Loanword,
+                            3400,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
+                        if include_english {
+                            add_cand(
+                                format!("{}{}", en_loan, suf_en),
+                                CandidateSource::Loanword,
+                                -1600,
+                                &mut raw_candidates,
+                                &mut seen,
+                            );
+                        }
+                        break;
+                    }
+                }
+            }
         }
 
         // 5. Special literal matches on middle portion (e.g. (:smile:), (=12+5))
@@ -1826,5 +1902,53 @@ mod tests {
 
         let (cands_shartho, _) = sugg.suggest("shartho", true, true, &empty_memory);
         assert_eq!(cands_shartho[0], "স্বার্থ");
+
+        // 6. Conversational 2nd-person Verbs (acho, korcho, esho, dekho, cholo, paro)
+        let (cands_acho, _) = sugg.suggest("acho", true, true, &empty_memory);
+        assert_eq!(cands_acho[0], "আছো");
+
+        let (cands_korcho, _) = sugg.suggest("korcho", true, true, &empty_memory);
+        assert_eq!(cands_korcho[0], "করছো");
+
+        let (cands_esho, _) = sugg.suggest("esho", true, true, &empty_memory);
+        assert_eq!(cands_esho[0], "এসো");
+
+        let (cands_dekho, _) = sugg.suggest("dekho", true, true, &empty_memory);
+        assert_eq!(cands_dekho[0], "দেখো");
+
+        let (cands_cholo, _) = sugg.suggest("cholo", true, true, &empty_memory);
+        assert_eq!(cands_cholo[0], "চলো");
+
+        let (cands_paro, _) = sugg.suggest("paro", true, true, &empty_memory);
+        assert_eq!(cands_paro[0], "পারো");
+
+        // 7. Complex Sanskrit / Ha-Conjuncts & Clitics
+        let (cands_ahban, _) = sugg.suggest("ahban", true, true, &empty_memory);
+        assert_eq!(cands_ahban[0], "আহ্বান");
+
+        let (cands_chinho, _) = sugg.suggest("chinho", true, true, &empty_memory);
+        assert_eq!(cands_chinho[0], "চিহ্ন");
+
+        let (cands_apranho, _) = sugg.suggest("apranho", true, true, &empty_memory);
+        assert_eq!(cands_apranho[0], "অপরাহ্ন");
+
+        let (cands_hrit, _) = sugg.suggest("hritpindo", true, true, &empty_memory);
+        assert_eq!(cands_hrit[0], "হৃৎপিণ্ড");
+
+        let (cands_chhatro, _) = sugg.suggest("chhatrochhatriderkeo", true, true, &empty_memory);
+        assert_eq!(cands_chhatro[0], "ছাত্রছাত্রীদেরকেও");
+
+        let (cands_dhai, _) = sugg.suggest("dhai", true, true, &empty_memory);
+        assert_eq!(cands_dhai[0], "আড়াই");
+
+        // 8. Inflected Loanwords (computere -> কম্পিউটারে, fileti -> ফাইলটি)
+        let (cands_comp, _) = sugg.suggest("computere", true, true, &empty_memory);
+        assert!(cands_comp[0] == "কম্পিউটারে" || cands_comp.contains(&"কম্পিউটারে".to_string()));
+
+        let (cands_file, _) = sugg.suggest("fileti", true, true, &empty_memory);
+        assert!(cands_file[0] == "ফাইলটি" || cands_file.contains(&"ফাইলটি".to_string()));
+
+        let (cands_phone, _) = sugg.suggest("smartphonete", true, true, &empty_memory);
+        assert!(cands_phone[0] == "স্মার্টফোনে" || cands_phone.contains(&"স্মার্টফোনে".to_string()));
     }
 }
