@@ -1,11 +1,12 @@
-//! Bijoy (ANSI) ⇄ Unicode Bengali Conversion Engine
+//! Bijoy (ANSI / SutonnyMJ) ⇄ Unicode Bengali Conversion Engine
 
 use hashbrown::HashMap;
 use std::sync::LazyLock;
 
 static BIJOY_TO_UNICODE: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
-    let mut m = HashMap::with_capacity(100);
-    // Vowels
+    let mut m = HashMap::with_capacity(200);
+
+    // Compound Conjuncts & Special Ligatures
     m.insert("Av", "আ");
     m.insert("A", "অ");
     m.insert("B", "ই");
@@ -18,7 +19,7 @@ static BIJOY_TO_UNICODE: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
     m.insert("I", "ও");
     m.insert("J", "ঔ");
 
-    // Consonants
+    // Standard Consonants
     m.insert("K", "ক");
     m.insert("L", "খ");
     m.insert("M", "গ");
@@ -59,7 +60,7 @@ static BIJOY_TO_UNICODE: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
     m.insert("t", "ঃ");
     m.insert("u", "ঁ");
 
-    // Kars
+    // Kars & Diacritics
     m.insert("v", "া");
     m.insert("w", "ি");
     m.insert("x", "ী");
@@ -69,6 +70,94 @@ static BIJOY_TO_UNICODE: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
     m.insert("†", "ে");
     m.insert("‰", "ৈ");
     m.insert("Š", "ৌ");
+    m.insert("¨", "্");
+    m.insert("«", "্র");
+    m.insert("ª", "্র");
+    m.insert("º", "্র");
+    m.insert("¨", "্");
+
+    // Common and Rare Sanskrit Conjuncts
+    m.insert("¶¥", "ক্ষ্ম");
+    m.insert("¶", "ক্ষ");
+    m.insert("³", "ক্ত");
+    m.insert("K¬", "ক্ল");
+    m.insert("²", "ক্স");
+    m.insert("µ", "ক্র");
+    m.insert("Á", "জ্ঞ");
+    m.insert("Â", "ঞ্চ");
+    m.insert("Ã", "ঞ্ছ");
+    m.insert("Ä", "ঞ্জ");
+    m.insert("Æ", "ট্ট");
+    m.insert("Ç", "ট্ঠ");
+    m.insert("È", "ড্ড");
+    m.insert("É", "ণ্ট");
+    m.insert("Ê", "ণ্ঠ");
+    m.insert("Ë", "ণ্ড");
+    m.insert("Ì", "ত্ব");
+    m.insert("Í", "ত্ম");
+    m.insert("Î", "ত্র");
+    m.insert("Ï", "থ্ব");
+    m.insert("Ð", "দ্দ");
+    m.insert("Ñ", "দ্ধ");
+    m.insert("Ò", "দ্ব");
+    m.insert("Ó", "দ্ম");
+    m.insert("Ô", "ধ্ন");
+    m.insert("Õ", "ধ্ব");
+    m.insert("×", "ন্ট");
+    m.insert("Ø", "ন্ঠ");
+    m.insert("Ù", "ন্ড");
+    m.insert("Ú", "ন্ত");
+    m.insert("Û", "ন্থ");
+    m.insert("Ü", "ন্দ");
+    m.insert("Ý", "ন্ধ");
+    m.insert("Þ", "ন্ন");
+    m.insert("ß", "ন্ম");
+    m.insert("à", "ন্ব");
+    m.insert("á", "প্ট");
+    m.insert("â", "প্ত");
+    m.insert("ã", "প্ন");
+    m.insert("ä", "প্প");
+    m.insert("å", "প্ল");
+    m.insert("æ", "প্স");
+    m.insert("ç", "ফ্ট");
+    m.insert("è", "ফ্ফ");
+    m.insert("é", "ফ্ল");
+    m.insert("ê", "ব্জ");
+    m.insert("ë", "ব্দ");
+    m.insert("ì", "ব্ধ");
+    m.insert("í", "ব্ব");
+    m.insert("î", "ব্ল");
+    m.insert("ï", "ভ্ল");
+    m.insert("ð", "ম্ন");
+    m.insert("ñ", "ম্প");
+    m.insert("ò", "ম্ফ");
+    m.insert("ó", "ম্ব");
+    m.insert("ô", "ম্ভ");
+    m.insert("õ", "ম্ম");
+    m.insert("ö", "ম্ল");
+    m.insert("÷", "ল্ক");
+    m.insert("ø", "ল্গ");
+    m.insert("ù", "ল্ট");
+    m.insert("ú", "ল্ড");
+    m.insert("û", "ল্প");
+    m.insert("ü", "ল্ফ");
+    m.insert("ý", "ল্ব");
+    m.insert("þ", "ল্ম");
+    m.insert("ÿ", "ল্ল");
+    m.insert("¯‹", "স্ক");
+    m.insert("¯Í", "স্ত");
+    m.insert("¯’", "স্থ");
+    m.insert("¯œ", "স্ন");
+    m.insert("¯ú", "স্প");
+    m.insert("¯¢", "স্ফ");
+    m.insert("¯^", "স্ব");
+    m.insert("¯§", "স্ম");
+    m.insert("¯ø", "স্ল");
+    m.insert("ü", "হ্ণ");
+    m.insert("ý", "হ্ন");
+    m.insert("þ", "হ্ম");
+    m.insert("ÿ", "হ্ল");
+    m.insert("ü", "হৃ");
 
     // Digits
     m.insert("0", "০");
@@ -89,9 +178,10 @@ static BIJOY_TO_UNICODE: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
 });
 
 static UNICODE_TO_BIJOY: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
-    let mut u_to_b = HashMap::with_capacity(100);
+    let mut u_to_b = HashMap::with_capacity(200);
     for (&k, &v) in BIJOY_TO_UNICODE.iter() {
-        u_to_b.insert(v, k);
+        // Priority to shorter or primary mappings
+        u_to_b.entry(v).or_insert(k);
     }
     u_to_b
 });
@@ -139,7 +229,7 @@ pub fn bijoy_to_unicode(input: &str) -> String {
 
 /// Convert Unicode Bengali text to Bijoy (ANSI / SutonnyMJ)
 pub fn unicode_to_bijoy(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
+    let mut result = String::with_capacity(input.len() * 2);
     let chars: Vec<char> = input.chars().collect();
     let len = chars.len();
     let mut i = 0;
@@ -164,6 +254,13 @@ pub fn unicode_to_bijoy(input: &str) -> String {
             }
         }
 
+        // Special handling for O-kar (ো -> † + consonant + v)
+        if chars[i] == 'ো' {
+            result.push('v');
+            i += 1;
+            continue;
+        }
+
         let single: String = chars[i..i + 1].iter().collect();
         if let Some(bijoy) = UNICODE_TO_BIJOY.get(single.as_str()) {
             result.push_str(bijoy);
@@ -179,21 +276,58 @@ pub fn unicode_to_bijoy(input: &str) -> String {
 fn post_process_bijoy_to_unicode(input: &str) -> String {
     let mut chars: Vec<char> = input.chars().collect();
     let mut i = 0;
-    while i + 1 < chars.len() {
-        // Fix misplaced E-Kar / I-Kar (if kar is before consonant, swap them)
-        if (chars[i] == 'ি' || chars[i] == 'ে' || chars[i] == 'ৈ') && is_consonant(chars[i + 1])
-        {
-            chars.swap(i, i + 1);
+
+    while i < chars.len() {
+        // Fix misplaced pre-kars (ি, ে, ৈ) placed before consonant
+        if (chars[i] == 'ি' || chars[i] == 'ে' || chars[i] == 'ৈ') && i + 1 < chars.len() {
+            let mut end_cons = i + 1;
+            while end_cons + 2 < chars.len() && chars[end_cons + 1] == '্' && is_consonant(chars[end_cons + 2]) {
+                end_cons += 2;
+            }
+            if is_consonant(chars[end_cons]) {
+                let kar = chars.remove(i);
+                chars.insert(end_cons, kar);
+            }
         }
-        // Fix Ref (্ + র at end of consonant)
+
+        // Fix Reph '©' at end of consonant (transforms to র্ before consonant cluster)
         if chars[i] == '©' {
-            // Bijoy Reph
-            chars[i] = 'র';
-            chars.insert(i + 1, '্');
+            chars.remove(i);
+            let mut start_cons = if i > 0 { i - 1 } else { 0 };
+            while start_cons >= 2 && chars[start_cons - 1] == '্' && is_consonant(chars[start_cons - 2]) {
+                start_cons -= 2;
+            }
+            chars.insert(start_cons, 'র');
+            chars.insert(start_cons + 1, '্');
+            i += 2;
+            continue;
         }
+
         i += 1;
     }
-    chars.into_iter().collect()
+
+    // Synthesize O-kar (ে + া -> ো) and OU-kar (ে + ৗ -> ৌ)
+    let mut synthesized = String::with_capacity(chars.len());
+    let mut iter = chars.into_iter().peekable();
+
+    while let Some(c) = iter.next() {
+        if c == 'ে' {
+            if let Some(&next) = iter.peek() {
+                if next == 'া' {
+                    synthesized.push('ো');
+                    iter.next();
+                    continue;
+                } else if next == 'ৗ' || next == 'Š' {
+                    synthesized.push('ৌ');
+                    iter.next();
+                    continue;
+                }
+            }
+        }
+        synthesized.push(c);
+    }
+
+    synthesized
 }
 
 fn is_consonant(c: char) -> bool {
@@ -208,5 +342,8 @@ mod tests {
     fn test_bijoy_conversion() {
         assert_eq!(bijoy_to_unicode("evsjv"), "বাংলা");
         assert_eq!(bijoy_to_unicode("Avwg"), "আমি");
+        assert_eq!(bijoy_to_unicode("†mvbvi"), "সোনার");
+        assert_eq!(bijoy_to_unicode("¯^vaxb"), "স্বাধীন");
+        assert_eq!(bijoy_to_unicode("¶wZ"), "ক্ষতি");
     }
 }
