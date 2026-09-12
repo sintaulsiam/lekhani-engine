@@ -24,6 +24,22 @@ pub const CASE_MARKERS: &[&str] = &[
 /// Layer 4: Emphasis & Particle Clitics (বলবাচক প্রত্যয় ও সংযোজক)
 pub const EMPHASIS_PARTICLES: &[&str] = &["ই", "ও", "তো"];
 
+/// Colloquial & Spoken continuous verb suffix patterns (Latin suffix -> [Standard Cholit, Spoken/Sadhu])
+pub const COLLOQUIAL_VERBAL_PATTERNS: &[(&str, &[&str])] = &[
+    ("tesi", &["ছি", "তেছি"]),
+    ("tasi", &["ছি", "তেছি"]),
+    ("taso", &["ছো", "তেছো"]),
+    ("tasa", &["ছো", "তেছো"]),
+    ("tase", &["ছে", "তেছে"]),
+    ("tasen", &["ছেন", "তেছেন"]),
+    ("tasilam", &["ছিলাম", "তেছিলাম"]),
+    ("tasila", &["ছিলা", "তেছিলা"]),
+    ("tasilo", &["ছিল", "তেছিল"]),
+    ("tasilen", &["ছিলেন", "তেছিলেন"]),
+    ("chen", &["ছেন", "তেছেন"]),
+    ("cheni", &["ছেনি", "তেছেন"]),
+];
+
 /// Comprehensive list of inflectional suffixes ordered by descending length for greedy stemming
 pub const BENGALI_INFLECTIONAL_SUFFIXES: &[&str] = &[
     "গুলোতেই", "গুলোতেও", "গুলিতেই", "গুলিতেও", "দেরকেই", "দেরকেও",
@@ -34,6 +50,7 @@ pub const BENGALI_INFLECTIONAL_SUFFIXES: &[&str] = &[
     "েদের", "দের", "খানা", "খানি", "টিকে", "টাকে", "টির", "টার", "টিতে", "টাতে",
     "টি", "টা", "টুকু", "টুকুন", "গাছা", "গাছি", "ভাবে", "পূর্বক", "শীল",
     "মুখী", "ময়", "তম", "তর", "সমূহ", "বৃন্দ", "গণ", "বর্গ",
+    "তেছিলাম", "তেছিলেন", "তেছিল", "তেছিলা", "তেছেন", "তেছে", "তেছো", "তেছি",
     "ছেন", "ছেনি", "ছিলাম", "ছিলেন", "ছিলা", "ছিল", "বেন", "বা", "বে",
     "ছি", "ছে", "ছিস", "লাম", "লে", "লেন", "তাম", "তেন",
     "দ্বারা", "দিয়ে", "থেকে", "হতে",

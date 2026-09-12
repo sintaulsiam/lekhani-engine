@@ -462,6 +462,18 @@ impl PhoneticSuggestion {
                 );
             }
 
+            // 9b. Colloquial & Spoken continuous verb forms (e.g. kortesi -> করছি, করতেছি)
+            let colloquial_matches = self.add_colloquial_verbs(middle);
+            for item in colloquial_matches {
+                add_cand(
+                    item,
+                    CandidateSource::MorphologicalInflection,
+                    3300,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+            }
+
             // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
             let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
             let mut valid_fuzzy_stems = Vec::new();
@@ -951,6 +963,71 @@ impl PhoneticSuggestion {
             }
         }
 
+        list
+    }
+
+    fn add_colloquial_verbs(&self, middle: &str) -> Vec<String> {
+        let mut list = Vec::new();
+        for &(suffix_key, expansions) in super::morphology::COLLOQUIAL_VERBAL_PATTERNS {
+            if middle.ends_with(suffix_key) && middle.len() > suffix_key.len() {
+                let stem_latin = &middle[..middle.len() - suffix_key.len()];
+                if stem_latin.chars().count() >= 2 {
+                    let stem_bn = self.convert_phonetic(stem_latin);
+                    for &exp in expansions {
+                        let combined = match stem_latin {
+                            "jai" | "jawa" => match exp {
+                                "ছি" => "যাচ্ছি".to_string(),
+                                "ছো" => "যাচ্ছ".to_string(),
+                                "ছে" => "যাচ্ছে".to_string(),
+                                "ছেন" => "যাচ্ছেন".to_string(),
+                                "ছিলাম" => "যাচ্ছিলাম".to_string(),
+                                "ছিলা" => "যাচ্ছিলা".to_string(),
+                                "ছিল" => "যাচ্ছিল".to_string(),
+                                "ছিলেন" => "যাচ্ছিলেন".to_string(),
+                                _ => format!("যাই{}", exp),
+                            },
+                            "khai" | "khawa" => match exp {
+                                "ছি" => "খাচ্ছি".to_string(),
+                                "ছো" => "খাচ্ছ".to_string(),
+                                "ছে" => "খাচ্ছে".to_string(),
+                                "ছেন" => "খাচ্ছেন".to_string(),
+                                "ছিলাম" => "খাচ্ছিলাম".to_string(),
+                                "ছিলা" => "খাচ্ছিলা".to_string(),
+                                "ছিল" => "খাচ্ছিল".to_string(),
+                                "ছিলেন" => "খাচ্ছিলেন".to_string(),
+                                _ => format!("খাই{}", exp),
+                            },
+                            "de" | "di" => match exp {
+                                "ছি" => "দিচ্ছি".to_string(),
+                                "ছো" => "দিচ্ছ".to_string(),
+                                "ছে" => "দিচ্ছে".to_string(),
+                                "ছেন" => "দিচ্ছেন".to_string(),
+                                "ছিলাম" => "দিচ্ছিলাম".to_string(),
+                                "ছিল" => "দিচ্ছিল".to_string(),
+                                _ => format!("দি{}", exp),
+                            },
+                            "ne" | "ni" => match exp {
+                                "ছি" => "নিচ্ছি".to_string(),
+                                "ছো" => "নিচ্ছ".to_string(),
+                                "ছে" => "নিচ্ছে".to_string(),
+                                "ছেন" => "নিচ্ছেন".to_string(),
+                                "ছিলাম" => "নিচ্ছিলাম".to_string(),
+                                "ছিল" => "নিচ্ছিল".to_string(),
+                                _ => format!("নি{}", exp),
+                            },
+                            "ash" | "as" => format!("আস{}", exp),
+                            "bol" => format!("বল{}", exp),
+                            "kor" => format!("কর{}", exp),
+                            "dekh" | "dek" => format!("দেখ{}", exp),
+                            _ => format!("{}{}", stem_bn, exp),
+                        };
+                        if !list.contains(&combined) {
+                            list.push(combined);
+                        }
+                    }
+                }
+            }
+        }
         list
     }
 }
@@ -1630,5 +1707,32 @@ mod tests {
 
         let (cands_tea, _) = sugg.suggest("cha", true, true, &empty_memory);
         assert_ne!(cands_tea[0], "☕");
+    }
+
+    #[test]
+    fn test_colloquial_verb_suggestions() {
+        let mut sugg = PhoneticSuggestion::new();
+        let layout_candidates = [
+            std::path::Path::new("../../data/layouts/avrophonetic.json"),
+            std::path::Path::new("data/layouts/avrophonetic.json"),
+            std::path::Path::new("../data/layouts/avrophonetic.json"),
+        ];
+        for p in layout_candidates {
+            if p.exists() {
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    if let Ok(json) = serde_json::from_str(&content) {
+                        sugg.set_layout(&json);
+                        break;
+                    }
+                }
+            }
+        }
+        let empty_memory = HashMap::new();
+
+        let (cands_kor, _) = sugg.suggest("kortesi", true, true, &empty_memory);
+        assert!(cands_kor.contains(&"করছি".to_string()) || cands_kor.contains(&"করতেছি".to_string()));
+
+        let (cands_jai, _) = sugg.suggest("jaitasi", true, true, &empty_memory);
+        assert!(cands_jai.contains(&"যাচ্ছি".to_string()) || cands_jai.contains(&"যাইতেছি".to_string()));
     }
 }
