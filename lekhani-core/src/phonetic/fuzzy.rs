@@ -337,6 +337,7 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
 /// - Affricates & Semivowels (জ, য, য়, ্য) -> 'J'
 /// - Velars (ক, খ) -> 'K', (গ, ঘ) -> 'G'
 /// - Labials (প, ফ) -> 'P', (ব, ভ) -> 'B'
+///
 /// Deduplicates adjacent identical phonetic codes.
 pub fn bengali_phonetic_soundex(word: &str) -> String {
     let mut soundex = String::with_capacity(word.len());
