@@ -622,8 +622,7 @@ impl PhoneticSuggestion {
 
         // 15. Global Multi-Factor Probabilistic Scoring & Ranker
         let has_valid_dict_candidates = raw_candidates.iter().any(|c| {
-            c.source != CandidateSource::DirectTransliteration
-                && c.source != CandidateSource::EmojiKeyword
+            (c.source == CandidateSource::FuzzySoundLaw || c.source == CandidateSource::Autocorrect)
                 && self.database.is_exact_dictionary_word(&c.text)
         });
 
@@ -925,7 +924,7 @@ impl PhoneticSuggestion {
         result
     }
 
-    fn add_suffixes(&self, middle: &str, phonetic: &str) -> Vec<String> {
+    fn add_suffixes(&self, middle: &str, _phonetic: &str) -> Vec<String> {
         let mut list = Vec::new();
 
         if middle.chars().count() > 2 {
@@ -940,7 +939,7 @@ impl PhoneticSuggestion {
                         } else {
                             self.convert_phonetic(&ac)
                         };
-                        if !conv.is_empty() {
+                        if !conv.is_empty() && !base_candidates.contains(&conv) {
                             base_candidates.push(conv);
                         }
                     }
@@ -949,12 +948,19 @@ impl PhoneticSuggestion {
                         base_candidates.push(base_phonetic);
                     }
 
+                    // Apply stem-level sound-laws (e.g. "manush" in "manusher" -> "মানুষ")
+                    for fz in super::fuzzy::generate_phonetic_variants(base_key) {
+                        let conv = self.convert_phonetic(&fz);
+                        if self.database.is_exact_dictionary_word(&conv) && !base_candidates.contains(&conv) {
+                            base_candidates.push(conv);
+                        }
+                    }
+
                     for base in &base_candidates {
                         let word = super::morphology::apply_sandhi_join(base, suffix);
                         if (self.database.is_exact_dictionary_word(&word)
                             || self.database.is_exact_dictionary_word(base))
                             && !list.iter().any(|item| item == &word)
-                            && word != phonetic
                         {
                             list.push(word);
                         }
@@ -1734,5 +1740,91 @@ mod tests {
 
         let (cands_jai, _) = sugg.suggest("jaitasi", true, true, &empty_memory);
         assert!(cands_jai.contains(&"যাচ্ছি".to_string()) || cands_jai.contains(&"যাইতেছি".to_string()));
+    }
+
+    #[test]
+    fn test_inflection_and_ranking_regressions() {
+        let mut sugg = PhoneticSuggestion::new();
+        let layout_candidates = [
+            std::path::Path::new("../../data/layouts/avrophonetic.json"),
+            std::path::Path::new("data/layouts/avrophonetic.json"),
+            std::path::Path::new("../data/layouts/avrophonetic.json"),
+        ];
+        for p in layout_candidates {
+            if p.exists() {
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    if let Ok(json) = serde_json::from_str(&content) {
+                        sugg.set_layout(&json);
+                        break;
+                    }
+                }
+            }
+        }
+        let empty_memory = HashMap::new();
+
+        // 1. Inflected Nouns (should rank exact inflections at #1, not longer compound autocompletions)
+        let (cands_deshe, _) = sugg.suggest("deshe", true, true, &empty_memory);
+        assert_eq!(cands_deshe[0], "দেশে");
+
+        let (cands_desher, _) = sugg.suggest("desher", true, true, &empty_memory);
+        assert_eq!(cands_desher[0], "দেশের");
+
+        let (cands_dine, _) = sugg.suggest("dine", true, true, &empty_memory);
+        assert_eq!(cands_dine[0], "দিনে");
+
+        let (cands_ekhane, _) = sugg.suggest("ekhane", true, true, &empty_memory);
+        assert_eq!(cands_ekhane[0], "এখানে");
+
+        let (cands_bhabe, _) = sugg.suggest("bhabe", true, true, &empty_memory);
+        assert_eq!(cands_bhabe[0], "ভাবে");
+
+        // 2. Everyday common words outranking obscure dictionary entries
+        let (cands_tomra, _) = sugg.suggest("tomra", true, true, &empty_memory);
+        assert_eq!(cands_tomra[0], "তোমরা");
+
+        let (cands_gari, _) = sugg.suggest("gari", true, true, &empty_memory);
+        assert_eq!(cands_gari[0], "গাড়ি");
+
+        let (cands_shob, _) = sugg.suggest("shob", true, true, &empty_memory);
+        assert_eq!(cands_shob[0], "সব");
+
+        let (cands_jabo, _) = sugg.suggest("jabo", true, true, &empty_memory);
+        assert_eq!(cands_jabo[0], "যাব");
+
+        let (cands_kono, _) = sugg.suggest("kono", true, true, &empty_memory);
+        assert_eq!(cands_kono[0], "কোনো");
+
+        // 3. Suffixes and Classifiers
+        let (cands_boita, _) = sugg.suggest("boita", true, true, &empty_memory);
+        assert_eq!(cands_boita[0], "বইটা");
+
+        let (cands_garite, _) = sugg.suggest("garite", true, true, &empty_memory);
+        assert_eq!(cands_garite[0], "গাড়িতে");
+
+        // 4. Sound-law Stem Propagation on Inflected Words
+        let (cands_manusher, _) = sugg.suggest("manusher", true, true, &empty_memory);
+        assert_eq!(cands_manusher[0], "মানুষের");
+
+        let (cands_porikkhay, _) = sugg.suggest("porikkhay", true, true, &empty_memory);
+        assert!(cands_porikkhay[0] == "পরীক্ষায়" || cands_porikkhay[0] == "পরীক্ষায়");
+
+        // 5. Casual Phonetic Typing
+        let (cands_ektu, _) = sugg.suggest("ektu", true, true, &empty_memory);
+        assert_eq!(cands_ektu[0], "একটু");
+
+        let (cands_bisshash, _) = sugg.suggest("bisshash", true, true, &empty_memory);
+        assert_eq!(cands_bisshash[0], "বিশ্বাস");
+
+        let (cands_bissho, _) = sugg.suggest("bissho", true, true, &empty_memory);
+        assert_eq!(cands_bissho[0], "বিশ্ব");
+
+        let (cands_ditiyo, _) = sugg.suggest("ditiyo", true, true, &empty_memory);
+        assert_eq!(cands_ditiyo[0], "দ্বিতীয়");
+
+        let (cands_shikhok, _) = sugg.suggest("shikhok", true, true, &empty_memory);
+        assert_eq!(cands_shikhok[0], "শিক্ষক");
+
+        let (cands_shartho, _) = sugg.suggest("shartho", true, true, &empty_memory);
+        assert_eq!(cands_shartho[0], "স্বার্থ");
     }
 }

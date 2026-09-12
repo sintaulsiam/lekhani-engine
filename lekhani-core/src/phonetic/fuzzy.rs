@@ -63,11 +63,12 @@ pub fn collapse_elongated_runs(input: &str) -> Vec<String> {
 
 /// Generic Phoneme Equivalence Sound Laws (Equivalence Classes)
 pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
-    // 1. Sibilants & Sibilant Conjuncts (স, শ, ষ, স্ব, স্ম, ষ্ট, ষ্ঠ, স্ক, ষ্প, স্ফ, স্ত্র)
-    ("sh", &["sw", "s", "Sh"]),
-    ("Sh", &["sh", "s", "sw"]),
-    ("ss", &["sh", "s", "sw"]),
-    ("s", &["sw", "sh", "Sh"]),
+    // 1. Sibilants & Sibilant Conjuncts (স, শ, ষ, স্ব, স্ম, ষ্ট, ষ্ঠ, স্ক, ষ্প, স্ফ, স্ত্র, শ্ব)
+    ("ssh", &["shw", "sw", "sh", "Shw"]),
+    ("sh", &["sw", "s", "Sh", "shw"]),
+    ("Sh", &["sh", "s", "sw", "Shw"]),
+    ("ss", &["sh", "s", "sw", "shw"]),
+    ("s", &["sw", "sh", "Sh", "shw"]),
     ("sw", &["shw", "s", "sh"]),
     ("shw", &["sw", "s"]),
     ("sm", &["Shm", "shm", "s"]),
@@ -88,14 +89,17 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("sf", &["Shf", "sf", "shf"]),
     ("shf", &["Shf", "sf"]),
     ("str", &["sTr", "ShTr", "str"]),
-    // 2. Dental & Retroflex Stops (ত/ট, থ/ঠ, দ/ড, ধ/ঢ, খণ্ড-ত ৎ)
+    // 2. Dental & Retroflex Stops (ত/ট, থ/ঠ, দ/ড, ধ/ঢ, খণ্ড-ত ৎ, দ্ব)
     ("th", &["Th", "t"]),
     ("Th", &["th", "T"]),
     ("t", &["T", "th", "t``"]),
     ("T", &["t", "Th"]),
+    ("kt", &["kT", "kt``", "kth"]),
     ("dh", &["Dh", "d"]),
     ("Dh", &["dh", "D"]),
-    ("d", &["D", "dh"]),
+    ("d", &["dw", "D", "dh"]),
+    ("dw", &["d", "dh", "D"]),
+    ("dit", &["dwit", "dit"]),
     ("D", &["d", "Dh"]),
     ("tt", &["t", "tZ", "t``"]),
     ("tth", &["thZ", "tt"]),
@@ -124,7 +128,7 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("gri", &["grri", "gri"]),
     // Reph consonant combinations (র-ফলা / রেফ: র্)
     ("rt", &["rrt", "rrT"]),
-    ("rth", &["rrth", "rrTh"]),
+    ("rth", &["rrth", "rrTh", "rT"]),
     ("ortho", &["orrth", "rrth", "orth"]),
     ("orth", &["orrth", "rrth"]),
     ("rtho", &["rrth", "rrTh", "rth"]),
@@ -141,9 +145,9 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("rgh", &["rrgh"]),
     // 4. Affricates, Semivowels & Ja-fala (জ, য, য়, ওয়, ঝ, জ্ঞ, ক্ষ)
     ("z", &["j", "y"]),
-    ("j", &["z", "jh", "y"]),
+    ("j", &["z", "jh", "y", "J"]),
     ("jh", &["j"]),
-    ("y", &["z", "Y", "y"]),
+    ("y", &["z", "Y", "y", "j"]),
     ("w", &["o", "oy", "v", "bh"]),
     ("gann", &["gZan", "jNGan", "gZann"]),
     ("gani", &["gZani", "gZanI", "gZanee", "jNGani"]),
@@ -154,7 +158,10 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("gg", &["gZ", "jNG"]),
     ("gn", &["gZ", "jNG"]),
     ("gan", &["gZan", "jNGan"]),
-    ("kkh", &["kSh", "x", "ks"]),
+    ("kkh", &["kSh", "x", "ks", "kh"]),
+    ("khok", &["kShok", "khok"]),
+    ("khi", &["kShi", "khee"]),
+    ("khe", &["kShe", "khe"]),
     ("x", &["kkh", "kSh"]),
     ("ks", &["kkh", "x"]),
     // 5. Aspirated vs Unaspirated Stops (ক/খ, গ/ঘ, চ/ছ, প/ফ, ব/ভ)
@@ -183,6 +190,11 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("u", &["U", "oo", "uu"]),
     ("U", &["u", "oo"]),
     ("aa", &["a", "A"]),
+    ("aate", &["ate", "aate"]),
+    ("aater", &["ater", "aater"]),
+    ("aatei", &["atei", "aatei"]),
+    ("omra", &["Omra", "amra"]),
+    ("ono", &["Ono", "ano"]),
     ("o", &["O", "a", "u"]),
     ("O", &["o", "u"]),
     ("noiti", &["nOIti", "noyti"]),

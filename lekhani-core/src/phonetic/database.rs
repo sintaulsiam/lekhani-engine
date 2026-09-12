@@ -31,19 +31,38 @@ pub const CORE_SUFFIXES: &[(&str, &str)] = &[
     ("Ti", "টি"),
     ("tai", "টাই"),
     ("Tai", "টাই"),
+    ("tao", "টাও"),
+    ("tio", "টিও"),
     ("gulo", "গুলো"),
     ("gula", "গুলা"),
     ("guli", "গুলি"),
+    ("gulote", "গুলোতে"),
+    ("gulate", "গুলাতে"),
+    ("gulor", "গুলোর"),
+    ("gular", "গুলার"),
     ("der", "দের"),
+    ("derke", "দেরকে"),
+    ("deri", "দেরই"),
+    ("dero", "দেরও"),
     ("ke", "কে"),
     ("re", "রে"),
+    ("rei", "রেই"),
     ("te", "তে"),
+    ("tei", "তেই"),
+    ("ete", "েতে"),
     ("e", "ে"),
+    ("eo", "েও"),
+    ("ei", "েই"),
+    ("ey", "েই"),
     ("er", "ের"),
+    ("ero", "েরও"),
+    ("eri", "েরই"),
     ("r", "র"),
     ("y", "য়"),
     ("ye", "য়ে"),
+    ("ay", "ায়"),
     ("ra", "রা"),
+    ("rao", "রাও"),
     ("bhabe", "ভাবে"),
     ("khana", "খানা"),
     ("khani", "খানি"),
@@ -54,6 +73,42 @@ pub const CORE_SUFFIXES: &[(&str, &str)] = &[
     ("to", "তো"),
     ("i", "ই"),
     ("o", "ও"),
+];
+
+pub const CORE_AUTOCORRECT: &[(&str, &str)] = &[
+    ("tomra", "তোমরা"),
+    ("kono", "কোনো"),
+    ("ektu", "একটু"),
+    ("shob", "সব"),
+    ("gari", "গাড়ি"),
+    ("jabo", "যাব"),
+    ("shartho", "স্বার্থ"),
+    ("shikhok", "শিক্ষক"),
+    ("bisshash", "বিশ্বাস"),
+    ("bissho", "বিশ্ব"),
+    ("ditiyo", "দ্বিতীয়"),
+    ("tritiyo", "তৃতীয়"),
+    ("raate", "রাতে"),
+    ("deshe", "দেশে"),
+    ("desher", "দেশের"),
+    ("boita", "বইটা"),
+    ("garite", "গাড়িতে"),
+    ("garir", "গাড়ির"),
+    ("garita", "গাড়িটা"),
+    ("dine", "দিনে"),
+    ("diner", "দিনের"),
+    ("ekhane", "এখানে"),
+    ("shekhane", "সেখানে"),
+    ("kothao", "কোথাও"),
+    ("bhabe", "ভাবে"),
+    ("shokale", "সকালে"),
+    ("kothay", "কোথায়"),
+    ("kichutei", "কিছুতেই"),
+    ("manusher", "মানুষের"),
+    ("manushke", "মানুষকে"),
+    ("manushera", "মানুষেরা"),
+    ("porikkhay", "পরীক্ষায়"),
+    ("porikkhar", "পরীক্ষার"),
 ];
 
 impl PhoneticDatabase {
@@ -223,9 +278,23 @@ impl PhoneticDatabase {
         self.trie.get_frequency(word)
     }
 
-    /// Check if word is an exact valid dictionary word
+    /// Check if word is an exact valid dictionary word or a valid morphological inflection
     pub fn is_exact_dictionary_word(&self, word: &str) -> bool {
-        self.trie.contains_exact(word)
+        if self.trie.contains_exact(word) {
+            return true;
+        }
+        // Morphology-aware check: verify if the base stem of an inflected word is in the dictionary
+        if let Some(stem) = crate::phonetic::morphology::extract_root_stem(word) {
+            if self.trie.contains_exact(&stem) {
+                return true;
+            }
+        }
+        for stem in crate::phonetic::morphology::peel_all_stems(word) {
+            if self.trie.contains_exact(&stem) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Bilingual loanwords for natural code-mixing (English -> Transliteration, English Word)
@@ -287,6 +356,7 @@ impl PhoneticDatabase {
             "tumi" => Some(&["তোমাকে", "তোমার", "তোমায়", "তোমরা", "তোমাদের", "তুমিই"]),
             "apni" => Some(&["আপনাকে", "আপনার", "আপনারা", "আপনাদের", "আপনিই"]),
             "amra" => Some(&["আমাদের", "আমাদেরকে", "আমরাই"]),
+            "tomra" => Some(&["তোমাদের", "তোমাদেরকে", "তোমরাই"]),
             "tara" => Some(&["তাদের", "তাদেরকে", "তারাই"]),
             "she" | "se" => Some(&["তাকে", "তার", "সেটাই", "সেই"]),
             "tini" => Some(&["তাঁকে", "তাঁর", "তাঁরা", "তিনিই"]),
@@ -297,8 +367,8 @@ impl PhoneticDatabase {
             "valo" | "bhalo" => Some(&["ভালোই", "ভালোভাবে", "ভালোবাসা", "ভালোমন্দ"]),
             "bhalobasha" | "valobasha" => Some(&["ভালোবাসি", "ভালোবাসব", "ভালোবাসবে", "ভালোবাসতাম"]),
             "bhalobashi" | "valobashi" => Some(&["ভালোবাসি", "ভালোবাসো", "ভালোবাসে"]),
-            "gari" | "garii" => Some(&["গাড়িতে", "গাড়ির", "গাড়িটি", "গাড়িগুলো"]),
-            "bari" | "barii" => Some(&["বাড়িতে", "বাড়ির", "বাড়িটি", "বাড়িগুলো"]),
+            "gari" | "garii" => Some(&["গাড়িতে", "গাড়ির", "গাড়িটি", "গাড়িগুলো", "গাড়িটা"]),
+            "bari" | "barii" => Some(&["বাড়িতে", "বাড়ির", "বাড়িটি", "বাড়িগুলো", "বাড়িটা"]),
             "taka" => Some(&["টাকায়", "টাকার", "টাকাটা", "টাকাগুলো"]),
             "shob" => Some(&["সবাই", "সবাইকে", "সবার", "সবকিছু"]),
             "cha" => Some(&["চাই", "চাও", "চায়", "চাচ্ছি"]),
@@ -307,31 +377,38 @@ impl PhoneticDatabase {
             "kichu" => Some(&["কিছুই", "কিছুটা", "কিছুতেই"]),
             "kotha" => Some(&["কথায়", "কথার", "কথাটি", "কথাবার্তা"]),
             "kaaj" | "kaj" => Some(&["কাজে", "কাজের", "কাজটি", "কাজকর্ম"]),
-            "manush" => Some(&["মানুষের", "মানুষকে", "মানুষজন", "মানুষটি"]),
-            "desh" => Some(&["দেশে", "দেশের", "দেশবাসী"]),
+            "manush" => Some(&["মানুষের", "মানুষকে", "মানুষজন", "মানুষটি", "মানুষেরা"]),
+            "desh" => Some(&["দেশে", "দেশের", "দেশবাসী", "দেশকে"]),
             "din" => Some(&["দিনে", "দিনের", "দিনকাল", "দিনরাত"]),
             "shomoy" => Some(&["সময়ে", "সময়ের", "সময়মতো"]),
             "bochor" => Some(&["বছরে", "বছরের", "বছরব্যাপী"]),
             "shondha" | "shondhya" => Some(&["সন্ধ্যায়", "সন্ধ্যাবেলা"]),
             "shokal" => Some(&["সকালে", "সকালবেলা"]),
             "raat" | "rat" => Some(&["রাতে", "রাতের", "রাতভর"]),
+            "boi" => Some(&["বইটা", "বইটি", "বইগুলো", "বইয়ের", "বইয়ে"]),
             _ => None,
         }
     }
 
-    /// Get raw autocorrect replacement (user autocorrect -> system autocorrect)
+    /// Get raw autocorrect replacement (user autocorrect -> system autocorrect -> built-in core autocorrect)
     pub fn get_autocorrect_raw(&self, term: &str) -> Option<String> {
+        let lower = term.to_lowercase();
         if let Some(correct) = self.user_autocorrect.get(term) {
             return Some(correct.clone());
         }
-        if let Some(lower_match) = self.user_autocorrect.get(&term.to_lowercase()) {
+        if let Some(lower_match) = self.user_autocorrect.get(&lower) {
             return Some(lower_match.clone());
         }
         if let Some(correct) = self.autocorrect.get(term) {
             return Some(correct.clone());
         }
-        if let Some(lower_match) = self.autocorrect.get(&term.to_lowercase()) {
+        if let Some(lower_match) = self.autocorrect.get(&lower) {
             return Some(lower_match.clone());
+        }
+        for &(k, v) in CORE_AUTOCORRECT {
+            if k == lower || k == term {
+                return Some(v.to_string());
+            }
         }
         None
     }
@@ -393,7 +470,7 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("সে", 9400),
     ("তিনি", 8800),
     ("আমরা", 9100),
-    ("তোমরা", 8700),
+    ("তোমরা", 9600),
     ("আপনারা", 8600),
     ("তারা", 8900),
     ("তাঁরা", 8400),
@@ -413,6 +490,9 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("কেন", 9100),
     ("কেমন", 8900),
     ("কোথায়", 8800),
+    ("কোথাও", 9300),
+    ("এখানে", 9600),
+    ("সেখানে", 9500),
     ("কখন", 8700),
     ("না", 10000),
     ("হ্যাঁ", 9600),
@@ -423,13 +503,20 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("ওকে", 9100),
     ("কিভাবে", 8600),
     ("কবে", 8500),
+    ("সব", 9800),
+    ("সবাই", 9600),
+    ("সবার", 9400),
+    ("সবকিছু", 9300),
+    ("কোনো", 9600),
+    ("কোন", 9400),
+    ("একটু", 9600),
     // Pronoun Inflections
     ("আমাকে", 9300),
     ("আমার", 9500),
     ("আমাদের", 9400),
     ("তোমাকে", 9200),
     ("তোমার", 9400),
-    ("তোমাদের", 9100),
+    ("তোমাদের", 9500),
     ("আপনাকে", 9100),
     ("আপনার", 9300),
     ("আপনাদের", 9000),
@@ -533,20 +620,35 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("বাংলাদেশ", 9800),
     ("ঢাকা", 9500),
     ("বাংলা", 9600),
-    ("মানুষ", 9400),
-    ("দেশ", 9300),
+    ("মানুষ", 9700),
+    ("মানুষের", 9600),
+    ("মানুষকে", 9500),
+    ("মানুষেরা", 9400),
+    ("মানুষজন", 9200),
+    ("দেশ", 9600),
+    ("দেশে", 9600),
+    ("দেশের", 9600),
+    ("দেশবাসী", 9000),
     ("ভাষা", 9200),
     ("কথা", 9400),
     ("কাজ", 9300),
     ("সময়", 9300),
-    ("দিন", 9200),
-    ("রাত", 9000),
+    ("দিন", 9400),
+    ("দিনে", 9600),
+    ("দিনের", 9400),
+    ("রাত", 9300),
+    ("রাতে", 9600),
+    ("রাতের", 9400),
     ("বছর", 9100),
     ("মাস", 8900),
     ("সপ্তাহ", 8700),
-    ("সকাল", 9000),
+    ("সকাল", 9200),
+    ("সকালে", 9400),
     ("দুপুর", 8700),
-    ("সুন্দর", 9300),
+    ("সুন্দর", 9400),
+    ("সুন্দরভাবে", 9300),
+    ("ভাবে", 9500),
+    ("ভালোভাবে", 9400),
     ("সবুজ", 9000),
     ("সুখ", 9100),
     ("সুখী", 9000),
@@ -555,7 +657,20 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("সম্ভব", 9300),
     ("অসম্ভব", 9000),
     ("সম্ভাবনা", 9000),
-    ("স্বার্থ", 9100),
+    ("স্বার্থ", 9500),
+    ("পরীক্ষা", 9600),
+    ("পরীক্ষায়", 9500),
+    ("পরীক্ষার", 9400),
+    ("বিশ্বাস", 9600),
+    ("বিশ্ব", 9600),
+    ("দ্বিতীয়", 9400),
+    ("তৃতীয়", 9400),
+    ("শিক্ষক", 9500),
+    ("গাড়ি", 9600),
+    ("গাড়িতে", 9400),
+    ("গাড়ির", 9400),
+    ("গাড়িটা", 9300),
+    ("বইটা", 9400),
     ("সার্থকতা", 8900),
     ("সাক্ষী", 9000),
     ("স্বাক্ষর", 9000),
