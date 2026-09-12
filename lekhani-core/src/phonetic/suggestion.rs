@@ -391,7 +391,7 @@ impl PhoneticSuggestion {
                 if clean_middle.len() > suf_en.len() && clean_middle.ends_with(suf_en) {
                     let base_en = &clean_middle[..clean_middle.len() - suf_en.len()];
                     if let Some((bn_loan, en_loan)) = PhoneticDatabase::get_bilingual_loanword(base_en) {
-                        let actual_suffix = if suf_bn == "র" && !bn_loan.chars().last().map_or(false, |c| c.is_kar() || c.is_vowel()) {
+                        let actual_suffix = if suf_bn == "র" && !bn_loan.chars().last().is_some_and(|c| c.is_kar() || c.is_vowel()) {
                             "ের"
                         } else {
                             suf_bn
