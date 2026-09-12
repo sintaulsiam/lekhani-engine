@@ -89,6 +89,24 @@ pub const CORE_SUFFIXES: &[(&str, &str)] = &[
 ];
 
 pub const CORE_AUTOCORRECT: &[(&str, &str)] = &[
+    ("dur", "দূর"),
+    ("dUr", "দূর"),
+    ("dure", "দূরে"),
+    ("dUre", "দূরে"),
+    ("durer", "দূরের"),
+    ("dUrer", "দূরের"),
+    ("dureo", "দূরেও"),
+    ("durei", "দূরেই"),
+    ("durotto", "দূরত্ব"),
+    ("bhalobasha", "ভালোবাসা"),
+    ("bhalobashi", "ভালোবাসি"),
+    ("valobasha", "ভালোবাসা"),
+    ("valobashi", "ভালোবাসি"),
+    ("somoymoto", "সময়মতো"),
+    ("shomoymoto", "সময়মতো"),
+    ("mrittyu", "মৃত্যু"),
+    ("mrittu", "মৃত্যু"),
+    ("mrritZu", "মৃত্যু"),
     ("ekhon", "এখন"),
     ("mathe", "মাঠে"),
     ("mather", "মাঠের"),
@@ -448,8 +466,8 @@ impl PhoneticDatabase {
         if self.trie.contains_exact(word) {
             return true;
         }
-        // Morphology-aware check: verify if the base stem of an inflected word is in the dictionary
-        if let Some(stem) = crate::phonetic::morphology::extract_root_stem(word) {
+        // Morphology-aware check: verify if any candidate base stem of an inflected word is in the dictionary
+        for stem in crate::phonetic::morphology::extract_all_candidate_stems(word) {
             if self.trie.contains_exact(&stem) {
                 return true;
             }
@@ -682,6 +700,10 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("কোথাও", 9300),
     ("এখানে", 9600),
     ("সেখানে", 9500),
+    ("দূর", 9200),
+    ("দূরে", 9500),
+    ("দূরের", 8800),
+    ("দূরত্ব", 8900),
     ("কখন", 8700),
     ("না", 10000),
     ("হ্যাঁ", 9600),

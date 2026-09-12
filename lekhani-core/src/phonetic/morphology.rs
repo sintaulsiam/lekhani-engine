@@ -252,6 +252,40 @@ pub fn extract_root_stem(word: &str) -> Option<String> {
     None
 }
 
+/// Extract all candidate stems by checking every applicable suffix rule
+pub fn extract_all_candidate_stems(word: &str) -> Vec<String> {
+    let word = word.trim();
+    if word.chars().count() <= 2 {
+        return Vec::new();
+    }
+
+    let mut stems = Vec::new();
+    for &suffix in BENGALI_INFLECTIONAL_SUFFIXES {
+        if word.ends_with(suffix) && word.len() > suffix.len() {
+            let base = &word[..word.len() - suffix.len()];
+            if base.chars().count() >= 2 {
+                let mut clean_base = base.to_string();
+                if clean_base.ends_with('য়') && clean_base.chars().count() >= 3 {
+                    clean_base.pop();
+                }
+                if !stems.contains(&clean_base) {
+                    stems.push(clean_base.clone());
+                }
+                if clean_base.ends_with('ত') {
+                    let mut kt_base = clean_base;
+                    kt_base.pop();
+                    kt_base.push('ৎ');
+                    if !stems.contains(&kt_base) {
+                        stems.push(kt_base);
+                    }
+                }
+            }
+        }
+    }
+
+    stems
+}
+
 /// Recursively peel multiple layers of affixes to uncover the innermost root lemma
 pub fn peel_all_stems(word: &str) -> Vec<String> {
     let mut stems = Vec::new();

@@ -2,6 +2,47 @@ use hashbrown::HashMap;
 use lekhani_core::phonetic::PhoneticSuggestion;
 
 #[test]
+fn test_dure_suggestions() {
+    let mut sugg = PhoneticSuggestion::new();
+    let layout_candidates = [
+        std::path::Path::new("../../data/layouts/avrophonetic.json"),
+        std::path::Path::new("data/layouts/avrophonetic.json"),
+        std::path::Path::new("../data/layouts/avrophonetic.json"),
+    ];
+    for p in layout_candidates {
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(p) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    sugg.set_layout(&json);
+                    break;
+                }
+            }
+        }
+    }
+    let dict_candidates = [
+        std::path::Path::new("../../data/dictionaries"),
+        std::path::Path::new("data/dictionaries"),
+        std::path::Path::new("../data/dictionaries"),
+    ];
+    for p in dict_candidates {
+        if p.exists() {
+            let _ = sugg.database.load_from_dir(p);
+            break;
+        }
+    }
+    let empty_memory = HashMap::new();
+    let (cands_dure, _) = sugg.suggest("dure", true, true, &empty_memory);
+    let (cands_d_ure, _) = sugg.suggest("dUre", true, true, &empty_memory);
+    let (cands_dur, _) = sugg.suggest("dur", true, true, &empty_memory);
+    let (cands_d_ur, _) = sugg.suggest("dUr", true, true, &empty_memory);
+
+    assert_eq!(cands_dure[0], "দূরে", "Expected 'দূরে' for 'dure'");
+    assert_eq!(cands_d_ure[0], "দূরে", "Expected 'দূরে' for 'dUre'");
+    assert_eq!(cands_dur[0], "দূর", "Expected 'দূর' for 'dur'");
+    assert_eq!(cands_d_ur[0], "দূর", "Expected 'দূর' for 'dUr'");
+}
+
+#[test]
 fn test_daily_and_complex_typing_simulation() {
     let mut sugg = PhoneticSuggestion::new();
     let layout_candidates = [
@@ -72,6 +113,10 @@ fn test_daily_and_complex_typing_simulation() {
         ("shob", "সব"),
         ("kichutei", "কিছুতেই"),
         ("raate", "রাতে"),
+        ("dur", "দূর"),
+        ("dUr", "দূর"),
+        ("dure", "দূরে"),
+        ("dUre", "দূরে"),
 
         // 3. Complex Sanskrit / Ha-Conjuncts & Clitics
         ("ahban", "আহ্বান"),
