@@ -40,6 +40,7 @@ fn test_dure_suggestions() {
     assert_eq!(cands_d_ure[0], "দূরে", "Expected 'দূরে' for 'dUre'");
     assert_eq!(cands_dur[0], "দূর", "Expected 'দূর' for 'dur'");
     assert_eq!(cands_d_ur[0], "দূর", "Expected 'দূর' for 'dUr'");
+
 }
 
 #[test]
