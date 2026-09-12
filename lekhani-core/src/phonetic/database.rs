@@ -208,6 +208,16 @@ impl PhoneticDatabase {
         self.trie.find_prefix_matches(prefix, limit)
     }
 
+    /// Search dictionary with zero-allocation borrowed string slices
+    pub fn search_dictionary_ref<'a>(&'a self, prefix: &str, limit: usize) -> Vec<&'a str> {
+        self.trie.find_prefix_matches_ref(prefix, limit)
+    }
+
+    /// Search dictionary returning word slice and frequency weight
+    pub fn search_dictionary_entries<'a>(&'a self, prefix: &str, limit: usize) -> Vec<(&'a str, u32)> {
+        self.trie.find_prefix_entries(prefix, limit)
+    }
+
     /// Get corpus frequency of a word
     pub fn get_frequency(&self, word: &str) -> u32 {
         self.trie.get_frequency(word)
