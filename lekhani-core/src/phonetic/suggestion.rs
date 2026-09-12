@@ -298,6 +298,7 @@ impl PhoneticSuggestion {
         };
 
         // 4. Bilingual Loanword Code-Mixing (e.g. "meeting" -> "মিটিং", "meeting")
+        let mut preferred_loanword = None;
         let loan_opt = PhoneticDatabase::get_bilingual_loanword(middle).or_else(|| {
             if middle.contains('-') && middle.len() >= 3 && !middle.split('-').all(|p| p.len() <= 1)
             {
@@ -311,10 +312,11 @@ impl PhoneticSuggestion {
             add_cand(
                 bn_loan.to_string(),
                 CandidateSource::Loanword,
-                3600,
+                6500,
                 &mut raw_candidates,
                 &mut seen,
             );
+            preferred_loanword = Some(bn_loan.to_string());
             if include_english {
                 add_cand(
                     en_loan.to_string(),
@@ -327,6 +329,9 @@ impl PhoneticSuggestion {
         } else {
             // Suffix decomposition on loanwords (e.g. "computere" -> "কম্পিউটার" + "ে" -> "কম্পিউটারে", "fileti" -> "ফাইলটি")
             const LOANWORD_SUFFIXES: &[(&str, &str)] = &[
+                ("developerder", "দের"),
+                ("developerra", "রা"),
+                ("notificationgulo", "গুলো"),
                 ("guloteo", "গুলোতেও"),
                 ("gulateo", "গুলাতেও"),
                 ("gulotei", "গুলোতেই"),
@@ -362,10 +367,11 @@ impl PhoneticSuggestion {
                 ("rei", "রেই"),
                 ("ta", "টা"),
                 ("ti", "টি"),
-                ("te", "তে"),
+                ("te", "ে"),
                 ("er", "ের"),
                 ("re", "রে"),
                 ("ke", "কে"),
+                ("ra", "রা"),
                 ("ei", "েই"),
                 ("eo", "েও"),
                 ("ey", "েই"),
@@ -375,18 +381,30 @@ impl PhoneticSuggestion {
                 ("r", "র"),
             ];
 
+            let clean_middle = if middle.contains('-') && middle.len() >= 3 {
+                middle.replace('-', "")
+            } else {
+                middle.to_string()
+            };
+
             for &(suf_en, suf_bn) in LOANWORD_SUFFIXES {
-                if middle.len() > suf_en.len() && middle.ends_with(suf_en) {
-                    let base_en = &middle[..middle.len() - suf_en.len()];
+                if clean_middle.len() > suf_en.len() && clean_middle.ends_with(suf_en) {
+                    let base_en = &clean_middle[..clean_middle.len() - suf_en.len()];
                     if let Some((bn_loan, en_loan)) = PhoneticDatabase::get_bilingual_loanword(base_en) {
-                        let combined_bn = super::morphology::apply_sandhi_join(bn_loan, suf_bn);
+                        let actual_suffix = if suf_bn == "র" && !bn_loan.chars().last().map_or(false, |c| c.is_kar() || c.is_vowel()) {
+                            "ের"
+                        } else {
+                            suf_bn
+                        };
+                        let combined_bn = super::morphology::apply_sandhi_join(bn_loan, actual_suffix);
                         add_cand(
-                            combined_bn,
+                            combined_bn.clone(),
                             CandidateSource::Loanword,
-                            3400,
+                            6000,
                             &mut raw_candidates,
                             &mut seen,
                         );
+                        preferred_loanword = Some(combined_bn);
                         if include_english {
                             add_cand(
                                 format!("{}{}", en_loan, suf_en),
@@ -414,7 +432,7 @@ impl PhoneticSuggestion {
             );
         }
 
-        // 6. Autocorrect / Common Overrides / Elongation Collapse
+        // 6. Autocorrect / Common Overrides / Loanwords / Verbal Decomposition / Elongation Collapse
         let resolve_ac = |raw: &str| -> String {
             if raw.chars().any(|c| c.is_bengali()) {
                 raw.to_string()
@@ -429,7 +447,7 @@ impl PhoneticSuggestion {
                 add_cand(
                     converted_ac.clone(),
                     CandidateSource::Autocorrect,
-                    6000,
+                    6500,
                     &mut raw_candidates,
                     &mut seen,
                 );
@@ -437,6 +455,17 @@ impl PhoneticSuggestion {
             } else {
                 None
             }
+        } else if let Some(loan_pref) = preferred_loanword {
+            Some(loan_pref)
+        } else if let Some(verbal_word) = super::morphology::decompose_verbal_form(middle) {
+            add_cand(
+                verbal_word.clone(),
+                CandidateSource::ExactDictionary,
+                5500,
+                &mut raw_candidates,
+                &mut seen,
+            );
+            Some(verbal_word)
         } else {
             let mut found_collapsed = None;
             for collapsed in super::fuzzy::collapse_elongated_runs(middle) {
@@ -731,14 +760,16 @@ impl PhoneticSuggestion {
                 let dist = edit_distance(&phonetic, &cand.text);
                 if cand.text == phonetic || cand.text == *primary {
                     if is_in_dict {
-                        score += 1200;
+                        score += 3500;
+                    } else {
+                        score += 1500;
                     }
                 } else {
-                    score -= (dist as i32) * 160;
+                    score -= (dist as i32) * 200;
                     let len_diff = (cand.text.chars().count() as isize
                         - phonetic.chars().count() as isize)
                         .abs() as i32;
-                    score -= len_diff * 70;
+                    score -= len_diff * 400;
                 }
             }
 

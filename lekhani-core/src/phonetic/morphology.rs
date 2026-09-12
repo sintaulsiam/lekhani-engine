@@ -48,8 +48,123 @@ pub const COLLOQUIAL_VERBAL_PATTERNS: &[(&str, &[&str])] = &[
     ("tasilo", &["ছিল", "তেছিল"]),
     ("tasilen", &["ছিলেন", "তেছিলেন"]),
     ("chen", &["ছেন", "তেছেন"]),
-    ("cheni", &["ছেনি", "তেছেন"]),
+    ("cheni", &["ছেনi", "তেছেন"]),
 ];
+
+pub const BENGALI_VERB_ROOTS: &[(&str, &str)] = &[
+    ("thak", "থাক"),
+    ("dekh", "দেখ"),
+    ("bol", "বল"),
+    ("ash", "আস"),
+    ("as", "আস"),
+    ("esh", "এস"),
+    ("es", "এস"),
+    ("chol", "চল"),
+    ("kor", "কর"),
+    ("par", "পার"),
+    ("shun", "শুন"),
+    ("sun", "শুন"),
+    ("jan", "জান"),
+    ("rakh", "রাখ"),
+    ("likh", "লিখ"),
+    ("uth", "উঠ"),
+    ("bhab", "ভাব"),
+    ("bosh", "বস"),
+    ("bos", "বস"),
+    ("ja", "যা"),
+    ("ge", "গে"),
+    ("kha", "খা"),
+    ("khe", "খে"),
+    ("de", "দে"),
+    ("ne", "নে"),
+    ("ho", "হ"),
+];
+
+pub const BENGALI_VERBAL_CONJUGATIONS: &[(&str, &str)] = &[
+    ("tesilam", "তেছিলাম"),
+    ("tesilen", "তেছিলেন"),
+    ("tesilo", "তেছিল"),
+    ("tesila", "তেছিলা"),
+    ("techhilam", "তেছিলাম"),
+    ("techhilen", "তেছিলেন"),
+    ("techhilo", "তেছিল"),
+    ("echilam", "েছিলাম"),
+    ("echilen", "েছিলেন"),
+    ("echilo", "েছিল"),
+    ("echhile", "েছিলে"),
+    ("chhilam", "ছিলাম"),
+    ("chhilen", "ছিলেন"),
+    ("chhilo", "ছিল"),
+    ("chhile", "ছিলে"),
+    ("chilam", "ছিলাম"),
+    ("chilen", "ছিলেন"),
+    ("chilo", "ছিল"),
+    ("chile", "ছিলে"),
+    ("yechi", "য়েছি"),
+    ("yecho", "য়েছো"),
+    ("yeche", "য়েছে"),
+    ("yechen", "য়েছেন"),
+    ("echi", "েছি"),
+    ("echo", "েছো"),
+    ("eche", "েছে"),
+    ("echen", "েছেন"),
+    ("tesi", "তেছি"),
+    ("tese", "তেছে"),
+    ("tesen", "তেছেন"),
+    ("teso", "তেছো"),
+    ("cchi", "চ্ছি"),
+    ("cche", "চ্ছে"),
+    ("cchen", "চ্ছেন"),
+    ("ccho", "চ্ছো"),
+    ("cci", "চ্ছি"),
+    ("cce", "চ্ছে"),
+    ("ccen", "চ্ছেন"),
+    ("lam", "লাম"),
+    ("len", "লেন"),
+    ("lo", "ল"),
+    ("le", "লে"),
+    ("ben", "বেন"),
+    ("be", "বে"),
+    ("bo", "ব"),
+    ("bi", "বি"),
+    ("tam", "তাম"),
+    ("ten", "তেন"),
+    ("to", "তো"),
+    ("ta", "তা"),
+    ("ish", "ইশ"),
+    ("is", "িস"),
+    ("un", "ুন"),
+    ("en", "েন"),
+    ("chhi", "চ্ছি"),
+    ("chhe", "চ্ছে"),
+    ("chhen", "চ্ছেন"),
+    ("chho", "চ্ছো"),
+    ("chi", "ছি"),
+    ("che", "ছে"),
+    ("chen", "ছেন"),
+    ("cho", "ছো"),
+    ("i", "ি"),
+    ("o", "ো"),
+    ("e", "ে"),
+];
+
+/// Decompose a compound verbal form into root stem and conjugation to prevent false Juktoborno
+pub fn decompose_verbal_form(input: &str) -> Option<String> {
+    let lower = input.to_ascii_lowercase();
+    for &(conj_en, conj_bn) in BENGALI_VERBAL_CONJUGATIONS {
+        if lower.len() > conj_en.len() && lower.ends_with(conj_en) {
+            let root_part = &lower[..lower.len() - conj_en.len()];
+            for &(root_en, root_bn) in BENGALI_VERB_ROOTS {
+                if root_part == root_en {
+                    let mut result = root_bn.to_string();
+                    result.push_str(conj_bn);
+                    return Some(result);
+                }
+            }
+        }
+    }
+    None
+}
 
 /// Comprehensive list of inflectional suffixes ordered by descending length for greedy stemming
 pub const BENGALI_INFLECTIONAL_SUFFIXES: &[&str] = &[
@@ -91,10 +206,14 @@ pub fn apply_sandhi_join(base: &str, suffix: &str) -> String {
             result.pop();
             result.push('ত');
         }
-        // 2. Anusvara (ং) transforms to Nga (ঙ) before vowel/kar suffixes
+        // 2. Anusvara (ং) transforms to Nga (ঙ) for native roots (রং -> রঙের), or inserts Ya glide (মিটিং -> মিটিংয়ে)
         else if b_last == 'ং' && (s_first.is_kar() || s_first.is_vowel() || s_first == 'ে') {
-            result.pop();
-            result.push('ঙ');
+            if base == "রং" || base == "ঢং" || base == "স্বাং" || base == "অং" {
+                result.pop();
+                result.push('ঙ');
+            } else {
+                result.push('য়');
+            }
         }
         // 3. Vowel Hiatus / Glide Insertion:
         // When base ends with a vowel/kar and suffix begins with E-kar (ে), insert Ya (য়) or preserve glide
