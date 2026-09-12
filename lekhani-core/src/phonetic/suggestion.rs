@@ -601,6 +601,14 @@ impl PhoneticSuggestion {
                             &mut seen,
                         );
                     }
+                } else if middle.chars().count() <= 3 && !var_phonetic.is_empty() && var_phonetic.chars().all(|c| c.is_bengali()) {
+                    add_cand(
+                        var_phonetic,
+                        CandidateSource::FuzzySoundLaw,
+                        1800,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
                 }
             }
 
@@ -726,6 +734,10 @@ impl PhoneticSuggestion {
         }
 
         // 15. Global Multi-Factor Probabilistic Scoring & Ranker
+        let has_backtick = middle.contains('`') || term.contains('`');
+        let has_explicit_casing = middle.chars().any(|c| c.is_ascii_uppercase() && c != 'K');
+        let is_short_token = middle.chars().count() <= 3;
+
         let has_valid_dict_candidates = raw_candidates.iter().any(|c| {
             (c.source == CandidateSource::FuzzySoundLaw || c.source == CandidateSource::Autocorrect)
                 && self.database.is_exact_dictionary_word(&c.text)
@@ -742,8 +754,8 @@ impl PhoneticSuggestion {
             if is_in_dict {
                 score += 2200;
             } else if cand.source == CandidateSource::DirectTransliteration {
-                // If raw transliteration is NOT in the dictionary, but valid sound-law alternatives exist, penalize it!
-                if has_valid_dict_candidates {
+                // If raw transliteration is NOT in the dictionary, but valid sound-law alternatives exist, penalize only if no explicit intent markers are present!
+                if has_valid_dict_candidates && !has_explicit_casing && !has_backtick && !is_short_token {
                     score -= 2800;
                 }
             }
@@ -764,12 +776,27 @@ impl PhoneticSuggestion {
                     } else {
                         score += 1500;
                     }
+                    if has_backtick {
+                        score += 5000;
+                    } else if has_explicit_casing {
+                        score += 3500;
+                    } else if is_short_token {
+                        score += 1200;
+                    }
                 } else {
                     score -= (dist as i32) * 200;
                     let len_diff = (cand.text.chars().count() as isize
                         - phonetic.chars().count() as isize)
                         .abs() as i32;
                     score -= len_diff * 400;
+
+                    if cand.source == CandidateSource::FuzzySoundLaw {
+                        if has_backtick {
+                            score -= 4000;
+                        } else if has_explicit_casing {
+                            score -= 2500;
+                        }
+                    }
                 }
             }
 

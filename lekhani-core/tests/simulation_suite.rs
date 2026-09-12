@@ -40,7 +40,68 @@ fn test_dure_suggestions() {
     assert_eq!(cands_d_ure[0], "দূরে", "Expected 'দূরে' for 'dUre'");
     assert_eq!(cands_dur[0], "দূর", "Expected 'দূর' for 'dur'");
     assert_eq!(cands_d_ur[0], "দূর", "Expected 'দূর' for 'dUr'");
+}
 
+#[test]
+fn test_dirgho_u_and_vowel_kar_variations() {
+    let mut sugg = PhoneticSuggestion::new();
+    let layout_candidates = [
+        std::path::Path::new("../../data/layouts/avrophonetic.json"),
+        std::path::Path::new("data/layouts/avrophonetic.json"),
+        std::path::Path::new("../data/layouts/avrophonetic.json"),
+    ];
+    for p in layout_candidates {
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(p) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    sugg.set_layout(&json);
+                    break;
+                }
+            }
+        }
+    }
+    let dict_candidates = [
+        std::path::Path::new("../../data/dictionaries"),
+        std::path::Path::new("data/dictionaries"),
+        std::path::Path::new("../data/dictionaries"),
+    ];
+    for p in dict_candidates {
+        if p.exists() {
+            let _ = sugg.database.load_from_dir(p);
+            break;
+        }
+    }
+    let empty_memory = HashMap::new();
+
+    let (cands_ku_upper, _) = sugg.suggest("kU", true, true, &empty_memory);
+    assert_eq!(cands_ku_upper[0], "কূ", "Expected 'কূ' for 'kU'");
+
+    let (cands_ku_backtick, _) = sugg.suggest("kU`", true, true, &empty_memory);
+    assert_eq!(cands_ku_backtick[0], "কূ", "Expected 'কূ' for 'kU`'");
+
+    let (cands_koo_backtick, _) = sugg.suggest("koo`", true, true, &empty_memory);
+    assert_eq!(cands_koo_backtick[0], "কূ", "Expected 'কূ' for 'koo`'");
+
+    let (cands_ku_lower, _) = sugg.suggest("ku", true, true, &empty_memory);
+    assert_eq!(cands_ku_lower[0], "কু", "Expected 'কু' for 'ku'");
+
+    let (cands_mu, _) = sugg.suggest("mU", true, true, &empty_memory);
+    assert_eq!(cands_mu[0], "মূ", "Expected 'মূ' for 'mU'");
+
+    let (cands_bhu, _) = sugg.suggest("bhU", true, true, &empty_memory);
+    assert_eq!(cands_bhu[0], "ভূ", "Expected 'ভূ' for 'bhU'");
+
+    let (cands_dhu, _) = sugg.suggest("dhU", true, true, &empty_memory);
+    assert_eq!(cands_dhu[0], "ধূ", "Expected 'ধূ' for 'dhU'");
+
+    let (cands_ru, _) = sugg.suggest("rU", true, true, &empty_memory);
+    assert_eq!(cands_ru[0], "রূ", "Expected 'রূ' for 'rU'");
+
+    let (cands_shu, _) = sugg.suggest("shU", true, true, &empty_memory);
+    assert_eq!(cands_shu[0], "শূ", "Expected 'শূ' for 'shU'");
+
+    let (cands_su, _) = sugg.suggest("sU", true, true, &empty_memory);
+    assert_eq!(cands_su[0], "সূ", "Expected 'সূ' for 'sU'");
 }
 
 #[test]
