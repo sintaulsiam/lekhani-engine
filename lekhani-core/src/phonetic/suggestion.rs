@@ -339,8 +339,16 @@ impl PhoneticSuggestion {
         }
 
         // 6. Autocorrect / Common Overrides / Elongation Collapse
+        let resolve_ac = |raw: &str| -> String {
+            if raw.chars().any(|c| c.is_bengali()) {
+                raw.to_string()
+            } else {
+                self.convert_phonetic(raw)
+            }
+        };
+
         let preferred_word = if let Some(raw_ac) = self.database.get_autocorrect_raw(middle) {
-            let converted_ac = self.convert_phonetic(&raw_ac);
+            let converted_ac = resolve_ac(&raw_ac);
             if !converted_ac.is_empty() {
                 add_cand(
                     converted_ac.clone(),
@@ -357,7 +365,7 @@ impl PhoneticSuggestion {
             let mut found_collapsed = None;
             for collapsed in super::fuzzy::collapse_elongated_runs(middle) {
                 if let Some(raw_ac) = self.database.get_autocorrect_raw(&collapsed) {
-                    let converted_ac = self.convert_phonetic(&raw_ac);
+                    let converted_ac = resolve_ac(&raw_ac);
                     if !converted_ac.is_empty() {
                         add_cand(
                             converted_ac.clone(),
@@ -915,7 +923,11 @@ impl PhoneticSuggestion {
                     let base_key = &middle[..i];
                     let mut base_candidates = Vec::new();
                     if let Some(ac) = self.database.get_autocorrect_raw(base_key) {
-                        let conv = self.convert_phonetic(&ac);
+                        let conv = if ac.chars().any(|c| c.is_bengali()) {
+                            ac
+                        } else {
+                            self.convert_phonetic(&ac)
+                        };
                         if !conv.is_empty() {
                             base_candidates.push(conv);
                         }
@@ -926,21 +938,7 @@ impl PhoneticSuggestion {
                     }
 
                     for base in &base_candidates {
-                        let mut word = base.clone();
-                        if let (Some(base_rmc), Some(suffix_lmc)) =
-                            (base.chars().last(), suffix.chars().next())
-                        {
-                            if base_rmc.is_vowel() && suffix_lmc.is_kar() {
-                                word.push('য়');
-                            } else if base_rmc == 'ৎ' {
-                                word.pop();
-                                word.push('ত');
-                            } else if base_rmc == 'ং' {
-                                word.pop();
-                                word.push('ঙ');
-                            }
-                        }
-                        word.push_str(suffix);
+                        let word = super::morphology::apply_sandhi_join(base, suffix);
                         if (self.database.is_exact_dictionary_word(&word)
                             || self.database.is_exact_dictionary_word(base))
                             && !list.iter().any(|item| item == &word)

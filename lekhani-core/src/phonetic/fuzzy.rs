@@ -326,6 +326,68 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     results
 }
 
+/// Compute a canonical Bengali phonetic soundex key
+/// Groups homophones and phonologically equivalent characters into canonical classes:
+/// - Sibilants (শ, ষ, স) -> 'S'
+/// - Nasals (ন, ণ, ং, ঙ, ঁ) -> 'N'
+/// - High Vowels / Kars (ি, ী, ই, ঈ) -> 'I'
+/// - Mid-Low Vowels / Kars (ু, ূ, উ, ঊ) -> 'U'
+/// - Rhotics / Flaps (র, ড়, ঢ়, ঋ, ৃ, র্) -> 'R'
+/// - Dental / Retroflex Stops (ত, ৎ, ট) -> 'T', (থ, ঠ) -> 't', (দ, ড) -> 'D', (ধ, ঢ) -> 'd'
+/// - Affricates & Semivowels (জ, য, য়, ্য) -> 'J'
+/// - Velars (ক, খ) -> 'K', (গ, ঘ) -> 'G'
+/// - Labials (প, ফ) -> 'P', (ব, ভ) -> 'B'
+/// Deduplicates adjacent identical phonetic codes.
+pub fn bengali_phonetic_soundex(word: &str) -> String {
+    let mut soundex = String::with_capacity(word.len());
+    let mut last_code = ' ';
+
+    for ch in word.chars() {
+        let code = match ch {
+            // Sibilants
+            'শ' | 'ষ' | 'স' => 'S',
+            // Nasals
+            'ন' | 'ণ' | 'ং' | 'ঙ' | 'ঁ' | 'ঞ' => 'N',
+            // High Vowels & Kars
+            'ি' | 'ী' | 'ই' | 'ঈ' => 'I',
+            // Mid-Low Vowels & Kars
+            'ু' | 'ূ' | 'উ' | 'ঊ' => 'U',
+            // A-vowels
+            'া' | 'আ' => 'A',
+            // E-vowels
+            'ে' | 'এ' => 'E',
+            // O-vowels
+            'ো' | 'ও' | 'অ' => 'O',
+            // Diphthongs
+            'ৈ' | 'ঐ' => 'Y',
+            'ৌ' | 'ঔ' => 'W',
+            // Rhotics & Flaps
+            'র' | 'ড়' | 'ঢ়' | 'ঋ' | 'ৃ' => 'R',
+            // Stops
+            'ত' | 'ৎ' | 'ট' => 'T',
+            'থ' | 'ঠ' => 't',
+            'দ' | 'ড' => 'D',
+            'ধ' | 'ঢ' => 'd',
+            'ক' | 'খ' => 'K',
+            'গ' | 'ঘ' => 'G',
+            'চ' | 'ছ' => 'C',
+            'প' | 'ফ' => 'P',
+            'ব' | 'ভ' => 'B',
+            'জ' | 'য' | 'য়' | 'ঝ' => 'J',
+            'হ' => 'H',
+            '্' => continue, // ignore hasant in soundex
+            _ => continue,
+        };
+
+        if code != last_code {
+            soundex.push(code);
+            last_code = code;
+        }
+    }
+
+    soundex
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -349,5 +411,22 @@ mod tests {
         assert!(ch_variants
             .iter()
             .any(|v| v.contains("c") || v.contains("ceShTa") || v.contains("ceshTa")));
+    }
+
+    #[test]
+    fn test_bengali_phonetic_soundex() {
+        // Homophones map to identical soundex signatures
+        assert_eq!(
+            bengali_phonetic_soundex("বিদেশি"),
+            bengali_phonetic_soundex("বিদেশী")
+        );
+        assert_eq!(
+            bengali_phonetic_soundex("শহীদ"),
+            bengali_phonetic_soundex("সহিদ")
+        );
+        assert_eq!(
+            bengali_phonetic_soundex("সাধারণ"),
+            bengali_phonetic_soundex("সাধারন")
+        );
     }
 }

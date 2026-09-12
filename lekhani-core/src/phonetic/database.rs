@@ -941,3 +941,32 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("কথাটা", 9400),
     ("সবগুলো", 9400),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_utf8_autocorrect_loading() {
+        let mut db = PhoneticDatabase::new();
+        let ac_candidates = [
+            "../../data",
+            "data",
+            "../data",
+        ];
+        for dir in ac_candidates {
+            let p = std::path::Path::new(dir).join("dictionaries");
+            if p.exists() {
+                let _ = db.load_from_dir(&p);
+                break;
+            }
+        }
+
+        if let Some(res) = db.get_autocorrect_raw("account") {
+            assert_eq!(res, "অ্যাকাউন্ট");
+        }
+        if let Some(res) = db.get_autocorrect_raw("birthday") {
+            assert_eq!(res, "বার্থডে");
+        }
+    }
+}
