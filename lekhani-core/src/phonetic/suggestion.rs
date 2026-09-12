@@ -566,10 +566,22 @@ impl PhoneticSuggestion {
         }
 
         // 13. Contextual Emoji / Symbol Keywords (Demoted so they sit trailing)
-        let kw_emojis = self.database.lookup_emoji_keywords(middle);
-        for em in kw_emojis {
+        let mut kw_emojis = self.database.lookup_emoji_keywords(middle);
+        for em in self.database.lookup_emoji_keywords(primary) {
+            if !kw_emojis.contains(&em) {
+                kw_emojis.push(em);
+            }
+        }
+        if phonetic != *primary {
+            for em in self.database.lookup_emoji_keywords(&phonetic) {
+                if !kw_emojis.contains(&em) {
+                    kw_emojis.push(em);
+                }
+            }
+        }
+        for em in &kw_emojis {
             add_cand(
-                em,
+                em.clone(),
                 CandidateSource::EmojiKeyword,
                 -2000,
                 &mut raw_candidates,
@@ -683,16 +695,33 @@ impl PhoneticSuggestion {
 
         let mut candidates: Vec<String> = Vec::with_capacity(8);
         let has_english = include_english && scored_candidates.iter().any(|(c, _)| c == term);
-        let target_len = if has_english { 7 } else { 8 };
+        let has_emoji = scored_candidates.iter().any(|(c, _)| kw_emojis.contains(c));
+        let first_emoji = scored_candidates
+            .iter()
+            .find(|(c, _)| kw_emojis.contains(c))
+            .map(|(c, _)| c.clone());
 
-        for (c, _) in scored_candidates {
-            if c == term {
+        let text_target_len = match (has_english, has_emoji) {
+            (true, true) => 6,
+            (true, false) | (false, true) => 7,
+            (false, false) => 8,
+        };
+
+        for (c, _) in &scored_candidates {
+            if c == term || kw_emojis.contains(c) {
                 continue;
             }
-            if candidates.len() < target_len {
-                candidates.push(c);
+            if candidates.len() < text_target_len {
+                candidates.push(c.clone());
             }
         }
+
+        if let Some(em) = first_emoji {
+            if !candidates.contains(&em) {
+                candidates.push(em);
+            }
+        }
+
         if has_english {
             candidates.push(term.to_string());
         }
@@ -1088,6 +1117,48 @@ mod tests {
 
         let res_car = sugg.transliterate_phrase_or_sentence("gaRi diye bari jabo");
         assert!(res_car.contains("গাড়ি"));
+    }
+
+    #[test]
+    fn test_bilingual_keyword_emoji_suggestions() {
+        let mut sugg = PhoneticSuggestion::new();
+        let layout_candidates = [
+            std::path::Path::new("../../data/layouts/avrophonetic.json"),
+            std::path::Path::new("data/layouts/avrophonetic.json"),
+            std::path::Path::new("../data/layouts/avrophonetic.json"),
+        ];
+        for p in layout_candidates {
+            if p.exists() {
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    if let Ok(json) = serde_json::from_str(&content) {
+                        sugg.set_layout(&json);
+                        break;
+                    }
+                }
+            }
+        }
+        let empty_memory = HashMap::new();
+
+        // 1. Bengali word "cha" should suggest "চা" at top, and "☕" in trailing candidates
+        let (cands_cha, _) = sugg.suggest("cha", true, true, &empty_memory);
+        assert_eq!(cands_cha[0], "চা");
+        assert!(cands_cha.contains(&"☕".to_string()));
+
+        // 2. Bengali word "bhalobasha" should suggest "ভালোবাসা" at top, and "❤️" in trailing candidates
+        let (cands_love, _) = sugg.suggest("bhalobasha", true, true, &empty_memory);
+        assert_eq!(cands_love[0], "ভালোবাসা");
+        assert!(cands_love.contains(&"❤️".to_string()));
+
+        // 3. English word "coffee" / "tea" should suggest "☕"
+        let (cands_coffee, _) = sugg.suggest("coffee", true, true, &empty_memory);
+        assert!(cands_coffee.contains(&"☕".to_string()));
+
+        // 4. English word "dog" / "cat" should suggest emojis
+        let (cands_dog, _) = sugg.suggest("dog", true, true, &empty_memory);
+        assert!(cands_dog.contains(&"🐶".to_string()));
+
+        let (cands_cat, _) = sugg.suggest("cat", true, true, &empty_memory);
+        assert!(cands_cat.contains(&"🐱".to_string()));
     }
 
     #[test]
