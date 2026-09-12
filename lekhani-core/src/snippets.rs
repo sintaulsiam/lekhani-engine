@@ -91,9 +91,9 @@ impl SnippetManager {
             }
         }
 
-        // 2. Math Formula Evaluator (e.g. "=125*8", "=sqrt(144)", "=1500+250")
+        // 2. Math Formula Evaluator (e.g. "=125*8", "=sqrt(144)", "=1500+250", "=25*4=")
         if word.starts_with('=') && word.len() > 1 {
-            let expr = &word[1..];
+            let expr = word[1..].trim_end_matches('=');
             if let Some(val) = eval_math_expression(expr) {
                 let bn_str = format_math_result_bn(val);
                 let en_str = format_math_result_en(val);
