@@ -85,12 +85,17 @@ fn is_latin_vowel(c: char) -> bool {
     matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'A' | 'E' | 'I' | 'O' | 'U' | 'y' | 'Y' | '`')
 }
 
-/// Ensure canonical Unicode ordering for Bengali Chandra Bindu glyphs
+/// Ensure canonical Unicode ordering for Bengali Chandra Bindu and Nukta glyphs
 pub fn fix_chandra_bindu_position(text: &str) -> String {
-    if !text.contains('ঁ') {
-        return text.to_string();
-    }
     let mut res = text.to_string();
+    if res.contains('\u{09BC}') {
+        res = res.replace("\u{09AF}\u{09BC}", "য়");
+        res = res.replace("\u{09A1}\u{09BC}", "ড়");
+        res = res.replace("\u{09A2}\u{09BC}", "ঢ়");
+    }
+    if !res.contains('ঁ') {
+        return res;
+    }
     res = res.replace("ঁআ", "াঁ");
     res = res.replace("ঁা", "াঁ");
     res = res.replace("ঁএ", "েঁ");
@@ -243,30 +248,7 @@ impl PhoneticSuggestion {
             return (Vec::new(), 0);
         }
 
-        // Fast Memoization Cache check
-        let cache_key = format!(
-            "{}:{}:{}:{}",
-            term,
-            context.join(" "),
-            include_english,
-            use_dictionary
-        );
-        if let Some(cached) = self.cache.get(&cache_key) {
-            let selected_index = if let Some(fav) = candidate_memory
-                .get(term)
-                .or_else(|| candidate_memory.get(&cache_key))
-            {
-                cached
-                    .iter()
-                    .position(|c| c == fav || c.contains(fav))
-                    .unwrap_or(0)
-            } else {
-                0
-            };
-            return (cached.clone(), selected_index);
-        }
-
-        // 1. Smart Typography & Punctuation
+        // 1. Instant Fast-Path: Smart Typography, Punctuation & Vowel Signs (Zero Allocations)
         match term {
             ".." => {
                 let mut cands = vec!["।".to_string()];
@@ -403,6 +385,33 @@ impl PhoneticSuggestion {
             _ => {}
         }
 
+        // Fast Memoization Cache check (avoid context.join allocation when context is empty)
+        let cache_key = if context.is_empty() {
+            format!("{}:{}:{}", term, include_english, use_dictionary)
+        } else {
+            format!(
+                "{}:{}:{}:{}",
+                term,
+                context.join(" "),
+                include_english,
+                use_dictionary
+            )
+        };
+        if let Some(cached) = self.cache.get(&cache_key) {
+            let selected_index = if let Some(fav) = candidate_memory
+                .get(term)
+                .or_else(|| candidate_memory.get(&cache_key))
+            {
+                cached
+                    .iter()
+                    .position(|c| c == fav || c.contains(fav))
+                    .unwrap_or(0)
+            } else {
+                0
+            };
+            return (cached.clone(), selected_index);
+        }
+
         // 2. Direct whole-term special matches (Math `=125*8`, Currency `#usd50`, Snippets `!shubhechha`, Exact Emojis `:smile:`, `:)`, `$$`, `*taka*`)
         let literals = self.database.search_special_literals(term);
         if !literals.is_empty() {
@@ -462,9 +471,7 @@ impl PhoneticSuggestion {
                         initial_boost: i32,
                         raw_candidates: &mut Vec<CandidateHypothesis>,
                         seen: &mut hashbrown::HashSet<String>| {
-            if text.contains('ঁ') {
-                text = fix_chandra_bindu_position(&text);
-            }
+            text = fix_chandra_bindu_position(&text);
             if !text.is_empty() && seen.insert(text.clone()) {
                 raw_candidates.push(CandidateHypothesis {
                     text,
@@ -1004,6 +1011,8 @@ impl PhoneticSuggestion {
                             score -= 4000;
                         } else if has_explicit_casing {
                             score -= 2500;
+                        } else if middle.chars().count() <= 2 && dist > 0 {
+                            score -= 3000;
                         }
                     }
                 }
@@ -1053,6 +1062,7 @@ impl PhoneticSuggestion {
             scored_candidates.push((cand.text, score));
         }
 
+
         // Sort candidates by descending total score
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
 
@@ -1095,10 +1105,11 @@ impl PhoneticSuggestion {
         let post_converted = self.convert_phonetic(post);
 
         for cand in candidates {
+            let norm_cand = fix_chandra_bindu_position(&cand);
             if pre.is_empty() && post.is_empty() {
-                final_candidates.push(cand);
+                final_candidates.push(norm_cand);
             } else {
-                final_candidates.push(format!("{}{}{}", pre_converted, cand, post_converted));
+                final_candidates.push(format!("{}{}{}", pre_converted, norm_cand, post_converted));
             }
         }
 
@@ -1671,6 +1682,7 @@ mod tests {
         // When previous word is "বই", "pora" should rank "পড়া" first
         let (cands_book, _) =
             sugg.suggest_with_context("pora", Some("বই"), true, true, &empty_memory);
+        println!("cands_book: {:?}", cands_book);
         assert_eq!(cands_book[0], "পড়া");
 
         // When previous word is "শার্ট", "pora" should rank "পরা" first
@@ -2218,7 +2230,7 @@ mod tests {
         assert_eq!(cands_chhatro[0], "ছাত্রছাত্রীদেরকেও");
 
         let (cands_dhai, _) = sugg.suggest("dhai", true, true, &empty_memory);
-        assert_eq!(cands_dhai[0], "আড়াই");
+        assert_eq!(cands_dhai[0], "\u{0986}\u{09DC}\u{09BE}\u{0987}");
 
         // 8. Inflected Loanwords (computere -> কম্পিউটারে, fileti -> ফাইলটি)
         let (cands_comp, _) = sugg.suggest("computere", true, true, &empty_memory);

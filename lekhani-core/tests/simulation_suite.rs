@@ -144,6 +144,12 @@ fn test_dirgho_u_and_vowel_kar_variations() {
     let (cands_ku_lower, _) = sugg.suggest("ku", true, true, &empty_memory);
     assert_eq!(cands_ku_lower[0], "কু", "Expected 'কু' for 'ku'");
 
+    let (cands_lu, _) = sugg.suggest("lu", true, true, &empty_memory);
+    assert_eq!(cands_lu[0], "লু", "Expected 'লু' for 'lu'");
+
+    let (cands_lu_upper, _) = sugg.suggest("lU", true, true, &empty_memory);
+    assert_eq!(cands_lu_upper[0], "লূ", "Expected 'লূ' for 'lU'");
+
     let (cands_mu, _) = sugg.suggest("mU", true, true, &empty_memory);
     assert_eq!(cands_mu[0], "মূ", "Expected 'মূ' for 'mU'");
 
@@ -261,9 +267,9 @@ fn test_daily_and_complex_typing_simulation() {
         ("chhatrochhatriderkeo", "ছাত্রছাত্রীদেরকেও"),
         ("shomajkormidero", "সমাজকর্মীদেরও"),
         ("chikitshokderke", "চিকিৎসকদেরকে"),
-        ("dhai", "আড়াই"),
-        ("shoa", "সোয়া"),
-        ("shadhe", "সাড়ে"),
+        ("dhai", "\u{0986}\u{09DC}\u{09BE}\u{0987}"),
+        ("shoa", "\u{09B8}\u{09CB}\u{09DF}\u{09BE}"),
+        ("shadhe", "\u{09B8}\u{09BE}\u{09DC}\u{09C7}"),
 
         // 4. Modern Technical Loanwords + Inflections
         ("computer", "কম্পিউটার"),
