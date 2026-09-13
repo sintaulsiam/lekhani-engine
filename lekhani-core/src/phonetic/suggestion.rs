@@ -296,8 +296,105 @@ impl PhoneticSuggestion {
                 }
                 return (cands, 0);
             }
+            "a" | "A" => {
+                let mut cands = vec!["আ".to_string(), "া".to_string()];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "i" => {
+                let mut cands = vec![
+                    "ই".to_string(),
+                    "ি".to_string(),
+                    "ঈ".to_string(),
+                    "ী".to_string(),
+                ];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "I" => {
+                let mut cands = vec![
+                    "ঈ".to_string(),
+                    "ী".to_string(),
+                    "ই".to_string(),
+                    "ি".to_string(),
+                ];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "u" => {
+                let mut cands = vec![
+                    "উ".to_string(),
+                    "ু".to_string(),
+                    "ঊ".to_string(),
+                    "ূ".to_string(),
+                ];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "U" => {
+                let mut cands = vec![
+                    "ঊ".to_string(),
+                    "ূ".to_string(),
+                    "উ".to_string(),
+                    "ু".to_string(),
+                ];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "e" | "E" => {
+                let mut cands = vec!["এ".to_string(), "ে".to_string()];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
             "o" | "O" => {
-                let mut cands = vec!["ও".to_string(), "অ".to_string()];
+                let mut cands = vec!["ও".to_string(), "অ".to_string(), "ো".to_string()];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "rri" | "RRI" => {
+                let mut cands = vec!["ঋ".to_string(), "ৃ".to_string()];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "oi" => {
+                let mut cands = vec!["ওই".to_string(), "ঐ".to_string(), "ৈ".to_string()];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "OI" => {
+                let mut cands = vec!["ঐ".to_string(), "ৈ".to_string(), "ওই".to_string()];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "ou" => {
+                let mut cands = vec!["ঔ".to_string(), "ৌ".to_string(), "ওউ".to_string()];
+                if include_english {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
+            }
+            "OU" => {
+                let mut cands = vec!["ঔ".to_string(), "ৌ".to_string()];
                 if include_english {
                     cands.push(term.to_string());
                 }

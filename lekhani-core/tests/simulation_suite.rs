@@ -304,3 +304,36 @@ fn test_daily_and_complex_typing_simulation() {
     assert!(failures.is_empty(), "Failed {} out of {} simulation test cases", failures.len(), test_cases.len());
     println!("Simulation Passed: {}/{} (100% accuracy)", passed, test_cases.len());
 }
+
+#[test]
+fn test_vowel_and_kar_candidates() {
+    let mut sugg = PhoneticSuggestion::new();
+    let empty_memory = HashMap::new();
+
+    let (cands_a, _) = sugg.suggest("a", true, true, &empty_memory);
+    assert_eq!(cands_a[0], "আ");
+    assert_eq!(cands_a[1], "া");
+
+    let (cands_i, _) = sugg.suggest("i", true, true, &empty_memory);
+    assert_eq!(cands_i[0], "ই");
+    assert!(cands_i.contains(&"ি".to_string()));
+
+    let (cands_u, _) = sugg.suggest("u", true, true, &empty_memory);
+    assert_eq!(cands_u[0], "উ");
+    assert!(cands_u.contains(&"ু".to_string()));
+
+    let (cands_e, _) = sugg.suggest("e", true, true, &empty_memory);
+    assert_eq!(cands_e[0], "এ");
+    assert_eq!(cands_e[1], "ে");
+
+    let (cands_o, _) = sugg.suggest("o", true, true, &empty_memory);
+    assert_eq!(cands_o[0], "ও");
+    assert!(cands_o.contains(&"ো".to_string()));
+
+    let (cands_oi, _) = sugg.suggest("oi", true, true, &empty_memory);
+    assert!(cands_oi.contains(&"ৈ".to_string()));
+
+    let (cands_ou, _) = sugg.suggest("ou", true, true, &empty_memory);
+    assert!(cands_ou.contains(&"ৌ".to_string()));
+}
+
