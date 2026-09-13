@@ -422,6 +422,130 @@ pub fn bengali_phonetic_soundex(word: &str) -> String {
     soundex
 }
 
+/// Physical coordinates of QWERTY keys on a standard keyboard
+pub fn qwerty_coordinates(c: char) -> Option<(f32, f32)> {
+    let lower = c.to_ascii_lowercase();
+    match lower {
+        'q' => Some((0.0, 1.0)),
+        'w' => Some((1.0, 1.0)),
+        'e' => Some((2.0, 1.0)),
+        'r' => Some((3.0, 1.0)),
+        't' => Some((4.0, 1.0)),
+        'y' => Some((5.0, 1.0)),
+        'u' => Some((6.0, 1.0)),
+        'i' => Some((7.0, 1.0)),
+        'o' => Some((8.0, 1.0)),
+        'p' => Some((9.0, 1.0)),
+        'a' => Some((0.25, 2.0)),
+        's' => Some((1.25, 2.0)),
+        'd' => Some((2.25, 2.0)),
+        'f' => Some((3.25, 2.0)),
+        'g' => Some((4.25, 2.0)),
+        'h' => Some((5.25, 2.0)),
+        'j' => Some((6.25, 2.0)),
+        'k' => Some((7.25, 2.0)),
+        'l' => Some((8.25, 2.0)),
+        'z' => Some((0.75, 3.0)),
+        'x' => Some((1.75, 3.0)),
+        'c' => Some((2.75, 3.0)),
+        'v' => Some((3.75, 3.0)),
+        'b' => Some((4.75, 3.0)),
+        'n' => Some((5.75, 3.0)),
+        'm' => Some((6.75, 3.0)),
+        _ => None,
+    }
+}
+
+/// Compute Euclidean physical distance between two QWERTY keys
+pub fn qwerty_distance(c1: char, c2: char) -> f32 {
+    if c1 == c2 {
+        return 0.0;
+    }
+    if let (Some((x1, y1)), Some((x2, y2))) = (qwerty_coordinates(c1), qwerty_coordinates(c2)) {
+        ((x1 - x2).powi(2) + (y1 - y2).powi(2)).sqrt()
+    } else {
+        4.0
+    }
+}
+
+/// Direct physically adjacent neighbors on standard QWERTY layout
+pub fn qwerty_neighbors(c: char) -> &'static [char] {
+    match c.to_ascii_lowercase() {
+        'a' => &['q', 'w', 's', 'z'],
+        'b' => &['v', 'g', 'h', 'n'],
+        'c' => &['x', 'd', 'f', 'v'],
+        'd' => &['e', 'r', 's', 'f', 'x', 'c'],
+        'e' => &['w', 'r', 's', 'd'],
+        'f' => &['r', 't', 'd', 'g', 'c', 'v'],
+        'g' => &['t', 'y', 'f', 'h', 'v', 'b'],
+        'h' => &['y', 'u', 'g', 'j', 'b', 'n'],
+        'i' => &['u', 'o', 'j', 'k'],
+        'j' => &['u', 'i', 'h', 'k', 'n', 'm'],
+        'k' => &['i', 'o', 'j', 'l', 'm'],
+        'l' => &['o', 'p', 'k'],
+        'm' => &['n', 'j', 'k'],
+        'n' => &['b', 'h', 'j', 'm'],
+        'o' => &['i', 'p', 'k', 'l'],
+        'p' => &['o', 'l'],
+        'q' => &['w', 'a'],
+        'r' => &['e', 't', 'd', 'f'],
+        's' => &['w', 'e', 'a', 'd', 'z', 'x'],
+        't' => &['r', 'y', 'f', 'g'],
+        'u' => &['y', 'i', 'h', 'j'],
+        'v' => &['c', 'f', 'g', 'b'],
+        'w' => &['q', 'e', 'a', 's'],
+        'x' => &['z', 's', 'd', 'c'],
+        'y' => &['t', 'u', 'g', 'h'],
+        'z' => &['a', 's', 'x'],
+        _ => &[],
+    }
+}
+
+/// Generate physical typing slip variants (adjacent key slips and adjacent letter transpositions)
+pub fn generate_qwerty_typo_variants(input: &str) -> Vec<String> {
+    if input.len() < 3 || input.len() > 25 {
+        return Vec::new();
+    }
+
+    let mut variants = HashSet::new();
+    let chars: Vec<char> = input.chars().collect();
+
+    // 1. Adjacent Character Transpositions (e.g. "korhco" -> "korcho", "bhalobahsa" -> "bhalobasha")
+    for i in 0..chars.len() - 1 {
+        if chars[i] != chars[i + 1] {
+            let mut swapped = chars.clone();
+            swapped.swap(i, i + 1);
+            let s: String = swapped.into_iter().collect();
+            if s != input {
+                variants.insert(s);
+            }
+        }
+    }
+
+    // 2. Single Key Physical Adjacency Slips (for words of length >= 4 to avoid over-generating short words)
+    if chars.len() >= 4 {
+        for (i, &ch) in chars.iter().enumerate() {
+            for &neighbor in qwerty_neighbors(ch) {
+                let mut replaced = chars.clone();
+                // Preserve case if original was uppercase
+                replaced[i] = if ch.is_uppercase() {
+                    neighbor.to_ascii_uppercase()
+                } else {
+                    neighbor
+                };
+                let s: String = replaced.into_iter().collect();
+                if s != input {
+                    variants.insert(s);
+                }
+            }
+        }
+    }
+
+    let mut result: Vec<String> = variants.into_iter().collect();
+    result.sort();
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462,5 +586,22 @@ mod tests {
             bengali_phonetic_soundex("সাধারণ"),
             bengali_phonetic_soundex("সাধারন")
         );
+    }
+
+    #[test]
+    fn test_qwerty_distance_and_typos() {
+        // Physical distance between adjacent keys should be small
+        assert!(qwerty_distance('a', 's') < 1.1);
+        assert!(qwerty_distance('a', 'w') < 1.5);
+        // Distant keys
+        assert!(qwerty_distance('a', 'p') > 5.0);
+
+        // Transposition typo
+        let typo_transposed = generate_qwerty_typo_variants("korhco");
+        assert!(typo_transposed.contains(&"korcho".to_string()));
+
+        // Neighbor key slip typo
+        let typo_neighbor = generate_qwerty_typo_variants("bhalobaaha");
+        assert!(typo_neighbor.contains(&"bhalobasha".to_string()));
     }
 }

@@ -3,7 +3,25 @@
 //! Provides sub-microsecond N-gram probability estimation with Jelinek-Mercer
 //! interpolation for contextual candidate re-ranking and next-word prediction.
 
-use hashbrown::HashMap;
+use hashbrown::{Equivalent, HashMap};
+
+#[derive(Hash, PartialEq, Eq)]
+pub struct BigramKey<'a>(pub &'a str, pub &'a str);
+
+impl<'a> Equivalent<(String, String)> for BigramKey<'a> {
+    fn equivalent(&self, key: &(String, String)) -> bool {
+        self.0 == key.0.as_str() && self.1 == key.1.as_str()
+    }
+}
+
+#[derive(Hash, PartialEq, Eq)]
+pub struct TrigramKey<'a>(pub &'a str, pub &'a str, pub &'a str);
+
+impl<'a> Equivalent<(String, String, String)> for TrigramKey<'a> {
+    fn equivalent(&self, key: &(String, String, String)) -> bool {
+        self.0 == key.0.as_str() && self.1 == key.1.as_str() && self.2 == key.2.as_str()
+    }
+}
 
 /// Pre-computed high-frequency Bengali unigram frequencies (normalized log probabilities)
 pub const UNIGRAM_LOG_PROBS: &[(&str, f32)] = &[
@@ -1186,15 +1204,12 @@ impl LanguageModel {
         let mut score = self.lambda1 * (10.0f32.powf(unigram_p));
 
         if let Some(w1) = clean_w1 {
-            if let Some(&bi_p) = self.bigrams.get(&(w1.to_string(), clean_word.to_string())) {
+            if let Some(&bi_p) = self.bigrams.get(&BigramKey(w1, clean_word)) {
                 score += self.lambda2 * (10.0f32.powf(bi_p));
             }
 
             if let Some(w2) = clean_w2 {
-                if let Some(&tri_p) =
-                    self.trigrams
-                        .get(&(w2.to_string(), w1.to_string(), clean_word.to_string()))
-                {
+                if let Some(&tri_p) = self.trigrams.get(&TrigramKey(w2, w1, clean_word)) {
                     score += self.lambda3 * (10.0f32.powf(tri_p));
                 }
             }
@@ -1253,7 +1268,7 @@ impl LanguageModel {
 
         if let Some(list) = self
             .next_trigram_map
-            .get(&(clean_prev2.to_string(), clean_prev1.to_string()))
+            .get(&BigramKey(clean_prev2, clean_prev1))
         {
             list.iter().take(limit).map(|(w, _)| w.clone()).collect()
         } else {

@@ -14,6 +14,11 @@ impl ContextScorer {
         }
     }
 
+    /// Access the underlying LanguageModel directly without re-allocating
+    pub fn lm(&self) -> &LanguageModel {
+        &self.lm
+    }
+
     /// Score and re-rank candidate list based on multi-token preceding context
     pub fn rank_candidates(&self, context: &[&str], candidates: &[String]) -> Vec<String> {
         if candidates.is_empty() {

@@ -669,28 +669,48 @@ impl PhoneticSuggestion {
                 }
             }
 
-            // 12. Single-Edit Typo Tolerance Fallback
+            // 12. Physical QWERTY Typo & Transposition Fallback
             let has_dict_cand = raw_candidates
                 .iter()
                 .any(|c| self.database.is_exact_dictionary_word(&c.text));
             if !has_dict_cand && middle.chars().count() >= 4 {
                 let mut typo_matches: Vec<String> = Vec::new();
-                for (i, ch) in middle.char_indices() {
-                    let mut del = String::with_capacity(middle.len());
-                    del.push_str(&middle[..i]);
-                    del.push_str(&middle[i + ch.len_utf8()..]);
-                    let del_conv = self.convert_phonetic(&del);
-                    if self.database.is_exact_dictionary_word(&del_conv) {
-                        typo_matches.push(del_conv);
+
+                // 12a. Physical QWERTY key adjacency slips and adjacent transpositions
+                let qwerty_variants = super::fuzzy::generate_qwerty_typo_variants(middle);
+                for qv in &qwerty_variants {
+                    let conv = self.convert_phonetic(qv);
+                    if self.database.is_exact_dictionary_word(&conv) && !typo_matches.contains(&conv) {
+                        typo_matches.push(conv);
+                    }
+                    for fz in super::fuzzy::generate_phonetic_variants(qv) {
+                        let fz_conv = self.convert_phonetic(&fz);
+                        if self.database.is_exact_dictionary_word(&fz_conv) && !typo_matches.contains(&fz_conv) {
+                            typo_matches.push(fz_conv);
+                        }
                     }
                 }
+
+                // 12b. Single deletion typo fallback
+                if typo_matches.is_empty() {
+                    for (i, ch) in middle.char_indices() {
+                        let mut del = String::with_capacity(middle.len());
+                        del.push_str(&middle[..i]);
+                        del.push_str(&middle[i + ch.len_utf8()..]);
+                        let del_conv = self.convert_phonetic(&del);
+                        if self.database.is_exact_dictionary_word(&del_conv) && !typo_matches.contains(&del_conv) {
+                            typo_matches.push(del_conv);
+                        }
+                    }
+                }
+
                 typo_matches
                     .sort_unstable_by_key(|w| std::cmp::Reverse(self.database.get_frequency(w)));
-                for tm in typo_matches.into_iter().take(3) {
+                for tm in typo_matches.into_iter().take(4) {
                     add_cand(
                         tm,
                         CandidateSource::TypoFallback,
-                        1000,
+                        900,
                         &mut raw_candidates,
                         &mut seen,
                     );
@@ -783,6 +803,11 @@ impl PhoneticSuggestion {
                     } else if is_short_token {
                         score += 1200;
                     }
+                } else if cand.source == CandidateSource::TypoFallback {
+                    // Typo fallback candidates alter the user's physical keypresses;
+                    // apply motor slip penalty so intentional words aren't hijacked
+                    score -= 2400;
+                    score -= (dist.min(3) as i32) * 100;
                 } else {
                     score -= (dist as i32) * 200;
                     let len_diff = (cand.text.chars().count() as isize
@@ -800,33 +825,34 @@ impl PhoneticSuggestion {
                 }
             }
 
-            // 4. Contextual Homophone & AI Language Model Scoring
+            // 4. Contextual Homophone & AI Language Model Scoring (Zero Allocations)
             if !context.is_empty() && cand.source != CandidateSource::EmojiKeyword {
                 let prev = context.last().copied();
-                let homophone_boost = Self::score_contextual_homophone(prev, &cand.text);
-                if homophone_boost > 0 {
-                    score += homophone_boost * 4;
-                } else if use_dictionary {
-                    let lm_score = lekhani_ai::LanguageModel::new().score_candidate(
-                        if context.len() >= 2 {
-                            context.get(context.len() - 2).copied()
-                        } else {
-                            None
-                        },
-                        prev,
-                        &cand.text,
-                    );
-                    if lm_score > -1.0 {
-                        score += 1800;
-                    } else if lm_score > -2.2 {
-                        score += 900;
-                    } else if lm_score > -3.5 {
-                        score += 300;
-                    }
+                let prev_prev = if context.len() >= 2 {
+                    context.get(context.len() - 2).copied()
+                } else {
+                    None
+                };
+
+                let lm_score = self.ai_context.lm().score_candidate(prev_prev, prev, &cand.text);
+                if lm_score > -0.5 {
+                    score += 4800;
+                } else if lm_score > -1.0 {
+                    score += 4000;
+                } else if lm_score > -2.0 {
+                    score += 2400;
+                } else if lm_score > -3.0 {
+                    score += 1000;
+                }
+
+                // 5. Dynamic User Bigram Personalization Boost
+                if let Some(p) = prev {
+                    let user_boost = self.database.learner.get_user_bigram_boost(p, &cand.text);
+                    score += user_boost;
                 }
             }
 
-            // 5. Candidate Memory & Autonomous Learner Boost
+            // 6. Candidate Memory & Autonomous Learner Boost
             if let Some(fav) = candidate_memory
                 .get(term)
                 .or_else(|| candidate_memory.get(middle))
@@ -967,7 +993,10 @@ impl PhoneticSuggestion {
             _ => return 0,
         };
 
-        let score = lekhani_ai::LanguageModel::new().score_candidate(None, Some(prev), candidate);
+        static DEFAULT_LM: std::sync::OnceLock<lekhani_ai::LanguageModel> = std::sync::OnceLock::new();
+        let lm = DEFAULT_LM.get_or_init(lekhani_ai::LanguageModel::new);
+
+        let score = lm.score_candidate(None, Some(prev), candidate);
         if score > -0.5 {
             1200
         } else if score > -1.0 {
@@ -979,6 +1008,14 @@ impl PhoneticSuggestion {
         } else {
             0
         }
+    }
+
+    /// Observe a committed word and preceding context to learn personalization and new vocabulary
+    pub fn observe_committed(&mut self, previous_word: Option<&str>, committed_word: &str) -> Vec<String> {
+        if let Some(prev) = previous_word {
+            self.database.learner.observe_committed_pair(prev, committed_word);
+        }
+        self.database.observe_committed_word(committed_word)
     }
 
     /// Predict next probable Bengali words for zero-preedit state using the statistical language model

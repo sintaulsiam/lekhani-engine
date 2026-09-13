@@ -3,12 +3,21 @@
 //! Automatically discovers new vocabulary, proper nouns, and technical jargon
 //! from the user's typing stream and indexes them into the active trie.
 
-use hashbrown::{HashMap, HashSet};
+use hashbrown::{Equivalent, HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use super::morphology::analyze_morphemes;
 use crate::trie::PrefixTrie;
+
+#[derive(Hash, PartialEq, Eq)]
+pub struct BigramKey<'a>(pub &'a str, pub &'a str);
+
+impl<'a> Equivalent<(String, String)> for BigramKey<'a> {
+    fn equivalent(&self, key: &(String, String)) -> bool {
+        self.0 == key.0.as_str() && self.1 == key.1.as_str()
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutonomousLearner {
@@ -16,6 +25,10 @@ pub struct AutonomousLearner {
     pub learned_words: HashSet<String>,
     #[serde(default = "default_threshold")]
     pub auto_learn_threshold: u32,
+    #[serde(default)]
+    pub user_bigrams: HashMap<(String, String), u32>,
+    #[serde(default)]
+    pub last_committed_word: Option<String>,
 }
 
 fn default_threshold() -> u32 {
@@ -34,6 +47,37 @@ impl AutonomousLearner {
             observed_counts: HashMap::new(),
             learned_words: HashSet::new(),
             auto_learn_threshold: 1,
+            user_bigrams: HashMap::new(),
+            last_committed_word: None,
+        }
+    }
+
+    /// Record a committed word pair transition to personalize future ranking
+    pub fn observe_committed_pair(&mut self, prev_word: &str, current_word: &str) {
+        let clean_prev = prev_word.trim();
+        let clean_curr = current_word.trim();
+        if clean_prev.is_empty() || clean_curr.is_empty() || clean_prev == clean_curr {
+            return;
+        }
+        let count = self
+            .user_bigrams
+            .entry((clean_prev.to_string(), clean_curr.to_string()))
+            .or_insert(0);
+        *count = (*count + 1).min(1000);
+        self.last_committed_word = Some(clean_curr.to_string());
+    }
+
+    /// Retrieve the personalized candidate score boost for a word following a previous word
+    pub fn get_user_bigram_boost(&self, prev_word: &str, candidate: &str) -> i32 {
+        let clean_prev = prev_word.trim();
+        let clean_cand = candidate.trim();
+        if clean_prev.is_empty() || clean_cand.is_empty() {
+            return 0;
+        }
+        if let Some(&count) = self.user_bigrams.get(&BigramKey(clean_prev, clean_cand)) {
+            (1500 + count.min(6) as i32 * 500).min(4500)
+        } else {
+            0
         }
     }
 
@@ -110,5 +154,19 @@ mod tests {
         let learned = learner.observe_and_learn("কুয়েটে", &mut trie);
         assert!(learned.contains(&"কুয়েট".to_string()) || learned.contains(&"কুয়েটে".to_string()));
         assert!(trie.contains_exact("কুয়েট") || trie.contains_exact("কুয়েটে"));
+    }
+
+    #[test]
+    fn test_user_bigram_adaptation() {
+        let mut learner = AutonomousLearner::new();
+        assert_eq!(learner.get_user_bigram_boost("আমি", "খাব"), 0);
+
+        learner.observe_committed_pair("আমি", "খাব");
+        let boost1 = learner.get_user_bigram_boost("আমি", "খাব");
+        assert!(boost1 >= 1500);
+
+        learner.observe_committed_pair("আমি", "খাব");
+        let boost2 = learner.get_user_bigram_boost("আমি", "খাব");
+        assert!(boost2 > boost1);
     }
 }
