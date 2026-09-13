@@ -937,9 +937,11 @@ impl PhoneticSuggestion {
             );
         }
 
+
         // 15. Global Multi-Factor Probabilistic Scoring & Ranker
         let has_backtick = middle.contains('`') || term.contains('`');
         let has_explicit_casing = middle.chars().any(|c| c.is_ascii_uppercase() && c != 'K');
+        let has_explicit_rri = middle.ends_with("rri") || term.ends_with("rri");
         let is_short_token = middle.chars().count() <= 3;
 
         let has_valid_dict_candidates = raw_candidates.iter().any(|c| {
@@ -960,7 +962,7 @@ impl PhoneticSuggestion {
                 score += 2200;
             } else if cand.source == CandidateSource::DirectTransliteration {
                 // If raw transliteration is NOT in the dictionary, but valid sound-law alternatives exist, penalize only if no explicit intent markers are present!
-                if has_valid_dict_candidates && !has_explicit_casing && !has_backtick && !is_short_token {
+                if has_valid_dict_candidates && !has_explicit_casing && !has_backtick && !has_explicit_rri && !is_short_token {
                     score -= 2800;
                 }
             }
@@ -991,6 +993,8 @@ impl PhoneticSuggestion {
                         score += 5000;
                     } else if has_explicit_casing {
                         score += 3500;
+                    } else if has_explicit_rri {
+                        score += 3500;
                     } else if is_short_token {
                         score += 1200;
                     }
@@ -1011,6 +1015,8 @@ impl PhoneticSuggestion {
                             score -= 4000;
                         } else if has_explicit_casing {
                             score -= 2500;
+                        } else if has_explicit_rri && dist > 0 {
+                            score -= 3500;
                         } else if middle.chars().count() <= 2 && dist > 0 {
                             score -= 3000;
                         }
@@ -1061,6 +1067,7 @@ impl PhoneticSuggestion {
 
             scored_candidates.push((cand.text, score));
         }
+
 
 
         // Sort candidates by descending total score
@@ -1296,6 +1303,9 @@ impl PhoneticSuggestion {
         if middle.chars().count() > 2 {
             for (i, _) in middle.char_indices().skip(1) {
                 let suffix_key = &middle[i..];
+                if suffix_key == "i" && middle[..i].ends_with("rr") {
+                    continue;
+                }
                 if let Some(suffix) = self.database.find_suffix(suffix_key) {
                     let base_key = &middle[..i];
                     let mut base_candidates = Vec::new();

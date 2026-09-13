@@ -150,6 +150,12 @@ fn test_dirgho_u_and_vowel_kar_variations() {
     let (cands_lu_upper, _) = sugg.suggest("lU", true, true, &empty_memory);
     assert_eq!(cands_lu_upper[0], "লূ", "Expected 'লূ' for 'lU'");
 
+    let (cands_crri, _) = sugg.suggest("crri", true, true, &empty_memory);
+    assert_eq!(cands_crri[0], "চৃ", "Expected 'চৃ' for 'crri'");
+
+    let (cands_krri, _) = sugg.suggest("krri", true, true, &empty_memory);
+    assert_eq!(cands_krri[0], "কৃ", "Expected 'কৃ' for 'krri'");
+
     let (cands_mu, _) = sugg.suggest("mU", true, true, &empty_memory);
     assert_eq!(cands_mu[0], "মূ", "Expected 'মূ' for 'mU'");
 

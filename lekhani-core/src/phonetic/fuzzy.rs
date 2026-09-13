@@ -298,6 +298,42 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     let apply_sound_laws = |src: &str, out: &mut HashSet<String>| {
         let src_lower = src.to_lowercase();
         for &(target, replacements) in PHONEME_SOUND_LAWS {
+            if target == "rr" {
+                for (pos, _) in src_lower.match_indices(target) {
+                    if src_lower[pos..].starts_with("rri") {
+                        continue;
+                    }
+                    for &rep in replacements {
+                        let mut variant = String::with_capacity(src.len() + rep.len());
+                        variant.push_str(&src[..pos]);
+                        variant.push_str(rep);
+                        variant.push_str(&src[pos + target.len()..]);
+                        if variant != src && variant != input {
+                            out.insert(variant);
+                        }
+                    }
+                }
+                continue;
+            }
+            if target == "r" {
+                for (pos, _) in src_lower.match_indices(target) {
+                    if src_lower[pos..].starts_with("rri")
+                        || (pos > 0 && src_lower[pos - 1..].starts_with("rri"))
+                    {
+                        continue;
+                    }
+                    for &rep in replacements {
+                        let mut variant = String::with_capacity(src.len() + rep.len());
+                        variant.push_str(&src[..pos]);
+                        variant.push_str(rep);
+                        variant.push_str(&src[pos + target.len()..]);
+                        if variant != src && variant != input {
+                            out.insert(variant);
+                        }
+                    }
+                }
+                continue;
+            }
             for (pos, _) in src_lower.match_indices(target) {
                 for &rep in replacements {
                     let mut variant = String::with_capacity(src.len() + rep.len());
