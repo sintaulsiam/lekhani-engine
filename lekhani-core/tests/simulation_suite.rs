@@ -43,6 +43,65 @@ fn test_dure_suggestions() {
 }
 
 #[test]
+fn test_quality_fixes_regression() {
+    let mut sugg = PhoneticSuggestion::new();
+    let layout_candidates = [
+        std::path::Path::new("../../data/layouts/avrophonetic.json"),
+        std::path::Path::new("data/layouts/avrophonetic.json"),
+        std::path::Path::new("../data/layouts/avrophonetic.json"),
+    ];
+    for p in layout_candidates {
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(p) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    sugg.set_layout(&json);
+                    break;
+                }
+            }
+        }
+    }
+    let dict_candidates = [
+        std::path::Path::new("../../data/dictionaries"),
+        std::path::Path::new("data/dictionaries"),
+        std::path::Path::new("../data/dictionaries"),
+    ];
+    for p in dict_candidates {
+        if p.exists() {
+            let _ = sugg.database.load_from_dir(p);
+            break;
+        }
+    }
+    let empty_memory = HashMap::new();
+
+    // 1. Snippet Macro Collision Fix
+    let (cands_dhonnobad, _) = sugg.suggest("dhonnobad", true, true, &empty_memory);
+    assert_eq!(cands_dhonnobad[0], "ধন্যবাদ", "Expected 'ধন্যবাদ' for 'dhonnobad'");
+
+    let (cands_macro_dhonnobad, _) = sugg.suggest("!dhonnobad", true, true, &empty_memory);
+    assert_eq!(cands_macro_dhonnobad[0], "আপনাকে অনেক অনেক ধন্যবাদ", "Expected snippet macro for '!dhonnobad'");
+
+    // 2. Chandra Bindu Position Reordering Fix
+    let (cands_cad, _) = sugg.suggest("c^ad", true, true, &empty_memory);
+    assert_eq!(cands_cad[0], "চাঁদ", "Expected 'চাঁদ' for 'c^ad'");
+
+    let (cands_k_ada, _) = sugg.suggest("k^ada", true, true, &empty_memory);
+    assert_eq!(cands_k_ada[0], "কাঁদা", "Expected 'কাঁদা' for 'k^ada'");
+
+    // 3. Dictionary vs Non-Dictionary Ranking Fix
+    let (cands_laglo, _) = sugg.suggest("laglo", true, true, &empty_memory);
+    assert_eq!(cands_laglo[0], "লাগল", "Expected 'লাগল' for 'laglo'");
+
+    let (cands_boiti, _) = sugg.suggest("boiti", true, true, &empty_memory);
+    assert_eq!(cands_boiti[0], "বইটি", "Expected 'বইটি' for 'boiti'");
+
+    let (cands_tomake, _) = sugg.suggest("tomake", true, true, &empty_memory);
+    assert_eq!(cands_tomake[0], "তোমাকে", "Expected 'তোমাকে' for 'tomake'");
+
+    let (cands_hete, _) = sugg.suggest("hete", true, true, &empty_memory);
+    assert_eq!(cands_hete[0], "হেঁটে", "Expected 'হেঁটে' for 'hete'");
+}
+
+#[test]
 fn test_dirgho_u_and_vowel_kar_variations() {
     let mut sugg = PhoneticSuggestion::new();
     let layout_candidates = [

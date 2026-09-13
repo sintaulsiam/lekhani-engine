@@ -50,6 +50,70 @@ impl std::fmt::Debug for PhoneticSuggestion {
     }
 }
 
+/// Normalize caret position in Latin phonetic input (e.g. "ch^ad" -> "cha^d", "k^ada" -> "ka^da")
+pub fn normalize_chandra_latin(input: &str) -> String {
+    if !input.contains('^') {
+        return input.to_string();
+    }
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '^' && i + 1 < chars.len() {
+            let next = chars[i + 1];
+            if is_latin_vowel(next) {
+                let mut v_end = i + 1;
+                while v_end < chars.len() && is_latin_vowel(chars[v_end]) {
+                    v_end += 1;
+                }
+                for v in &chars[i + 1..v_end] {
+                    out.push(*v);
+                }
+                out.push('^');
+                i = v_end;
+                continue;
+            }
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
+#[inline]
+fn is_latin_vowel(c: char) -> bool {
+    matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'A' | 'E' | 'I' | 'O' | 'U' | 'y' | 'Y' | '`')
+}
+
+/// Ensure canonical Unicode ordering for Bengali Chandra Bindu glyphs
+pub fn fix_chandra_bindu_position(text: &str) -> String {
+    if !text.contains('ঁ') {
+        return text.to_string();
+    }
+    let mut res = text.to_string();
+    res = res.replace("ঁআ", "াঁ");
+    res = res.replace("ঁা", "াঁ");
+    res = res.replace("ঁএ", "েঁ");
+    res = res.replace("ঁে", "েঁ");
+    res = res.replace("ঁই", "িঁ");
+    res = res.replace("ঁি", "িঁ");
+    res = res.replace("ঁউ", "ুঁ");
+    res = res.replace("ঁু", "ুঁ");
+    res = res.replace("ঁও", "োঁ");
+    res = res.replace("ঁো", "োঁ");
+    res = res.replace("ঁঈ", "ীঁ");
+    res = res.replace("ঁী", "ীঁ");
+    res = res.replace("ঁঊ", "ূঁ");
+    res = res.replace("ঁূ", "ূঁ");
+    res = res.replace("ঁঋ", "ৃঁ");
+    res = res.replace("ঁৃ", "ৃঁ");
+    res = res.replace("ঁঐ", "ৈঁ");
+    res = res.replace("ঁৈ", "ৈঁ");
+    res = res.replace("ঁঔ", "ৌঁ");
+    res = res.replace("ঁৌ", "ৌঁ");
+    res
+}
+
 impl Default for PhoneticSuggestion {
     fn default() -> Self {
         Self::new()
@@ -100,6 +164,13 @@ impl PhoneticSuggestion {
         if text.is_empty() {
             return String::new();
         }
+        let norm_text = if text.contains('^') {
+            normalize_chandra_latin(text)
+        } else {
+            text.to_string()
+        };
+        let text = norm_text.as_str();
+
         if text.is_ascii() {
             if text.contains('-') && text.len() >= 3 && text.split('-').all(|p| p.len() <= 2) {
                 let parts: Vec<String> = text
@@ -112,7 +183,7 @@ impl PhoneticSuggestion {
                         "u" => "উ".to_string(),
                         _ if !part.is_empty() => {
                             if let Some(ref parser) = self.phonetic_parser {
-                                parser.convert(part)
+                                fix_chandra_bindu_position(&parser.convert(part))
                             } else {
                                 part.to_string()
                             }
@@ -123,7 +194,7 @@ impl PhoneticSuggestion {
                 return parts.join("-");
             }
             if let Some(ref parser) = self.phonetic_parser {
-                return parser.convert(text);
+                return fix_chandra_bindu_position(&parser.convert(text));
             }
             return text.to_string();
         }
@@ -139,7 +210,7 @@ impl PhoneticSuggestion {
             } else {
                 if !ascii_chunk.is_empty() {
                     if let Some(ref parser) = self.phonetic_parser {
-                        result.push_str(&parser.convert(&ascii_chunk));
+                        result.push_str(&fix_chandra_bindu_position(&parser.convert(&ascii_chunk)));
                     } else {
                         result.push_str(&ascii_chunk);
                     }
@@ -150,13 +221,13 @@ impl PhoneticSuggestion {
         }
         if !ascii_chunk.is_empty() {
             if let Some(ref parser) = self.phonetic_parser {
-                result.push_str(&parser.convert(&ascii_chunk));
+                result.push_str(&fix_chandra_bindu_position(&parser.convert(&ascii_chunk)));
             } else {
                 result.push_str(&ascii_chunk);
             }
         }
 
-        result
+        fix_chandra_bindu_position(&result)
     }
 
     /// Generate ranked candidates for typed term with multi-token preceding context
@@ -267,7 +338,13 @@ impl PhoneticSuggestion {
             }
         }
 
-        let (pre, middle, post) = split_word_punct(term);
+        let (pre, middle_raw, post) = split_word_punct(term);
+        let middle_norm = if middle_raw.contains('^') {
+            normalize_chandra_latin(middle_raw)
+        } else {
+            middle_raw.to_string()
+        };
+        let middle = middle_norm.as_str();
 
         if middle.is_empty() {
             let lonely = format!(
@@ -283,11 +360,14 @@ impl PhoneticSuggestion {
         let mut raw_candidates: Vec<CandidateHypothesis> = Vec::with_capacity(32);
         let mut seen = hashbrown::HashSet::new();
 
-        let add_cand = |text: String,
+        let add_cand = |mut text: String,
                         source: CandidateSource,
                         initial_boost: i32,
                         raw_candidates: &mut Vec<CandidateHypothesis>,
                         seen: &mut hashbrown::HashSet<String>| {
+            if text.contains('ঁ') {
+                text = fix_chandra_bindu_position(&text);
+            }
             if !text.is_empty() && seen.insert(text.clone()) {
                 raw_candidates.push(CandidateHypothesis {
                     text,
@@ -561,7 +641,7 @@ impl PhoneticSuggestion {
                 add_cand(
                     item,
                     CandidateSource::MorphologicalInflection,
-                    2000,
+                    3500,
                     &mut raw_candidates,
                     &mut seen,
                 );
@@ -759,7 +839,8 @@ impl PhoneticSuggestion {
         let is_short_token = middle.chars().count() <= 3;
 
         let has_valid_dict_candidates = raw_candidates.iter().any(|c| {
-            (c.source == CandidateSource::FuzzySoundLaw || c.source == CandidateSource::Autocorrect)
+            c.source != CandidateSource::DirectTransliteration
+                && c.text != phonetic
                 && self.database.is_exact_dictionary_word(&c.text)
         });
 
@@ -785,6 +866,12 @@ impl PhoneticSuggestion {
                 let freq_f = freq as f64;
                 let log_freq = freq_f.log2();
                 score += (log_freq * 130.0) as i32;
+            }
+            if freq >= 8000 {
+                score += 2000;
+            }
+            if self.database.trie.contains_exact(&cand.text) {
+                score += 1000;
             }
 
             // 3. Edit distance & length difference penalty from raw phonetic form

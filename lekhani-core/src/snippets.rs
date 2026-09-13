@@ -84,12 +84,6 @@ impl SnippetManager {
         if let Some(val) = self.user_snippets.get(word) {
             return vec![val.clone()];
         }
-        if !word.starts_with('!') {
-            let with_exclaim = format!("!{}", word);
-            if let Some(val) = self.user_snippets.get(&with_exclaim) {
-                return vec![val.clone()];
-            }
-        }
 
         // 2. Math Formula Evaluator (e.g. "=125*8", "=sqrt(144)", "=1500+250", "=25*4=")
         if word.starts_with('=') && word.len() > 1 {

@@ -3,21 +3,12 @@
 //! Automatically discovers new vocabulary, proper nouns, and technical jargon
 //! from the user's typing stream and indexes them into the active trie.
 
-use hashbrown::{Equivalent, HashMap, HashSet};
+use hashbrown::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use super::morphology::analyze_morphemes;
 use crate::trie::PrefixTrie;
-
-#[derive(Hash, PartialEq, Eq)]
-pub struct BigramKey<'a>(pub &'a str, pub &'a str);
-
-impl<'a> Equivalent<(String, String)> for BigramKey<'a> {
-    fn equivalent(&self, key: &(String, String)) -> bool {
-        self.0 == key.0.as_str() && self.1 == key.1.as_str()
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutonomousLearner {
@@ -26,7 +17,7 @@ pub struct AutonomousLearner {
     #[serde(default = "default_threshold")]
     pub auto_learn_threshold: u32,
     #[serde(default)]
-    pub user_bigrams: HashMap<(String, String), u32>,
+    pub user_bigrams: HashMap<String, u32>,
     #[serde(default)]
     pub last_committed_word: Option<String>,
 }
@@ -59,10 +50,8 @@ impl AutonomousLearner {
         if clean_prev.is_empty() || clean_curr.is_empty() || clean_prev == clean_curr {
             return;
         }
-        let count = self
-            .user_bigrams
-            .entry((clean_prev.to_string(), clean_curr.to_string()))
-            .or_insert(0);
+        let key = format!("{}\t{}", clean_prev, clean_curr);
+        let count = self.user_bigrams.entry(key).or_insert(0);
         *count = (*count + 1).min(1000);
         self.last_committed_word = Some(clean_curr.to_string());
     }
@@ -74,7 +63,8 @@ impl AutonomousLearner {
         if clean_prev.is_empty() || clean_cand.is_empty() {
             return 0;
         }
-        if let Some(&count) = self.user_bigrams.get(&BigramKey(clean_prev, clean_cand)) {
+        let key = format!("{}\t{}", clean_prev, clean_cand);
+        if let Some(&count) = self.user_bigrams.get(&key) {
             (1500 + count.min(6) as i32 * 500).min(4500)
         } else {
             0
@@ -115,6 +105,52 @@ impl AutonomousLearner {
         newly_learned
     }
 
+    /// Pre-trained high-frequency conversational word pairs and idioms for instant warm-start
+    pub fn pretrain_baseline(&mut self) {
+        for &(w1, w2, count) in PRETRAINED_CONVERSATIONAL_BIGRAMS {
+            let key = format!("{}\t{}", w1, w2);
+            self.user_bigrams.insert(key, count);
+            self.learned_words.insert(w1.to_string());
+            self.learned_words.insert(w2.to_string());
+            *self.observed_counts.entry(w1.to_string()).or_insert(0) += count;
+            *self.observed_counts.entry(w2.to_string()).or_insert(0) += count;
+        }
+    }
+
+    /// Ingest a raw Bengali text corpus to train both vocabulary and word pair transitions
+    pub fn train_text(&mut self, text: &str) {
+        let mut prev_word: Option<String> = None;
+        for token in text.split_whitespace() {
+            let clean: String = token
+                .chars()
+                .filter(|c| {
+                    !c.is_ascii_punctuation()
+                        && *c != '।'
+                        && *c != '—'
+                        && *c != ','
+                        && *c != '"'
+                        && *c != '\''
+                        && *c != '‘'
+                        && *c != '’'
+                        && *c != '“'
+                        && *c != '”'
+                })
+                .collect();
+            let clean = clean.trim();
+            if clean.chars().count() >= 2 && !clean.is_ascii() {
+                self.learned_words.insert(clean.to_string());
+                *self.observed_counts.entry(clean.to_string()).or_insert(0) += 1;
+                if let Some(ref prev) = prev_word {
+                    self.observe_committed_pair(prev, clean);
+                }
+                prev_word = Some(clean.to_string());
+            }
+            if token.contains('।') || token.contains('?') || token.contains('!') {
+                prev_word = None;
+            }
+        }
+    }
+
     /// Save learned dictionary to a JSON file
     pub fn save_to_path<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
         let path = path.as_ref();
@@ -126,7 +162,7 @@ impl AutonomousLearner {
         std::fs::write(path, data)
     }
 
-    /// Load learned dictionary from a JSON file
+    /// Load learned dictionary from a JSON file, automatically seeding baseline if file doesn't exist
     pub fn load_from_path<P: AsRef<Path>>(path: P) -> Self {
         let path = path.as_ref();
         if path.exists() {
@@ -136,9 +172,90 @@ impl AutonomousLearner {
                 }
             }
         }
-        Self::new()
+        let mut learner = Self::new();
+        learner.pretrain_baseline();
+        let _ = learner.save_to_path(path);
+        learner
     }
 }
+
+/// Pre-trained high-frequency Bengali conversational word pairs
+pub const PRETRAINED_CONVERSATIONAL_BIGRAMS: &[(&str, &str, u32)] = &[
+    ("কেমন", "আছো", 20),
+    ("কেমন", "আছেন", 20),
+    ("ভালো", "আছি", 20),
+    ("ভালো", "আছেন", 18),
+    ("ভালো", "থেকো", 15),
+    ("অনেক", "ধন্যবাদ", 20),
+    ("অসংখ্য", "ধন্যবাদ", 16),
+    ("শুভ", "সকাল", 15),
+    ("শুভ", "রাত্রি", 15),
+    ("শুভ", "কামনা", 14),
+    ("শুভ", "জন্মদিন", 18),
+    ("চা", "খাব", 16),
+    ("চা", "খাচ্ছি", 14),
+    ("ভাত", "খাব", 16),
+    ("ভাত", "খাচ্ছি", 16),
+    ("পানি", "খাব", 14),
+    ("বাসায়", "যাব", 18),
+    ("বাসায়", "যাচ্ছি", 18),
+    ("বাসায়", "আছি", 16),
+    ("অফিসে", "আছি", 16),
+    ("অফিসে", "যাব", 16),
+    ("দেরি", "হবে", 18),
+    ("দেরি", "হচ্ছে", 16),
+    ("দেখা", "হবে", 18),
+    ("কথা", "বলব", 16),
+    ("কথা", "বলছি", 16),
+    ("ফোন", "দাও", 15),
+    ("ফোন", "দিচ্ছি", 16),
+    ("ফোন", "করেছি", 14),
+    ("সমস্যা", "নাই", 20),
+    ("সমস্যা", "নেই", 18),
+    ("প্যারা", "নাই", 20),
+    ("কোথায়", "যাচ্ছ", 16),
+    ("কোথায়", "আছো", 18),
+    ("কোথায়", "তুমি", 16),
+    ("কী", "খবর", 18),
+    ("কী", "করছ", 18),
+    ("কী", "করছেন", 16),
+    ("সব", "ঠিক", 18),
+    ("ঠিক", "আছে", 20),
+    ("একটু", "পরে", 18),
+    ("একটু", "দেরি", 16),
+    ("জরুরি", "কাজ", 16),
+    ("জরুরি", "কথা", 16),
+    ("আজকে", "বৃষ্টি", 15),
+    ("আজকে", "যাব", 15),
+    ("কালকে", "দেখা", 16),
+    ("বই", "পড়া", 20),
+    ("শার্ট", "পরা", 20),
+    ("জুতা", "পরা", 18),
+    ("গান", "শুনব", 16),
+    ("গান", "শুনছি", 16),
+    ("ছবি", "দেখব", 16),
+    ("ছবি", "দেখছি", 16),
+    ("খুব", "সুন্দর", 18),
+    ("দারুণ", "হয়েছে", 18),
+    ("অভিনন্দন", "জানাই", 16),
+    ("খোদা", "হাফেজ", 18),
+    ("আল্লাহ", "হাফেজ", 18),
+    ("ইনশাআল্লাহ", "হবে", 18),
+    ("আলহামদুলিল্লাহ", "ভালো", 20),
+    ("মাশাল্লাহ", "সুন্দর", 16),
+    ("ঘুম", "পাচ্ছে", 16),
+    ("ঘুমাব", "এখন", 16),
+    ("বাইরে", "যাচ্ছি", 16),
+    ("দ্রুত", "আসো", 16),
+    ("তাড়াতাড়ি", "করো", 16),
+    ("কোথাও", "যাব", 14),
+    ("কিছু", "বলব", 14),
+    ("মনে", "পড়ছে", 16),
+    ("মনে", "হচ্ছে", 18),
+    ("মনে", "রাখব", 16),
+    ("কাজ", "করছি", 16),
+    ("কাজ", "শেষ", 18),
+];
 
 #[cfg(test)]
 mod tests {
@@ -168,5 +285,24 @@ mod tests {
         learner.observe_committed_pair("আমি", "খাব");
         let boost2 = learner.get_user_bigram_boost("আমি", "খাব");
         assert!(boost2 > boost1);
+    }
+
+    #[test]
+    fn test_pretrain_baseline_and_serialization() {
+        let mut learner = AutonomousLearner::new();
+        learner.pretrain_baseline();
+
+        assert!(learner.learned_words.len() > 50);
+        assert!(learner.user_bigrams.len() > 50);
+        assert!(learner.get_user_bigram_boost("কেমন", "আছো") >= 1500);
+        assert!(learner.get_user_bigram_boost("প্যারা", "নাই") >= 1500);
+
+        // Verify JSON serialization and deserialization
+        let json = serde_json::to_string(&learner).expect("JSON serialization must succeed");
+        let deserialized: AutonomousLearner =
+            serde_json::from_str(&json).expect("JSON deserialization must succeed");
+
+        assert_eq!(deserialized.learned_words.len(), learner.learned_words.len());
+        assert_eq!(deserialized.user_bigrams.len(), learner.user_bigrams.len());
     }
 }
