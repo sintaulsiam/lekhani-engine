@@ -699,7 +699,7 @@ impl PhoneticSuggestion {
             add_cand(
                 primary.to_string(),
                 CandidateSource::DirectTransliteration,
-                600,
+                1500,
                 &mut raw_candidates,
                 &mut seen,
             );
@@ -718,7 +718,7 @@ impl PhoneticSuggestion {
                 add_cand(
                     phonetic.clone(),
                     CandidateSource::DirectTransliteration,
-                    500,
+                    1200,
                     &mut raw_candidates,
                     &mut seen,
                 );
@@ -941,7 +941,8 @@ impl PhoneticSuggestion {
         // 15. Global Multi-Factor Probabilistic Scoring & Ranker
         let has_backtick = middle.contains('`') || term.contains('`');
         let has_explicit_casing = middle.chars().any(|c| c.is_ascii_uppercase() && c != 'K');
-        let has_explicit_rri = middle.ends_with("rri") || term.ends_with("rri");
+        let has_explicit_rri_digraph = middle.contains("rri") || term.contains("rri");
+        let is_atomic_syllable = is_atomic_cv_syllable(&phonetic);
         let is_short_token = middle.chars().count() <= 3;
 
         let has_valid_dict_candidates = raw_candidates.iter().any(|c| {
@@ -961,8 +962,16 @@ impl PhoneticSuggestion {
             if is_in_dict {
                 score += 2200;
             } else if cand.source == CandidateSource::DirectTransliteration {
-                // If raw transliteration is NOT in the dictionary, but valid sound-law alternatives exist, penalize only if no explicit intent markers are present!
-                if has_valid_dict_candidates && !has_explicit_casing && !has_backtick && !has_explicit_rri && !is_short_token {
+                // If raw transliteration is NOT in the dictionary, but valid sound-law alternatives exist,
+                // penalize full words so casual homophones (e.g. মানুষ for manus, চা for cha) win.
+                // But NEVER penalize when explicit casing, backticks, or explicit rri digraph are present!
+                if has_valid_dict_candidates
+                    && !has_explicit_casing
+                    && !has_backtick
+                    && !has_explicit_rri_digraph
+                    && (!is_atomic_syllable || !is_primary_in_dict)
+                    && !is_short_token
+                {
                     score -= 2800;
                 }
             }
@@ -991,10 +1000,10 @@ impl PhoneticSuggestion {
                     }
                     if has_backtick {
                         score += 5000;
-                    } else if has_explicit_casing {
+                    } else if has_explicit_casing || has_explicit_rri_digraph {
                         score += 3500;
-                    } else if has_explicit_rri {
-                        score += 3500;
+                    } else if is_atomic_syllable && is_primary_in_dict {
+                        score += 3000;
                     } else if is_short_token {
                         score += 1200;
                     }
@@ -1010,13 +1019,15 @@ impl PhoneticSuggestion {
                         .abs() as i32;
                     score -= len_diff * 400;
 
+                    if (is_primary_in_dict || has_explicit_rri_digraph) && is_atomic_syllable && dist > 0 {
+                        score -= 3500;
+                    }
+
                     if cand.source == CandidateSource::FuzzySoundLaw {
                         if has_backtick {
                             score -= 4000;
                         } else if has_explicit_casing {
                             score -= 2500;
-                        } else if has_explicit_rri && dist > 0 {
-                            score -= 3500;
                         } else if middle.chars().count() <= 2 && dist > 0 {
                             score -= 3000;
                         }
@@ -1302,13 +1313,16 @@ impl PhoneticSuggestion {
 
         if middle.chars().count() > 2 {
             for (i, _) in middle.char_indices().skip(1) {
-                let suffix_key = &middle[i..];
-                if suffix_key == "i" && middle[..i].ends_with("rr") {
+                // Suffix split point cannot cut strictly inside an atomic layout digraph
+                if super::fuzzy::cuts_layout_digraph(middle, i) {
                     continue;
                 }
+                let suffix_key = &middle[i..];
                 if let Some(suffix) = self.database.find_suffix(suffix_key) {
                     let base_key = &middle[..i];
                     let mut base_candidates = Vec::new();
+                    let mut has_verified_base = false;
+
                     if let Some(ac) = self.database.get_autocorrect_raw(base_key) {
                         let conv = if ac.chars().any(|c| c.is_bengali()) {
                             ac
@@ -1317,18 +1331,27 @@ impl PhoneticSuggestion {
                         };
                         if !conv.is_empty() && !base_candidates.contains(&conv) {
                             base_candidates.push(conv);
+                            has_verified_base = true;
                         }
                     }
+
                     let base_phonetic = self.convert_phonetic(base_key);
+                    let is_base_dict = self.database.is_exact_dictionary_word(&base_phonetic);
+                    if is_base_dict {
+                        has_verified_base = true;
+                    }
                     if !base_candidates.contains(&base_phonetic) {
                         base_candidates.push(base_phonetic);
                     }
 
                     // Apply stem-level sound-laws (e.g. "manush" in "manusher" -> "মানুষ")
-                    for fz in super::fuzzy::generate_phonetic_variants(base_key) {
-                        let conv = self.convert_phonetic(&fz);
-                        if self.database.is_exact_dictionary_word(&conv) && !base_candidates.contains(&conv) {
-                            base_candidates.push(conv);
+                    // Only permit fuzzy expansion if base is verified or a multi-syllable stem (>= 4 chars)
+                    if has_verified_base || base_key.chars().count() >= 4 {
+                        for fz in super::fuzzy::generate_phonetic_variants(base_key) {
+                            let conv = self.convert_phonetic(&fz);
+                            if self.database.is_exact_dictionary_word(&conv) && !base_candidates.contains(&conv) {
+                                base_candidates.push(conv);
+                            }
                         }
                     }
 
@@ -1412,6 +1435,21 @@ impl PhoneticSuggestion {
         }
         list
     }
+}
+
+/// Check if a Bengali string represents an atomic CV syllable (1 consonant + 1 kar) or a single independent vowel/consonant
+pub fn is_atomic_cv_syllable(s: &str) -> bool {
+    let chars: Vec<char> = s.chars().collect();
+    if chars.is_empty() {
+        return false;
+    }
+    if chars.len() == 1 {
+        return chars[0].is_vowel() || chars[0].is_consonant();
+    }
+    if chars.len() == 2 {
+        return chars[0].is_consonant() && chars[1].is_kar();
+    }
+    false
 }
 
 /// Helper to split leading/trailing punctuation from core word

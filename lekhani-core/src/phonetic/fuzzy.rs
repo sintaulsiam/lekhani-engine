@@ -286,6 +286,41 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("ka", &["k^a", "ka"]),
 ];
 
+/// Recognized atomic layout digraphs in Avro Phonetic.
+/// These represent single Bengali graphemes and must not be mutated internally or split.
+pub const AVRO_LAYOUT_DIGRAPHS: &[&str] = &[
+    "rri", "kkh", "cch", "tsh", "t``", "ng",
+];
+
+/// Check if a replacement [pos..pos + len] overlaps strictly inside an atomic layout digraph
+pub fn overlaps_layout_digraph(src: &str, pos: usize, len: usize) -> bool {
+    let end = pos + len;
+    for &digraph in AVRO_LAYOUT_DIGRAPHS {
+        for (d_start, _) in src.match_indices(digraph) {
+            let d_end = d_start + digraph.len();
+            // If target overlaps with digraph but is strictly shorter than the digraph,
+            // it is attempting to mutate an internal part of an atomic digraph.
+            if pos < d_end && end > d_start && len < digraph.len() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Check if a split boundary index cuts strictly inside any atomic layout digraph
+pub fn cuts_layout_digraph(src: &str, split_idx: usize) -> bool {
+    for &digraph in AVRO_LAYOUT_DIGRAPHS {
+        for (d_start, _) in src.match_indices(digraph) {
+            let d_end = d_start + digraph.len();
+            if split_idx > d_start && split_idx < d_end {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Generate plausible phonetic spelling variants of a Latin word using generic sound laws
 pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     if input.is_empty() || input.chars().count() > 30 {
@@ -298,43 +333,10 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     let apply_sound_laws = |src: &str, out: &mut HashSet<String>| {
         let src_lower = src.to_lowercase();
         for &(target, replacements) in PHONEME_SOUND_LAWS {
-            if target == "rr" {
-                for (pos, _) in src_lower.match_indices(target) {
-                    if src_lower[pos..].starts_with("rri") {
-                        continue;
-                    }
-                    for &rep in replacements {
-                        let mut variant = String::with_capacity(src.len() + rep.len());
-                        variant.push_str(&src[..pos]);
-                        variant.push_str(rep);
-                        variant.push_str(&src[pos + target.len()..]);
-                        if variant != src && variant != input {
-                            out.insert(variant);
-                        }
-                    }
-                }
-                continue;
-            }
-            if target == "r" {
-                for (pos, _) in src_lower.match_indices(target) {
-                    if src_lower[pos..].starts_with("rri")
-                        || (pos > 0 && src_lower[pos - 1..].starts_with("rri"))
-                    {
-                        continue;
-                    }
-                    for &rep in replacements {
-                        let mut variant = String::with_capacity(src.len() + rep.len());
-                        variant.push_str(&src[..pos]);
-                        variant.push_str(rep);
-                        variant.push_str(&src[pos + target.len()..]);
-                        if variant != src && variant != input {
-                            out.insert(variant);
-                        }
-                    }
-                }
-                continue;
-            }
             for (pos, _) in src_lower.match_indices(target) {
+                if overlaps_layout_digraph(&src_lower, pos, target.len()) {
+                    continue;
+                }
                 for &rep in replacements {
                     let mut variant = String::with_capacity(src.len() + rep.len());
                     variant.push_str(&src[..pos]);
