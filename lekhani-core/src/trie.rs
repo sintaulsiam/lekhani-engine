@@ -250,6 +250,109 @@ impl PrefixTrie {
     pub fn iter(&self) -> impl Iterator<Item = (&str, u32)> {
         self.entries.iter().map(move |e| (self.word_at(e), e.freq))
     }
+
+    const BINARY_MAGIC: &'static [u8; 4] = b"LDI3";
+    const BINARY_VERSION: u32 = 1;
+
+    /// Serialize trie to a compact binary format for ultra-fast loading
+    pub fn to_binary(&self) -> Vec<u8> {
+        let entry_count = self.entries.len() as u32;
+        let buffer_len = self.buffer.len() as u32;
+        let total_size = 16 + (self.entries.len() * 10) + self.buffer.len();
+        let mut out = Vec::with_capacity(total_size);
+
+        out.extend_from_slice(Self::BINARY_MAGIC);
+        out.extend_from_slice(&Self::BINARY_VERSION.to_le_bytes());
+        out.extend_from_slice(&entry_count.to_le_bytes());
+        out.extend_from_slice(&buffer_len.to_le_bytes());
+
+        for entry in &self.entries {
+            out.extend_from_slice(&entry.offset.to_le_bytes());
+            out.extend_from_slice(&entry.len.to_le_bytes());
+            out.extend_from_slice(&entry.freq.to_le_bytes());
+        }
+
+        out.extend_from_slice(self.buffer.as_bytes());
+        out
+    }
+
+    /// Save trie to a binary file
+    pub fn save_binary<P: AsRef<std::path::Path>>(&self, path: P) -> std::io::Result<()> {
+        let bytes = self.to_binary();
+        std::fs::write(path, bytes)
+    }
+
+    /// Load trie from compact binary slice in milliseconds
+    pub fn from_binary(data: &[u8]) -> Result<Self, std::io::Error> {
+        if data.len() < 16 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Binary data too short for header",
+            ));
+        }
+
+        if &data[0..4] != Self::BINARY_MAGIC {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid binary dictionary magic header",
+            ));
+        }
+
+        let version = u32::from_le_bytes(data[4..8].try_into().unwrap());
+        if version != Self::BINARY_VERSION {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Unsupported binary dictionary version: {}", version),
+            ));
+        }
+
+        let entry_count = u32::from_le_bytes(data[8..12].try_into().unwrap()) as usize;
+        let buffer_len = u32::from_le_bytes(data[12..16].try_into().unwrap()) as usize;
+
+        let expected_size = 16 + (entry_count * 10) + buffer_len;
+        if data.len() < expected_size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "Binary data truncated",
+            ));
+        }
+
+        let mut entries = Vec::with_capacity(entry_count);
+        let mut cursor = 16;
+        for _ in 0..entry_count {
+            let offset = u32::from_le_bytes(data[cursor..cursor + 4].try_into().unwrap());
+            let len = u16::from_le_bytes(data[cursor + 4..cursor + 6].try_into().unwrap());
+            let freq = u32::from_le_bytes(data[cursor + 6..cursor + 10].try_into().unwrap());
+            entries.push(TrieEntry { offset, len, freq });
+            cursor += 10;
+        }
+
+        let buffer_bytes = &data[cursor..cursor + buffer_len];
+        let buffer = std::str::from_utf8(buffer_bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+            .to_string();
+
+        Ok(Self {
+            buffer,
+            entries,
+            is_sorted: true,
+        })
+    }
+
+    /// Load trie directly from a binary file
+    pub fn load_binary<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
+        let bytes = std::fs::read(path)?;
+        Self::from_binary(&bytes)
+    }
+
+    /// Merge entries from another trie into self
+    pub fn merge(&mut self, other: &PrefixTrie) {
+        let mut new_entries = Vec::with_capacity(other.len());
+        for (w, freq) in other.iter() {
+            new_entries.push((w.to_string(), freq));
+        }
+        self.insert_bulk_weighted(new_entries);
+    }
 }
 
 #[cfg(test)]
@@ -285,12 +388,23 @@ mod tests {
         let items: Vec<(&str, u32)> = trie.iter().collect();
         assert_eq!(items.len(), 5);
 
-        // Serialization roundtrip
+        // Serialization roundtrip (JSON)
         let json = serde_json::to_string(&trie).unwrap();
         let deserialized: PrefixTrie = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.get_frequency("বাংলাদেশ"), 9500);
         assert_eq!(
             deserialized.find_prefix_matches("বাং", 2),
+            vec!["বাংলাদেশ", "বাংলা"]
+        );
+
+        // Binary serialization and ultra-fast loading
+        let bin = trie.to_binary();
+        assert!(bin.starts_with(b"LDI3"));
+        let bin_loaded = PrefixTrie::from_binary(&bin).expect("Binary trie should deserialize");
+        assert_eq!(bin_loaded.len(), trie.len());
+        assert_eq!(bin_loaded.get_frequency("বাংলাদেশ"), 9500);
+        assert_eq!(
+            bin_loaded.find_prefix_matches("বাং", 2),
             vec!["বাংলাদেশ", "বাংলা"]
         );
     }

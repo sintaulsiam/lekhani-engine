@@ -344,16 +344,24 @@ impl PhoneticDatabase {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let dir = dir.as_ref();
 
-        // 1. Fast Flat Binary Dictionary (or JSON fallback)
+        // 1. Ultra-Fast Binary Dictionary (or JSON / legacy fallback)
         let dict_bin_path = dir.join("dictionary.bin");
         if dict_bin_path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&dict_bin_path) {
-                let words: Vec<String> = content
-                    .lines()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect();
-                self.trie.insert_bulk(words);
+            if let Ok(bytes) = std::fs::read(&dict_bin_path) {
+                if bytes.starts_with(b"LDI3") {
+                    if let Ok(bin_trie) = PrefixTrie::from_binary(&bytes) {
+                        self.trie.merge(&bin_trie);
+                    }
+                } else if let Ok(content) = std::str::from_utf8(&bytes) {
+                    let words: Vec<String> = content
+                        .lines()
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    self.trie.insert_bulk(words);
+                    // Upgrade legacy plain-text cache to high-speed binary format
+                    let _ = self.trie.save_binary(&dict_bin_path);
+                }
             }
         } else {
             let dict_path = dir.join("dictionary.json");
@@ -366,9 +374,9 @@ impl PhoneticDatabase {
                         for (_k, v_list) in raw_map {
                             words.extend(v_list);
                         }
-                        let lines = words.join("\n");
-                        let _ = std::fs::write(&dict_bin_path, lines);
                         self.trie.insert_bulk(words);
+                        // Save fast binary dictionary for sub-millisecond future boots
+                        let _ = self.trie.save_binary(&dict_bin_path);
                     }
                 }
             }
