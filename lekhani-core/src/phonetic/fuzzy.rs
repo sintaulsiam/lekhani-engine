@@ -583,6 +583,7 @@ pub fn generate_qwerty_typo_variants(input: &str) -> Vec<String> {
 }
 
 /// Compute true Damerau-Levenshtein distance (insertions, deletions, substitutions, adjacent transpositions)
+#[allow(clippy::needless_range_loop)]
 pub fn damerau_levenshtein(s1: &str, s2: &str) -> usize {
     let a: Vec<char> = s1.chars().collect();
     let b: Vec<char> = s2.chars().collect();
