@@ -1271,6 +1271,14 @@ impl PhoneticSuggestion {
         self.ai_predictor.predict_next(&[prev], 8)
     }
 
+    /// Predict next words given multi-word sentence context (up to trigrams)
+    pub fn suggest_next_words_with_context(&self, context: &[&str]) -> Vec<String> {
+        if context.is_empty() {
+            return Vec::new();
+        }
+        self.ai_predictor.predict_next(context, 8)
+    }
+
     /// Transliterate a full phrase or sentence using global AI Beam Search sequence decoding
     pub fn transliterate_phrase_or_sentence(&mut self, text: &str) -> String {
         if text.is_empty() {

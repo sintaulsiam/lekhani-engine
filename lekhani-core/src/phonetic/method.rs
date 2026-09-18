@@ -52,8 +52,11 @@ impl PhoneticMethod {
         if !self.buffer.is_empty() {
             return false;
         }
-        if let Some(ref last) = self.last_committed_word {
-            let preds = self.suggestion_engine.suggest_next_words(last);
+        let ctx_refs: Vec<&str> = self.recent_context.iter().map(|s| s.as_str()).collect();
+        if !ctx_refs.is_empty() {
+            let preds = self
+                .suggestion_engine
+                .suggest_next_words_with_context(&ctx_refs);
             if !preds.is_empty() {
                 self.current_candidates = preds;
                 self.selected_index = 0;
