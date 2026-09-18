@@ -10,6 +10,8 @@ pub struct UserStats {
     pub total_words_typed: u64,
     pub keystrokes_saved: u64,
     pub top_words: HashMap<String, u64>,
+    #[serde(default)]
+    pub char_frequencies: HashMap<char, u64>,
 }
 
 impl Default for UserStats {
@@ -25,6 +27,7 @@ impl UserStats {
             total_words_typed: 0,
             keystrokes_saved: 0,
             top_words: HashMap::new(),
+            char_frequencies: HashMap::new(),
         }
     }
 
@@ -45,6 +48,34 @@ impl UserStats {
             .top_words
             .entry(committed_text.to_string())
             .or_insert(0) += 1;
+
+        for ch in committed_text.chars() {
+            if !ch.is_whitespace() && !ch.is_ascii_punctuation() {
+                *self.char_frequencies.entry(ch).or_insert(0) += 1;
+            }
+        }
+    }
+
+    /// Get sorted list of most frequent characters with count and percentage
+    pub fn get_top_characters(&self, limit: usize) -> Vec<(char, u64, f64)> {
+        let total_chars: u64 = self.char_frequencies.values().sum();
+        let mut list: Vec<(char, u64)> = self
+            .char_frequencies
+            .iter()
+            .map(|(c, v)| (*c, *v))
+            .collect();
+        list.sort_unstable_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        list.truncate(limit);
+        list.into_iter()
+            .map(|(c, count)| {
+                let pct = if total_chars == 0 {
+                    0.0
+                } else {
+                    (count as f64 / total_chars as f64) * 100.0
+                };
+                (c, count, pct)
+            })
+            .collect()
     }
 
     /// Calculate percentage of keystrokes saved via suggestions and smart snippets

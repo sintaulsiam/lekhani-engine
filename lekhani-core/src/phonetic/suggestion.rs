@@ -911,9 +911,11 @@ impl PhoneticSuggestion {
                 typo_matches.sort_by(|a, b| {
                     let dist_a = super::fuzzy::damerau_levenshtein(middle, a);
                     let dist_b = super::fuzzy::damerau_levenshtein(middle, b);
-                    dist_a
-                        .cmp(&dist_b)
-                        .then_with(|| self.database.get_frequency(b).cmp(&self.database.get_frequency(a)))
+                    dist_a.cmp(&dist_b).then_with(|| {
+                        self.database
+                            .get_frequency(b)
+                            .cmp(&self.database.get_frequency(a))
+                    })
                 });
                 for tm in typo_matches.into_iter().take(4) {
                     add_cand(
