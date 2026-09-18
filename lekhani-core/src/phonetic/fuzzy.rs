@@ -582,6 +582,49 @@ pub fn generate_qwerty_typo_variants(input: &str) -> Vec<String> {
     result
 }
 
+/// Compute true Damerau-Levenshtein distance (insertions, deletions, substitutions, adjacent transpositions)
+pub fn damerau_levenshtein(s1: &str, s2: &str) -> usize {
+    let a: Vec<char> = s1.chars().collect();
+    let b: Vec<char> = s2.chars().collect();
+    let len_a = a.len();
+    let len_b = b.len();
+
+    if len_a == 0 {
+        return len_b;
+    }
+    if len_b == 0 {
+        return len_a;
+    }
+
+    let mut d = vec![vec![0usize; len_b + 1]; len_a + 1];
+
+    for i in 0..=len_a {
+        d[i][0] = i;
+    }
+    for j in 0..=len_b {
+        d[0][j] = j;
+    }
+
+    for i in 1..=len_a {
+        for j in 1..=len_b {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+
+            let deletion = d[i - 1][j] + 1;
+            let insertion = d[i][j - 1] + 1;
+            let substitution = d[i - 1][j - 1] + cost;
+
+            d[i][j] = deletion.min(insertion).min(substitution);
+
+            // Damerau adjacent transposition
+            if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                d[i][j] = d[i][j].min(d[i - 2][j - 2] + 1);
+            }
+        }
+    }
+
+    d[len_a][len_b]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -639,5 +682,17 @@ mod tests {
         // Neighbor key slip typo
         let typo_neighbor = generate_qwerty_typo_variants("bhalobaaha");
         assert!(typo_neighbor.contains(&"bhalobasha".to_string()));
+    }
+
+    #[test]
+    fn test_damerau_levenshtein() {
+        assert_eq!(damerau_levenshtein("", ""), 0);
+        assert_eq!(damerau_levenshtein("a", ""), 1);
+        assert_eq!(damerau_levenshtein("daktar", "daktar"), 0);
+        // Transposition cost = 1 (Damerau property vs standard Levenshtein which is 2)
+        assert_eq!(damerau_levenshtein("ab", "ba"), 1);
+        assert_eq!(damerau_levenshtein("caht", "chat"), 1);
+        // Substitution
+        assert_eq!(damerau_levenshtein("dakter", "daktar"), 1);
     }
 }
