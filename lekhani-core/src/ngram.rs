@@ -116,7 +116,16 @@ impl UserStats {
         let path = path.as_ref();
         if path.exists() {
             if let Ok(content) = std::fs::read_to_string(path) {
-                if let Ok(stats) = serde_json::from_str::<UserStats>(&content) {
+                if let Ok(mut stats) = serde_json::from_str::<UserStats>(&content) {
+                    if stats.char_frequencies.is_empty() && !stats.top_words.is_empty() {
+                        for (word, count) in &stats.top_words {
+                            for ch in word.chars() {
+                                if !ch.is_whitespace() && !ch.is_ascii_punctuation() {
+                                    *stats.char_frequencies.entry(ch).or_insert(0) += *count;
+                                }
+                            }
+                        }
+                    }
                     return stats;
                 }
             }
