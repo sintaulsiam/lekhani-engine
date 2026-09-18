@@ -113,11 +113,7 @@ impl PrefixTrie {
             let offset = self.buffer.len() as u32;
             let len = cand.len() as u16;
             self.buffer.push_str(&cand);
-            self.entries.push(TrieEntry {
-                offset,
-                len,
-                freq,
-            });
+            self.entries.push(TrieEntry { offset, len, freq });
         }
         self.is_sorted = false;
         self.ensure_sorted();
@@ -195,7 +191,10 @@ impl PrefixTrie {
         }
 
         // Find starting index using binary search
-        let start_idx = match self.entries.binary_search_by(|e| self.word_at(e).cmp(prefix)) {
+        let start_idx = match self
+            .entries
+            .binary_search_by(|e| self.word_at(e).cmp(prefix))
+        {
             Ok(idx) => idx,
             Err(idx) => idx,
         };
@@ -290,6 +289,9 @@ mod tests {
         let json = serde_json::to_string(&trie).unwrap();
         let deserialized: PrefixTrie = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.get_frequency("বাংলাদেশ"), 9500);
-        assert_eq!(deserialized.find_prefix_matches("বাং", 2), vec!["বাংলাদেশ", "বাংলা"]);
+        assert_eq!(
+            deserialized.find_prefix_matches("বাং", 2),
+            vec!["বাংলাদেশ", "বাংলা"]
+        );
     }
 }

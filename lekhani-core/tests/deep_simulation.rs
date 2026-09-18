@@ -54,7 +54,6 @@ fn test_massive_deep_simulation_suite() {
         ("tomake", &["তোমাকে"]),
         ("take", &["তাকে"]),
         ("apnake", &["আপনাকে"]),
-
         // 2. High Frequency Conversational Verbs (Present, Past, Future, Continuous)
         ("kori", &["করি"]),
         ("koro", &["করো"]),
@@ -168,7 +167,6 @@ fn test_massive_deep_simulation_suite() {
         ("thaklam", &["থাকলাম"]),
         ("thaklo", &["থাকল"]),
         ("thaklen", &["থাকলেন"]),
-
         // 3. Daily Relations, Slang, Connectors & Emphatics
         ("bhai", &["ভাই"]),
         ("bhaiya", &["ভাইয়া"]),
@@ -225,7 +223,6 @@ fn test_massive_deep_simulation_suite() {
         ("khub", &["খুব"]),
         ("beshi", &["বেশি"]),
         ("kom", &["কম"]),
-
         // 4. Case Inflections, Classifiers & Postpositions
         ("deshe", &["দেশে"]),
         ("desher", &["দেশের"]),
@@ -292,7 +289,6 @@ fn test_massive_deep_simulation_suite() {
         ("chobiti", &["ছবিটি"]),
         ("chobigulo", &["ছবিগুলো"]),
         ("somoymoto", &["সময়মতো", "সময়মতো"]),
-
         // 5. Complex Sanskrit Conjuncts & Orthography
         ("ahban", &["আহ্বান"]),
         ("jihba", &["জিহ্বা"]),
@@ -362,7 +358,6 @@ fn test_massive_deep_simulation_suite() {
         ("shomajkormidero", &["সমাজকর্মীদেরও"]),
         ("chikitshokderke", &["চিকিৎসকদেরকে"]),
         ("onishchitotay", &["অনিশ্চয়তায়", "অনিশ্চয়তায়"]),
-
         ("dhai", &["ধাই", "\u{0986}\u{09DC}\u{09BE}\u{0987}"]),
         ("shoa", &["সোয়া", "সোয়া"]),
         ("shadhe", &["সাড়ে", "সাড়ে"]),
@@ -374,7 +369,6 @@ fn test_massive_deep_simulation_suite() {
         ("trayodash", &["ত্রয়োদশ", "ত্রয়োদশ"]),
         ("ditiyo", &["দ্বিতীয়", "দ্বিতীয়"]),
         ("tritiyo", &["তৃতীয়", "তৃতীয়"]),
-
         // 7. Bilingual / Digital Loanwords & Inflected Forms
         ("computer", &["কম্পিউটার"]),
         ("computere", &["কম্পিউটারে"]),
@@ -459,7 +453,11 @@ fn test_massive_deep_simulation_suite() {
     for &(input, expected_list) in test_cases {
         let (cands, _) = sugg.suggest(input, true, true, &empty_memory);
         if cands.is_empty() {
-            failures.push((input, expected_list[0], "No candidates returned".to_string()));
+            failures.push((
+                input,
+                expected_list[0],
+                "No candidates returned".to_string(),
+            ));
         } else if expected_list.contains(&cands[0].as_str()) {
             passed += 1;
         } else {
@@ -468,16 +466,29 @@ fn test_massive_deep_simulation_suite() {
     }
 
     println!("\n=======================================================");
-    println!("Simulation Results: {} / {} Passed ({:.1}%)", 
-        passed, test_cases.len(), (passed as f64 / test_cases.len() as f64) * 100.0);
+    println!(
+        "Simulation Results: {} / {} Passed ({:.1}%)",
+        passed,
+        test_cases.len(),
+        (passed as f64 / test_cases.len() as f64) * 100.0
+    );
     println!("=======================================================");
 
     if !failures.is_empty() {
-        eprintln!("\n=== Deep Simulation Failures ({} / {}) ===", failures.len(), test_cases.len());
+        eprintln!(
+            "\n=== Deep Simulation Failures ({} / {}) ===",
+            failures.len(),
+            test_cases.len()
+        );
         for (inp, exp, got) in &failures {
             eprintln!("{:<25} -> Expected: {:<20} | Got: {}", inp, exp, got);
         }
     }
 
-    assert!(failures.is_empty(), "Failed {} out of {} test cases in deep simulation", failures.len(), test_cases.len());
+    assert!(
+        failures.is_empty(),
+        "Failed {} out of {} test cases in deep simulation",
+        failures.len(),
+        test_cases.len()
+    );
 }

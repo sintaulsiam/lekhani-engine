@@ -46,7 +46,11 @@ impl EmojiMap {
         // ==========================================
         // 1. Bengali Symbols & Native Punctuation
         // ==========================================
-        add_emoji!("*taka*", "৳", ["taka", "tk", "poisha", "টাকা", "টাকায়", "পয়সা", "পয়সা"]);
+        add_emoji!(
+            "*taka*",
+            "৳",
+            ["taka", "tk", "poisha", "টাকা", "টাকায়", "পয়সা", "পয়সা"]
+        );
         add_emoji!("*tk*", "৳", ["taka", "tk", "টাকা"]);
         add_emoji!("$taka", "৳");
         add_emoji!("$tk", "৳");
@@ -56,21 +60,40 @@ impl EmojiMap {
         add_emoji!(
             "*hasant*",
             "্",
-            ["hasant", "hasanta", "hosonto", "hoshonto", "halant", "virama", "হসন্ত"]
+            [
+                "hasant",
+                "hasanta",
+                "hosonto",
+                "hoshonto",
+                "halant",
+                "virama",
+                "হসন্ত"
+            ]
         );
         add_emoji!("*hosonto*", "্");
         add_emoji!("*hoshonto*", "্");
         add_emoji!("*hasanta*", "্");
         add_emoji!("*halant*", "্");
         add_emoji!("*virama*", "্");
-        add_emoji!("*khandatta*", "ৎ", ["khandatta", "khandata", "খন্ডত", "খণ্ডত"]);
+        add_emoji!(
+            "*khandatta*",
+            "ৎ",
+            ["khandatta", "khandata", "খন্ডত", "খণ্ডত"]
+        );
         add_emoji!("*khandata*", "ৎ");
         add_emoji!("*khanda_ta*", "ৎ");
         add_emoji!("*khandota*", "ৎ");
         add_emoji!(
             "*anusvara*",
             "ং",
-            ["anusvara", "anushbar", "onushbar", "onushor", "anushar", "অনুস্বার"]
+            [
+                "anusvara",
+                "anushbar",
+                "onushbar",
+                "onushor",
+                "anushar",
+                "অনুস্বার"
+            ]
         );
         add_emoji!("*anusvar*", "ং");
         add_emoji!("*anushbar*", "ং");
@@ -108,9 +131,20 @@ impl EmojiMap {
             ":bhalobasha:",
             "❤️",
             [
-                "bhalobasha", "valobasha", "bhalobasa", "valobasa", "bhalobasi",
-                "ভালোবাসা", "ভালবাসা", "ভালোবাসি", "ভালবাসি", "প্রেম",
-                "love", "heart", "romance", "affection"
+                "bhalobasha",
+                "valobasha",
+                "bhalobasa",
+                "valobasa",
+                "bhalobasi",
+                "ভালোবাসা",
+                "ভালবাসা",
+                "ভালোবাসি",
+                "ভালবাসি",
+                "প্রেম",
+                "love",
+                "heart",
+                "romance",
+                "affection"
             ]
         );
         add_emoji!(":valobasha:", "❤️");
@@ -119,50 +153,148 @@ impl EmojiMap {
             ":pranam:",
             "🙏",
             [
-                "pranam", "প্রণাম", "adab", "আদাব", "namaskar", "নমস্কার",
-                "doya", "দোয়া", "দোয়া", "munajat", "মোনাজাত", "pray", "prayer", "please"
+                "pranam",
+                "প্রণাম",
+                "adab",
+                "আদাব",
+                "namaskar",
+                "নমস্কার",
+                "doya",
+                "দোয়া",
+                "দোয়া",
+                "munajat",
+                "মোনাজাত",
+                "pray",
+                "prayer",
+                "please"
             ]
         );
-        add_emoji!(":salam:", "🤝", ["salam", "সালাম", "handshake", "agreement", "চুক্তি", "হ্যান্ডশেক"]);
+        add_emoji!(
+            ":salam:",
+            "🤝",
+            ["salam", "সালাম", "handshake", "agreement", "চুক্তি", "হ্যান্ডশেক"]
+        );
         add_emoji!(":adab:", "🙏");
         add_emoji!(":namaskar:", "🙏");
-        add_emoji!(":shurjo:", "☀️", ["shurjo", "surjo", "সূর্য", "রোদ", "sun", "sunny", "sunshine"]);
+        add_emoji!(
+            ":shurjo:",
+            "☀️",
+            ["shurjo", "surjo", "সূর্য", "রোদ", "sun", "sunny", "sunshine"]
+        );
         add_emoji!(":surjo:", "☀️");
-        add_emoji!(":chad:", "🌙", ["chad", "chand", "চাঁদ", "জোছনা", "moon", "night"]);
+        add_emoji!(
+            ":chad:",
+            "🌙",
+            ["chad", "chand", "চাঁদ", "জোছনা", "moon", "night"]
+        );
         add_emoji!(":tara:", "⭐", ["tara", "তারা", "নক্ষত্র", "star"]);
-        add_emoji!(":ful:", "🌸", ["ful", "phul", "ফুল", "flower", "blossom", "cherry"]);
+        add_emoji!(
+            ":ful:",
+            "🌸",
+            ["ful", "phul", "ফুল", "flower", "blossom", "cherry"]
+        );
         add_emoji!(":golap:", "🌹", ["golap", "গোলাপ", "rose"]);
         add_emoji!(":padma:", "🪷", ["padma", "পদ্ম", "lotus", "waterlily"]);
         add_emoji!(":shapla:", "🪷", ["shapla", "শাপলা"]);
-        add_emoji!(":agun:", "🔥", ["agun", "আগুন", "fire", "hot", "flame", "lit"]);
+        add_emoji!(
+            ":agun:",
+            "🔥",
+            ["agun", "আগুন", "fire", "hot", "flame", "lit"]
+        );
         add_emoji!(":aguni:", "🔥");
-        add_emoji!(":hasukhi:", "😊", ["hasukhi", "khushi", "খুশি", "আনন্দ", "happy", "blessed"]);
-        add_emoji!(":hashi:", "😄", ["hashi", "hasi", "হাসি", "হাস্য", "smile", "laugh", "happy"]);
+        add_emoji!(
+            ":hasukhi:",
+            "😊",
+            ["hasukhi", "khushi", "খুশি", "আনন্দ", "happy", "blessed"]
+        );
+        add_emoji!(
+            ":hashi:",
+            "😄",
+            ["hashi", "hasi", "হাসি", "হাস্য", "smile", "laugh", "happy"]
+        );
         add_emoji!(
             ":kanna:",
             "😭",
-            ["kanna", "কান্না", "dukkho", "দুঃখ", "কষ্ট", "cry", "sob", "sad", "tears"]
+            [
+                "kanna",
+                "কান্না",
+                "dukkho",
+                "দুঃখ",
+                "কষ্ট",
+                "cry",
+                "sob",
+                "sad",
+                "tears"
+            ]
         );
-        add_emoji!(":thik:", "✅", ["thik", "ঠিক", "shothik", "সঠিক", "yes", "correct", "check", "done"]);
-        add_emoji!(":bhul:", "❌", ["bhul", "ভুল", "অশুদ্ধ", "no", "wrong", "cross", "incorrect"]);
+        add_emoji!(
+            ":thik:",
+            "✅",
+            [
+                "thik",
+                "ঠিক",
+                "shothik",
+                "সঠিক",
+                "yes",
+                "correct",
+                "check",
+                "done"
+            ]
+        );
+        add_emoji!(
+            ":bhul:",
+            "❌",
+            ["bhul", "ভুল", "অশুদ্ধ", "no", "wrong", "cross", "incorrect"]
+        );
         add_emoji!(
             ":shabash:",
             "👍",
             [
-                "shabash", "sabash", "সাবাশ", "bhalo", "ভালো", "সেরা",
-                "like", "good", "thumbsup", "agree", "upvote"
+                "shabash",
+                "sabash",
+                "সাবাশ",
+                "bhalo",
+                "ভালো",
+                "সেরা",
+                "like",
+                "good",
+                "thumbsup",
+                "agree",
+                "upvote"
             ]
         );
         add_emoji!(
             ":durbar:",
             "⚡",
             [
-                "durbar", "duronto", "দুর্বার", "bijli", "বিজলী", "বিদ্যুৎ",
-                "zap", "flash", "lightning", "power", "energy"
+                "durbar",
+                "duronto",
+                "দুর্বার",
+                "bijli",
+                "বিজলী",
+                "বিদ্যুৎ",
+                "zap",
+                "flash",
+                "lightning",
+                "power",
+                "energy"
             ]
         );
         add_emoji!(":bijli:", "⚡");
-        add_emoji!(":chokh:", "👀", ["chokh", "চোখ", "নজর", "দৃষ্টি", "eyes", "look", "see", "watch"]);
+        add_emoji!(
+            ":chokh:",
+            "👀",
+            [
+                "chokh",
+                "চোখ",
+                "নজর",
+                "দৃষ্টি",
+                "eyes",
+                "look",
+                "see",
+                "watch"
+            ]
+        );
         add_emoji!(":machh:", "🐟", ["mach", "machh", "মাছ", "fish", "sea"]);
         add_emoji!(":ilish:", "🐟", ["ilish", "ইলিশ", "hilsa"]);
         add_emoji!(":pakhi:", "🐦", ["pakhi", "পাখি", "bird"]);
@@ -170,46 +302,167 @@ impl EmojiMap {
         add_emoji!(":bagh:", "🐅", ["bagh", "বাঘ", "tiger", "royal"]);
         add_emoji!(":singho:", "🦁", ["singho", "সিংহ", "lion"]);
         add_emoji!(":shap:", "🐍", ["shap", "সাপ", "snake"]);
-        add_emoji!(":gach:", "🌳", ["gach", "গাছ", "বৃক্ষ", "tree", "nature", "forest"]);
-        add_emoji!(":brishti:", "🌧️", ["brishti", "বৃষ্টি", "বর্ষা", "rain", "rainy", "shower"]);
+        add_emoji!(
+            ":gach:",
+            "🌳",
+            ["gach", "গাছ", "বৃক্ষ", "tree", "nature", "forest"]
+        );
+        add_emoji!(
+            ":brishti:",
+            "🌧️",
+            ["brishti", "বৃষ্টি", "বর্ষা", "rain", "rainy", "shower"]
+        );
         add_emoji!(":megh:", "☁️", ["megh", "মেঘ", "আকাশ", "cloud", "cloudy"]);
-        add_emoji!(":jhor:", "🌪️", ["jhor", "ঝড়", "ঝড়", "তুফান", "storm", "cyclone", "tornado"]);
-        add_emoji!(":cha:", "☕", ["cha", "চা", "tea", "coffee", "কফি", "hot", "cuppa"]);
-        add_emoji!(":pani:", "💧", ["pani", "পানি", "jol", "জল", "water", "drop", "liquid"]);
+        add_emoji!(
+            ":jhor:",
+            "🌪️",
+            ["jhor", "ঝড়", "ঝড়", "তুফান", "storm", "cyclone", "tornado"]
+        );
+        add_emoji!(
+            ":cha:",
+            "☕",
+            ["cha", "চা", "tea", "coffee", "কফি", "hot", "cuppa"]
+        );
+        add_emoji!(
+            ":pani:",
+            "💧",
+            ["pani", "পানি", "jol", "জল", "water", "drop", "liquid"]
+        );
         add_emoji!(":vath:", "🍚", ["bhat", "vath", "ভাত", "rice", "meal"]);
-        add_emoji!(":biryani:", "🍲", ["biryani", "বিরিয়ানি", "বিরিয়ানি", "খাবার", "food", "dish"]);
+        add_emoji!(
+            ":biryani:",
+            "🍲",
+            ["biryani", "বিরিয়ানি", "বিরিয়ানি", "খাবার", "food", "dish"]
+        );
         add_emoji!(":dudh:", "🥛", ["dudh", "দুধ", "milk", "drink"]);
-        add_emoji!(":mishti:", "🍬", ["mishti", "মিষ্টি", "sweet", "candy", "dessert"]);
-        add_emoji!(":boishakh:", "🎭", ["boishakh", "বৈশাখ", "mela", "মেলা", "উৎসব", "drama", "theatre"]);
+        add_emoji!(
+            ":mishti:",
+            "🍬",
+            ["mishti", "মিষ্টি", "sweet", "candy", "dessert"]
+        );
+        add_emoji!(
+            ":boishakh:",
+            "🎭",
+            [
+                "boishakh",
+                "বৈশাখ",
+                "mela",
+                "মেলা",
+                "উৎসব",
+                "drama",
+                "theatre"
+            ]
+        );
         add_emoji!(
             ":potaka:",
             "🇧🇩",
-            ["potaka", "পতাকা", "bangladesh", "বাংলাদেশ", "bd", "flag_bd", "দেশ"]
+            [
+                "potaka",
+                "পতাকা",
+                "bangladesh",
+                "বাংলাদেশ",
+                "bd",
+                "flag_bd",
+                "দেশ"
+            ]
         );
         add_emoji!(":bangladesh:", "🇧🇩");
         add_emoji!(":bd:", "🇧🇩");
-        add_emoji!(":biral:", "🐱", ["biral", "বিড়াল", "বিড়াল", "বেড়াল", "cat", "kitty", "kitten"]);
+        add_emoji!(
+            ":biral:",
+            "🐱",
+            ["biral", "বিড়াল", "বিড়াল", "বেড়াল", "cat", "kitty", "kitten"]
+        );
         add_emoji!(":kukur:", "🐶", ["kukur", "কুকুর", "kutta", "dog", "puppy"]);
-        add_emoji!(":gari:", "🚗", ["gari", "গাড়ি", "গাড়ি", "car", "drive", "vehicle"]);
-        add_emoji!(":rickshaw:", "🛺", ["rickshaw", "রিকশা", "রিক্সা", "auto", "cng"]);
+        add_emoji!(
+            ":gari:",
+            "🚗",
+            ["gari", "গাড়ি", "গাড়ি", "car", "drive", "vehicle"]
+        );
+        add_emoji!(
+            ":rickshaw:",
+            "🛺",
+            ["rickshaw", "রিকশা", "রিক্সা", "auto", "cng"]
+        );
         add_emoji!(":nouka:", "⛵", ["nouka", "নৌকা", "boat", "sail"]);
-        add_emoji!(":boi:", "📖", ["boi", "বই", "কিতাব", "book", "read", "study"]);
+        add_emoji!(
+            ":boi:",
+            "📖",
+            ["boi", "বই", "কিতাব", "book", "read", "study"]
+        );
         add_emoji!(":kolom:", "🖊️", ["kolom", "কলম", "pen", "write", "author"]);
         add_emoji!(":pencil:", "✏️", ["pencil", "পেন্সিল", "আঁকা"]);
-        add_emoji!(":bari:", "🏠", ["bari", "বাড়ি", "বাড়ি", "ঘর", "home", "house"]);
-        add_emoji!(":alo:", "💡", ["alo", "আলো", "bulb", "idea", "light", "আইডিয়া"]);
-        add_emoji!(":ghori:", "⏰", ["ghori", "ঘড়ি", "ঘড়ি", "সময়", "shomoy", "clock", "time", "alarm"]);
-        add_emoji!(":phone:", "📱", ["phone", "ফোন", "mobile", "মোবাইল", "স্মার্টফোন"]);
-        add_emoji!(":laptop:", "💻", ["laptop", "computer", "ল্যাপটপ", "কম্পিউটার", "code", "কোড", "প্রোগ্রাম"]);
+        add_emoji!(
+            ":bari:",
+            "🏠",
+            ["bari", "বাড়ি", "বাড়ি", "ঘর", "home", "house"]
+        );
+        add_emoji!(
+            ":alo:",
+            "💡",
+            ["alo", "আলো", "bulb", "idea", "light", "আইডিয়া"]
+        );
+        add_emoji!(
+            ":ghori:",
+            "⏰",
+            [
+                "ghori",
+                "ঘড়ি",
+                "ঘড়ি",
+                "সময়",
+                "shomoy",
+                "clock",
+                "time",
+                "alarm"
+            ]
+        );
+        add_emoji!(
+            ":phone:",
+            "📱",
+            ["phone", "ফোন", "mobile", "মোবাইল", "স্মার্টফোন"]
+        );
+        add_emoji!(
+            ":laptop:",
+            "💻",
+            [
+                "laptop",
+                "computer",
+                "ল্যাপটপ",
+                "কম্পিউটার",
+                "code",
+                "কোড",
+                "প্রোগ্রাম"
+            ]
+        );
         add_emoji!(
             ":daktar:",
             "🩺",
-            ["daktar", "ডাক্তার", "doctor", "hospital", "হাসপাতাল", "চিকিৎসক", "ঔষধ"]
+            [
+                "daktar",
+                "ডাক্তার",
+                "doctor",
+                "hospital",
+                "হাসপাতাল",
+                "চিকিৎসক",
+                "ঔষধ"
+            ]
         );
-        add_emoji!(":shikkhok:", "🧑‍🏫", ["shikkhok", "শিক্ষক", "teacher", "স্যার", "ম্যাডাম"]);
-        add_emoji!(":khela:", "⚽", ["khela", "খেলা", "football", "soccer", "ফুটবল"]);
+        add_emoji!(
+            ":shikkhok:",
+            "🧑‍🏫",
+            ["shikkhok", "শিক্ষক", "teacher", "স্যার", "ম্যাডাম"]
+        );
+        add_emoji!(
+            ":khela:",
+            "⚽",
+            ["khela", "খেলা", "football", "soccer", "ফুটবল"]
+        );
         add_emoji!(":cricket:", "🏏", ["cricket", "ক্রিকেট", "ব্যাট"]);
-        add_emoji!(":gaan:", "🎵", ["gan", "gaan", "গান", "সঙ্গীত", "music", "song", "audio"]);
+        add_emoji!(
+            ":gaan:",
+            "🎵",
+            ["gan", "gaan", "গান", "সঙ্গীত", "music", "song", "audio"]
+        );
         add_emoji!(":nach:", "💃", ["nach", "নাচ", "নৃত্য", "dance"]);
         add_emoji!(":bhoot:", "👻", ["bhoot", "ভুত", "ভূত", "ghost", "scary"]);
 
@@ -235,7 +488,11 @@ impl EmojiMap {
         add_emoji!(":shrug:", "🤷", ["shrug", "dunno", "জানি_না"]);
         add_emoji!(":neutral_face:", "😐", ["neutral", "meh", "নীরব"]);
         add_emoji!(":expressionless:", "😑", ["expressionless"]);
-        add_emoji!(":rolling_eyes:", "🙄", ["rolling_eyes", "whatever", "বিরক্ত"]);
+        add_emoji!(
+            ":rolling_eyes:",
+            "🙄",
+            ["rolling_eyes", "whatever", "বিরক্ত"]
+        );
         add_emoji!(":grimacing:", "😬", ["grimacing", "awkward"]);
         add_emoji!(":relieved:", "😌", ["relieved", "peaceful", "শান্তি"]);
         add_emoji!(":pensive:", "😔", ["pensive", "sad", "বিষণ্ণ"]);
@@ -246,9 +503,17 @@ impl EmojiMap {
         add_emoji!(":cold_face:", "🥶", ["cold", "cold_face", "ঠান্ডা", "শীত"]);
         add_emoji!(":woozy_face:", "🥴", ["woozy", "tipsy"]);
         add_emoji!(":dizzy_face:", "😵", ["dizzy", "unconscious"]);
-        add_emoji!(":exploding_head:", "🤯", ["mindblown", "mind_blown", "বিস্ফোরণ"]);
+        add_emoji!(
+            ":exploding_head:",
+            "🤯",
+            ["mindblown", "mind_blown", "বিস্ফোরণ"]
+        );
         add_emoji!(":mind_blown:", "🤯");
-        add_emoji!(":partying_face:", "🥳", ["party", "partying", "celebrate", "উৎসব"]);
+        add_emoji!(
+            ":partying_face:",
+            "🥳",
+            ["party", "partying", "celebrate", "উৎসব"]
+        );
         add_emoji!(":party:", "🥳");
         add_emoji!(":pleading_face:", "🥺", ["please", "pleading", "মিনতি"]);
         add_emoji!(":sob:", "😭", ["sob", "crying", "কান্না"]);
@@ -269,8 +534,16 @@ impl EmojiMap {
         add_emoji!(":pray:", "🙏", ["pray", "please", "namaste", "প্রণাম", "দোয়া"]);
         add_emoji!(":clap:", "👏", ["clap", "applaud", "তালি", "অভিনন্দন"]);
         add_emoji!(":raised_hands:", "🙌", ["raised_hands", "hooray", "জয়"]);
-        add_emoji!(":thumbsup:", "👍", ["thumbsup", "like", "yes", "good", "ভালো"]);
-        add_emoji!(":thumbsdown:", "👎", ["thumbsdown", "dislike", "no", "bad", "খারাপ"]);
+        add_emoji!(
+            ":thumbsup:",
+            "👍",
+            ["thumbsup", "like", "yes", "good", "ভালো"]
+        );
+        add_emoji!(
+            ":thumbsdown:",
+            "👎",
+            ["thumbsdown", "dislike", "no", "bad", "খারাপ"]
+        );
         add_emoji!(":punch:", "👊", ["punch", "fist_bump"]);
         add_emoji!(":fist:", "✊", ["fist", "power", "শক্তি"]);
         add_emoji!(":v:", "✌️", ["peace", "victory", "শান্তি", "জয়"]);
@@ -278,8 +551,16 @@ impl EmojiMap {
         add_emoji!(":metal:", "🤘", ["metal", "rock"]);
         add_emoji!(":ok_hand:", "👌", ["ok", "perfect", "ঠিক"]);
         add_emoji!(":pinching_hand:", "🤏", ["pinch", "little", "একটু"]);
-        add_emoji!(":wave:", "👋", ["wave", "hi", "hello", "bye", "সালাম", "বিদায়"]);
-        add_emoji!(":muscle:", "💪", ["muscle", "strong", "flex", "শক্তি", "বলবান"]);
+        add_emoji!(
+            ":wave:",
+            "👋",
+            ["wave", "hi", "hello", "bye", "সালাম", "বিদায়"]
+        );
+        add_emoji!(
+            ":muscle:",
+            "💪",
+            ["muscle", "strong", "flex", "শক্তি", "বলবান"]
+        );
 
         // ==========================================
         // 5. Hearts & Colors
@@ -293,27 +574,51 @@ impl EmojiMap {
         add_emoji!(":purple_heart:", "💜", ["purple_heart"]);
         add_emoji!(":black_heart:", "🖤", ["black_heart"]);
         add_emoji!(":white_heart:", "🤍", ["white_heart"]);
-        add_emoji!(":broken_heart:", "💔", ["broken_heart", "heartbreak", "ভাঙাহৃদয়"]);
+        add_emoji!(
+            ":broken_heart:",
+            "💔",
+            ["broken_heart", "heartbreak", "ভাঙাহৃদয়"]
+        );
         add_emoji!(":sparkling_heart:", "💖", ["sparkling_heart", "love"]);
         add_emoji!(":sparkles:", "✨", ["sparkles", "magic", "জ্যোতি", "চকচক"]);
         add_emoji!(":star:", "⭐", ["star", "তারা"]);
         add_emoji!(":star2:", "🌟", ["star2", "glowing_star"]);
         add_emoji!(":fire:", "🔥", ["fire", "flame", "hot", "lit", "আগুন"]);
         add_emoji!(":100:", "💯", ["100", "perfect", "score", "শতভাগ"]);
-        add_emoji!(":collision:", "💥", ["boom", "collision", "blast", "বিস্ফোরণ"]);
+        add_emoji!(
+            ":collision:",
+            "💥",
+            ["boom", "collision", "blast", "বিস্ফোরণ"]
+        );
         add_emoji!(":boom:", "💥");
         add_emoji!(":bulb:", "💡", ["bulb", "idea", "আলো"]);
         add_emoji!(":idea:", "💡");
         add_emoji!(":check:", "✔️", ["check", "done"]);
-        add_emoji!(":white_check_mark:", "✅", ["check_mark", "correct", "সঠিক"]);
+        add_emoji!(
+            ":white_check_mark:",
+            "✅",
+            ["check_mark", "correct", "সঠিক"]
+        );
         add_emoji!(":x:", "❌", ["cross", "wrong", "ভুল"]);
         add_emoji!(":warning:", "⚠️", ["warning", "alert", "সতর্ক"]);
-        add_emoji!(":rocket:", "🚀", ["rocket", "launch", "fast", "রকেট", "দ্রুত"]);
-        add_emoji!(":tada:", "🎉", ["tada", "congrats", "party", "অভিনন্দন", "উৎসব"]);
+        add_emoji!(
+            ":rocket:",
+            "🚀",
+            ["rocket", "launch", "fast", "রকেট", "দ্রুত"]
+        );
+        add_emoji!(
+            ":tada:",
+            "🎉",
+            ["tada", "congrats", "party", "অভিনন্দন", "উৎসব"]
+        );
         add_emoji!(":confetti:", "🎊", ["confetti"]);
         add_emoji!(":balloon:", "🎈", ["balloon", "বেলুন"]);
         add_emoji!(":gift:", "🎁", ["gift", "present", "উপহার"]);
-        add_emoji!(":trophy:", "🏆", ["trophy", "winner", "champion", "ট্রফি", "বিজয়ী"]);
+        add_emoji!(
+            ":trophy:",
+            "🏆",
+            ["trophy", "winner", "champion", "ট্রফি", "বিজয়ী"]
+        );
         add_emoji!(":medal:", "🏅", ["medal", "award", "পদক"]);
         add_emoji!(":gem:", "💎", ["gem", "diamond", "হীরা", "রত্ন"]);
         add_emoji!(":money:", "💰", ["money", "rich", "cash", "টাকা", "ধন"]);
@@ -585,7 +890,9 @@ mod tests {
         assert!(em.lookup_by_keyword("love").contains(&"❤️".to_string()));
 
         // Bengali phonetic keywords
-        assert!(em.lookup_by_keyword("bhalobasha").contains(&"❤️".to_string()));
+        assert!(em
+            .lookup_by_keyword("bhalobasha")
+            .contains(&"❤️".to_string()));
         assert!(em.lookup_by_keyword("cha").contains(&"☕".to_string()));
         assert!(em.lookup_by_keyword("kukur").contains(&"🐶".to_string()));
         assert!(em.lookup_by_keyword("biral").contains(&"🐱".to_string()));

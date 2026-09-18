@@ -281,7 +281,10 @@ fn post_process_bijoy_to_unicode(input: &str) -> String {
         // Fix misplaced pre-kars (ি, ে, ৈ) placed before consonant
         if (chars[i] == 'ি' || chars[i] == 'ে' || chars[i] == 'ৈ') && i + 1 < chars.len() {
             let mut end_cons = i + 1;
-            while end_cons + 2 < chars.len() && chars[end_cons + 1] == '্' && is_consonant(chars[end_cons + 2]) {
+            while end_cons + 2 < chars.len()
+                && chars[end_cons + 1] == '্'
+                && is_consonant(chars[end_cons + 2])
+            {
                 end_cons += 2;
             }
             if is_consonant(chars[end_cons]) {
@@ -294,7 +297,10 @@ fn post_process_bijoy_to_unicode(input: &str) -> String {
         if chars[i] == '©' {
             chars.remove(i);
             let mut start_cons = if i > 0 { i - 1 } else { 0 };
-            while start_cons >= 2 && chars[start_cons - 1] == '্' && is_consonant(chars[start_cons - 2]) {
+            while start_cons >= 2
+                && chars[start_cons - 1] == '্'
+                && is_consonant(chars[start_cons - 2])
+            {
                 start_cons -= 2;
             }
             chars.insert(start_cons, 'র');

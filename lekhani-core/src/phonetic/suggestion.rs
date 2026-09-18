@@ -82,7 +82,10 @@ pub fn normalize_chandra_latin(input: &str) -> String {
 
 #[inline]
 fn is_latin_vowel(c: char) -> bool {
-    matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'A' | 'E' | 'I' | 'O' | 'U' | 'y' | 'Y' | '`')
+    matches!(
+        c,
+        'a' | 'e' | 'i' | 'o' | 'u' | 'A' | 'E' | 'I' | 'O' | 'U' | 'y' | 'Y' | '`'
+    )
 }
 
 /// Ensure canonical Unicode ordering for Bengali Chandra Bindu and Nukta glyphs
@@ -574,13 +577,21 @@ impl PhoneticSuggestion {
             for &(suf_en, suf_bn) in LOANWORD_SUFFIXES {
                 if clean_middle.len() > suf_en.len() && clean_middle.ends_with(suf_en) {
                     let base_en = &clean_middle[..clean_middle.len() - suf_en.len()];
-                    if let Some((bn_loan, en_loan)) = PhoneticDatabase::get_bilingual_loanword(base_en) {
-                        let actual_suffix = if suf_bn == "র" && !bn_loan.chars().last().is_some_and(|c| c.is_kar() || c.is_vowel()) {
+                    if let Some((bn_loan, en_loan)) =
+                        PhoneticDatabase::get_bilingual_loanword(base_en)
+                    {
+                        let actual_suffix = if suf_bn == "র"
+                            && !bn_loan
+                                .chars()
+                                .last()
+                                .is_some_and(|c| c.is_kar() || c.is_vowel())
+                        {
                             "ের"
                         } else {
                             suf_bn
                         };
-                        let combined_bn = super::morphology::apply_sandhi_join(bn_loan, actual_suffix);
+                        let combined_bn =
+                            super::morphology::apply_sandhi_join(bn_loan, actual_suffix);
                         add_cand(
                             combined_bn.clone(),
                             CandidateSource::Loanword,
@@ -785,7 +796,10 @@ impl PhoneticSuggestion {
                             &mut seen,
                         );
                     }
-                } else if middle.chars().count() <= 3 && !var_phonetic.is_empty() && var_phonetic.chars().all(|c| c.is_bengali()) {
+                } else if middle.chars().count() <= 3
+                    && !var_phonetic.is_empty()
+                    && var_phonetic.chars().all(|c| c.is_bengali())
+                {
                     add_cand(
                         var_phonetic,
                         CandidateSource::FuzzySoundLaw,
@@ -864,12 +878,16 @@ impl PhoneticSuggestion {
                 let qwerty_variants = super::fuzzy::generate_qwerty_typo_variants(middle);
                 for qv in &qwerty_variants {
                     let conv = self.convert_phonetic(qv);
-                    if self.database.is_exact_dictionary_word(&conv) && !typo_matches.contains(&conv) {
+                    if self.database.is_exact_dictionary_word(&conv)
+                        && !typo_matches.contains(&conv)
+                    {
                         typo_matches.push(conv);
                     }
                     for fz in super::fuzzy::generate_phonetic_variants(qv) {
                         let fz_conv = self.convert_phonetic(&fz);
-                        if self.database.is_exact_dictionary_word(&fz_conv) && !typo_matches.contains(&fz_conv) {
+                        if self.database.is_exact_dictionary_word(&fz_conv)
+                            && !typo_matches.contains(&fz_conv)
+                        {
                             typo_matches.push(fz_conv);
                         }
                     }
@@ -882,7 +900,9 @@ impl PhoneticSuggestion {
                         del.push_str(&middle[..i]);
                         del.push_str(&middle[i + ch.len_utf8()..]);
                         let del_conv = self.convert_phonetic(&del);
-                        if self.database.is_exact_dictionary_word(&del_conv) && !typo_matches.contains(&del_conv) {
+                        if self.database.is_exact_dictionary_word(&del_conv)
+                            && !typo_matches.contains(&del_conv)
+                        {
                             typo_matches.push(del_conv);
                         }
                     }
@@ -936,7 +956,6 @@ impl PhoneticSuggestion {
                 &mut seen,
             );
         }
-
 
         // 15. Global Multi-Factor Probabilistic Scoring & Ranker
         let has_backtick = middle.contains('`') || term.contains('`');
@@ -1019,7 +1038,10 @@ impl PhoneticSuggestion {
                         .abs() as i32;
                     score -= len_diff * 400;
 
-                    if (is_primary_in_dict || has_explicit_rri_digraph) && is_atomic_syllable && dist > 0 {
+                    if (is_primary_in_dict || has_explicit_rri_digraph)
+                        && is_atomic_syllable
+                        && dist > 0
+                    {
                         score -= 3500;
                     }
 
@@ -1044,7 +1066,10 @@ impl PhoneticSuggestion {
                     None
                 };
 
-                let lm_score = self.ai_context.lm().score_candidate(prev_prev, prev, &cand.text);
+                let lm_score = self
+                    .ai_context
+                    .lm()
+                    .score_candidate(prev_prev, prev, &cand.text);
                 if lm_score > -0.5 {
                     score += 4800;
                 } else if lm_score > -1.0 {
@@ -1078,8 +1103,6 @@ impl PhoneticSuggestion {
 
             scored_candidates.push((cand.text, score));
         }
-
-
 
         // Sort candidates by descending total score
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
@@ -1206,7 +1229,8 @@ impl PhoneticSuggestion {
             _ => return 0,
         };
 
-        static DEFAULT_LM: std::sync::OnceLock<lekhani_ai::LanguageModel> = std::sync::OnceLock::new();
+        static DEFAULT_LM: std::sync::OnceLock<lekhani_ai::LanguageModel> =
+            std::sync::OnceLock::new();
         let lm = DEFAULT_LM.get_or_init(lekhani_ai::LanguageModel::new);
 
         let score = lm.score_candidate(None, Some(prev), candidate);
@@ -1224,9 +1248,15 @@ impl PhoneticSuggestion {
     }
 
     /// Observe a committed word and preceding context to learn personalization and new vocabulary
-    pub fn observe_committed(&mut self, previous_word: Option<&str>, committed_word: &str) -> Vec<String> {
+    pub fn observe_committed(
+        &mut self,
+        previous_word: Option<&str>,
+        committed_word: &str,
+    ) -> Vec<String> {
         if let Some(prev) = previous_word {
-            self.database.learner.observe_committed_pair(prev, committed_word);
+            self.database
+                .learner
+                .observe_committed_pair(prev, committed_word);
         }
         self.database.observe_committed_word(committed_word)
     }
@@ -1349,7 +1379,9 @@ impl PhoneticSuggestion {
                     if has_verified_base || base_key.chars().count() >= 4 {
                         for fz in super::fuzzy::generate_phonetic_variants(base_key) {
                             let conv = self.convert_phonetic(&fz);
-                            if self.database.is_exact_dictionary_word(&conv) && !base_candidates.contains(&conv) {
+                            if self.database.is_exact_dictionary_word(&conv)
+                                && !base_candidates.contains(&conv)
+                            {
                                 base_candidates.push(conv);
                             }
                         }
@@ -2151,10 +2183,14 @@ mod tests {
         let empty_memory = HashMap::new();
 
         let (cands_kor, _) = sugg.suggest("kortesi", true, true, &empty_memory);
-        assert!(cands_kor.contains(&"করছি".to_string()) || cands_kor.contains(&"করতেছি".to_string()));
+        assert!(
+            cands_kor.contains(&"করছি".to_string()) || cands_kor.contains(&"করতেছি".to_string())
+        );
 
         let (cands_jai, _) = sugg.suggest("jaitasi", true, true, &empty_memory);
-        assert!(cands_jai.contains(&"যাচ্ছি".to_string()) || cands_jai.contains(&"যাইতেছি".to_string()));
+        assert!(
+            cands_jai.contains(&"যাচ্ছি".to_string()) || cands_jai.contains(&"যাইতেছি".to_string())
+        );
     }
 
     #[test]

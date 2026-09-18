@@ -59,7 +59,6 @@ fn test_avro_strict_raw_parser_fidelity() {
         ("songsod", "সংসদ"),
         ("rong", "রং"),
         ("songbad", "সংবাদ"),
-
         // 2. Escape / Joiner Breaker with Backtick (`)
         ("k`k", "কক"),
         ("d`h", "দহ"),
@@ -72,7 +71,6 @@ fn test_avro_strict_raw_parser_fidelity() {
         ("j`h", "জহ"),
         ("T`h", "টহ"),
         ("D`h", "ডহ"),
-
         // 3. Vowels & Independent Vowel Placement
         ("a", "আ"),
         ("i", "ই"),
@@ -85,7 +83,6 @@ fn test_avro_strict_raw_parser_fidelity() {
         ("OI", "ঐ"),
         ("O", "ও"),
         ("OU", "ঔ"),
-
         // 4. Medial Vowels / Kar
         ("ka", "কা"),
         ("ki", "কি"),
@@ -99,7 +96,6 @@ fn test_avro_strict_raw_parser_fidelity() {
         ("ko", "ক"),
         ("kO", "কো"),
         ("kOU", "কৌ"),
-
         // 5. Ja-phala (Z)
         ("bZbohar", "ব্যবহার"),
         ("bZapti", "ব্যাপ্তি"),
@@ -125,7 +121,6 @@ fn test_avro_strict_raw_parser_fidelity() {
         ("rohosZo", "রহস্য"),
         ("shosZo", "শস্য"),
         ("alosZo", "আলস্য"),
-
         // 6. Reph (rr) & Ra-phala (r)
         ("rrk", "র্ক"),
         ("rrkh", "র্খ"),
@@ -164,7 +159,6 @@ fn test_avro_strict_raw_parser_fidelity() {
         ("borrNo", "বর্ণ"),
         ("gorrbo", "গর্ব"),
         ("sorrbo", "সর্ব"),
-
         // 7. Ri-kar (rri)
         ("krriShi", "কৃষি"),
         ("srriShTi", "সৃষ্টি"),
@@ -173,7 +167,6 @@ fn test_avro_strict_raw_parser_fidelity() {
         ("mrritZu", "মৃত্যু"),
         ("hrridoy", "হৃদয়"),
         ("drriShTi", "দৃষ্টি"),
-
         // 8. Sanskrit Juktoborno & Ha-Conjuncts
         ("kShoma", "ক্ষমা"),
         ("kShiti", "ক্ষিতি"),
@@ -280,14 +273,27 @@ fn test_avro_strict_raw_parser_fidelity() {
     }
 
     if !failures.is_empty() {
-        eprintln!("\n=== Raw Avro Parser Failures ({} / {}) ===", failures.len(), raw_test_cases.len());
+        eprintln!(
+            "\n=== Raw Avro Parser Failures ({} / {}) ===",
+            failures.len(),
+            raw_test_cases.len()
+        );
         for (inp, exp, got) in &failures {
             eprintln!("Input: {:<20} Expected: {:<20} Got: {}", inp, exp, got);
         }
     }
 
-    assert!(failures.is_empty(), "Failed {} out of {} raw parser test cases", failures.len(), raw_test_cases.len());
-    println!("Raw Parser Fidelity: {}/{} (100% accuracy)", passed, raw_test_cases.len());
+    assert!(
+        failures.is_empty(),
+        "Failed {} out of {} raw parser test cases",
+        failures.len(),
+        raw_test_cases.len()
+    );
+    println!(
+        "Raw Parser Fidelity: {}/{} (100% accuracy)",
+        passed,
+        raw_test_cases.len()
+    );
 }
 
 #[test]
@@ -374,7 +380,11 @@ fn test_avro_smart_suggestion_complex_fidelity() {
     for &(input, expected_list) in suggestion_test_cases {
         let (cands, _) = sugg.suggest(input, true, true, &empty_memory);
         if cands.is_empty() {
-            failures.push((input, expected_list[0], "No candidates returned".to_string()));
+            failures.push((
+                input,
+                expected_list[0],
+                "No candidates returned".to_string(),
+            ));
         } else if expected_list.contains(&cands[0].as_str()) {
             passed += 1;
         } else {
@@ -383,12 +393,28 @@ fn test_avro_smart_suggestion_complex_fidelity() {
     }
 
     if !failures.is_empty() {
-        eprintln!("\n=== Suggestion Engine Failures ({} / {}) ===", failures.len(), suggestion_test_cases.len());
+        eprintln!(
+            "\n=== Suggestion Engine Failures ({} / {}) ===",
+            failures.len(),
+            suggestion_test_cases.len()
+        );
         for (inp, exp, got) in &failures {
-            eprintln!("Input: {:<25} Expected: {:<20} Got Top 1: {}", inp, exp, got);
+            eprintln!(
+                "Input: {:<25} Expected: {:<20} Got Top 1: {}",
+                inp, exp, got
+            );
         }
     }
 
-    assert!(failures.is_empty(), "Failed {} out of {} suggestion test cases", failures.len(), suggestion_test_cases.len());
-    println!("Smart Suggestion Fidelity: {}/{} (100% accuracy)", passed, suggestion_test_cases.len());
+    assert!(
+        failures.is_empty(),
+        "Failed {} out of {} suggestion test cases",
+        failures.len(),
+        suggestion_test_cases.len()
+    );
+    println!(
+        "Smart Suggestion Fidelity: {}/{} (100% accuracy)",
+        passed,
+        suggestion_test_cases.len()
+    );
 }

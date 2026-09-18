@@ -75,10 +75,16 @@ fn test_quality_fixes_regression() {
 
     // 1. Snippet Macro Collision Fix
     let (cands_dhonnobad, _) = sugg.suggest("dhonnobad", true, true, &empty_memory);
-    assert_eq!(cands_dhonnobad[0], "ধন্যবাদ", "Expected 'ধন্যবাদ' for 'dhonnobad'");
+    assert_eq!(
+        cands_dhonnobad[0], "ধন্যবাদ",
+        "Expected 'ধন্যবাদ' for 'dhonnobad'"
+    );
 
     let (cands_macro_dhonnobad, _) = sugg.suggest("!dhonnobad", true, true, &empty_memory);
-    assert_eq!(cands_macro_dhonnobad[0], "আপনাকে অনেক অনেক ধন্যবাদ", "Expected snippet macro for '!dhonnobad'");
+    assert_eq!(
+        cands_macro_dhonnobad[0], "আপনাকে অনেক অনেক ধন্যবাদ",
+        "Expected snippet macro for '!dhonnobad'"
+    );
 
     // 2. Chandra Bindu Position Reordering Fix
     let (cands_cad, _) = sugg.suggest("c^ad", true, true, &empty_memory);
@@ -221,7 +227,6 @@ fn test_daily_and_complex_typing_simulation() {
         ("shunbo", "শুনব"),
         ("bhalobasha", "ভালোবাসা"),
         ("bhalobashi", "ভালোবাসি"),
-
         // 2. Inflected Daily Nouns & Adverbs
         ("deshe", "দেশে"),
         ("desher", "দেশের"),
@@ -250,7 +255,6 @@ fn test_daily_and_complex_typing_simulation() {
         ("dUr", "দূর"),
         ("dure", "দূরে"),
         ("dUre", "দূরে"),
-
         // 3. Complex Sanskrit / Ha-Conjuncts & Clitics
         ("ahban", "আহ্বান"),
         ("jihba", "জিহ্বা"),
@@ -276,7 +280,6 @@ fn test_daily_and_complex_typing_simulation() {
         ("dhai", "\u{0986}\u{09DC}\u{09BE}\u{0987}"),
         ("shoa", "\u{09B8}\u{09CB}\u{09DF}\u{09BE}"),
         ("shadhe", "\u{09B8}\u{09BE}\u{09DC}\u{09C7}"),
-
         // 4. Modern Technical Loanwords + Inflections
         ("computer", "কম্পিউটার"),
         ("computere", "কম্পিউটারে"),
@@ -307,14 +310,30 @@ fn test_daily_and_complex_typing_simulation() {
     }
 
     if !failures.is_empty() {
-        eprintln!("\n=== Simulation Failures ({} / {}) ===", failures.len(), test_cases.len());
+        eprintln!(
+            "\n=== Simulation Failures ({} / {}) ===",
+            failures.len(),
+            test_cases.len()
+        );
         for (inp, exp, got) in &failures {
-            eprintln!("Input: {:<20} Expected: {:<20} Got Top 1: {}", inp, exp, got);
+            eprintln!(
+                "Input: {:<20} Expected: {:<20} Got Top 1: {}",
+                inp, exp, got
+            );
         }
     }
 
-    assert!(failures.is_empty(), "Failed {} out of {} simulation test cases", failures.len(), test_cases.len());
-    println!("Simulation Passed: {}/{} (100% accuracy)", passed, test_cases.len());
+    assert!(
+        failures.is_empty(),
+        "Failed {} out of {} simulation test cases",
+        failures.len(),
+        test_cases.len()
+    );
+    println!(
+        "Simulation Passed: {}/{} (100% accuracy)",
+        passed,
+        test_cases.len()
+    );
 }
 
 #[test]
@@ -348,4 +367,3 @@ fn test_vowel_and_kar_candidates() {
     let (cands_ou, _) = sugg.suggest("ou", true, true, &empty_memory);
     assert!(cands_ou.contains(&"ৌ".to_string()));
 }
-

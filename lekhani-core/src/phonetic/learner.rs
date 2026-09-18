@@ -302,7 +302,10 @@ mod tests {
         let deserialized: AutonomousLearner =
             serde_json::from_str(&json).expect("JSON deserialization must succeed");
 
-        assert_eq!(deserialized.learned_words.len(), learner.learned_words.len());
+        assert_eq!(
+            deserialized.learned_words.len(),
+            learner.learned_words.len()
+        );
         assert_eq!(deserialized.user_bigrams.len(), learner.user_bigrams.len());
     }
 }

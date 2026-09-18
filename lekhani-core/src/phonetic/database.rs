@@ -471,7 +471,11 @@ impl PhoneticDatabase {
     }
 
     /// Search dictionary returning word slice and frequency weight
-    pub fn search_dictionary_entries<'a>(&'a self, prefix: &str, limit: usize) -> Vec<(&'a str, u32)> {
+    pub fn search_dictionary_entries<'a>(
+        &'a self,
+        prefix: &str,
+        limit: usize,
+    ) -> Vec<(&'a str, u32)> {
         self.trie.find_prefix_entries(prefix, limit)
     }
 
@@ -1349,11 +1353,7 @@ mod tests {
     #[test]
     fn test_utf8_autocorrect_loading() {
         let mut db = PhoneticDatabase::new();
-        let ac_candidates = [
-            "../../data",
-            "data",
-            "../data",
-        ];
+        let ac_candidates = ["../../data", "data", "../data"];
         for dir in ac_candidates {
             let p = std::path::Path::new(dir).join("dictionaries");
             if p.exists() {

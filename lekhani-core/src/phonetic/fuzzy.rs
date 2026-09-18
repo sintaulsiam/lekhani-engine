@@ -288,9 +288,7 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
 
 /// Recognized atomic layout digraphs in Avro Phonetic.
 /// These represent single Bengali graphemes and must not be mutated internally or split.
-pub const AVRO_LAYOUT_DIGRAPHS: &[&str] = &[
-    "rri", "kkh", "cch", "tsh", "t``", "ng",
-];
+pub const AVRO_LAYOUT_DIGRAPHS: &[&str] = &["rri", "kkh", "cch", "tsh", "t``", "ng"];
 
 /// Check if a replacement [pos..pos + len] overlaps strictly inside an atomic layout digraph
 pub fn overlaps_layout_digraph(src: &str, pos: usize, len: usize) -> bool {
