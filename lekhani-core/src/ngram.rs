@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct UserStats {
     pub total_keystrokes: u64,
     pub total_words_typed: u64,
     pub keystrokes_saved: u64,
     pub top_words: HashMap<String, u64>,
-    #[serde(default)]
     pub char_frequencies: HashMap<char, u64>,
 }
 
