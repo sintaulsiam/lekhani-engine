@@ -103,6 +103,15 @@ fn test_quality_fixes_regression() {
     let (cands_tomake, _) = sugg.suggest("tomake", true, true, &empty_memory);
     assert_eq!(cands_tomake[0], "তোমাকে", "Expected 'তোমাকে' for 'tomake'");
 
+    let (cands_t_omake, _) = sugg.suggest("tOmake", true, true, &empty_memory);
+    assert_eq!(cands_t_omake[0], "তোমাকে", "Expected 'তোমাকে' for 'tOmake'");
+
+    let (cands_tomar, _) = sugg.suggest("tomar", true, true, &empty_memory);
+    assert_eq!(cands_tomar[0], "তোমার", "Expected 'তোমার' for 'tomar'");
+
+    let (cands_t_omar, _) = sugg.suggest("tOmar", true, true, &empty_memory);
+    assert_eq!(cands_t_omar[0], "তোমার", "Expected 'তোমার' for 'tOmar'");
+
     let (cands_hete, _) = sugg.suggest("hete", true, true, &empty_memory);
     assert_eq!(cands_hete[0], "হেঁটে", "Expected 'হেঁটে' for 'hete'");
 }
