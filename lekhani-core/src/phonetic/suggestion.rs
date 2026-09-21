@@ -21,6 +21,8 @@ pub enum CandidateSource {
     DirectTransliteration,
     TypoFallback,
     EmojiKeyword,
+    CodeShield,
+    SegmentedLattice,
 }
 
 #[derive(Debug, Clone)]
@@ -484,6 +486,21 @@ impl PhoneticSuggestion {
             }
         };
 
+        // 3b. Developer Code-Mixing Shield (e.g. "onClick", "user_id", "--help", "const", "https://...")
+        let is_code = (super::code_shield::is_code_token(term)
+            || super::code_shield::is_code_token(middle))
+            && !self.database.is_exact_dictionary_word(&phonetic)
+            && !is_atomic_cv_syllable(&phonetic);
+        if is_code {
+            add_cand(
+                middle.to_string(),
+                CandidateSource::CodeShield,
+                30000,
+                &mut raw_candidates,
+                &mut seen,
+            );
+        }
+
         // 4. Bilingual Loanword Code-Mixing (e.g. "meeting" -> "মিটিং", "meeting")
         let mut preferred_loanword = None;
         let loan_opt = PhoneticDatabase::get_bilingual_loanword(middle).or_else(|| {
@@ -650,8 +667,8 @@ impl PhoneticSuggestion {
             } else {
                 None
             }
-        } else if let Some(loan_pref) = preferred_loanword {
-            Some(loan_pref)
+        } else if let Some(ref loan_pref) = preferred_loanword {
+            Some(loan_pref.clone())
         } else if let Some(verbal_word) = super::morphology::decompose_verbal_form(middle) {
             add_cand(
                 verbal_word.clone(),
@@ -929,6 +946,25 @@ impl PhoneticSuggestion {
             }
         }
 
+        // 12c. Concatenated Word Lattice Segmentation (e.g. "kemonaso" -> "কেমন আছো", "dhonnobadbhai" -> "ধন্যবাদ ভাই")
+        if middle.len() >= 6 && !middle.contains(' ') {
+            let segmented = super::segmenter::segment_concatenated_token(
+                middle,
+                &self.database,
+                |s| self.convert_phonetic(s),
+            );
+            for seg in segmented {
+                let boost = if is_primary_in_dict { 3000 } else { 12000 };
+                add_cand(
+                    seg.text,
+                    CandidateSource::SegmentedLattice,
+                    boost + (seg.score.min(2000)),
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+            }
+        }
+
         // 13. Contextual Emoji / Symbol Keywords (Demoted so they sit trailing)
         let mut kw_emojis = self.database.lookup_emoji_keywords(middle);
         for em in self.database.lookup_emoji_keywords(primary) {
@@ -973,6 +1009,7 @@ impl PhoneticSuggestion {
 
         let has_valid_dict_candidates = raw_candidates.iter().any(|c| {
             c.source != CandidateSource::DirectTransliteration
+                && c.source != CandidateSource::SegmentedLattice
                 && c.text != phonetic
                 && self.database.is_exact_dictionary_word(&c.text)
         });
@@ -980,6 +1017,20 @@ impl PhoneticSuggestion {
         let mut scored_candidates: Vec<(String, i32)> = Vec::with_capacity(raw_candidates.len());
 
         for cand in raw_candidates {
+            if cand.source == CandidateSource::CodeShield {
+                scored_candidates.push((cand.text, 60000));
+                continue;
+            }
+            if cand.source == CandidateSource::SegmentedLattice {
+                let boost = if is_primary_in_dict || has_valid_dict_candidates || preferred_loanword.is_some() {
+                    cand.initial_boost.min(3000)
+                } else {
+                    cand.initial_boost + 2000
+                };
+                scored_candidates.push((cand.text, boost));
+                continue;
+            }
+
             let is_in_dict = self.database.is_exact_dictionary_word(&cand.text);
             let freq = self.database.get_frequency(&cand.text);
             let mut score = cand.initial_boost;
@@ -1137,7 +1188,7 @@ impl PhoneticSuggestion {
         };
 
         for (c, _) in &scored_candidates {
-            if c == term || kw_emojis.contains(c) {
+            if (c == term && !is_code) || kw_emojis.contains(c) {
                 continue;
             }
             if candidates.len() < text_target_len {
@@ -1151,7 +1202,7 @@ impl PhoneticSuggestion {
             }
         }
 
-        if has_english {
+        if has_english && !candidates.contains(&term.to_string()) {
             candidates.push(term.to_string());
         }
 
@@ -1283,7 +1334,7 @@ impl PhoneticSuggestion {
             return Vec::new();
         }
 
-        self.ai_predictor.predict_next(&[prev], 8)
+        self.suggest_next_words_with_context(&[prev])
     }
 
     /// Predict next words given multi-word sentence context (up to trigrams)
@@ -1291,7 +1342,23 @@ impl PhoneticSuggestion {
         if context.is_empty() {
             return Vec::new();
         }
-        self.ai_predictor.predict_next(context, 8)
+        let mut predictions = self.ai_predictor.predict_next(context, 8);
+
+        // Instant Bengali Reduplication (দ্বিরুক্ত শব্দ) promotion
+        if let Some(&last_word) = context.last() {
+            let clean_last = last_word.trim_matches(|c: char| {
+                c.is_ascii_punctuation() || c == '।' || c == '—' || c == ','
+            });
+            if super::reduplication::is_reduplicative_word(clean_last) {
+                let redup_str = clean_last.to_string();
+                if let Some(pos) = predictions.iter().position(|p| p == &redup_str) {
+                    predictions.remove(pos);
+                }
+                predictions.insert(0, redup_str);
+            }
+        }
+
+        predictions
     }
 
     /// Transliterate a full phrase or sentence using global AI Beam Search sequence decoding

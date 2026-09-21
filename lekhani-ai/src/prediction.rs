@@ -8,6 +8,19 @@ pub struct NextWordPredictor {
     lm: LanguageModel,
 }
 
+pub const BENGALI_IDIOM_PHRASES: &[(&[&str], &[&str])] = &[
+    (&["অনেক", "অনেক"], &["ধন্যবাদ", "শুভেচ্ছা ও অভিনন্দন"]),
+    (&["অনেক"], &["ধন্যবাদ", "সুন্দর", "ভালো"]),
+    (&["কেমন"], &["আছেন?", "আছো?", "হলো?"]),
+    (&["শুভ"], &["সকাল", "সন্ধ্যা", "রাত্রি", "কামনা", "জন্মদিন", "নববর্ষ"]),
+    (&["সব", "কিছু"], &["ঠিক আছে", "সুন্দর"]),
+    (&["ঠিক"], &["আছে", "আছেন"]),
+    (&["ইনশা"], &["আল্লাহ"]),
+    (&["আলহামদু"], &["লিল্লাহ"]),
+    (&["মাশা"], &["আল্লাহ"]),
+    (&["খুব"], &["ভালো", "সুন্দর", "কষ্ট"]),
+];
+
 impl NextWordPredictor {
     pub fn new() -> Self {
         Self {
@@ -50,6 +63,21 @@ impl NextWordPredictor {
             .into_iter()
             .take(limit)
             .collect();
+        }
+
+        // 0. Match high-confidence conversational idioms and phrases
+        let mut idiom_matches = Vec::new();
+        for &(pattern, continuations) in BENGALI_IDIOM_PHRASES {
+            if context.len() >= pattern.len() {
+                let tail = &context[context.len() - pattern.len()..];
+                if tail == pattern {
+                    for &cont in continuations {
+                        if !idiom_matches.contains(&cont.to_string()) {
+                            idiom_matches.push(cont.to_string());
+                        }
+                    }
+                }
+            }
         }
 
         let pool_size = (limit * 3).max(12);
@@ -123,6 +151,16 @@ impl NextWordPredictor {
                     candidate_set.push(fb.to_string());
                 }
             }
+        }
+
+        if !idiom_matches.is_empty() {
+            let mut final_set = idiom_matches;
+            for c in candidate_set {
+                if !final_set.contains(&c) {
+                    final_set.push(c);
+                }
+            }
+            candidate_set = final_set;
         }
 
         candidate_set.truncate(limit);

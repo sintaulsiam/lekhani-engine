@@ -457,3 +457,72 @@ fn test_casual_banglish_and_colloquial_verbs() {
     let (cands_amar, _) = sugg.suggest("amar", true, true, &empty_memory);
     assert_eq!(cands_amar[0], "আমার");
 }
+
+#[test]
+fn test_advanced_ai_ergonomics() {
+    let mut sugg = PhoneticSuggestion::new();
+    let layout_candidates = [
+        std::path::Path::new("../../data/layouts/avrophonetic.json"),
+        std::path::Path::new("data/layouts/avrophonetic.json"),
+        std::path::Path::new("../data/layouts/avrophonetic.json"),
+    ];
+    for p in layout_candidates {
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(p) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    sugg.set_layout(&json);
+                    break;
+                }
+            }
+        }
+    }
+    let dict_candidates = [
+        std::path::Path::new("../../data/dictionaries"),
+        std::path::Path::new("data/dictionaries"),
+        std::path::Path::new("../data/dictionaries"),
+    ];
+    for p in dict_candidates {
+        if p.exists() {
+            let _ = sugg.database.load_from_dir(p);
+            break;
+        }
+    }
+    let empty_memory = HashMap::new();
+
+    // 1. Developer Code-Mixing Shield
+    let (cands_onclick, _) = sugg.suggest("onClick", true, true, &empty_memory);
+    assert_eq!(cands_onclick[0], "onClick");
+
+    let (cands_user_id, _) = sugg.suggest("user_id", true, true, &empty_memory);
+    assert_eq!(cands_user_id[0], "user_id");
+
+    let (cands_flag, _) = sugg.suggest("--verbose", true, true, &empty_memory);
+    assert_eq!(cands_flag[0], "--verbose");
+
+    let (cands_kw, _) = sugg.suggest("const", true, true, &empty_memory);
+    assert_eq!(cands_kw[0], "const");
+
+    // 2. Concatenated Word Lattice Segmentation
+    let (cands_kemonaso, _) = sugg.suggest("kemonaso", true, true, &empty_memory);
+    assert_eq!(cands_kemonaso[0], "কেমন আছো");
+
+    let (cands_dhonnobadbhai, _) = sugg.suggest("dhonnobadbhai", true, true, &empty_memory);
+    assert_eq!(cands_dhonnobadbhai[0], "ধন্যবাদ ভাই");
+
+    // 3. Bengali Reduplicated Words (দ্বিরুক্ত শব্দ)
+    let redup_dhire = sugg.suggest_next_words("ধীরে");
+    assert_eq!(redup_dhire[0], "ধীরে");
+
+    let redup_majhe = sugg.suggest_next_words("মাঝে");
+    assert_eq!(redup_majhe[0], "মাঝে");
+
+    let redup_choto = sugg.suggest_next_words("ছোট");
+    assert_eq!(redup_choto[0], "ছোট");
+
+    // 4. Multi-word Phrase & Idiom Completion
+    let phrase_onek = sugg.suggest_next_words_with_context(&["অনেক", "অনেক"]);
+    assert!(phrase_onek.contains(&"ধন্যবাদ".to_string()));
+
+    let phrase_insha = sugg.suggest_next_words_with_context(&["ইনশা"]);
+    assert!(phrase_insha.contains(&"আল্লাহ".to_string()));
+}
