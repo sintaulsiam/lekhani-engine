@@ -10,11 +10,11 @@ use crate::ngram::UserStats;
 
 #[derive(Debug, Clone, Default)]
 pub struct PhoneticMethod {
-    buffer: String,
+    pub buffer: String,
     pub suggestion_engine: PhoneticSuggestion,
-    candidate_memory: HashMap<String, String>,
-    current_candidates: Vec<String>,
-    selected_index: usize,
+    pub candidate_memory: HashMap<String, String>,
+    pub current_candidates: Vec<String>,
+    pub selected_index: usize,
     pub use_dictionary: bool,
     pub include_english: bool,
     pub last_committed_word: Option<String>,
@@ -177,10 +177,14 @@ impl PhoneticMethod {
             if self.selected_index != index && !self.buffer.is_empty() {
                 self.candidate_memory
                     .insert(self.buffer.clone(), committed.clone());
+                self.suggestion_engine
+                    .database
+                    .learner
+                    .record_candidate_selection(&self.buffer, committed);
             }
+            let prev_word = self.last_committed_word.clone();
             self.suggestion_engine
-                .database
-                .observe_committed_word(committed);
+                .observe_committed(prev_word.as_deref(), committed);
             self.stats.record_commit(typed_len, committed);
             self.recent_context.push(committed.clone());
             if self.recent_context.len() > 6 {

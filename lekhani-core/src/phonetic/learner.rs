@@ -20,6 +20,8 @@ pub struct AutonomousLearner {
     pub user_bigrams: HashMap<String, u32>,
     #[serde(default)]
     pub last_committed_word: Option<String>,
+    #[serde(default)]
+    pub candidate_memory: HashMap<String, String>,
 }
 
 fn default_threshold() -> u32 {
@@ -40,6 +42,7 @@ impl AutonomousLearner {
             auto_learn_threshold: 1,
             user_bigrams: HashMap::new(),
             last_committed_word: None,
+            candidate_memory: HashMap::new(),
         }
     }
 
@@ -54,6 +57,9 @@ impl AutonomousLearner {
         let count = self.user_bigrams.entry(key).or_insert(0);
         *count = (*count + 1).min(1000);
         self.last_committed_word = Some(clean_curr.to_string());
+        if self.user_bigrams.len() > 8500 {
+            self.prune_if_needed();
+        }
     }
 
     /// Retrieve the personalized candidate score boost for a word following a previous word
@@ -69,6 +75,86 @@ impl AutonomousLearner {
         } else {
             0
         }
+    }
+
+    /// Record user's candidate selection override permanently
+    pub fn record_candidate_selection(&mut self, buffer: &str, candidate: &str) {
+        let clean_buf = buffer.trim();
+        let clean_cand = candidate.trim();
+        if clean_buf.is_empty() || clean_cand.is_empty() {
+            return;
+        }
+        self.candidate_memory
+            .insert(clean_buf.to_string(), clean_cand.to_string());
+        if self.candidate_memory.len() > 2200 {
+            self.prune_if_needed();
+        }
+    }
+
+    /// Retrieve top user-learned continuations following `prev_word` for next-word prediction
+    pub fn get_top_user_continuations(&self, prev_word: &str, limit: usize) -> Vec<String> {
+        let clean_prev = prev_word.trim();
+        if clean_prev.is_empty() {
+            return Vec::new();
+        }
+        let prefix = format!("{}\t", clean_prev);
+        let mut matches: Vec<(&str, u32)> = Vec::new();
+        for (k, &count) in &self.user_bigrams {
+            if let Some(next_word) = k.strip_prefix(&prefix) {
+                if !next_word.is_empty() {
+                    matches.push((next_word, count));
+                }
+            }
+        }
+        matches.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        matches
+            .into_iter()
+            .take(limit)
+            .map(|(w, _)| w.to_string())
+            .collect()
+    }
+
+    /// Prune low-frequency and excess entries to maintain bounded memory and fast serialization
+    pub fn prune_if_needed(&mut self) {
+        const MAX_BIGRAMS: usize = 8000;
+        const MAX_OBSERVED: usize = 4000;
+        const MAX_CANDIDATES: usize = 2000;
+
+        if self.user_bigrams.len() > MAX_BIGRAMS {
+            self.user_bigrams.retain(|_, &mut count| count > 1);
+            if self.user_bigrams.len() > MAX_BIGRAMS {
+                let mut entries: Vec<(String, u32)> = self.user_bigrams.drain().collect();
+                entries.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+                entries.truncate(MAX_BIGRAMS - 1000);
+                self.user_bigrams = entries.into_iter().collect();
+            }
+        }
+
+        if self.observed_counts.len() > MAX_OBSERVED {
+            self.observed_counts.retain(|_, &mut count| count > 1);
+            if self.observed_counts.len() > MAX_OBSERVED {
+                let mut entries: Vec<(String, u32)> = self.observed_counts.drain().collect();
+                entries.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+                entries.truncate(MAX_OBSERVED - 500);
+                self.observed_counts = entries.into_iter().collect();
+            }
+        }
+
+        if self.candidate_memory.len() > MAX_CANDIDATES {
+            let mut entries: Vec<(String, String)> = self.candidate_memory.drain().collect();
+            entries.truncate(MAX_CANDIDATES - 200);
+            self.candidate_memory = entries.into_iter().collect();
+        }
+    }
+
+    /// Clear all user-learned data and reset baseline
+    pub fn clear_user_data(&mut self) {
+        self.observed_counts.clear();
+        self.learned_words.clear();
+        self.candidate_memory.clear();
+        self.user_bigrams.clear();
+        self.last_committed_word = None;
+        self.pretrain_baseline();
     }
 
     /// Process a committed word, extract potential root stems, and auto-learn new vocabulary
@@ -100,6 +186,10 @@ impl AutonomousLearner {
                 trie.insert_weighted(word.clone(), 9200);
                 newly_learned.push(word);
             }
+        }
+
+        if self.observed_counts.len() > 4200 {
+            self.prune_if_needed();
         }
 
         newly_learned
@@ -151,7 +241,7 @@ impl AutonomousLearner {
         }
     }
 
-    /// Save learned dictionary to a JSON file
+    /// Save learned dictionary to a JSON file safely using atomic rename
     pub fn save_to_path<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
@@ -159,7 +249,12 @@ impl AutonomousLearner {
         }
         let data = serde_json::to_string_pretty(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
-        std::fs::write(path, data)
+        let tmp_path = path.with_extension("tmp");
+        if std::fs::write(&tmp_path, &data).is_ok() && std::fs::rename(&tmp_path, path).is_ok() {
+            Ok(())
+        } else {
+            std::fs::write(path, data)
+        }
     }
 
     /// Load learned dictionary from a JSON file, automatically seeding baseline if file doesn't exist
@@ -307,5 +402,39 @@ mod tests {
             learner.learned_words.len()
         );
         assert_eq!(deserialized.user_bigrams.len(), learner.user_bigrams.len());
+    }
+
+    #[test]
+    fn test_candidate_selection_memory() {
+        let mut learner = AutonomousLearner::new();
+        learner.record_candidate_selection("kormo", "কর্ম");
+        assert_eq!(learner.candidate_memory.get("kormo"), Some(&"কর্ম".to_string()));
+
+        let json = serde_json::to_string(&learner).expect("JSON serialization must succeed");
+        let deserialized: AutonomousLearner = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.candidate_memory.get("kormo"), Some(&"কর্ম".to_string()));
+    }
+
+    #[test]
+    fn test_top_user_continuations() {
+        let mut learner = AutonomousLearner::new();
+        learner.observe_committed_pair("আমি", "ভাত");
+        learner.observe_committed_pair("আমি", "ভাত");
+        learner.observe_committed_pair("আমি", "চা");
+
+        let continuations = learner.get_top_user_continuations("আমি", 2);
+        assert_eq!(continuations, vec!["ভাত".to_string(), "চা".to_string()]);
+    }
+
+    #[test]
+    fn test_clear_user_data() {
+        let mut learner = AutonomousLearner::new();
+        learner.observe_committed_pair("কাস্টম", "শব্দ");
+        learner.record_candidate_selection("test", "টেস্ট");
+        learner.clear_user_data();
+
+        assert_eq!(learner.candidate_memory.len(), 0);
+        assert!(learner.user_bigrams.len() > 0); // baseline re-seeded
+        assert_eq!(learner.get_user_bigram_boost("কেমন", "আছো") >= 1500, true);
     }
 }

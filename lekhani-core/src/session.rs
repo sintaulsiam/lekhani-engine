@@ -49,6 +49,13 @@ impl InputSession {
             .suggestion_engine
             .database
             .load_user_learned(path);
+        self.phonetic.candidate_memory = self
+            .phonetic
+            .suggestion_engine
+            .database
+            .learner
+            .candidate_memory
+            .clone();
     }
 
     pub fn save_user_learned<P: AsRef<std::path::Path>>(
@@ -59,6 +66,27 @@ impl InputSession {
             .suggestion_engine
             .database
             .save_user_learned(path)
+    }
+
+    pub fn clear_user_learned<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), std::io::Error> {
+        self.phonetic
+            .suggestion_engine
+            .database
+            .learner
+            .clear_user_data();
+        self.phonetic.candidate_memory.clear();
+        self.phonetic
+            .suggestion_engine
+            .database
+            .save_user_learned(path)
+    }
+
+    pub fn get_learned_counts(&self) -> (usize, usize) {
+        let l = &self.phonetic.suggestion_engine.database.learner;
+        (l.learned_words.len(), l.user_bigrams.len())
     }
 
     pub fn load_stats<P: AsRef<std::path::Path>>(&mut self, path: P) {
@@ -354,5 +382,83 @@ mod tests {
         println!("suggest('towmar') = {:?}", cands_towmar);
         let (cands_to, _) = sugg.suggest("to", true, true, &empty_memory);
         println!("suggest('to') = {:?}", cands_to);
+    }
+
+    #[test]
+    fn test_session_word_pair_and_candidate_learning() {
+        let mut session = InputSession::new();
+        session.active_layout_type = ActiveLayoutType::Phonetic;
+
+        // 1. Consecutive word commit
+        session.phonetic.current_candidates = vec!["আমি".to_string()];
+        session.commit(0);
+        assert_eq!(session.phonetic.last_committed_word, Some("আমি".to_string()));
+
+        session.phonetic.current_candidates = vec!["খাব".to_string()];
+        session.commit(0);
+        assert_eq!(session.phonetic.last_committed_word, Some("খাব".to_string()));
+
+        // Check user bigram was recorded
+        assert_eq!(
+            session
+                .phonetic
+                .suggestion_engine
+                .database
+                .learner
+                .user_bigrams
+                .get("আমি\tখাব"),
+            Some(&1)
+        );
+
+        // Check next-word suggestion promotion
+        let next_words = session.phonetic.suggestion_engine.suggest_next_words_with_context(&["আমি"]);
+        assert!(next_words.contains(&"খাব".to_string()));
+        assert_eq!(next_words[0], "খাব");
+
+        // 2. Candidate memory preference override and custom word learning
+        session.phonetic.buffer = "siam".to_string();
+        session.phonetic.selected_index = 0;
+        session.phonetic.current_candidates = vec!["সিয়াম".to_string(), "সায়াম".to_string()];
+        session.commit(1); // pick index 1 ("সায়াম")
+
+        assert_eq!(session.phonetic.candidate_memory.get("siam"), Some(&"সায়াম".to_string()));
+        assert_eq!(
+            session
+                .phonetic
+                .suggestion_engine
+                .database
+                .learner
+                .candidate_memory
+                .get("siam"),
+            Some(&"সায়াম".to_string())
+        );
+
+        // 3. Serialization and Deserialization round-trip
+        let temp_dir = std::env::temp_dir();
+        let temp_file = temp_dir.join("lekhani_test_learning_roundtrip.json");
+        session.save_user_learned(&temp_file).unwrap();
+
+        let mut session2 = InputSession::new();
+        session2.load_user_learned(&temp_file);
+        assert_eq!(session2.phonetic.candidate_memory.get("siam"), Some(&"সায়াম".to_string()));
+        assert_eq!(
+            session2
+                .phonetic
+                .suggestion_engine
+                .database
+                .learner
+                .user_bigrams
+                .get("আমি\tখাব"),
+            Some(&1)
+        );
+
+        let (words_cnt, bigrams_cnt) = session2.get_learned_counts();
+        assert!(words_cnt > 0);
+        assert!(bigrams_cnt > 0);
+
+        // 4. Clear learned data
+        session2.clear_user_learned(&temp_file).unwrap();
+        assert_eq!(session2.phonetic.candidate_memory.get("siam"), None);
+        let _ = std::fs::remove_file(&temp_file);
     }
 }

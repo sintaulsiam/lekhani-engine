@@ -1209,6 +1209,9 @@ impl PhoneticSuggestion {
                 .get(term)
                 .or_else(|| candidate_memory.get(middle))
                 .or_else(|| candidate_memory.get(&phonetic))
+                .or_else(|| self.database.learner.candidate_memory.get(term))
+                .or_else(|| self.database.learner.candidate_memory.get(middle))
+                .or_else(|| self.database.learner.candidate_memory.get(&phonetic))
             {
                 if &cand.text == fav || cand.text.contains(fav) {
                     score += 5000;
@@ -1399,6 +1402,23 @@ impl PhoneticSuggestion {
             self.config.enable_phrase_prediction,
         );
 
+        // Personalized user-learned continuations promotion
+        if let Some(&last_word) = context.last() {
+            let clean_last = last_word.trim_matches(|c: char| {
+                c.is_ascii_punctuation() || c == '।' || c == '—' || c == ','
+            });
+            let user_conts = self
+                .database
+                .learner
+                .get_top_user_continuations(clean_last, 4);
+            for cont in user_conts.into_iter().rev() {
+                if let Some(pos) = predictions.iter().position(|p| p == &cont) {
+                    predictions.remove(pos);
+                }
+                predictions.insert(0, cont);
+            }
+        }
+
         // Instant Bengali Reduplication (দ্বিরুক্ত শব্দ) promotion
         if self.config.enable_reduplication {
             if let Some(&last_word) = context.last() {
@@ -1415,6 +1435,7 @@ impl PhoneticSuggestion {
             }
         }
 
+        predictions.truncate(8);
         predictions
     }
 
