@@ -10,8 +10,9 @@ use std::path::Path;
 #[derive(Debug, Clone)]
 pub struct PhoneticDatabase {
     pub trie: PrefixTrie,
-    suffix: HashMap<String, String>,
-    autocorrect: HashMap<String, String>,
+    pub suffix: HashMap<String, String>,
+    pub autocorrect: HashMap<String, String>,
+    pub shorthand: HashMap<String, String>,
     user_autocorrect: HashMap<String, String>,
     emojis: EmojiMap,
     snippets: SnippetManager,
@@ -402,14 +403,17 @@ impl PhoneticDatabase {
         for &(k, v) in CORE_AUTOCORRECT {
             autocorrect.insert(k.to_string(), v.to_string());
         }
+
+        let mut shorthand = HashMap::new();
         for &(k, v) in BANGLISH_SHORTHAND {
-            autocorrect.insert(k.to_string(), v.to_string());
+            shorthand.insert(k.to_string(), v.to_string());
         }
 
         Self {
             trie,
             suffix,
             autocorrect,
+            shorthand,
             user_autocorrect: HashMap::new(),
             emojis: EmojiMap::new(),
             snippets: SnippetManager::new(),
@@ -710,6 +714,10 @@ impl PhoneticDatabase {
 
     /// Get raw autocorrect replacement (user autocorrect -> system autocorrect -> built-in core autocorrect)
     pub fn get_autocorrect_raw(&self, term: &str) -> Option<String> {
+        self.get_autocorrect_raw_filtered(term, true)
+    }
+
+    pub fn get_autocorrect_raw_filtered(&self, term: &str, include_shorthand: bool) -> Option<String> {
         let lower = term.to_lowercase();
         if let Some(correct) = self.user_autocorrect.get(term) {
             return Some(correct.clone());
@@ -728,9 +736,12 @@ impl PhoneticDatabase {
                 return Some(v.to_string());
             }
         }
-        for &(k, v) in BANGLISH_SHORTHAND {
-            if k == lower || k == term {
-                return Some(v.to_string());
+        if include_shorthand {
+            if let Some(correct) = self.shorthand.get(term) {
+                return Some(correct.clone());
+            }
+            if let Some(lower_match) = self.shorthand.get(&lower) {
+                return Some(lower_match.clone());
             }
         }
         None

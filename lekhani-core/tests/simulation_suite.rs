@@ -431,6 +431,8 @@ fn test_casual_banglish_and_colloquial_verbs() {
     assert_eq!(cands_drkr[0], "দরকার", "Expected 'দরকার' for 'drkr'");
 
     // 2. Spoken and Colloquial Verbs
+    // Enable colloquial dialects for this section
+    sugg.config.enable_colloquial_dialects = true;
     let (cands_korsi, _) = sugg.suggest("korsi", true, true, &empty_memory);
     assert!(cands_korsi[0] == "করছি" || cands_korsi.contains(&"করছি".to_string()));
 
@@ -445,6 +447,12 @@ fn test_casual_banglish_and_colloquial_verbs() {
 
     let (cands_khamu, _) = sugg.suggest("khamu", true, true, &empty_memory);
     assert!(cands_khamu.contains(&"খাব".to_string()));
+
+    // Verify toggle off for shorthand
+    sugg.config.enable_banglish_shorthand = false;
+    let (cands_drkr_no_shorthand, _) = sugg.suggest("drkr", true, true, &empty_memory);
+    assert_ne!(cands_drkr_no_shorthand[0], "দরকার", "Disabling shorthand must prevent 'drkr' -> 'দরকার'");
+    sugg.config.enable_banglish_shorthand = true;
 
     // 3. Exact Backtick and Explicit Case Veto (writing experience preservation)
     let (cands_amr_backtick, _) = sugg.suggest("amr`", true, true, &empty_memory);
@@ -489,7 +497,14 @@ fn test_advanced_ai_ergonomics() {
     }
     let empty_memory = HashMap::new();
 
-    // 1. Developer Code-Mixing Shield
+    // 1. Developer Code-Mixing Shield (Opt-in)
+    // Disabled by default
+    assert!(!sugg.config.enable_code_shield);
+    let (cands_onclick_off, _) = sugg.suggest("onClick", true, true, &empty_memory);
+    assert_ne!(cands_onclick_off[0], "onClick");
+
+    // Enabled
+    sugg.config.enable_code_shield = true;
     let (cands_onclick, _) = sugg.suggest("onClick", true, true, &empty_memory);
     assert_eq!(cands_onclick[0], "onClick");
 
@@ -502,14 +517,22 @@ fn test_advanced_ai_ergonomics() {
     let (cands_kw, _) = sugg.suggest("const", true, true, &empty_memory);
     assert_eq!(cands_kw[0], "const");
 
-    // 2. Concatenated Word Lattice Segmentation
+    // 2. Concatenated Word Lattice Segmentation (Opt-in)
+    // Disabled by default
+    sugg.config.enable_word_segmentation = false;
+    let (cands_kemonaso_off, _) = sugg.suggest("kemonaso", true, true, &empty_memory);
+    assert_ne!(cands_kemonaso_off[0], "কেমন আছো");
+
+    // Enabled
+    sugg.config.enable_word_segmentation = true;
     let (cands_kemonaso, _) = sugg.suggest("kemonaso", true, true, &empty_memory);
     assert_eq!(cands_kemonaso[0], "কেমন আছো");
 
     let (cands_dhonnobadbhai, _) = sugg.suggest("dhonnobadbhai", true, true, &empty_memory);
     assert_eq!(cands_dhonnobadbhai[0], "ধন্যবাদ ভাই");
 
-    // 3. Bengali Reduplicated Words (দ্বিরুক্ত শব্দ)
+    // 3. Bengali Reduplicated Words (দ্বিরুক্ত শব্দ) (Enabled by default)
+    assert!(sugg.config.enable_reduplication);
     let redup_dhire = sugg.suggest_next_words("ধীরে");
     assert_eq!(redup_dhire[0], "ধীরে");
 
@@ -519,10 +542,21 @@ fn test_advanced_ai_ergonomics() {
     let redup_choto = sugg.suggest_next_words("ছোট");
     assert_eq!(redup_choto[0], "ছোট");
 
-    // 4. Multi-word Phrase & Idiom Completion
+    // 4. Multi-word Phrase & Idiom Completion (Enabled by default)
+    assert!(sugg.config.enable_phrase_prediction);
     let phrase_onek = sugg.suggest_next_words_with_context(&["অনেক", "অনেক"]);
     assert!(phrase_onek.contains(&"ধন্যবাদ".to_string()));
 
     let phrase_insha = sugg.suggest_next_words_with_context(&["ইনশা"]);
     assert!(phrase_insha.contains(&"আল্লাহ".to_string()));
+
+    // 5. Dynamic Macros (Enabled by default, can be toggled off)
+    assert!(sugg.config.enable_dynamic_macros);
+    let (cands_snip_on, _) = sugg.suggest("!shubhechha", true, true, &empty_memory);
+    assert!(cands_snip_on.contains(&"আন্তরিক শুভেচ্ছা ও অভিনন্দন".to_string()));
+
+    sugg.config.enable_dynamic_macros = false;
+    let (cands_snip_off, _) = sugg.suggest("!shubhechha", true, true, &empty_memory);
+    assert!(!cands_snip_off.contains(&"আন্তরিক শুভেচ্ছা ও অভিনন্দন".to_string()));
+    sugg.config.enable_dynamic_macros = true;
 }

@@ -52,6 +52,16 @@ impl NextWordPredictor {
 
     /// Predict the top-K probable next words given preceding sentence context
     pub fn predict_next(&self, context: &[&str], limit: usize) -> Vec<String> {
+        self.predict_next_with_options(context, limit, true)
+    }
+
+    /// Predict the top-K probable next words given preceding sentence context with optional idiom phrases
+    pub fn predict_next_with_options(
+        &self,
+        context: &[&str],
+        limit: usize,
+        enable_idiom_phrases: bool,
+    ) -> Vec<String> {
         if context.is_empty() {
             return vec![
                 "আমি".to_string(),
@@ -67,13 +77,15 @@ impl NextWordPredictor {
 
         // 0. Match high-confidence conversational idioms and phrases
         let mut idiom_matches = Vec::new();
-        for &(pattern, continuations) in BENGALI_IDIOM_PHRASES {
-            if context.len() >= pattern.len() {
-                let tail = &context[context.len() - pattern.len()..];
-                if tail == pattern {
-                    for &cont in continuations {
-                        if !idiom_matches.contains(&cont.to_string()) {
-                            idiom_matches.push(cont.to_string());
+        if enable_idiom_phrases {
+            for &(pattern, continuations) in BENGALI_IDIOM_PHRASES {
+                if context.len() >= pattern.len() {
+                    let tail = &context[context.len() - pattern.len()..];
+                    if tail == pattern {
+                        for &cont in continuations {
+                            if !idiom_matches.contains(&cont.to_string()) {
+                                idiom_matches.push(cont.to_string());
+                            }
                         }
                     }
                 }

@@ -32,6 +32,35 @@ pub struct CandidateHypothesis {
     pub initial_boost: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PhoneticSuggestionConfig {
+    pub use_dictionary: bool,
+    pub include_english: bool,
+    pub enable_code_shield: bool,
+    pub enable_word_segmentation: bool,
+    pub enable_colloquial_dialects: bool,
+    pub enable_banglish_shorthand: bool,
+    pub enable_reduplication: bool,
+    pub enable_phrase_prediction: bool,
+    pub enable_dynamic_macros: bool,
+}
+
+impl Default for PhoneticSuggestionConfig {
+    fn default() -> Self {
+        Self {
+            use_dictionary: true,
+            include_english: true,
+            enable_code_shield: false,
+            enable_word_segmentation: false,
+            enable_colloquial_dialects: true,
+            enable_banglish_shorthand: true,
+            enable_reduplication: true,
+            enable_phrase_prediction: true,
+            enable_dynamic_macros: true,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct PhoneticSuggestion {
     pub database: PhoneticDatabase,
@@ -40,6 +69,7 @@ pub struct PhoneticSuggestion {
     pub ai_context: lekhani_ai::ContextScorer,
     pub ai_predictor: lekhani_ai::NextWordPredictor,
     pub ai_decoder: lekhani_ai::BeamSearchDecoder,
+    pub config: PhoneticSuggestionConfig,
 }
 
 impl std::fmt::Debug for PhoneticSuggestion {
@@ -139,6 +169,7 @@ impl PhoneticSuggestion {
             ai_context: lekhani_ai::ContextScorer::new(),
             ai_predictor: lekhani_ai::NextWordPredictor::new(),
             ai_decoder: lekhani_ai::BeamSearchDecoder::new(),
+            config: PhoneticSuggestionConfig::default(),
         }
     }
 
@@ -156,6 +187,7 @@ impl PhoneticSuggestion {
             ai_context: lekhani_ai::ContextScorer::new(),
             ai_predictor: lekhani_ai::NextWordPredictor::new(),
             ai_decoder: lekhani_ai::BeamSearchDecoder::new(),
+            config: PhoneticSuggestionConfig::default(),
         }
     }
 
@@ -391,15 +423,22 @@ impl PhoneticSuggestion {
         }
 
         // Fast Memoization Cache check (avoid context.join allocation when context is empty)
+        let cfg_mask = (self.config.enable_code_shield as u32)
+            | ((self.config.enable_word_segmentation as u32) << 1)
+            | ((self.config.enable_colloquial_dialects as u32) << 2)
+            | ((self.config.enable_banglish_shorthand as u32) << 3)
+            | ((self.config.enable_dynamic_macros as u32) << 4);
+
         let cache_key = if context.is_empty() {
-            format!("{}:{}:{}", term, include_english, use_dictionary)
+            format!("{}:{}:{}:{}", term, include_english, use_dictionary, cfg_mask)
         } else {
             format!(
-                "{}:{}:{}:{}",
+                "{}:{}:{}:{}:{}",
                 term,
                 context.join(" "),
                 include_english,
-                use_dictionary
+                use_dictionary,
+                cfg_mask
             )
         };
         if let Some(cached) = self.cache.get(&cache_key) {
@@ -418,13 +457,15 @@ impl PhoneticSuggestion {
         }
 
         // 2. Direct whole-term special matches (Math `=125*8`, Currency `#usd50`, Snippets `!shubhechha`, Exact Emojis `:smile:`, `:)`, `$$`, `*taka*`)
-        let literals = self.database.search_special_literals(term);
-        if !literals.is_empty() {
-            let mut cands = literals;
-            if include_english && !cands.iter().any(|c| c == term) {
-                cands.push(term.to_string());
+        if self.config.enable_dynamic_macros || !term.starts_with('!') {
+            let literals = self.database.search_special_literals(term);
+            if !literals.is_empty() {
+                let mut cands = literals;
+                if include_english && !cands.iter().any(|c| c == term) {
+                    cands.push(term.to_string());
+                }
+                return (cands, 0);
             }
-            return (cands, 0);
         }
 
         // 3. Live Snippet / Emoji / Symbol prefix autocompletion (e.g. "!sh", ":sm", "*t", ":bhalo")
@@ -438,7 +479,7 @@ impl PhoneticSuggestion {
                 return (cands, 0);
             }
         }
-        if term.starts_with('!') && term.len() >= 2 {
+        if self.config.enable_dynamic_macros && term.starts_with('!') && term.len() >= 2 {
             let prefix_snippets = self.database.search_snippets_prefix(term, 8);
             if !prefix_snippets.is_empty() {
                 let mut cands = prefix_snippets;
@@ -487,10 +528,14 @@ impl PhoneticSuggestion {
         };
 
         // 3b. Developer Code-Mixing Shield (e.g. "onClick", "user_id", "--help", "const", "https://...")
-        let is_code = (super::code_shield::is_code_token(term)
-            || super::code_shield::is_code_token(middle))
-            && !self.database.is_exact_dictionary_word(&phonetic)
-            && !is_atomic_cv_syllable(&phonetic);
+        let is_code = if self.config.enable_code_shield {
+            (super::code_shield::is_code_token(term)
+                || super::code_shield::is_code_token(middle))
+                && !self.database.is_exact_dictionary_word(&phonetic)
+                && !is_atomic_cv_syllable(&phonetic)
+        } else {
+            false
+        };
         if is_code {
             add_cand(
                 middle.to_string(),
@@ -653,7 +698,7 @@ impl PhoneticSuggestion {
             }
         };
 
-        let preferred_word = if let Some(raw_ac) = self.database.get_autocorrect_raw(middle) {
+        let preferred_word = if let Some(raw_ac) = self.database.get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand) {
             let converted_ac = resolve_ac(&raw_ac);
             if !converted_ac.is_empty() {
                 add_cand(
@@ -669,7 +714,11 @@ impl PhoneticSuggestion {
             }
         } else if let Some(ref loan_pref) = preferred_loanword {
             Some(loan_pref.clone())
-        } else if let Some(verbal_word) = super::morphology::decompose_verbal_form(middle) {
+        } else if let Some(verbal_word) = if self.config.enable_colloquial_dialects {
+            super::morphology::decompose_verbal_form(middle)
+        } else {
+            None
+        } {
             add_cand(
                 verbal_word.clone(),
                 CandidateSource::ExactDictionary,
@@ -681,7 +730,7 @@ impl PhoneticSuggestion {
         } else {
             let mut found_collapsed = None;
             for collapsed in super::fuzzy::collapse_elongated_runs(middle) {
-                if let Some(raw_ac) = self.database.get_autocorrect_raw(&collapsed) {
+                if let Some(raw_ac) = self.database.get_autocorrect_raw_filtered(&collapsed, self.config.enable_banglish_shorthand) {
                     let converted_ac = resolve_ac(&raw_ac);
                     if !converted_ac.is_empty() {
                         add_cand(
@@ -780,15 +829,17 @@ impl PhoneticSuggestion {
             }
 
             // 9b. Colloquial & Spoken continuous verb forms (e.g. kortesi -> করছি, করতেছি)
-            let colloquial_matches = self.add_colloquial_verbs(middle);
-            for item in colloquial_matches {
-                add_cand(
-                    item,
-                    CandidateSource::MorphologicalInflection,
-                    3300,
-                    &mut raw_candidates,
-                    &mut seen,
-                );
+            if self.config.enable_colloquial_dialects {
+                let colloquial_matches = self.add_colloquial_verbs(middle);
+                for item in colloquial_matches {
+                    add_cand(
+                        item,
+                        CandidateSource::MorphologicalInflection,
+                        3300,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
             }
 
             // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
@@ -947,7 +998,7 @@ impl PhoneticSuggestion {
         }
 
         // 12c. Concatenated Word Lattice Segmentation (e.g. "kemonaso" -> "কেমন আছো", "dhonnobadbhai" -> "ধন্যবাদ ভাই")
-        if middle.len() >= 6 && !middle.contains(' ') {
+        if self.config.enable_word_segmentation && middle.len() >= 6 && !middle.contains(' ') {
             let segmented = super::segmenter::segment_concatenated_token(
                 middle,
                 &self.database,
@@ -1342,19 +1393,25 @@ impl PhoneticSuggestion {
         if context.is_empty() {
             return Vec::new();
         }
-        let mut predictions = self.ai_predictor.predict_next(context, 8);
+        let mut predictions = self.ai_predictor.predict_next_with_options(
+            context,
+            8,
+            self.config.enable_phrase_prediction,
+        );
 
         // Instant Bengali Reduplication (দ্বিরুক্ত শব্দ) promotion
-        if let Some(&last_word) = context.last() {
-            let clean_last = last_word.trim_matches(|c: char| {
-                c.is_ascii_punctuation() || c == '।' || c == '—' || c == ','
-            });
-            if super::reduplication::is_reduplicative_word(clean_last) {
-                let redup_str = clean_last.to_string();
-                if let Some(pos) = predictions.iter().position(|p| p == &redup_str) {
-                    predictions.remove(pos);
+        if self.config.enable_reduplication {
+            if let Some(&last_word) = context.last() {
+                let clean_last = last_word.trim_matches(|c: char| {
+                    c.is_ascii_punctuation() || c == '।' || c == '—' || c == ','
+                });
+                if super::reduplication::is_reduplicative_word(clean_last) {
+                    let redup_str = clean_last.to_string();
+                    if let Some(pos) = predictions.iter().position(|p| p == &redup_str) {
+                        predictions.remove(pos);
+                    }
+                    predictions.insert(0, redup_str);
                 }
-                predictions.insert(0, redup_str);
             }
         }
 
@@ -1443,7 +1500,7 @@ impl PhoneticSuggestion {
                     let mut base_candidates = Vec::new();
                     let mut has_verified_base = false;
 
-                    if let Some(ac) = self.database.get_autocorrect_raw(base_key) {
+                    if let Some(ac) = self.database.get_autocorrect_raw_filtered(base_key, self.config.enable_banglish_shorthand) {
                         let conv = if ac.chars().any(|c| c.is_bengali()) {
                             ac
                         } else {
