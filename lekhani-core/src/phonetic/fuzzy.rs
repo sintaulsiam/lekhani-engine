@@ -285,6 +285,10 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("pha", &["ph^a", "pha"]),
     ("ga", &["g^a", "ga"]),
     ("ka", &["k^a", "ka"]),
+    // 9. Casual Banglish & Conversational Sound Laws
+    ("aso", &["acho", "asen"]),
+    ("aco", &["acho"]),
+    ("taso", &["tacho", "taso"]),
 ];
 
 /// Recognized atomic layout digraphs in Avro Phonetic.

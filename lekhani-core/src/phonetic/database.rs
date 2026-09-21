@@ -313,6 +313,78 @@ pub const CORE_AUTOCORRECT: &[(&str, &str)] = &[
     ("chikitshokderke", "চিকিৎসকদেরকে"),
 ];
 
+/// Ubiquitous Casual Banglish & Chat Abbreviations
+pub const BANGLISH_SHORTHAND: &[(&str, &str)] = &[
+    ("amr", "আমার"),
+    ("tmr", "তোমার"),
+    ("apnr", "আপনার"),
+    ("ekhn", "এখন"),
+    ("ekhon", "এখন"),
+    ("kno", "কেন"),
+    ("kn", "কেন"),
+    ("shob", "সব"),
+    ("sb", "সব"),
+    ("kisu", "কিছু"),
+    ("thk", "ঠিক"),
+    ("valo", "ভালো"),
+    ("vhalo", "ভালো"),
+    ("kothay", "কোথায়"),
+    ("kothai", "কোথায়"),
+    ("ashbo", "আসব"),
+    ("asbo", "আসব"),
+    ("dorkar", "দরকার"),
+    ("drkr", "দরকার"),
+    ("plz", "প্লিজ"),
+    ("pls", "প্লিজ"),
+    ("bujhsi", "বুঝেছি"),
+    ("bujhlam", "বুঝলাম"),
+    ("shathe", "সাথে"),
+    ("sathe", "সাথে"),
+    ("dekha", "দেখা"),
+    ("kotha", "কথা"),
+    ("hobe", "হবে"),
+    ("hbe", "হবে"),
+    ("accha", "আচ্ছা"),
+    ("acha", "আচ্ছা"),
+    ("thikase", "ঠিক আছে"),
+    ("thikache", "ঠিক আছে"),
+    ("shotti", "সত্যি"),
+    ("sotti", "সত্যি"),
+    ("dhonnobad", "ধন্যবাদ"),
+    ("dhnbaad", "ধন্যবাদ"),
+    ("khobor", "খবর"),
+    ("khbr", "খবর"),
+    ("shundor", "সুন্দর"),
+    ("sundor", "সুন্দর"),
+    ("shomoy", "সময়"),
+    ("somoy", "সময়"),
+    ("shokal", "সকাল"),
+    ("sokal", "সকাল"),
+    ("raat", "রাত"),
+    ("rat", "রাত"),
+    ("bondhu", "বন্ধু"),
+    ("bndhu", "বন্ধু"),
+    ("kichu", "কিছু"),
+    ("dekhi", "দেখি"),
+    ("jani", "জানি"),
+    ("shuni", "শুনি"),
+    ("suni", "শুনি"),
+    ("ashi", "আসি"),
+    ("asi", "আসি"),
+    ("achi", "আছি"),
+    ("aso", "আছো"),
+    ("asen", "আছেন"),
+    ("achen", "আছেন"),
+    ("korsi", "করছি"),
+    ("kortesi", "করছি"),
+    ("kormu", "করব"),
+    ("gesilam", "গেছিলাম"),
+    ("jamu", "যাব"),
+    ("khamu", "খাব"),
+    ("khaiba", "খাবা"),
+    ("korba", "করবা"),
+];
+
 impl PhoneticDatabase {
     pub fn new() -> Self {
         let mut trie = PrefixTrie::new();
@@ -328,6 +400,9 @@ impl PhoneticDatabase {
 
         let mut autocorrect = HashMap::new();
         for &(k, v) in CORE_AUTOCORRECT {
+            autocorrect.insert(k.to_string(), v.to_string());
+        }
+        for &(k, v) in BANGLISH_SHORTHAND {
             autocorrect.insert(k.to_string(), v.to_string());
         }
 
@@ -400,7 +475,7 @@ impl PhoneticDatabase {
         if ac_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&ac_path) {
                 if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
-                    self.autocorrect = map.into_iter().filter(|(k, v)| k != v).collect();
+                    self.autocorrect.extend(map.into_iter().filter(|(k, v)| k != v));
                 }
             }
         }
@@ -649,6 +724,11 @@ impl PhoneticDatabase {
             return Some(lower_match.clone());
         }
         for &(k, v) in CORE_AUTOCORRECT {
+            if k == lower || k == term {
+                return Some(v.to_string());
+            }
+        }
+        for &(k, v) in BANGLISH_SHORTHAND {
             if k == lower || k == term {
                 return Some(v.to_string());
             }

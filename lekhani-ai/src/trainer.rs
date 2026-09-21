@@ -17,11 +17,274 @@ pub struct TrainedLanguageModelData {
 }
 
 impl TrainedLanguageModelData {
+    pub const BINARY_MAGIC: &'static [u8; 4] = b"LLM1";
+    pub const BINARY_VERSION: u32 = 1;
+
     /// Load trained model data from a JSON file
     pub fn load_from_json<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
         let content = std::fs::read_to_string(path)?;
         serde_json::from_str(&content)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
+
+    /// Serialize language model data into compact binary format
+    pub fn to_binary(&self) -> Vec<u8> {
+        let mut vocab_map: HashMap<&str, u32> = HashMap::new();
+        let mut words: Vec<&str> = Vec::new();
+
+        for w in self.unigrams.keys() {
+            if !vocab_map.contains_key(w.as_str()) {
+                let id = words.len() as u32;
+                vocab_map.insert(w.as_str(), id);
+                words.push(w.as_str());
+            }
+        }
+        for (w1, w2, _) in &self.bigrams {
+            if !vocab_map.contains_key(w1.as_str()) {
+                let id = words.len() as u32;
+                vocab_map.insert(w1.as_str(), id);
+                words.push(w1.as_str());
+            }
+            if !vocab_map.contains_key(w2.as_str()) {
+                let id = words.len() as u32;
+                vocab_map.insert(w2.as_str(), id);
+                words.push(w2.as_str());
+            }
+        }
+        for (w1, w2, w3, _) in &self.trigrams {
+            if !vocab_map.contains_key(w1.as_str()) {
+                let id = words.len() as u32;
+                vocab_map.insert(w1.as_str(), id);
+                words.push(w1.as_str());
+            }
+            if !vocab_map.contains_key(w2.as_str()) {
+                let id = words.len() as u32;
+                vocab_map.insert(w2.as_str(), id);
+                words.push(w2.as_str());
+            }
+            if !vocab_map.contains_key(w3.as_str()) {
+                let id = words.len() as u32;
+                vocab_map.insert(w3.as_str(), id);
+                words.push(w3.as_str());
+            }
+        }
+
+        let mut string_buffer = Vec::new();
+        let mut vocab_entries: Vec<(u32, u16)> = Vec::with_capacity(words.len());
+        for &w in &words {
+            let offset = string_buffer.len() as u32;
+            let bytes = w.as_bytes();
+            let len = bytes.len() as u16;
+            string_buffer.extend_from_slice(bytes);
+            vocab_entries.push((offset, len));
+        }
+
+        let vocab_count = words.len() as u32;
+        let unigram_count = self.unigrams.len() as u32;
+        let bigram_count = self.bigrams.len() as u32;
+        let trigram_count = self.trigrams.len() as u32;
+        let string_buffer_len = string_buffer.len() as u32;
+
+        let total_size = 32
+            + (vocab_count as usize * 6)
+            + (unigram_count as usize * 8)
+            + (bigram_count as usize * 12)
+            + (trigram_count as usize * 16)
+            + string_buffer.len();
+
+        let mut out = Vec::with_capacity(total_size);
+
+        // Header (32 bytes)
+        out.extend_from_slice(Self::BINARY_MAGIC);
+        out.extend_from_slice(&Self::BINARY_VERSION.to_le_bytes());
+        out.extend_from_slice(&(self.total_words as u32).to_le_bytes());
+        out.extend_from_slice(&vocab_count.to_le_bytes());
+        out.extend_from_slice(&unigram_count.to_le_bytes());
+        out.extend_from_slice(&bigram_count.to_le_bytes());
+        out.extend_from_slice(&trigram_count.to_le_bytes());
+        out.extend_from_slice(&string_buffer_len.to_le_bytes());
+
+        // Vocab table
+        for (offset, len) in vocab_entries {
+            out.extend_from_slice(&offset.to_le_bytes());
+            out.extend_from_slice(&len.to_le_bytes());
+        }
+
+        // Unigrams
+        for (w, p) in &self.unigrams {
+            let wid = vocab_map[w.as_str()];
+            out.extend_from_slice(&wid.to_le_bytes());
+            out.extend_from_slice(&p.to_le_bytes());
+        }
+
+        // Bigrams
+        for (w1, w2, p) in &self.bigrams {
+            let w1_id = vocab_map[w1.as_str()];
+            let w2_id = vocab_map[w2.as_str()];
+            out.extend_from_slice(&w1_id.to_le_bytes());
+            out.extend_from_slice(&w2_id.to_le_bytes());
+            out.extend_from_slice(&p.to_le_bytes());
+        }
+
+        // Trigrams
+        for (w1, w2, w3, p) in &self.trigrams {
+            let w1_id = vocab_map[w1.as_str()];
+            let w2_id = vocab_map[w2.as_str()];
+            let w3_id = vocab_map[w3.as_str()];
+            out.extend_from_slice(&w1_id.to_le_bytes());
+            out.extend_from_slice(&w2_id.to_le_bytes());
+            out.extend_from_slice(&w3_id.to_le_bytes());
+            out.extend_from_slice(&p.to_le_bytes());
+        }
+
+        // String buffer
+        out.extend_from_slice(&string_buffer);
+
+        out
+    }
+
+    /// Save language model dataset directly to a binary file
+    pub fn save_binary<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
+        let bytes = self.to_binary();
+        std::fs::write(path, bytes)
+    }
+
+    /// Load language model data from compact binary bytes
+    pub fn from_binary(data: &[u8]) -> Result<Self, std::io::Error> {
+        if data.len() < 32 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Binary data too short for header",
+            ));
+        }
+
+        if &data[0..4] != Self::BINARY_MAGIC {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid binary language model magic header",
+            ));
+        }
+
+        let version = u32::from_le_bytes(data[4..8].try_into().unwrap());
+        if version != Self::BINARY_VERSION {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Unsupported binary language model version: {}", version),
+            ));
+        }
+
+        let total_words = u32::from_le_bytes(data[8..12].try_into().unwrap()) as usize;
+        let vocab_count = u32::from_le_bytes(data[12..16].try_into().unwrap()) as usize;
+        let unigram_count = u32::from_le_bytes(data[16..20].try_into().unwrap()) as usize;
+        let bigram_count = u32::from_le_bytes(data[20..24].try_into().unwrap()) as usize;
+        let trigram_count = u32::from_le_bytes(data[24..28].try_into().unwrap()) as usize;
+        let string_buffer_len = u32::from_le_bytes(data[28..32].try_into().unwrap()) as usize;
+
+        let expected_size = 32
+            + (vocab_count * 6)
+            + (unigram_count * 8)
+            + (bigram_count * 12)
+            + (trigram_count * 16)
+            + string_buffer_len;
+
+        if data.len() < expected_size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "Binary language model data truncated",
+            ));
+        }
+
+        let mut cursor = 32;
+
+        // Vocab table
+        let mut vocab_offsets_lens = Vec::with_capacity(vocab_count);
+        for _ in 0..vocab_count {
+            let offset = u32::from_le_bytes(data[cursor..cursor + 4].try_into().unwrap()) as usize;
+            let len = u16::from_le_bytes(data[cursor + 4..cursor + 6].try_into().unwrap()) as usize;
+            vocab_offsets_lens.push((offset, len));
+            cursor += 6;
+        }
+
+        // Unigrams cursor
+        let unigrams_start = cursor;
+        cursor += unigram_count * 8;
+
+        // Bigrams cursor
+        let bigrams_start = cursor;
+        cursor += bigram_count * 12;
+
+        // Trigrams cursor
+        let trigrams_start = cursor;
+        cursor += trigram_count * 16;
+
+        // String buffer
+        let string_buf_bytes = &data[cursor..cursor + string_buffer_len];
+        let string_buf = std::str::from_utf8(string_buf_bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+        let mut words = Vec::with_capacity(vocab_count);
+        for (offset, len) in vocab_offsets_lens {
+            let end = offset + len;
+            if end > string_buf.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Vocab string out of bounds",
+                ));
+            }
+            words.push(string_buf[offset..end].to_string());
+        }
+
+        // Parse unigrams
+        let mut unigrams = HashMap::with_capacity(unigram_count);
+        let mut u_cursor = unigrams_start;
+        for _ in 0..unigram_count {
+            let wid = u32::from_le_bytes(data[u_cursor..u_cursor + 4].try_into().unwrap()) as usize;
+            let prob = f32::from_le_bytes(data[u_cursor + 4..u_cursor + 8].try_into().unwrap());
+            if wid < words.len() {
+                unigrams.insert(words[wid].clone(), prob);
+            }
+            u_cursor += 8;
+        }
+
+        // Parse bigrams
+        let mut bigrams = Vec::with_capacity(bigram_count);
+        let mut b_cursor = bigrams_start;
+        for _ in 0..bigram_count {
+            let w1_id = u32::from_le_bytes(data[b_cursor..b_cursor + 4].try_into().unwrap()) as usize;
+            let w2_id = u32::from_le_bytes(data[b_cursor + 4..b_cursor + 8].try_into().unwrap()) as usize;
+            let prob = f32::from_le_bytes(data[b_cursor + 8..b_cursor + 12].try_into().unwrap());
+            if w1_id < words.len() && w2_id < words.len() {
+                bigrams.push((words[w1_id].clone(), words[w2_id].clone(), prob));
+            }
+            b_cursor += 12;
+        }
+
+        // Parse trigrams
+        let mut trigrams = Vec::with_capacity(trigram_count);
+        let mut t_cursor = trigrams_start;
+        for _ in 0..trigram_count {
+            let w1_id = u32::from_le_bytes(data[t_cursor..t_cursor + 4].try_into().unwrap()) as usize;
+            let w2_id = u32::from_le_bytes(data[t_cursor + 4..t_cursor + 8].try_into().unwrap()) as usize;
+            let w3_id = u32::from_le_bytes(data[t_cursor + 8..t_cursor + 12].try_into().unwrap()) as usize;
+            let prob = f32::from_le_bytes(data[t_cursor + 12..t_cursor + 16].try_into().unwrap());
+            if w1_id < words.len() && w2_id < words.len() && w3_id < words.len() {
+                trigrams.push((words[w1_id].clone(), words[w2_id].clone(), words[w3_id].clone(), prob));
+            }
+            t_cursor += 16;
+        }
+
+        Ok(Self {
+            unigrams,
+            bigrams,
+            trigrams,
+            total_words,
+        })
+    }
+
+    /// Load language model data directly from a binary file
+    pub fn load_binary<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
+        let bytes = std::fs::read(path)?;
+        Self::from_binary(&bytes)
     }
 }
 
@@ -223,5 +486,22 @@ mod tests {
             .trigrams
             .iter()
             .any(|(w1, w2, w3, _)| w1 == "বাংলায়" && w2 == "গান" && w3 == "গাই"));
+    }
+
+    #[test]
+    fn test_binary_roundtrip() {
+        let mut trainer = CorpusTrainer::new();
+        trainer.train_text("আমি বাংলায় গান গাই। আমি ভাত খাচ্ছি।");
+        let compiled = trainer.compile();
+
+        let bytes = compiled.to_binary();
+        assert!(!bytes.is_empty());
+        assert_eq!(&bytes[0..4], b"LLM1");
+
+        let loaded = TrainedLanguageModelData::from_binary(&bytes).expect("Failed to load binary");
+        assert_eq!(loaded.total_words, compiled.total_words);
+        assert_eq!(loaded.unigrams.len(), compiled.unigrams.len());
+        assert_eq!(loaded.bigrams.len(), compiled.bigrams.len());
+        assert_eq!(loaded.trigrams.len(), compiled.trigrams.len());
     }
 }

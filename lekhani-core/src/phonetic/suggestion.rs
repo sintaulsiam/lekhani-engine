@@ -1061,6 +1061,14 @@ impl PhoneticSuggestion {
                             score -= 3000;
                         }
                     }
+
+                    if cand.source == CandidateSource::Autocorrect {
+                        if has_backtick {
+                            score -= 5000;
+                        } else if has_explicit_casing {
+                            score -= 3500;
+                        }
+                    }
                 }
             }
 
@@ -1427,7 +1435,7 @@ impl PhoneticSuggestion {
                     let stem_bn = self.convert_phonetic(stem_latin);
                     for &exp in expansions {
                         let combined = match stem_latin {
-                            "jai" | "jawa" => match exp {
+                            "jai" | "jawa" | "ja" => match exp {
                                 "ছি" => "যাচ্ছি".to_string(),
                                 "ছো" => "যাচ্ছ".to_string(),
                                 "ছে" => "যাচ্ছে".to_string(),
@@ -1436,9 +1444,11 @@ impl PhoneticSuggestion {
                                 "ছিলা" => "যাচ্ছিলা".to_string(),
                                 "ছিল" => "যাচ্ছিল".to_string(),
                                 "ছিলেন" => "যাচ্ছিলেন".to_string(),
-                                _ => format!("যাই{}", exp),
+                                "ব" => "যাব".to_string(),
+                                "বা" => "যাবা".to_string(),
+                                _ => format!("যা{}", exp),
                             },
-                            "khai" | "khawa" => match exp {
+                            "khai" | "khawa" | "kha" => match exp {
                                 "ছি" => "খাচ্ছি".to_string(),
                                 "ছো" => "খাচ্ছ".to_string(),
                                 "ছে" => "খাচ্ছে".to_string(),
@@ -1447,7 +1457,9 @@ impl PhoneticSuggestion {
                                 "ছিলা" => "খাচ্ছিলা".to_string(),
                                 "ছিল" => "খাচ্ছিল".to_string(),
                                 "ছিলেন" => "খাচ্ছিলেন".to_string(),
-                                _ => format!("খাই{}", exp),
+                                "ব" => "খাব".to_string(),
+                                "বা" => "খাবা".to_string(),
+                                _ => format!("খা{}", exp),
                             },
                             "de" | "di" => match exp {
                                 "ছি" => "দিচ্ছি".to_string(),
@@ -1456,6 +1468,7 @@ impl PhoneticSuggestion {
                                 "ছেন" => "দিচ্ছেন".to_string(),
                                 "ছিলাম" => "দিচ্ছিলাম".to_string(),
                                 "ছিল" => "দিচ্ছিল".to_string(),
+                                "ব" => "দেব".to_string(),
                                 _ => format!("দি{}", exp),
                             },
                             "ne" | "ni" => match exp {
@@ -1465,12 +1478,81 @@ impl PhoneticSuggestion {
                                 "ছেন" => "নিচ্ছেন".to_string(),
                                 "ছিলাম" => "নিচ্ছিলাম".to_string(),
                                 "ছিল" => "নিচ্ছিল".to_string(),
+                                "ব" => "নেব".to_string(),
                                 _ => format!("নি{}", exp),
                             },
-                            "ash" | "as" => format!("আস{}", exp),
-                            "bol" => format!("বল{}", exp),
-                            "kor" => format!("কর{}", exp),
-                            "dekh" | "dek" => format!("দেখ{}", exp),
+                            "ge" => match exp {
+                                "ছি" => "গেছি".to_string(),
+                                "েছি" => "গিয়েছি".to_string(),
+                                "ছিলাম" => "গেছিলাম".to_string(),
+                                "েছিলাম" => "গিয়েছিলাম".to_string(),
+                                "ছিল" => "গেছিল".to_string(),
+                                "েছিল" => "গিয়েছিল".to_string(),
+                                _ => format!("গে{}", exp),
+                            },
+                            "bhab" => match exp {
+                                "ছি" => "ভাবছি".to_string(),
+                                "েছি" => "ভেবেছি".to_string(),
+                                "ছিলাম" => "ভাবছিলাম".to_string(),
+                                "েছিলাম" => "ভেবেছিলাম".to_string(),
+                                "ব" => "ভাবব".to_string(),
+                                _ => format!("ভাব{}", exp),
+                            },
+                            "bujh" => match exp {
+                                "ছি" => "বুঝছি".to_string(),
+                                "েছি" => "বুঝেছি".to_string(),
+                                "ছিলাম" => "বুঝছিলাম".to_string(),
+                                "েছিলাম" => "বুঝেছিলাম".to_string(),
+                                "ব" => "বুঝব".to_string(),
+                                _ => format!("বুঝ{}", exp),
+                            },
+                            "ash" | "as" => match exp {
+                                "ছি" => "আসছি".to_string(),
+                                "েছি" => "এসেছি".to_string(),
+                                "ছিলাম" => "আসছিলাম".to_string(),
+                                "েছিলাম" => "এসেছিলাম".to_string(),
+                                "ব" => "আসব".to_string(),
+                                _ => format!("আস{}", exp),
+                            },
+                            "bol" => match exp {
+                                "ছি" => "বলছি".to_string(),
+                                "েছি" => "বলেছি".to_string(),
+                                "ছিলাম" => "বলছিলাম".to_string(),
+                                "েছিলাম" => "বলেছিলাম".to_string(),
+                                "ব" => "বলব".to_string(),
+                                _ => format!("বল{}", exp),
+                            },
+                            "kor" => match exp {
+                                "ছি" => "করছি".to_string(),
+                                "েছি" => "করেছি".to_string(),
+                                "ছিলাম" => "করছিলাম".to_string(),
+                                "েছিলাম" => "করেছিলাম".to_string(),
+                                "ছিল" => "করছিল".to_string(),
+                                "েছিল" => "করেছিল".to_string(),
+                                "ছিলা" => "করছিলা".to_string(),
+                                "েছিলা" => "করেছিলা".to_string(),
+                                "ছেন" => "করছেন".to_string(),
+                                "েছেন" => "করেছেন".to_string(),
+                                "ব" => "করব".to_string(),
+                                "বা" => "করবা".to_string(),
+                                _ => format!("কর{}", exp),
+                            },
+                            "dekh" | "dek" => match exp {
+                                "ছি" => "দেখছি".to_string(),
+                                "েছি" => "দেখেছি".to_string(),
+                                "ছিলাম" => "দেখছিলাম".to_string(),
+                                "েছিলাম" => "দেখেছিলাম".to_string(),
+                                "ব" => "দেখব".to_string(),
+                                _ => format!("দেখ{}", exp),
+                            },
+                            "shun" | "sun" => match exp {
+                                "ছি" => "শুনছি".to_string(),
+                                "েছি" => "শুনেছি".to_string(),
+                                "ছিলাম" => "শুনছিলাম".to_string(),
+                                "েছিলাম" => "শুনেছিলাম".to_string(),
+                                "ব" => "শুনব".to_string(),
+                                _ => format!("শুন{}", exp),
+                            },
                             _ => format!("{}{}", stem_bn, exp),
                         };
                         if !list.contains(&combined) {

@@ -1153,6 +1153,13 @@ impl LanguageModel {
         self.load_trained_data(&compiled);
     }
 
+    /// Ingest a pre-compiled binary language model file (.bin) into the live model
+    pub fn load_binary_file<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+        let data = crate::trainer::TrainedLanguageModelData::load_binary(path)?;
+        self.load_trained_data(&data);
+        Ok(())
+    }
+
     /// Calculate interpolated conditional probability P(word | w_t-2, w_t-1) with 0 allocations
     pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
         let clean_word = word.trim_matches(|c: char| {

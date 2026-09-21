@@ -376,3 +376,84 @@ fn test_vowel_and_kar_candidates() {
     let (cands_ou, _) = sugg.suggest("ou", true, true, &empty_memory);
     assert!(cands_ou.contains(&"ৌ".to_string()));
 }
+
+#[test]
+fn test_casual_banglish_and_colloquial_verbs() {
+    let mut sugg = PhoneticSuggestion::new();
+    let layout_candidates = [
+        std::path::Path::new("../../data/layouts/avrophonetic.json"),
+        std::path::Path::new("data/layouts/avrophonetic.json"),
+        std::path::Path::new("../data/layouts/avrophonetic.json"),
+    ];
+    for p in layout_candidates {
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(p) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    sugg.set_layout(&json);
+                    break;
+                }
+            }
+        }
+    }
+    let dict_candidates = [
+        std::path::Path::new("../../data/dictionaries"),
+        std::path::Path::new("data/dictionaries"),
+        std::path::Path::new("../data/dictionaries"),
+    ];
+    for p in dict_candidates {
+        if p.exists() {
+            let _ = sugg.database.load_from_dir(p);
+            break;
+        }
+    }
+    let empty_memory = HashMap::new();
+
+    // 1. Banglish Chat Shorthand
+    let (cands_amr, _) = sugg.suggest("amr", true, true, &empty_memory);
+    assert_eq!(cands_amr[0], "আমার", "Expected 'আমার' for 'amr'");
+
+    let (cands_tmr, _) = sugg.suggest("tmr", true, true, &empty_memory);
+    assert_eq!(cands_tmr[0], "তোমার", "Expected 'তোমার' for 'tmr'");
+
+    let (cands_apnr, _) = sugg.suggest("apnr", true, true, &empty_memory);
+    assert_eq!(cands_apnr[0], "আপনার", "Expected 'আপনার' for 'apnr'");
+
+    let (cands_ekhn, _) = sugg.suggest("ekhn", true, true, &empty_memory);
+    assert_eq!(cands_ekhn[0], "এখন", "Expected 'এখন' for 'ekhn'");
+
+    let (cands_kno, _) = sugg.suggest("kno", true, true, &empty_memory);
+    assert_eq!(cands_kno[0], "কেন", "Expected 'কেন' for 'kno'");
+
+    let (cands_valo, _) = sugg.suggest("valo", true, true, &empty_memory);
+    assert_eq!(cands_valo[0], "ভালো", "Expected 'ভালো' for 'valo'");
+
+    let (cands_drkr, _) = sugg.suggest("drkr", true, true, &empty_memory);
+    assert_eq!(cands_drkr[0], "দরকার", "Expected 'দরকার' for 'drkr'");
+
+    // 2. Spoken and Colloquial Verbs
+    let (cands_korsi, _) = sugg.suggest("korsi", true, true, &empty_memory);
+    assert!(cands_korsi[0] == "করছি" || cands_korsi.contains(&"করছি".to_string()));
+
+    let (cands_kortasi, _) = sugg.suggest("kortasi", true, true, &empty_memory);
+    assert!(cands_kortasi.contains(&"করছি".to_string()) || cands_kortasi.contains(&"করতেছি".to_string()));
+
+    let (cands_korsilam, _) = sugg.suggest("korsilam", true, true, &empty_memory);
+    assert!(cands_korsilam.contains(&"করছিলাম".to_string()) || cands_korsilam.contains(&"করেছিলাম".to_string()));
+
+    let (cands_jamu, _) = sugg.suggest("jamu", true, true, &empty_memory);
+    assert!(cands_jamu.contains(&"যাব".to_string()));
+
+    let (cands_khamu, _) = sugg.suggest("khamu", true, true, &empty_memory);
+    assert!(cands_khamu.contains(&"খাব".to_string()));
+
+    // 3. Exact Backtick and Explicit Case Veto (writing experience preservation)
+    let (cands_amr_backtick, _) = sugg.suggest("amr`", true, true, &empty_memory);
+    assert_ne!(cands_amr_backtick[0], "আমার", "Backtick must veto casual shorthand");
+
+    // Standard Avro remains 100% faithful
+    let (cands_bhalo, _) = sugg.suggest("bhalo", true, true, &empty_memory);
+    assert_eq!(cands_bhalo[0], "ভালো");
+
+    let (cands_amar, _) = sugg.suggest("amar", true, true, &empty_memory);
+    assert_eq!(cands_amar[0], "আমার");
+}
