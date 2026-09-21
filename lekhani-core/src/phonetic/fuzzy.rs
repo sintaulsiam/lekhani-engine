@@ -217,6 +217,7 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("ono", &["Ono", "ano"]),
     ("ayo", &["oy", "ayo"]),
     ("ou", &["OU", "ow"]),
+    ("ow", &["O", "o", "ou", "OU"]),
     ("o", &["O", "a", "u"]),
     ("O", &["o", "u"]),
     ("noiti", &["nOIti", "noyti"]),

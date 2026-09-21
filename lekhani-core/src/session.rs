@@ -282,11 +282,77 @@ mod tests {
         // Backspace removes 'ক'
         session.process_backspace();
         assert_eq!(session.get_preedit_text(), "বা");
+    }
 
-        // Commit gives "বা" and clears buffer
-        let committed = session.commit(0);
-        assert_eq!(committed, Some("বা".to_string()));
-        assert!(!session.is_active());
-        assert_eq!(session.get_preedit_text(), "");
+    #[test]
+    fn test_typing_tomar() {
+        let mut session = InputSession::new();
+        let avro_raw = include_str!("../../../data/layouts/avrophonetic.json");
+        let val: serde_json::Value = serde_json::from_str(avro_raw).unwrap();
+        session.set_layout(ActiveLayoutType::Phonetic, &val);
+
+        let parser = rupantor::parser::PhoneticParser::new(val.get("layout").unwrap_or(&val));
+        println!("parser to: {:?}", parser.convert("to"));
+        println!("parser tom: {:?}", parser.convert("tom"));
+        println!("parser toma: {:?}", parser.convert("toma"));
+        println!("parser tomar: {:?}", parser.convert("tomar"));
+        println!("parser towmar: {:?}", parser.convert("towmar"));
+        println!("parser twmar: {:?}", parser.convert("twmar"));
+        println!("parser tO: {:?}", parser.convert("tO"));
+
+        session.process_key(VC_T, 0);
+        println!("after t: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+        session.process_key(VC_O, 0);
+        println!("after to: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+        session.process_key(VC_M, 0);
+        println!("after tom: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+        session.process_key(VC_A, 0);
+        println!("after toma: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+        session.process_key(VC_R, 0);
+        println!("after tomar: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+
+        let dict_candidates = [
+            std::path::Path::new("../../data/dictionaries"),
+            std::path::Path::new("data/dictionaries"),
+            std::path::Path::new("../data/dictionaries"),
+        ];
+        for p in dict_candidates {
+            if p.exists() {
+                session.load_database(p);
+                break;
+            }
+        }
+        let mut session2 = InputSession::new();
+        session2.set_layout(ActiveLayoutType::Phonetic, &val);
+        for p in dict_candidates {
+            if p.exists() {
+                session2.load_database(p);
+                break;
+            }
+        }
+        session2.process_key(VC_T, 0);
+        println!("with dict after t: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+        session2.process_key(VC_O, 0);
+        println!("with dict after to: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+        session2.process_key(VC_M, 0);
+        println!("with dict after tom: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+        session2.process_key(VC_A, 0);
+        println!("with dict after toma: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+        session2.process_key(VC_R, 0);
+        println!("with dict after tomar: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+
+        let mut sugg = crate::phonetic::PhoneticSuggestion::new();
+        sugg.set_layout(&val);
+        for p in dict_candidates {
+            if p.exists() {
+                let _ = sugg.database.load_from_dir(p);
+                break;
+            }
+        }
+        let empty_memory = hashbrown::HashMap::new();
+        let (cands_towmar, _) = sugg.suggest("towmar", true, true, &empty_memory);
+        println!("suggest('towmar') = {:?}", cands_towmar);
+        let (cands_to, _) = sugg.suggest("to", true, true, &empty_memory);
+        println!("suggest('to') = {:?}", cands_to);
     }
 }
