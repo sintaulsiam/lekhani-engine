@@ -68,13 +68,15 @@ static BIJOY_TO_UNICODE: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
     m.insert("~", "ূ");
     m.insert("„", "ৃ");
     m.insert("†", "ে");
+    m.insert("‡", "ে");
+    m.insert("ˆ", "ৈ");
     m.insert("‰", "ৈ");
     m.insert("Š", "ৌ");
     m.insert("¨", "্");
+    m.insert("&", "্");
     m.insert("«", "্র");
     m.insert("ª", "্র");
     m.insert("º", "্র");
-    m.insert("¨", "্");
 
     // Common and Rare Sanskrit Conjuncts
     m.insert("¶¥", "ক্ষ্ম");
@@ -135,15 +137,19 @@ static BIJOY_TO_UNICODE: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
     m.insert("ô", "ম্ভ");
     m.insert("õ", "ম্ম");
     m.insert("ö", "ম্ল");
-    m.insert("÷", "ল্ক");
-    m.insert("ø", "ল্গ");
-    m.insert("ù", "ল্ট");
-    m.insert("ú", "ল্ড");
-    m.insert("û", "ল্প");
-    m.insert("ü", "ল্ফ");
-    m.insert("ý", "ল্ব");
-    m.insert("þ", "ল্ম");
-    m.insert("ÿ", "ল্ল");
+    m.insert("÷", "স্ট");
+    m.insert("ø", "স্ন");
+    m.insert("ù", "স্ফ");
+    m.insert("ú", "্প");
+    m.insert("û", "হু");
+    m.insert("ü", "হৃ");
+    m.insert("ý", "হ্ন");
+    m.insert("þ", "হ্ম");
+    m.insert("ÿ", "হ্ল");
+    m.insert("nè", "হ্ণ");
+    m.insert("j^", "ল্ব");
+    m.insert("j§", "ল্ম");
+    m.insert("j¬", "ল্ল");
     m.insert("¯‹", "স্ক");
     m.insert("¯Í", "স্ত");
     m.insert("¯’", "স্থ");
@@ -153,11 +159,6 @@ static BIJOY_TO_UNICODE: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
     m.insert("¯^", "স্ব");
     m.insert("¯§", "স্ম");
     m.insert("¯ø", "স্ল");
-    m.insert("ü", "হ্ণ");
-    m.insert("ý", "হ্ন");
-    m.insert("þ", "হ্ম");
-    m.insert("ÿ", "হ্ল");
-    m.insert("ü", "হৃ");
 
     // Digits
     m.insert("0", "০");
@@ -290,6 +291,8 @@ fn post_process_bijoy_to_unicode(input: &str) -> String {
             if is_consonant(chars[end_cons]) {
                 let kar = chars.remove(i);
                 chars.insert(end_cons, kar);
+                i = end_cons + 1;
+                continue;
             }
         }
 
@@ -351,5 +354,12 @@ mod tests {
         assert_eq!(bijoy_to_unicode("†mvbvi"), "সোনার");
         assert_eq!(bijoy_to_unicode("¯^vaxb"), "স্বাধীন");
         assert_eq!(bijoy_to_unicode("¶wZ"), "ক্ষতি");
+        assert_eq!(bijoy_to_unicode("ü`q"), "হৃদয়");
+        assert_eq!(bijoy_to_unicode("wPý"), "চিহ্ন");
+        assert_eq!(bijoy_to_unicode("eªvþY"), "ব্রাহ্মণ");
+        assert_eq!(bijoy_to_unicode("÷vd"), "স্টাফ");
+        assert_eq!(bijoy_to_unicode("wK‡kvi"), "কিশোর");
+        assert_eq!(bijoy_to_unicode("wkw¶Z"), "শিক্ষিত");
+        assert_eq!(unicode_to_bijoy("হৃদয়"), "ü`q");
     }
 }
