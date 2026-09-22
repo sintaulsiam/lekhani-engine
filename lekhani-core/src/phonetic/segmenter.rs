@@ -23,7 +23,7 @@ pub fn segment_concatenated_token(
     let len = lower.len();
 
     // Minimum length for a 2-word compound is 6 letters (e.g. "kiholo", "kemonaso", "dhonnobadbhai")
-    if len < 6 || len > 28 || lower.contains(' ') {
+    if !(6..=28).contains(&len) || lower.contains(' ') {
         return Vec::new();
     }
 
@@ -82,7 +82,7 @@ pub fn segment_concatenated_token(
         }
     }
 
-    hypotheses.sort_by(|a, b| b.score.cmp(&a.score));
+    hypotheses.sort_by_key(|a| std::cmp::Reverse(a.score));
     hypotheses.dedup_by(|a, b| a.text == b.text);
     hypotheses.truncate(3);
     hypotheses

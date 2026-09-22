@@ -2588,6 +2588,6 @@ mod tests {
         // Disabled: auto_dari = false
         sugg.config.auto_dari = false;
         let (cands_disabled, _) = sugg.suggest("..", true, true, &empty_memory);
-        assert_ne!(cands_disabled.get(0).map(|s| s.as_str()), Some("।"));
+        assert_ne!(cands_disabled.first().map(|s| s.as_str()), Some("।"));
     }
 }

@@ -71,10 +71,12 @@ pub fn is_code_token(token: &str) -> bool {
     }
 
     // 5. snake_case with ASCII letters/numbers (e.g. "user_id", "get_status", "api_key_v2")
-    if trimmed.contains('_') && !trimmed.starts_with('_') && !trimmed.ends_with('_') {
-        if trimmed.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-            return true;
-        }
+    if trimmed.contains('_')
+        && !trimmed.starts_with('_')
+        && !trimmed.ends_with('_')
+        && trimmed.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return true;
     }
 
     // 6. kebab-case with ASCII letters (e.g. "user-profile", "btn-primary")

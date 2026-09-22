@@ -106,7 +106,7 @@ impl AutonomousLearner {
                 }
             }
         }
-        matches.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        matches.sort_unstable_by_key(|a| std::cmp::Reverse(a.1));
         matches
             .into_iter()
             .take(limit)
@@ -124,7 +124,7 @@ impl AutonomousLearner {
             self.user_bigrams.retain(|_, &mut count| count > 1);
             if self.user_bigrams.len() > MAX_BIGRAMS {
                 let mut entries: Vec<(String, u32)> = self.user_bigrams.drain().collect();
-                entries.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+                entries.sort_unstable_by_key(|a| std::cmp::Reverse(a.1));
                 entries.truncate(MAX_BIGRAMS - 1000);
                 self.user_bigrams = entries.into_iter().collect();
             }
@@ -134,7 +134,7 @@ impl AutonomousLearner {
             self.observed_counts.retain(|_, &mut count| count > 1);
             if self.observed_counts.len() > MAX_OBSERVED {
                 let mut entries: Vec<(String, u32)> = self.observed_counts.drain().collect();
-                entries.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+                entries.sort_unstable_by_key(|a| std::cmp::Reverse(a.1));
                 entries.truncate(MAX_OBSERVED - 500);
                 self.observed_counts = entries.into_iter().collect();
             }
@@ -434,7 +434,7 @@ mod tests {
         learner.clear_user_data();
 
         assert_eq!(learner.candidate_memory.len(), 0);
-        assert!(learner.user_bigrams.len() > 0); // baseline re-seeded
-        assert_eq!(learner.get_user_bigram_boost("কেমন", "আছো") >= 1500, true);
+        assert!(!learner.user_bigrams.is_empty()); // baseline re-seeded
+        assert!(learner.get_user_bigram_boost("কেমন", "আছো") >= 1500);
     }
 }
