@@ -19,7 +19,7 @@ pub use emojis::EmojiMap;
 pub use fixed::{FixedLayoutParser, FixedMethod};
 pub use keycodes::*;
 pub use ngram::UserStats;
-pub use phonetic::{AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion};
+pub use phonetic::{AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion, PhoneticSuggestionConfig};
 pub use session::{ActiveLayoutType, InputSession};
 pub use snippets::SnippetManager;
 pub use trie::PrefixTrie;

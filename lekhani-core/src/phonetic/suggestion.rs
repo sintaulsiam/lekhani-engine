@@ -43,6 +43,7 @@ pub struct PhoneticSuggestionConfig {
     pub enable_reduplication: bool,
     pub enable_phrase_prediction: bool,
     pub enable_dynamic_macros: bool,
+    pub auto_dari: bool,
 }
 
 impl Default for PhoneticSuggestionConfig {
@@ -57,6 +58,7 @@ impl Default for PhoneticSuggestionConfig {
             enable_reduplication: true,
             enable_phrase_prediction: true,
             enable_dynamic_macros: true,
+            auto_dari: true,
         }
     }
 }
@@ -201,6 +203,11 @@ impl PhoneticSuggestion {
         self.cache.clear();
     }
 
+    pub fn update_config(&mut self, config: PhoneticSuggestionConfig) {
+        self.config = config;
+        self.cache.clear();
+    }
+
     /// Transliterate directly using Avro phonetic rules
     pub fn convert_phonetic(&self, text: &str) -> String {
         if text.is_empty() {
@@ -287,7 +294,7 @@ impl PhoneticSuggestion {
 
         // 1. Instant Fast-Path: Smart Typography, Punctuation & Vowel Signs (Zero Allocations)
         match term {
-            ".." => {
+            ".." if self.config.auto_dari => {
                 let mut cands = vec!["।".to_string()];
                 if include_english {
                     cands.push("..".to_string());
@@ -2567,5 +2574,20 @@ mod tests {
 
         let (cands_phone, _) = sugg.suggest("smartphonete", true, true, &empty_memory);
         assert!(cands_phone[0] == "স্মার্টফোনে" || cands_phone.contains(&"স্মার্টফোনে".to_string()));
+    }
+
+    #[test]
+    fn test_auto_dari_toggle() {
+        let mut sugg = PhoneticSuggestion::new();
+        let empty_memory = HashMap::new();
+
+        // Default: auto_dari = true
+        let (cands, _) = sugg.suggest("..", true, true, &empty_memory);
+        assert_eq!(cands[0], "।");
+
+        // Disabled: auto_dari = false
+        sugg.config.auto_dari = false;
+        let (cands_disabled, _) = sugg.suggest("..", true, true, &empty_memory);
+        assert_ne!(cands_disabled.get(0).map(|s| s.as_str()), Some("।"));
     }
 }

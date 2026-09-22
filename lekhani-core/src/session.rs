@@ -117,6 +117,27 @@ impl InputSession {
         }
     }
 
+    pub fn update_suggestion_config(&mut self, config: crate::PhoneticSuggestionConfig) {
+        self.phonetic.suggestion_engine.update_config(config);
+    }
+
+    pub fn update_fixed_config(
+        &mut self,
+        auto_vowel: bool,
+        auto_chandra: bool,
+        traditional_kar: bool,
+        old_reph: bool,
+        numberpad: bool,
+    ) {
+        self.fixed.update_config(
+            auto_vowel,
+            auto_chandra,
+            traditional_kar,
+            old_reph,
+            numberpad,
+        );
+    }
+
     pub fn process_key(&mut self, keycode: u16, modifier_mask: u8) -> bool {
         match self.active_layout_type {
             ActiveLayoutType::Phonetic => self.phonetic.process_key(keycode, modifier_mask),

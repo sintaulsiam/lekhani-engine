@@ -42,6 +42,21 @@ impl FixedMethod {
         self.parser = FixedLayoutParser::from_json(layout);
     }
 
+    pub fn update_config(
+        &mut self,
+        auto_vowel: bool,
+        auto_chandra: bool,
+        traditional_kar: bool,
+        old_reph: bool,
+        numberpad: bool,
+    ) {
+        self.auto_vowel = auto_vowel;
+        self.auto_chandra = auto_chandra;
+        self.traditional_kar = traditional_kar;
+        self.old_reph = old_reph;
+        self.numberpad = numberpad;
+    }
+
     pub fn process_key(&mut self, keycode: u16, modifier_mask: u8) -> Option<String> {
         let modifier = if (modifier_mask & MODIFIER_ALT_GR) != 0 {
             KeyModifier::AltGr

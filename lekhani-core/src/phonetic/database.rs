@@ -428,39 +428,72 @@ impl PhoneticDatabase {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let dir = dir.as_ref();
 
-        // 1. Ultra-Fast Binary Dictionary (or JSON / legacy fallback)
+        // 1. Ultra-Fast Binary Dictionary with User Cache Fallback
+        let user_cache_bin = std::env::var("XDG_CACHE_HOME")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| {
+                std::env::var("HOME")
+                    .map(|h| std::path::PathBuf::from(h).join(".cache"))
+                    .unwrap_or_else(|_| std::env::temp_dir())
+            })
+            .join("lekhani")
+            .join("dictionary.bin");
+
+        let mut loaded = false;
         let dict_bin_path = dir.join("dictionary.bin");
-        if dict_bin_path.exists() {
-            if let Ok(bytes) = std::fs::read(&dict_bin_path) {
-                if bytes.starts_with(b"LDI3") {
-                    if let Ok(bin_trie) = PrefixTrie::from_binary(&bytes) {
-                        self.trie.merge(&bin_trie);
+        let dict_path = dir.join("dictionary.json");
+
+        let bin_candidates = [&dict_bin_path, &user_cache_bin];
+        for cand in bin_candidates {
+            if cand.exists() {
+                if dict_path.exists() {
+                    if let (Ok(m_cand), Ok(m_json)) = (
+                        cand.metadata().and_then(|m| m.modified()),
+                        dict_path.metadata().and_then(|m| m.modified()),
+                    ) {
+                        if m_cand < m_json {
+                            continue; // Cache is older than source json
+                        }
                     }
-                } else if let Ok(content) = std::str::from_utf8(&bytes) {
-                    let words: Vec<String> = content
-                        .lines()
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                    self.trie.insert_bulk(words);
-                    // Upgrade legacy plain-text cache to high-speed binary format
-                    let _ = self.trie.save_binary(&dict_bin_path);
+                }
+                if let Ok(bytes) = std::fs::read(cand) {
+                    if bytes.starts_with(b"LDI3") {
+                        if let Ok(bin_trie) = PrefixTrie::from_binary(&bytes) {
+                            self.trie.merge(&bin_trie);
+                            loaded = true;
+                            break;
+                        }
+                    } else if let Ok(content) = std::str::from_utf8(&bytes) {
+                        let words: Vec<String> = content
+                            .lines()
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty())
+                            .collect();
+                        self.trie.insert_bulk(words);
+                        let _ = self.trie.save_binary(cand);
+                        loaded = true;
+                        break;
+                    }
                 }
             }
-        } else {
-            let dict_path = dir.join("dictionary.json");
-            if dict_path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&dict_path) {
-                    if let Ok(raw_map) =
-                        serde_json::from_str::<HashMap<String, Vec<String>>>(&content)
-                    {
-                        let mut words = Vec::with_capacity(160000);
-                        for (_k, v_list) in raw_map {
-                            words.extend(v_list);
+        }
+
+        if !loaded && dict_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&dict_path) {
+                if let Ok(raw_map) =
+                    serde_json::from_str::<HashMap<String, Vec<String>>>(&content)
+                {
+                    let mut words = Vec::with_capacity(160000);
+                    for (_k, v_list) in raw_map {
+                        words.extend(v_list);
+                    }
+                    self.trie.insert_bulk(words);
+                    // Attempt saving adjacent to dictionary.json; if write fails (e.g. read-only system dir), save to user cache
+                    if self.trie.save_binary(&dict_bin_path).is_err() {
+                        if let Some(parent) = user_cache_bin.parent() {
+                            let _ = std::fs::create_dir_all(parent);
                         }
-                        self.trie.insert_bulk(words);
-                        // Save fast binary dictionary for sub-millisecond future boots
-                        let _ = self.trie.save_binary(&dict_bin_path);
+                        let _ = self.trie.save_binary(&user_cache_bin);
                     }
                 }
             }
