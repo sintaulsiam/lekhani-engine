@@ -1091,6 +1091,7 @@ impl PhoneticSuggestion {
         });
 
         let mut scored_candidates: Vec<(String, i32)> = Vec::with_capacity(raw_candidates.len());
+        let learner_guard = self.database.learner.read().ok();
 
         for cand in raw_candidates {
             if cand.source == CandidateSource::CodeShield {
@@ -1224,8 +1225,10 @@ impl PhoneticSuggestion {
 
                 // 5. Dynamic User Bigram Personalization Boost
                 if let Some(p) = prev {
-                    let user_boost = self.database.learner.get_user_bigram_boost(p, &cand.text);
-                    score += user_boost;
+                    if let Some(ref l) = learner_guard {
+                        let user_boost = l.get_user_bigram_boost(p, &cand.text);
+                        score += user_boost;
+                    }
                 }
             }
 
@@ -1234,16 +1237,18 @@ impl PhoneticSuggestion {
                 .get(term)
                 .or_else(|| candidate_memory.get(middle))
                 .or_else(|| candidate_memory.get(&phonetic))
-                .or_else(|| self.database.learner.candidate_memory.get(term))
-                .or_else(|| self.database.learner.candidate_memory.get(middle))
-                .or_else(|| self.database.learner.candidate_memory.get(&phonetic))
+                .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(term)))
+                .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(middle)))
+                .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(&phonetic)))
             {
                 if &cand.text == fav || cand.text.contains(fav) {
                     score += 5000;
                 }
             }
-            if self.database.learner.learned_words.contains(&cand.text) {
-                score += 3500;
+            if let Some(ref l) = learner_guard {
+                if l.learned_words.contains(&cand.text) {
+                    score += 3500;
+                }
             }
 
             scored_candidates.push((cand.text, score));
@@ -1399,9 +1404,9 @@ impl PhoneticSuggestion {
         committed_word: &str,
     ) -> Vec<String> {
         if let Some(prev) = previous_word {
-            self.database
-                .learner
-                .observe_committed_pair(prev, committed_word);
+            if let Ok(mut l) = self.database.learner.write() {
+                l.observe_committed_pair(prev, committed_word);
+            }
         }
         self.database.observe_committed_word(committed_word)
     }
@@ -1432,10 +1437,11 @@ impl PhoneticSuggestion {
             let clean_last = last_word.trim_matches(|c: char| {
                 c.is_ascii_punctuation() || c == '।' || c == '—' || c == ','
             });
-            let user_conts = self
-                .database
-                .learner
-                .get_top_user_continuations(clean_last, 4);
+            let user_conts = if let Ok(l) = self.database.learner.read() {
+                l.get_top_user_continuations(clean_last, 4)
+            } else {
+                Vec::new()
+            };
             for cont in user_conts.into_iter().rev() {
                 if let Some(pos) = predictions.iter().position(|p| p == &cont) {
                     predictions.remove(pos);

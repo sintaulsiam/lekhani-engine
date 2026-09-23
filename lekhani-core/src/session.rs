@@ -49,13 +49,9 @@ impl InputSession {
             .suggestion_engine
             .database
             .load_user_learned(path);
-        self.phonetic.candidate_memory = self
-            .phonetic
-            .suggestion_engine
-            .database
-            .learner
-            .candidate_memory
-            .clone();
+        if let Ok(l) = self.phonetic.suggestion_engine.database.learner.read() {
+            self.phonetic.candidate_memory = l.candidate_memory.clone();
+        }
     }
 
     pub fn save_user_learned<P: AsRef<std::path::Path>>(
@@ -72,11 +68,9 @@ impl InputSession {
         &mut self,
         path: P,
     ) -> Result<(), std::io::Error> {
-        self.phonetic
-            .suggestion_engine
-            .database
-            .learner
-            .clear_user_data();
+        if let Ok(mut l) = self.phonetic.suggestion_engine.database.learner.write() {
+            l.clear_user_data();
+        }
         self.phonetic.candidate_memory.clear();
         self.phonetic
             .suggestion_engine
@@ -85,8 +79,11 @@ impl InputSession {
     }
 
     pub fn get_learned_counts(&self) -> (usize, usize) {
-        let l = &self.phonetic.suggestion_engine.database.learner;
-        (l.learned_words.len(), l.user_bigrams.len())
+        if let Ok(l) = self.phonetic.suggestion_engine.database.learner.read() {
+            (l.learned_words.len(), l.user_bigrams.len())
+        } else {
+            (0, 0)
+        }
     }
 
     pub fn load_stats<P: AsRef<std::path::Path>>(&mut self, path: P) {
@@ -437,6 +434,8 @@ mod tests {
                 .suggestion_engine
                 .database
                 .learner
+                .read()
+                .unwrap()
                 .user_bigrams
                 .get("আমি\tখাব"),
             Some(&1)
@@ -460,6 +459,8 @@ mod tests {
                 .suggestion_engine
                 .database
                 .learner
+                .read()
+                .unwrap()
                 .candidate_memory
                 .get("siam"),
             Some(&"সায়াম".to_string())
@@ -467,7 +468,7 @@ mod tests {
 
         // 3. Serialization and Deserialization round-trip
         let temp_dir = std::env::temp_dir();
-        let temp_file = temp_dir.join("lekhani_test_learning_roundtrip.json");
+        let temp_file = temp_dir.join("lekhani_test_learning_roundtrip.bin");
         session.save_user_learned(&temp_file).unwrap();
 
         let mut session2 = InputSession::new();
@@ -479,6 +480,8 @@ mod tests {
                 .suggestion_engine
                 .database
                 .learner
+                .read()
+                .unwrap()
                 .user_bigrams
                 .get("আমি\tখাব"),
             Some(&1)

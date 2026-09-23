@@ -4,7 +4,7 @@ use crate::snippets::SnippetManager;
 use crate::trie::PrefixTrie;
 use hashbrown::HashMap;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct PhoneticDatabase {
@@ -15,7 +15,7 @@ pub struct PhoneticDatabase {
     user_autocorrect: HashMap<String, String>,
     emojis: Arc<EmojiMap>,
     snippets: Arc<SnippetManager>,
-    pub learner: AutonomousLearner,
+    pub learner: Arc<RwLock<AutonomousLearner>>,
 }
 
 impl Default for PhoneticDatabase {
@@ -416,7 +416,7 @@ impl PhoneticDatabase {
             user_autocorrect: HashMap::new(),
             emojis: Arc::new(EmojiMap::new()),
             snippets: Arc::new(SnippetManager::new()),
-            learner: AutonomousLearner::new(),
+            learner: Arc::new(RwLock::new(AutonomousLearner::new())),
         }
     }
 
@@ -551,21 +551,27 @@ impl PhoneticDatabase {
 
     /// Load user-learned vocabulary
     pub fn load_user_learned<P: AsRef<Path>>(&mut self, path: P) {
-        self.learner = AutonomousLearner::load_from_path(path);
-        let trie = Arc::make_mut(&mut self.trie);
-        for word in &self.learner.learned_words {
-            trie.insert_weighted(word.clone(), 9500);
+        if let Ok(mut l) = self.learner.write() {
+            *l = AutonomousLearner::load_from_path(path);
         }
     }
 
     /// Save user-learned vocabulary
     pub fn save_user_learned<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
-        self.learner.save_to_path(path)
+        if let Ok(mut l) = self.learner.write() {
+            l.save_to_path(path)
+        } else {
+            Ok(())
+        }
     }
 
     /// Observe committed word and auto-learn new vocabulary / root stems
     pub fn observe_committed_word(&mut self, word: &str) -> Vec<String> {
-        self.learner.observe_and_learn(word, Arc::make_mut(&mut self.trie))
+        if let Ok(mut l) = self.learner.write() {
+            l.observe_and_learn(word, &self.trie)
+        } else {
+            Vec::new()
+        }
     }
 
     /// Add custom user autocorrect entry
@@ -586,9 +592,20 @@ impl PhoneticDatabase {
         &self.autocorrect
     }
 
-    /// Search dictionary using fast prefix trie
+    /// Search dictionary using fast prefix trie and learned vocabulary
     pub fn search_dictionary(&self, prefix: &str, limit: usize) -> Vec<String> {
-        self.trie.find_prefix_matches(prefix, limit)
+        let mut res = self.trie.find_prefix_matches(prefix, limit);
+        if let Ok(l) = self.learner.read() {
+            for lw in &l.learned_words {
+                if lw.starts_with(prefix) && !res.contains(lw) {
+                    res.push(lw.clone());
+                    if res.len() >= limit {
+                        break;
+                    }
+                }
+            }
+        }
+        res
     }
 
     /// Search dictionary with zero-allocation borrowed string slices
@@ -607,13 +624,27 @@ impl PhoneticDatabase {
 
     /// Get corpus frequency of a word
     pub fn get_frequency(&self, word: &str) -> u32 {
-        self.trie.get_frequency(word)
+        let freq = self.trie.get_frequency(word);
+        if freq > 0 {
+            return freq;
+        }
+        if let Ok(l) = self.learner.read() {
+            if l.learned_words.contains(word) {
+                return 9500;
+            }
+        }
+        0
     }
 
     /// Check if word is an exact valid dictionary word or a valid morphological inflection
     pub fn is_exact_dictionary_word(&self, word: &str) -> bool {
         if self.trie.contains_exact(word) {
             return true;
+        }
+        if let Ok(l) = self.learner.read() {
+            if l.learned_words.contains(word) {
+                return true;
+            }
         }
         // Morphology-aware check: verify if any candidate base stem of an inflected word is in the dictionary
         for stem in crate::phonetic::morphology::extract_all_candidate_stems(word) {

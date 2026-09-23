@@ -179,10 +179,9 @@ impl PhoneticMethod {
             if self.selected_index != index && !self.buffer.is_empty() {
                 self.candidate_memory
                     .insert(self.buffer.clone(), committed.clone());
-                self.suggestion_engine
-                    .database
-                    .learner
-                    .record_candidate_selection(&self.buffer, committed);
+                if let Ok(mut l) = self.suggestion_engine.database.learner.write() {
+                    l.record_candidate_selection(&self.buffer, committed);
+                }
             }
             let prev_word = self.last_committed_word.clone();
             self.suggestion_engine

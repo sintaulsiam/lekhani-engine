@@ -22,6 +22,8 @@ pub struct AutonomousLearner {
     pub last_committed_word: Option<String>,
     #[serde(default)]
     pub candidate_memory: HashMap<String, String>,
+    #[serde(skip)]
+    pub dirty: bool,
 }
 
 fn default_threshold() -> u32 {
@@ -35,6 +37,9 @@ impl Default for AutonomousLearner {
 }
 
 impl AutonomousLearner {
+    pub const BINARY_MAGIC: &'static [u8; 4] = b"LLRN";
+    pub const BINARY_VERSION: u32 = 1;
+
     pub fn new() -> Self {
         Self {
             observed_counts: HashMap::new(),
@@ -43,6 +48,7 @@ impl AutonomousLearner {
             user_bigrams: HashMap::new(),
             last_committed_word: None,
             candidate_memory: HashMap::new(),
+            dirty: false,
         }
     }
 
@@ -57,6 +63,7 @@ impl AutonomousLearner {
         let count = self.user_bigrams.entry(key).or_insert(0);
         *count = (*count + 1).min(1000);
         self.last_committed_word = Some(clean_curr.to_string());
+        self.dirty = true;
         if self.user_bigrams.len() > 8500 {
             self.prune_if_needed();
         }
@@ -86,6 +93,7 @@ impl AutonomousLearner {
         }
         self.candidate_memory
             .insert(clean_buf.to_string(), clean_cand.to_string());
+        self.dirty = true;
         if self.candidate_memory.len() > 2200 {
             self.prune_if_needed();
         }
@@ -154,6 +162,7 @@ impl AutonomousLearner {
         self.candidate_memory.clear();
         self.user_bigrams.clear();
         self.last_committed_word = None;
+        self.dirty = true;
         self.pretrain_baseline();
     }
 
@@ -161,7 +170,7 @@ impl AutonomousLearner {
     pub fn observe_and_learn(
         &mut self,
         committed_word: &str,
-        trie: &mut PrefixTrie,
+        trie: &PrefixTrie,
     ) -> Vec<String> {
         let morphemes = analyze_morphemes(committed_word);
         let mut newly_learned = Vec::new();
@@ -172,18 +181,21 @@ impl AutonomousLearner {
                 continue;
             }
 
-            // If already known in trie or learned list, boost weight
+            // If already known in learned list, increment count
             if self.learned_words.contains(&word) {
-                trie.insert_weighted(word.clone(), 9500);
+                let count = self.observed_counts.entry(word).or_insert(0);
+                *count = (*count + 1).min(10000);
+                self.dirty = true;
                 continue;
             }
 
             let count = self.observed_counts.entry(word.clone()).or_insert(0);
             *count += 1;
+            self.dirty = true;
 
             if *count >= self.auto_learn_threshold && !trie.contains_exact(&word) {
                 self.learned_words.insert(word.clone());
-                trie.insert_weighted(word.clone(), 9200);
+                self.dirty = true;
                 newly_learned.push(word);
             }
         }
@@ -205,6 +217,7 @@ impl AutonomousLearner {
             *self.observed_counts.entry(w1.to_string()).or_insert(0) += count;
             *self.observed_counts.entry(w2.to_string()).or_insert(0) += count;
         }
+        self.dirty = true;
     }
 
     /// Ingest a raw Bengali text corpus to train both vocabulary and word pair transitions
@@ -230,6 +243,7 @@ impl AutonomousLearner {
             if clean.chars().count() >= 2 && !clean.is_ascii() {
                 self.learned_words.insert(clean.to_string());
                 *self.observed_counts.entry(clean.to_string()).or_insert(0) += 1;
+                self.dirty = true;
                 if let Some(ref prev) = prev_word {
                     self.observe_committed_pair(prev, clean);
                 }
@@ -241,34 +255,85 @@ impl AutonomousLearner {
         }
     }
 
-    /// Save learned dictionary to a JSON file safely using atomic rename
-    pub fn save_to_path<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
+    /// Merge another learner instance into this one
+    pub fn merge(&mut self, other: &AutonomousLearner) {
+        for word in &other.learned_words {
+            self.learned_words.insert(word.clone());
+        }
+        for (word, &count) in &other.observed_counts {
+            let entry = self.observed_counts.entry(word.clone()).or_insert(0);
+            *entry = (*entry).max(count).min(10000);
+        }
+        for (key, &count) in &other.user_bigrams {
+            let entry = self.user_bigrams.entry(key.clone()).or_insert(0);
+            *entry = (*entry).max(count).min(1000);
+        }
+        for (k, v) in &other.candidate_memory {
+            self.candidate_memory.insert(k.clone(), v.clone());
+        }
+        self.dirty = true;
+        self.prune_if_needed();
+    }
+
+    /// Export learned dictionary as formatted JSON for inspection or backup
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+
+    /// Import learned dictionary from JSON
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Save learned dictionary to a compact binary file safely using atomic rename.
+    /// Skips disk I/O immediately if dirty flag is false.
+    pub fn save_to_path<P: AsRef<Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+        if !self.dirty {
+            return Ok(());
+        }
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let data = serde_json::to_string_pretty(self)
+        let payload = bincode::serialize(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+        let mut buf = Vec::with_capacity(8 + payload.len());
+        buf.extend_from_slice(Self::BINARY_MAGIC);
+        buf.extend_from_slice(&Self::BINARY_VERSION.to_le_bytes());
+        buf.extend_from_slice(&payload);
+
         let tmp_path = path.with_extension("tmp");
-        if std::fs::write(&tmp_path, &data).is_ok() && std::fs::rename(&tmp_path, path).is_ok() {
+        let res = if std::fs::write(&tmp_path, &buf).is_ok() && std::fs::rename(&tmp_path, path).is_ok() {
             Ok(())
         } else {
-            std::fs::write(path, data)
+            std::fs::write(path, &buf)
+        };
+
+        if res.is_ok() {
+            self.dirty = false;
         }
+        res
     }
 
-    /// Load learned dictionary from a JSON file, automatically seeding baseline if file doesn't exist
+    /// Load learned dictionary from a compact binary file, automatically seeding baseline if file doesn't exist
     pub fn load_from_path<P: AsRef<Path>>(path: P) -> Self {
         let path = path.as_ref();
         if path.exists() {
-            if let Ok(content) = std::fs::read_to_string(path) {
-                if let Ok(learner) = serde_json::from_str::<AutonomousLearner>(&content) {
-                    return learner;
+            if let Ok(bytes) = std::fs::read(path) {
+                if bytes.len() >= 8 && &bytes[0..4] == Self::BINARY_MAGIC {
+                    let version = u32::from_le_bytes(bytes[4..8].try_into().unwrap_or([0; 4]));
+                    if version == Self::BINARY_VERSION {
+                        if let Ok(mut learner) = bincode::deserialize::<AutonomousLearner>(&bytes[8..]) {
+                            learner.dirty = false;
+                            return learner;
+                        }
+                    }
                 }
             }
         }
         let mut learner = Self::new();
         learner.pretrain_baseline();
+        learner.dirty = true;
         let _ = learner.save_to_path(path);
         learner
     }
@@ -359,13 +424,52 @@ mod tests {
     #[test]
     fn test_autonomous_learning() {
         let mut learner = AutonomousLearner::new();
-        let mut trie = PrefixTrie::new();
+        let trie = PrefixTrie::new();
 
         assert!(!trie.contains_exact("কুয়েট"));
 
-        let learned = learner.observe_and_learn("কুয়েটে", &mut trie);
+        let learned = learner.observe_and_learn("কুয়েটে", &trie);
         assert!(learned.contains(&"কুয়েট".to_string()) || learned.contains(&"কুয়েটে".to_string()));
-        assert!(trie.contains_exact("কুয়েট") || trie.contains_exact("কুয়েটে"));
+        assert!(learner.learned_words.contains("কুয়েট") || learner.learned_words.contains("কুয়েটে"));
+    }
+
+    #[test]
+    fn test_binary_roundtrip_and_dirty_flag() {
+        let mut learner = AutonomousLearner::new();
+        learner.observe_committed_pair("বাংলা", "ভাষা");
+        learner.record_candidate_selection("amr", "আমার");
+        assert!(learner.dirty);
+
+        let temp_dir = std::env::temp_dir();
+        let temp_path = temp_dir.join("lekhani_test_learner_bin_roundtrip.bin");
+
+        learner.save_to_path(&temp_path).expect("Binary save must succeed");
+        assert!(!learner.dirty);
+
+        let loaded = AutonomousLearner::load_from_path(&temp_path);
+        assert_eq!(loaded.get_user_bigram_boost("বাংলা", "ভাষা"), learner.get_user_bigram_boost("বাংলা", "ভাষা"));
+        assert_eq!(loaded.candidate_memory.get("amr"), Some(&"আমার".to_string()));
+        assert!(!loaded.dirty);
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn test_merge() {
+        let mut l1 = AutonomousLearner::new();
+        l1.observe_committed_pair("আমি", "ভাত");
+        l1.record_candidate_selection("tui", "তুই");
+
+        let mut l2 = AutonomousLearner::new();
+        l2.observe_committed_pair("আমি", "চা");
+        l2.record_candidate_selection("apni", "আপনি");
+
+        l1.merge(&l2);
+        assert!(l1.user_bigrams.contains_key("আমি\tভাত"));
+        assert!(l1.user_bigrams.contains_key("আমি\tচা"));
+        assert_eq!(l1.candidate_memory.get("tui"), Some(&"তুই".to_string()));
+        assert_eq!(l1.candidate_memory.get("apni"), Some(&"আপনি".to_string()));
+        assert!(l1.dirty);
     }
 
     #[test]
