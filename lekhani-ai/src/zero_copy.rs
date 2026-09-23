@@ -289,7 +289,8 @@ impl ZeroCopyLanguageModel {
 
     /// Retrieve the top next-word continuations for a word (zero extra HashMaps, ~50ns)
     pub fn get_next_words(&self, previous_word: &str, limit: usize) -> Vec<String> {
-        let w1_id = match self.get_word_id(previous_word) {
+        let clean = clean_token(previous_word);
+        let w1_id = match self.get_word_id(clean) {
             Some(id) => id,
             None => return Vec::new(),
         };
@@ -333,11 +334,13 @@ impl ZeroCopyLanguageModel {
 
     /// Retrieve the top next-word continuations for a trigram context (zero extra HashMaps, ~50ns)
     pub fn get_next_words_trigram(&self, prev2: &str, prev1: &str, limit: usize) -> Vec<String> {
-        let p2_id = match self.get_word_id(prev2) {
+        let c2 = clean_token(prev2);
+        let c1 = clean_token(prev1);
+        let p2_id = match self.get_word_id(c2) {
             Some(id) => id,
             None => return self.get_next_words(prev1, limit),
         };
-        let p1_id = match self.get_word_id(prev1) {
+        let p1_id = match self.get_word_id(c1) {
             Some(id) => id,
             None => return self.get_next_words(prev1, limit),
         };
@@ -388,15 +391,16 @@ impl ZeroCopyLanguageModel {
 
     /// Interpolated conditional probability scoring with zero heap allocations (~60ns)
     pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
-        let w_id = match self.get_word_id(word) {
+        let clean_word = clean_token(word);
+        let w_id = match self.get_word_id(clean_word) {
             Some(id) => id,
             None => return self.unigram_floor,
         };
 
         let unigram_log = self.get_unigram_prob(w_id).unwrap_or(self.unigram_floor);
 
-        let p1_id = prev1.and_then(|p| self.get_word_id(p));
-        let p2_id = prev2.and_then(|p| self.get_word_id(p));
+        let p1_id = prev1.map(clean_token).and_then(|p| self.get_word_id(p));
+        let p2_id = prev2.map(clean_token).and_then(|p| self.get_word_id(p));
 
         let bigram_log = p1_id.and_then(|p1| self.get_bigram_prob(p1, w_id));
         let trigram_log = match (p2_id, p1_id) {
@@ -420,4 +424,20 @@ impl ZeroCopyLanguageModel {
 
         interpolated.max(1e-12).log10()
     }
+}
+
+#[inline]
+fn clean_token(s: &str) -> &str {
+    s.trim_matches(|c: char| {
+        c.is_ascii_punctuation()
+            || c == '।'
+            || c == '—'
+            || c == '‘'
+            || c == '’'
+            || c == '“'
+            || c == '”'
+            || c == '\''
+            || c == '"'
+            || c == ','
+    })
 }

@@ -29,31 +29,54 @@ impl TrainedLanguageModelData {
 
     /// Serialize language model data into compact sorted binary format (LLM2)
     pub fn to_binary(&self) -> Vec<u8> {
-        let mut words_set = hashbrown::HashSet::new();
-        for w in self.unigrams.keys() {
-            words_set.insert(w.as_str());
-        }
-        for (w1, w2, _) in &self.bigrams {
-            words_set.insert(w1.as_str());
-            words_set.insert(w2.as_str());
-        }
-        for (w1, w2, w3, _) in &self.trigrams {
-            words_set.insert(w1.as_str());
-            words_set.insert(w2.as_str());
-            words_set.insert(w3.as_str());
+        let mut unigrams = self.unigrams.clone();
+        for &(w, p) in crate::lm::UNIGRAM_LOG_PROBS {
+            unigrams.entry(w.to_string()).or_insert(p);
         }
 
-        let mut words: Vec<&str> = words_set.into_iter().collect();
+        let mut bigrams = self.bigrams.clone();
+        let bigram_set: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
+        for &((w1, w2), p) in crate::lm::BIGRAM_TRANSITIONS {
+            if !bigram_set.contains(&(w1, w2)) {
+                bigrams.push((w1.to_string(), w2.to_string(), p));
+            }
+        }
+        drop(bigram_set);
+
+        let mut trigrams = self.trigrams.clone();
+        let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
+        for &((w1, w2, w3), p) in crate::lm::TRIGRAM_TRANSITIONS {
+            if !trigram_set.contains(&(w1, w2, w3)) {
+                trigrams.push((w1.to_string(), w2.to_string(), w3.to_string(), p));
+            }
+        }
+        drop(trigram_set);
+
+        let mut words_set = hashbrown::HashSet::new();
+        for w in unigrams.keys() {
+            words_set.insert(w.clone());
+        }
+        for (w1, w2, _) in &bigrams {
+            words_set.insert(w1.clone());
+            words_set.insert(w2.clone());
+        }
+        for (w1, w2, w3, _) in &trigrams {
+            words_set.insert(w1.clone());
+            words_set.insert(w2.clone());
+            words_set.insert(w3.clone());
+        }
+
+        let mut words: Vec<String> = words_set.into_iter().collect();
         words.sort_unstable(); // Lexicographical sort for O(log N) zero-alloc binary search
 
         let mut vocab_map: HashMap<&str, u32> = HashMap::with_capacity(words.len());
-        for (id, &w) in words.iter().enumerate() {
-            vocab_map.insert(w, id as u32);
+        for (id, w) in words.iter().enumerate() {
+            vocab_map.insert(w.as_str(), id as u32);
         }
 
         let mut string_buffer = Vec::new();
         let mut vocab_entries: Vec<(u32, u16)> = Vec::with_capacity(words.len());
-        for &w in &words {
+        for w in &words {
             let offset = string_buffer.len() as u32;
             let bytes = w.as_bytes();
             let len = bytes.len() as u16;
@@ -65,7 +88,7 @@ impl TrainedLanguageModelData {
         let unigram_count = words.len() as u32;
 
         // Sort bigrams: w1_id ascending, log_prob descending, w2_id ascending
-        let mut sorted_bigrams = self.bigrams.clone();
+        let mut sorted_bigrams = bigrams;
         sorted_bigrams.sort_unstable_by(|(a1, a2, p1), (b1, b2, p2)| {
             let id_a1 = vocab_map[a1.as_str()];
             let id_b1 = vocab_map[b1.as_str()];
@@ -78,7 +101,7 @@ impl TrainedLanguageModelData {
         let bigram_count = sorted_bigrams.len() as u32;
 
         // Sort trigrams: (w1_id, w2_id) ascending, log_prob descending, w3_id ascending
-        let mut sorted_trigrams = self.trigrams.clone();
+        let mut sorted_trigrams = trigrams;
         sorted_trigrams.sort_unstable_by(|(a1, a2, a3, p1), (b1, b2, b3, p2)| {
             let id_a1 = vocab_map[a1.as_str()];
             let id_b1 = vocab_map[b1.as_str()];
@@ -120,8 +143,8 @@ impl TrainedLanguageModelData {
         }
 
         // Unigrams (in direct word_id order [0..vocab_count])
-        for (id, &w) in words.iter().enumerate() {
-            let p = self.unigrams.get(w).copied().unwrap_or(-6.0);
+        for (id, w) in words.iter().enumerate() {
+            let p = unigrams.get(w).copied().unwrap_or(-6.0);
             out.extend_from_slice(&(id as u32).to_le_bytes());
             out.extend_from_slice(&p.to_le_bytes());
         }
@@ -1050,14 +1073,14 @@ mod tests {
 
         let loaded = TrainedLanguageModelData::from_binary(&bytes).expect("Failed to load binary");
         assert_eq!(loaded.total_words, compiled.total_words);
-        assert_eq!(loaded.unigrams.len(), compiled.unigrams.len());
-        assert_eq!(loaded.bigrams.len(), compiled.bigrams.len());
-        assert_eq!(loaded.trigrams.len(), compiled.trigrams.len());
+        assert!(loaded.unigrams.len() >= compiled.unigrams.len());
+        assert!(loaded.bigrams.len() >= compiled.bigrams.len());
+        assert!(loaded.trigrams.len() >= compiled.trigrams.len());
 
         let zc = crate::zero_copy::ZeroCopyLanguageModel::from_slice(bytes.leak()).expect("Failed to parse zero-copy LLM2");
-        assert_eq!(zc.unigram_count(), compiled.unigrams.len());
-        assert_eq!(zc.bigram_count(), compiled.bigrams.len());
-        assert_eq!(zc.trigram_count(), compiled.trigrams.len());
+        assert_eq!(zc.unigram_count(), loaded.unigrams.len());
+        assert_eq!(zc.bigram_count(), loaded.bigrams.len());
+        assert_eq!(zc.trigram_count(), loaded.trigrams.len());
     }
 
     #[test]
