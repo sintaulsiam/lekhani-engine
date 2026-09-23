@@ -317,12 +317,12 @@ impl TrainingConfig {
     /// Optimized configuration for large-scale corpora (e.g. Wikipedia, OSCAR, web dumps)
     pub fn production() -> Self {
         Self {
-            min_unigram_freq: 2,
-            min_bigram_freq: 3,
-            min_trigram_freq: 4,
-            max_unigrams: 120_000,
-            max_bigrams: 600_000,
-            max_trigrams: 1_200_000,
+            min_unigram_freq: 3,
+            min_bigram_freq: 5,
+            min_trigram_freq: 8,
+            max_unigrams: 65_000,
+            max_bigrams: 160_000,
+            max_trigrams: 60_000,
         }
     }
 }

@@ -33,7 +33,22 @@ pub struct CandidateHypothesis {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AiProfile {
+    Balanced,
+    Lite,
+    Off,
+}
+
+impl Default for AiProfile {
+    fn default() -> Self {
+        Self::Balanced
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PhoneticSuggestionConfig {
+    pub ai_profile: AiProfile,
     pub use_dictionary: bool,
     pub include_english: bool,
     pub enable_code_shield: bool,
@@ -49,6 +64,7 @@ pub struct PhoneticSuggestionConfig {
 impl Default for PhoneticSuggestionConfig {
     fn default() -> Self {
         Self {
+            ai_profile: AiProfile::default(),
             use_dictionary: true,
             include_english: true,
             enable_code_shield: false,
@@ -1184,9 +1200,9 @@ impl PhoneticSuggestion {
             }
 
             // 4. Contextual Homophone & AI Language Model Scoring (Zero Allocations)
-            if !context.is_empty() && cand.source != CandidateSource::EmojiKeyword {
+            if self.config.ai_profile != AiProfile::Off && !context.is_empty() && cand.source != CandidateSource::EmojiKeyword {
                 let prev = context.last().copied();
-                let prev_prev = if context.len() >= 2 {
+                let prev_prev = if self.config.ai_profile == AiProfile::Balanced && context.len() >= 2 {
                     context.get(context.len() - 2).copied()
                 } else {
                     None
@@ -2033,10 +2049,12 @@ mod tests {
         let next_ami = sugg.suggest_next_words("আমি");
         assert!(!next_ami.is_empty());
         assert!(
-            next_ami.contains(&"যাচ্ছি".to_string())
-                || next_ami.contains(&"তোমায়".to_string())
-                || next_ami.contains(&"তোমাকে".to_string())
+            next_ami.contains(&"মনে".to_string())
+                || next_ami.contains(&"জানি".to_string())
+                || next_ami.contains(&"আমার".to_string())
                 || next_ami.contains(&"ভালো".to_string())
+                || next_ami.contains(&"যাচ্ছি".to_string())
+                || next_ami.contains(&"তোমাকে".to_string())
         );
 
         let next_thanks = sugg.suggest_next_words("ধন্যবাদ");

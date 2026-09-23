@@ -1207,6 +1207,17 @@ impl LanguageModelInner {
             candidates.push(std::path::PathBuf::from(env_path));
         }
 
+        if let Some(home) = std::env::var_os("HOME") {
+            let u_data = std::path::PathBuf::from(&home).join(".local/share/lekhani/data/bengali_lm.bin");
+            candidates.push(u_data);
+            let u_dict = std::path::PathBuf::from(&home).join(".local/share/lekhani/dictionaries/bengali_lm.bin");
+            candidates.push(u_dict);
+        }
+
+        candidates.push(std::path::PathBuf::from("./data/dictionaries/bengali_lm.bin"));
+        candidates.push(std::path::PathBuf::from("../data/dictionaries/bengali_lm.bin"));
+        candidates.push(std::path::PathBuf::from("../../data/dictionaries/bengali_lm.bin"));
+
         if let Ok(exe) = std::env::current_exe() {
             if let Some(exe_dir) = exe.parent() {
                 candidates.push(exe_dir.join("data").join("dictionaries").join("bengali_lm.bin"));
@@ -1220,22 +1231,12 @@ impl LanguageModelInner {
             }
         }
 
-        if let Some(home) = std::env::var_os("HOME") {
-            let u_data = std::path::PathBuf::from(&home).join(".local/share/lekhani/data/bengali_lm.bin");
-            candidates.push(u_data);
-            let u_dict = std::path::PathBuf::from(&home).join(".local/share/lekhani/dictionaries/bengali_lm.bin");
-            candidates.push(u_dict);
-        }
-
         if let Some(appdata) = std::env::var_os("APPDATA") {
             candidates.push(std::path::PathBuf::from(appdata).join("Lekhani").join("data").join("bengali_lm.bin"));
         }
 
-        candidates.push(std::path::PathBuf::from("./data/dictionaries/bengali_lm.bin"));
-        candidates.push(std::path::PathBuf::from("../data/dictionaries/bengali_lm.bin"));
-        candidates.push(std::path::PathBuf::from("../../data/dictionaries/bengali_lm.bin"));
-        candidates.push(std::path::PathBuf::from("/usr/share/lekhani/data/bengali_lm.bin"));
         candidates.push(std::path::PathBuf::from("/usr/local/share/lekhani/data/bengali_lm.bin"));
+        candidates.push(std::path::PathBuf::from("/usr/share/lekhani/data/bengali_lm.bin"));
 
         for path in candidates {
             if path.is_file() {
@@ -1260,6 +1261,9 @@ impl LanguageModelInner {
             }
         };
 
+        const MAX_WORD_CONTINUATIONS: usize = 6;
+        const MAX_TRIGRAM_CONTINUATIONS: usize = 4;
+
         if self.unigrams.len() <= 500 {
             let static_unigrams = std::mem::take(&mut self.unigrams);
             let static_bigrams = std::mem::take(&mut self.bigrams);
@@ -1274,7 +1278,10 @@ impl LanguageModelInner {
                 let a1 = intern(w1);
                 let a2 = intern(w2);
                 self.bigrams.insert((a1.clone(), a2.clone()), *p);
-                self.next_word_map.entry(a1).or_default().push((a2, *p));
+                let entry = self.next_word_map.entry(a1).or_default();
+                if entry.len() < MAX_WORD_CONTINUATIONS {
+                    entry.push((a2, *p));
+                }
             }
             for (w1, w2, w3, p) in &data.trigrams {
                 let a1 = intern(w1);
@@ -1282,7 +1289,10 @@ impl LanguageModelInner {
                 let a3 = intern(w3);
                 self.trigrams
                     .insert((a1.clone(), a2.clone(), a3.clone()), *p);
-                self.next_trigram_map.entry((a1, a2)).or_default().push((a3, *p));
+                let tri_entry = self.next_trigram_map.entry((a1, a2)).or_default();
+                if tri_entry.len() < MAX_TRIGRAM_CONTINUATIONS {
+                    tri_entry.push((a3, *p));
+                }
             }
 
             for (w, _) in static_unigrams {
@@ -1291,14 +1301,14 @@ impl LanguageModelInner {
             for (pair, p) in static_bigrams {
                 self.bigrams.entry(pair.clone()).or_insert(p);
                 let entry = self.next_word_map.entry(pair.0).or_default();
-                if !entry.iter().any(|(cand, _)| cand == &pair.1) {
+                if !entry.iter().any(|(cand, _)| cand == &pair.1) && entry.len() < MAX_WORD_CONTINUATIONS {
                     entry.push((pair.1, p));
                 }
             }
             for (tri, p) in static_trigrams {
                 self.trigrams.entry(tri.clone()).or_insert(p);
                 let tri_entry = self.next_trigram_map.entry((tri.0, tri.1)).or_default();
-                if !tri_entry.iter().any(|(cand, _)| cand == &tri.2) {
+                if !tri_entry.iter().any(|(cand, _)| cand == &tri.2) && tri_entry.len() < MAX_TRIGRAM_CONTINUATIONS {
                     tri_entry.push((tri.2, p));
                 }
             }
@@ -1313,7 +1323,7 @@ impl LanguageModelInner {
                 let entry = self.next_word_map.entry(a1).or_default();
                 if let Some(pos) = entry.iter().position(|(cand, _)| cand == &a2) {
                     entry[pos].1 = *p;
-                } else {
+                } else if entry.len() < MAX_WORD_CONTINUATIONS {
                     entry.push((a2, *p));
                 }
             }
@@ -1326,7 +1336,7 @@ impl LanguageModelInner {
                 let tri_entry = self.next_trigram_map.entry((a1, a2)).or_default();
                 if let Some(pos) = tri_entry.iter().position(|(cand, _)| cand == &a3) {
                     tri_entry[pos].1 = *p;
-                } else {
+                } else if tri_entry.len() < MAX_TRIGRAM_CONTINUATIONS {
                     tri_entry.push((a3, *p));
                 }
             }
@@ -1336,12 +1346,26 @@ impl LanguageModelInner {
             list.sort_unstable_by(|a, b| {
                 b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
             });
+            if list.len() > MAX_WORD_CONTINUATIONS {
+                list.truncate(MAX_WORD_CONTINUATIONS);
+            }
+            list.shrink_to_fit();
         }
         for list in self.next_trigram_map.values_mut() {
             list.sort_unstable_by(|a, b| {
                 b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
             });
+            if list.len() > MAX_TRIGRAM_CONTINUATIONS {
+                list.truncate(MAX_TRIGRAM_CONTINUATIONS);
+            }
+            list.shrink_to_fit();
         }
+
+        self.unigrams.shrink_to_fit();
+        self.bigrams.shrink_to_fit();
+        self.trigrams.shrink_to_fit();
+        self.next_word_map.shrink_to_fit();
+        self.next_trigram_map.shrink_to_fit();
     }
 
     pub fn train_text(&mut self, text: &str) {

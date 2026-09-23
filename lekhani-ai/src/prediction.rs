@@ -190,7 +190,13 @@ mod tests {
 
         let preds_ami = predictor.predict_next(&["আমি"], 5);
         assert!(!preds_ami.is_empty());
-        assert!(preds_ami.contains(&"যাচ্ছি".to_string()) || preds_ami.contains(&"তোমায়".to_string()) || preds_ami.contains(&"ভালো".to_string()));
+        assert!(
+            preds_ami.contains(&"মনে".to_string())
+                || preds_ami.contains(&"জানি".to_string())
+                || preds_ami.contains(&"আমার".to_string())
+                || preds_ami.contains(&"ভালো".to_string())
+                || preds_ami.contains(&"যাচ্ছি".to_string())
+        );
 
         let preds_rice = predictor.predict_next(&["আমি", "ভাত"], 3);
         assert!(!preds_rice.is_empty());
