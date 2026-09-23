@@ -1047,7 +1047,8 @@ impl Default for LanguageModel {
 }
 
 impl LanguageModel {
-    pub fn new() -> Self {
+    /// Create a language model initialized strictly with hardcoded static baseline tables
+    pub fn from_static_tables() -> Self {
         let mut unigrams = HashMap::with_capacity(UNIGRAM_LOG_PROBS.len() + 100);
         for &(w, p) in UNIGRAM_LOG_PROBS {
             unigrams.insert(w.to_string(), p);
@@ -1106,37 +1107,171 @@ impl LanguageModel {
         }
     }
 
-    /// Ingest a trained language model dataset into the live model
-    pub fn load_trained_data(&mut self, data: &crate::trainer::TrainedLanguageModelData) {
-        for (w, p) in &data.unigrams {
-            self.unigrams.insert(w.clone(), *p);
+    /// Create default language model with automatic probing of system and user data directories
+    pub fn new() -> Self {
+        let mut lm = Self::from_static_tables();
+        let _ = lm.load_from_system_paths();
+        lm
+    }
+
+    /// Load a binary language model from an explicit file path, falling back to static tables on error
+    pub fn from_binary_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, std::io::Error> {
+        let mut lm = Self::from_static_tables();
+        lm.load_binary_file(path)?;
+        Ok(lm)
+    }
+
+    /// Number of unique unigram tokens stored in the model
+    pub fn unigram_count(&self) -> usize {
+        self.unigrams.len()
+    }
+
+    /// Number of unique bigram transitions stored in the model
+    pub fn bigram_count(&self) -> usize {
+        self.bigrams.len()
+    }
+
+    /// Number of unique trigram contexts stored in the model
+    pub fn trigram_count(&self) -> usize {
+        self.trigrams.len()
+    }
+
+    /// Automatically probe and load bengali_lm.bin from known system and user paths
+    pub fn load_from_system_paths(&mut self) -> bool {
+        let mut candidates = Vec::new();
+
+        // 1. Explicit environment variable override
+        if let Ok(env_path) = std::env::var("LEKHANI_LM_PATH") {
+            candidates.push(std::path::PathBuf::from(env_path));
         }
-        for (w1, w2, p) in &data.bigrams {
-            self.bigrams.insert((w1.clone(), w2.clone()), *p);
-            let entry = self.next_word_map.entry(w1.clone()).or_default();
-            if let Some(pos) = entry.iter().position(|(cand, _)| cand == w2) {
-                entry[pos].1 = *p;
-            } else {
-                entry.push((w2.clone(), *p));
+
+        // 2. Relative executable paths (for portable and installed binaries)
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(exe_dir) = exe.parent() {
+                candidates.push(exe_dir.join("data").join("dictionaries").join("bengali_lm.bin"));
+                candidates.push(exe_dir.join("data").join("bengali_lm.bin"));
+                candidates.push(exe_dir.join("bengali_lm.bin"));
+                if let Some(parent) = exe_dir.parent() {
+                    candidates.push(parent.join("data").join("dictionaries").join("bengali_lm.bin"));
+                    candidates.push(parent.join("data").join("bengali_lm.bin"));
+                    candidates.push(parent.join("share").join("lekhani").join("data").join("bengali_lm.bin"));
+                }
             }
         }
+
+        // 3. User local directory
+        if let Some(home) = std::env::var_os("HOME") {
+            let u_data = std::path::PathBuf::from(&home).join(".local/share/lekhani/data/bengali_lm.bin");
+            candidates.push(u_data);
+            let u_dict = std::path::PathBuf::from(&home).join(".local/share/lekhani/dictionaries/bengali_lm.bin");
+            candidates.push(u_dict);
+        }
+
+        // 4. Windows AppData / ProgramData
+        if let Some(appdata) = std::env::var_os("APPDATA") {
+            candidates.push(std::path::PathBuf::from(appdata).join("Lekhani").join("data").join("bengali_lm.bin"));
+        }
+
+        // 5. Local workspace development paths
+        candidates.push(std::path::PathBuf::from("./data/dictionaries/bengali_lm.bin"));
+        candidates.push(std::path::PathBuf::from("../data/dictionaries/bengali_lm.bin"));
+        candidates.push(std::path::PathBuf::from("../../data/dictionaries/bengali_lm.bin"));
+
+        // 6. Linux standard system directories
+        candidates.push(std::path::PathBuf::from("/usr/share/lekhani/data/bengali_lm.bin"));
+        candidates.push(std::path::PathBuf::from("/usr/local/share/lekhani/data/bengali_lm.bin"));
+
+        for path in candidates {
+            if path.is_file() {
+                if let Ok(()) = self.load_binary_file(&path) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Ingest a trained language model dataset into the live model
+    pub fn load_trained_data(&mut self, data: &crate::trainer::TrainedLanguageModelData) {
+        if self.unigrams.len() <= 500 {
+            let static_unigrams = std::mem::take(&mut self.unigrams);
+            let static_bigrams = std::mem::take(&mut self.bigrams);
+            let static_trigrams = std::mem::take(&mut self.trigrams);
+            self.next_word_map.clear();
+            self.next_trigram_map.clear();
+
+            for (w, p) in &data.unigrams {
+                self.unigrams.insert(w.clone(), *p);
+            }
+            for (w1, w2, p) in &data.bigrams {
+                self.bigrams.insert((w1.clone(), w2.clone()), *p);
+                self.next_word_map
+                    .entry(w1.clone())
+                    .or_default()
+                    .push((w2.clone(), *p));
+            }
+            for (w1, w2, w3, p) in &data.trigrams {
+                self.trigrams
+                    .insert((w1.clone(), w2.clone(), w3.clone()), *p);
+                self.next_trigram_map
+                    .entry((w1.clone(), w2.clone()))
+                    .or_default()
+                    .push((w3.clone(), *p));
+            }
+
+            // Fallback baseline unigrams smoothed to floor
+            for (w, _) in static_unigrams {
+                self.unigrams.entry(w).or_insert(-5.0);
+            }
+            // Fallback baseline bigrams
+            for (pair, p) in static_bigrams {
+                self.bigrams.entry(pair.clone()).or_insert(p);
+                let entry = self.next_word_map.entry(pair.0).or_default();
+                if !entry.iter().any(|(cand, _)| cand == &pair.1) {
+                    entry.push((pair.1, p));
+                }
+            }
+            // Fallback baseline trigrams
+            for (tri, p) in static_trigrams {
+                self.trigrams.entry(tri.clone()).or_insert(p);
+                let tri_entry = self.next_trigram_map.entry((tri.0, tri.1)).or_default();
+                if !tri_entry.iter().any(|(cand, _)| cand == &tri.2) {
+                    tri_entry.push((tri.2, p));
+                }
+            }
+        } else {
+            for (w, p) in &data.unigrams {
+                self.unigrams.insert(w.clone(), *p);
+            }
+            for (w1, w2, p) in &data.bigrams {
+                self.bigrams.insert((w1.clone(), w2.clone()), *p);
+                let entry = self.next_word_map.entry(w1.clone()).or_default();
+                if let Some(pos) = entry.iter().position(|(cand, _)| cand == w2) {
+                    entry[pos].1 = *p;
+                } else {
+                    entry.push((w2.clone(), *p));
+                }
+            }
+            for (w1, w2, w3, p) in &data.trigrams {
+                self.trigrams
+                    .insert((w1.clone(), w2.clone(), w3.clone()), *p);
+                let tri_entry = self
+                    .next_trigram_map
+                    .entry((w1.clone(), w2.clone()))
+                    .or_default();
+                if let Some(pos) = tri_entry.iter().position(|(cand, _)| cand == w3) {
+                    tri_entry[pos].1 = *p;
+                } else {
+                    tri_entry.push((w3.clone(), *p));
+                }
+            }
+        }
+
         for list in self.next_word_map.values_mut() {
             list.sort_unstable_by(|a, b| {
                 b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
             });
-        }
-        for (w1, w2, w3, p) in &data.trigrams {
-            self.trigrams
-                .insert((w1.clone(), w2.clone(), w3.clone()), *p);
-            let tri_entry = self
-                .next_trigram_map
-                .entry((w1.clone(), w2.clone()))
-                .or_default();
-            if let Some(pos) = tri_entry.iter().position(|(cand, _)| cand == w3) {
-                tri_entry[pos].1 = *p;
-            } else {
-                tri_entry.push((w3.clone(), *p));
-            }
         }
         for list in self.next_trigram_map.values_mut() {
             list.sort_unstable_by(|a, b| {

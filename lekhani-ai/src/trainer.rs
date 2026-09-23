@@ -288,6 +288,51 @@ impl TrainedLanguageModelData {
     }
 }
 
+use rayon::prelude::*;
+
+/// Configuration options for N-gram pruning and model capacity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainingConfig {
+    pub min_unigram_freq: usize,
+    pub min_bigram_freq: usize,
+    pub min_trigram_freq: usize,
+    pub max_unigrams: usize,
+    pub max_bigrams: usize,
+    pub max_trigrams: usize,
+}
+
+impl TrainingConfig {
+    /// Configuration that keeps all tokens without frequency pruning (suitable for small corpora/unit tests)
+    pub fn unpruned() -> Self {
+        Self {
+            min_unigram_freq: 1,
+            min_bigram_freq: 1,
+            min_trigram_freq: 1,
+            max_unigrams: usize::MAX,
+            max_bigrams: usize::MAX,
+            max_trigrams: usize::MAX,
+        }
+    }
+
+    /// Optimized configuration for large-scale corpora (e.g. Wikipedia, OSCAR, web dumps)
+    pub fn production() -> Self {
+        Self {
+            min_unigram_freq: 2,
+            min_bigram_freq: 3,
+            min_trigram_freq: 4,
+            max_unigrams: 120_000,
+            max_bigrams: 600_000,
+            max_trigrams: 1_200_000,
+        }
+    }
+}
+
+impl Default for TrainingConfig {
+    fn default() -> Self {
+        Self::unpruned()
+    }
+}
+
 /// Dynamic N-gram Corpus Trainer
 #[derive(Debug, Clone, Default)]
 pub struct CorpusTrainer {
@@ -316,6 +361,20 @@ impl CorpusTrainer {
 
     pub fn unique_trigrams(&self) -> usize {
         self.trigram_counts.len()
+    }
+
+    /// Merge counts from another trainer instance
+    pub fn merge(&mut self, other: CorpusTrainer) {
+        self.total_tokens += other.total_tokens;
+        for (w, c) in other.unigram_counts {
+            *self.unigram_counts.entry(w).or_insert(0) += c;
+        }
+        for (bi, c) in other.bigram_counts {
+            *self.bigram_counts.entry(bi).or_insert(0) += c;
+        }
+        for (tri, c) in other.trigram_counts {
+            *self.trigram_counts.entry(tri).or_insert(0) += c;
+        }
     }
 
     /// Clean, normalize, and tokenize Bengali text into sentences and words
@@ -372,6 +431,31 @@ impl CorpusTrainer {
         }
     }
 
+    /// Parallel multi-threaded text ingestion using Rayon
+    pub fn train_text_parallel(&mut self, text: &str) {
+        let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+        if lines.len() < 50 {
+            self.train_text(text);
+            return;
+        }
+
+        let chunk_size = (lines.len() / (rayon::current_num_threads().max(1) * 4)).max(25);
+        let sub_trainers: Vec<CorpusTrainer> = lines
+            .par_chunks(chunk_size)
+            .map(|chunk| {
+                let mut local = CorpusTrainer::new();
+                for line in chunk {
+                    local.train_text(line);
+                }
+                local
+            })
+            .collect();
+
+        for sub in sub_trainers {
+            self.merge(sub);
+        }
+    }
+
     /// Ingest a single pre-tokenized sentence
     pub fn train_sentence(&mut self, words: &[String]) {
         if words.is_empty() {
@@ -401,24 +485,67 @@ impl CorpusTrainer {
         }
     }
 
-    /// Compile accumulated frequencies into normalized log-probabilities with Laplace smoothing
-    pub fn compile(&self) -> TrainedLanguageModelData {
+    /// Compile accumulated frequencies into normalized log-probabilities with pruning and capacity capping
+    pub fn compile_with_config(&self, config: &TrainingConfig) -> TrainedLanguageModelData {
         let total_tokens_f = self.total_tokens.max(1) as f32;
-        let mut unigrams = HashMap::with_capacity(self.unigram_counts.len());
-        for (w, count) in &self.unigram_counts {
+
+        // 1. Filter and cap unigrams
+        let mut unigram_vec: Vec<(&String, &usize)> = self
+            .unigram_counts
+            .iter()
+            .filter(|(_, &count)| count >= config.min_unigram_freq)
+            .collect();
+        unigram_vec.sort_unstable_by(|a, b| b.1.cmp(a.1));
+        if unigram_vec.len() > config.max_unigrams {
+            unigram_vec.truncate(config.max_unigrams);
+        }
+
+        let mut unigrams = HashMap::with_capacity(unigram_vec.len());
+        for (w, count) in unigram_vec {
             let prob = (*count as f32) / total_tokens_f;
             unigrams.insert(w.clone(), prob.log10());
         }
 
-        let mut bigrams = Vec::with_capacity(self.bigram_counts.len());
-        for ((w1, w2), count) in &self.bigram_counts {
+        // 2. Filter and cap bigrams (only include if both unigrams exist)
+        let mut bigram_vec: Vec<(&(String, String), &usize)> = self
+            .bigram_counts
+            .iter()
+            .filter(|((w1, w2), &count)| {
+                count >= config.min_bigram_freq
+                    && unigrams.contains_key(w1)
+                    && unigrams.contains_key(w2)
+            })
+            .collect();
+        bigram_vec.sort_unstable_by(|a, b| b.1.cmp(a.1));
+        if bigram_vec.len() > config.max_bigrams {
+            bigram_vec.truncate(config.max_bigrams);
+        }
+
+        let mut bigrams = Vec::with_capacity(bigram_vec.len());
+        for ((w1, w2), count) in bigram_vec {
             let w1_count = self.unigram_counts.get(w1).copied().unwrap_or(1) as f32;
             let prob = (*count as f32) / w1_count;
             bigrams.push((w1.clone(), w2.clone(), prob.log10()));
         }
 
-        let mut trigrams = Vec::with_capacity(self.trigram_counts.len());
-        for ((w1, w2, w3), count) in &self.trigram_counts {
+        // 3. Filter and cap trigrams (only include if words are in vocabulary)
+        let mut trigram_vec: Vec<(&(String, String, String), &usize)> = self
+            .trigram_counts
+            .iter()
+            .filter(|((w1, w2, w3), &count)| {
+                count >= config.min_trigram_freq
+                    && unigrams.contains_key(w1)
+                    && unigrams.contains_key(w2)
+                    && unigrams.contains_key(w3)
+            })
+            .collect();
+        trigram_vec.sort_unstable_by(|a, b| b.1.cmp(a.1));
+        if trigram_vec.len() > config.max_trigrams {
+            trigram_vec.truncate(config.max_trigrams);
+        }
+
+        let mut trigrams = Vec::with_capacity(trigram_vec.len());
+        for ((w1, w2, w3), count) in trigram_vec {
             let bi_count = self
                 .bigram_counts
                 .get(&(w1.clone(), w2.clone()))
@@ -436,12 +563,29 @@ impl CorpusTrainer {
         }
     }
 
+    /// Compile accumulated frequencies into normalized log-probabilities using default configuration
+    pub fn compile(&self) -> TrainedLanguageModelData {
+        self.compile_with_config(&TrainingConfig::default())
+    }
+
     /// Export trained model to a JSON file
     pub fn export_to_json<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
         let compiled = self.compile();
         let json = serde_json::to_string_pretty(&compiled)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         std::fs::write(path, json)
+    }
+
+    /// Export compiled binary model directly to a file
+    pub fn export_to_binary<P: AsRef<Path>>(
+        &self,
+        path: P,
+        config: &TrainingConfig,
+    ) -> Result<usize, std::io::Error> {
+        let compiled = self.compile_with_config(config);
+        let bytes = compiled.to_binary();
+        std::fs::write(path, &bytes)?;
+        Ok(bytes.len())
     }
 }
 
@@ -503,5 +647,24 @@ mod tests {
         assert_eq!(loaded.unigrams.len(), compiled.unigrams.len());
         assert_eq!(loaded.bigrams.len(), compiled.bigrams.len());
         assert_eq!(loaded.trigrams.len(), compiled.trigrams.len());
+    }
+
+    #[test]
+    fn test_parallel_chunk_training_and_pruning() {
+        let mut trainer = CorpusTrainer::new();
+        let mut text = String::new();
+        for _ in 0..100 {
+            text.push_str("বাংলাদেশ একটি সুন্দর দেশ। আমরা সবাই দেশকে ভালোবাসি।\n");
+        }
+        trainer.train_text_parallel(&text);
+        assert!(trainer.total_tokens() > 500);
+
+        let config = TrainingConfig::production();
+        let compiled = trainer.compile_with_config(&config);
+        assert!(compiled.unigrams.contains_key("বাংলাদেশ"));
+        assert!(compiled
+            .bigrams
+            .iter()
+            .any(|(w1, w2, _)| w1 == "বাংলাদেশ" && w2 == "একটি"));
     }
 }
