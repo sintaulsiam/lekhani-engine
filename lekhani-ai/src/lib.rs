@@ -14,7 +14,9 @@ pub use beam::BeamSearchDecoder;
 pub use context::ContextScorer;
 pub use lm::LanguageModel;
 pub use prediction::NextWordPredictor;
-pub use trainer::{CorpusTrainer, TrainedLanguageModelData, TrainingConfig};
+pub use trainer::{
+    train_files_streaming, CorpusTrainer, TrainedLanguageModelData, TrainingConfig,
+};
 
 #[cfg(test)]
 mod tests {

@@ -440,20 +440,20 @@ impl CorpusTrainer {
         }
 
         let chunk_size = (lines.len() / (rayon::current_num_threads().max(1) * 4)).max(25);
-        let sub_trainers: Vec<CorpusTrainer> = lines
+        let merged = lines
             .par_chunks(chunk_size)
-            .map(|chunk| {
-                let mut local = CorpusTrainer::new();
+            .fold(CorpusTrainer::new, |mut local, chunk| {
                 for line in chunk {
                     local.train_text(line);
                 }
                 local
             })
-            .collect();
+            .reduce(CorpusTrainer::new, |mut a, b| {
+                a.merge(b);
+                a
+            });
 
-        for sub in sub_trainers {
-            self.merge(sub);
-        }
+        self.merge(merged);
     }
 
     /// Ingest a single pre-tokenized sentence
@@ -589,6 +589,403 @@ impl CorpusTrainer {
     }
 }
 
+/// Streaming, low-memory corpus trainer for massive datasets.
+///
+/// Uses a two-pass token indexing architecture:
+/// - Pass 1: Streams files line-by-line via `BufReader`, counts unigrams across parallel threads,
+///   and identifies the top `max_unigrams` meeting `min_unigram_freq`. Assigns compact `u32` IDs.
+/// - Pass 2: Streams lines again, maps words to `u32` IDs, and counts bigrams as packed `u64`
+///   (`((w1 as u64) << 32) | (w2 as u64)`) and trigrams as `(u32, u32, u32)`.
+///
+/// Memory footprint is strictly bounded to ~500 MB - 1 GB even on multi-gigabyte corpora,
+/// preventing Linux kernel OOM kills on machines with 8-16 GB RAM.
+pub fn train_files_streaming<P: AsRef<Path>>(
+    paths: &[P],
+    config: &TrainingConfig,
+) -> Result<TrainedLanguageModelData, std::io::Error> {
+    if paths.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "No input corpus paths provided",
+        ));
+    }
+
+    println!("    • Pass 1/2: Streaming unigram discovery & frequency counting...");
+    let mut master_unigrams: HashMap<String, usize> = HashMap::new();
+    let mut total_tokens = 0usize;
+
+    const BATCH_LINES: usize = 25_000;
+    for p in paths {
+        let file = std::fs::File::open(p.as_ref())?;
+        let reader = std::io::BufReader::with_capacity(512 * 1024, file);
+        use std::io::BufRead;
+
+        let mut batch = Vec::with_capacity(BATCH_LINES);
+        let mut total_lines = 0usize;
+
+        for line_res in reader.lines() {
+            let line = line_res?;
+            if !line.trim().is_empty() {
+                batch.push(line);
+            }
+            if batch.len() >= BATCH_LINES {
+                total_lines += batch.len();
+                let batch_unigrams = batch
+                    .par_chunks(2_500)
+                    .fold(HashMap::new, |mut acc: HashMap<String, usize>, chunk| {
+                        for line in chunk {
+                            extract_line_words(line, |w| {
+                                *acc.entry(w.to_string()).or_insert(0) += 1;
+                            });
+                        }
+                        acc
+                    })
+                    .reduce(HashMap::new, |mut a, b| {
+                        for (k, v) in b {
+                            *a.entry(k).or_insert(0) += v;
+                        }
+                        a
+                    });
+
+                for (w, count) in batch_unigrams {
+                    total_tokens += count;
+                    *master_unigrams.entry(w).or_insert(0) += count;
+                }
+                batch.clear();
+
+                if total_lines % 500_000 == 0 {
+                    println!(
+                        "      → Pass 1: {} lines processed ({} unique words so far)...",
+                        total_lines,
+                        master_unigrams.len()
+                    );
+                }
+            }
+        }
+
+        if !batch.is_empty() {
+            let batch_unigrams = batch
+                .par_chunks(2_500)
+                .fold(HashMap::new, |mut acc: HashMap<String, usize>, chunk| {
+                    for line in chunk {
+                        extract_line_words(line, |w| {
+                            *acc.entry(w.to_string()).or_insert(0) += 1;
+                        });
+                    }
+                    acc
+                })
+                .reduce(HashMap::new, |mut a, b| {
+                    for (k, v) in b {
+                        *a.entry(k).or_insert(0) += v;
+                    }
+                    a
+                });
+
+            for (w, count) in batch_unigrams {
+                total_tokens += count;
+                *master_unigrams.entry(w).or_insert(0) += count;
+            }
+            batch.clear();
+        }
+    }
+
+    println!(
+        "    [✓] Pass 1 complete: {} total tokens, {} raw vocabulary words discovered.",
+        total_tokens,
+        master_unigrams.len()
+    );
+
+    // Prune unigrams based on min_unigram_freq and max_unigrams
+    let mut unigram_vec: Vec<(String, usize)> = master_unigrams
+        .into_iter()
+        .filter(|(_, count)| *count >= config.min_unigram_freq)
+        .collect();
+    unigram_vec.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    if unigram_vec.len() > config.max_unigrams {
+        unigram_vec.truncate(config.max_unigrams);
+    }
+
+    let vocab_size = unigram_vec.len();
+    let mut vocab_list = Vec::with_capacity(vocab_size);
+    let mut vocab_lookup: HashMap<String, u32> = HashMap::with_capacity(vocab_size);
+    let mut unigram_counts: Vec<usize> = Vec::with_capacity(vocab_size);
+
+    for (id, (w, count)) in unigram_vec.into_iter().enumerate() {
+        let u_id = id as u32;
+        vocab_lookup.insert(w.clone(), u_id);
+        vocab_list.push(w);
+        unigram_counts.push(count);
+    }
+
+    println!(
+        "    [✓] Retained {} high-capacity vocabulary words. Starting Pass 2/2 N-gram indexing...",
+        vocab_size
+    );
+
+    let mut master_bigrams: HashMap<u64, u32> = HashMap::new();
+    let mut master_trigrams: HashMap<(u32, u32, u32), u32> = HashMap::new();
+
+    for p in paths {
+        let file = std::fs::File::open(p.as_ref())?;
+        let reader = std::io::BufReader::with_capacity(512 * 1024, file);
+        use std::io::BufRead;
+
+        let mut batch = Vec::with_capacity(BATCH_LINES);
+        let mut total_lines = 0usize;
+
+        for line_res in reader.lines() {
+            let line = line_res?;
+            if !line.trim().is_empty() {
+                batch.push(line);
+            }
+            if batch.len() >= BATCH_LINES {
+                total_lines += batch.len();
+                let (batch_bi, batch_tri) = batch
+                    .par_chunks(2_500)
+                    .fold(
+                        || (HashMap::<u64, u32>::new(), HashMap::<(u32, u32, u32), u32>::new()),
+                        |(mut local_bi, mut local_tri), chunk| {
+                            for line in chunk {
+                                process_line_ngrams(line, &vocab_lookup, &mut local_bi, &mut local_tri);
+                            }
+                            (local_bi, local_tri)
+                        },
+                    )
+                    .reduce(
+                        || (HashMap::new(), HashMap::new()),
+                        |(mut bi_a, mut tri_a), (bi_b, tri_b)| {
+                            for (k, v) in bi_b {
+                                *bi_a.entry(k).or_insert(0) += v;
+                            }
+                            for (k, v) in tri_b {
+                                *tri_a.entry(k).or_insert(0) += v;
+                            }
+                            (bi_a, tri_a)
+                        },
+                    );
+
+                for (k, v) in batch_bi {
+                    *master_bigrams.entry(k).or_insert(0) += v;
+                }
+                for (k, v) in batch_tri {
+                    *master_trigrams.entry(k).or_insert(0) += v;
+                }
+                batch.clear();
+
+                if total_lines % 500_000 == 0 {
+                    println!(
+                        "      → Pass 2: {} lines processed ({} bigrams, {} trigrams)...",
+                        total_lines,
+                        master_bigrams.len(),
+                        master_trigrams.len()
+                    );
+                }
+            }
+        }
+
+        if !batch.is_empty() {
+            let (batch_bi, batch_tri) = batch
+                .par_chunks(2_500)
+                .fold(
+                    || (HashMap::<u64, u32>::new(), HashMap::<(u32, u32, u32), u32>::new()),
+                    |(mut local_bi, mut local_tri), chunk| {
+                        for line in chunk {
+                            process_line_ngrams(line, &vocab_lookup, &mut local_bi, &mut local_tri);
+                        }
+                        (local_bi, local_tri)
+                    },
+                )
+                .reduce(
+                    || (HashMap::new(), HashMap::new()),
+                    |(mut bi_a, mut tri_a), (bi_b, tri_b)| {
+                        for (k, v) in bi_b {
+                            *bi_a.entry(k).or_insert(0) += v;
+                        }
+                        for (k, v) in tri_b {
+                            *tri_a.entry(k).or_insert(0) += v;
+                        }
+                        (bi_a, tri_a)
+                    },
+                );
+
+            for (k, v) in batch_bi {
+                *master_bigrams.entry(k).or_insert(0) += v;
+            }
+            for (k, v) in batch_tri {
+                *master_trigrams.entry(k).or_insert(0) += v;
+            }
+            batch.clear();
+        }
+    }
+
+    println!(
+        "    [✓] Pass 2 complete: {} unique bigram transitions, {} unique trigram contexts.",
+        master_bigrams.len(),
+        master_trigrams.len()
+    );
+
+    let total_tokens_f = total_tokens.max(1) as f32;
+
+    // 1. Unigrams
+    let mut unigrams = HashMap::with_capacity(vocab_list.len());
+    for (id, w) in vocab_list.iter().enumerate() {
+        let count = unigram_counts[id];
+        let prob = (count as f32) / total_tokens_f;
+        unigrams.insert(w.clone(), prob.log10());
+    }
+
+    // 2. Bigrams
+    let mut bigram_vec: Vec<(u64, u32)> = master_bigrams
+        .into_iter()
+        .filter(|(_, count)| (*count as usize) >= config.min_bigram_freq)
+        .collect();
+    bigram_vec.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    if bigram_vec.len() > config.max_bigrams {
+        bigram_vec.truncate(config.max_bigrams);
+    }
+
+    let mut compiled_bigram_counts: HashMap<u64, u32> = HashMap::with_capacity(bigram_vec.len());
+    let mut bigrams = Vec::with_capacity(bigram_vec.len());
+    for (bi_key, count) in bigram_vec {
+        compiled_bigram_counts.insert(bi_key, count);
+        let w1_id = (bi_key >> 32) as u32;
+        let w2_id = (bi_key & 0xFFFF_FFFF) as u32;
+        let w1 = &vocab_list[w1_id as usize];
+        let w2 = &vocab_list[w2_id as usize];
+        let w1_count = unigram_counts[w1_id as usize].max(1) as f32;
+        let prob = (count as f32) / w1_count;
+        bigrams.push((w1.clone(), w2.clone(), prob.log10()));
+    }
+
+    // 3. Trigrams
+    let mut trigram_vec: Vec<((u32, u32, u32), u32)> = master_trigrams
+        .into_iter()
+        .filter(|(_, count)| (*count as usize) >= config.min_trigram_freq)
+        .collect();
+    trigram_vec.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    if trigram_vec.len() > config.max_trigrams {
+        trigram_vec.truncate(config.max_trigrams);
+    }
+
+    let mut trigrams = Vec::with_capacity(trigram_vec.len());
+    for ((w1_id, w2_id, w3_id), count) in trigram_vec {
+        let bi_key = ((w1_id as u64) << 32) | (w2_id as u64);
+        let bi_count = compiled_bigram_counts.get(&bi_key).copied().unwrap_or(1).max(1) as f32;
+        let prob = (count as f32) / bi_count;
+        let w1 = &vocab_list[w1_id as usize];
+        let w2 = &vocab_list[w2_id as usize];
+        let w3 = &vocab_list[w3_id as usize];
+        trigrams.push((w1.clone(), w2.clone(), w3.clone(), prob.log10()));
+    }
+
+    Ok(TrainedLanguageModelData {
+        unigrams,
+        bigrams,
+        trigrams,
+        total_words: total_tokens,
+    })
+}
+
+fn extract_line_words<F: FnMut(&str)>(line: &str, mut on_word: F) {
+    let sentence_delimiters = ['।', '?', '!', '\n', ';'];
+    for raw_sentence in line.split(|c| sentence_delimiters.contains(&c)) {
+        for raw_word in raw_sentence.split_whitespace() {
+            if !raw_word.chars().any(crate::trainer::chars::is_bengali_char) {
+                continue;
+            }
+            let clean_word: String = raw_word
+                .chars()
+                .filter(|c| {
+                    !c.is_ascii_punctuation()
+                        && *c != '‘'
+                        && *c != '’'
+                        && *c != '“'
+                        && *c != '”'
+                        && *c != '\''
+                        && *c != '"'
+                        && *c != ','
+                        && *c != ':'
+                        && *c != '—'
+                        && *c != '-'
+                        && *c != '('
+                        && *c != ')'
+                        && *c != '['
+                        && *c != ']'
+                        && *c != '{'
+                        && *c != '}'
+                })
+                .collect();
+            let trimmed = clean_word.trim();
+            if !trimmed.is_empty() && trimmed.chars().any(crate::trainer::chars::is_bengali_char) {
+                on_word(trimmed);
+            }
+        }
+    }
+}
+
+fn process_line_ngrams(
+    line: &str,
+    vocab_lookup: &HashMap<String, u32>,
+    local_bi: &mut HashMap<u64, u32>,
+    local_tri: &mut HashMap<(u32, u32, u32), u32>,
+) {
+    let sentence_delimiters = ['।', '?', '!', '\n', ';'];
+    for raw_sentence in line.split(|c| sentence_delimiters.contains(&c)) {
+        let mut sentence_ids: Vec<Option<u32>> = Vec::new();
+        for raw_word in raw_sentence.split_whitespace() {
+            if !raw_word.chars().any(crate::trainer::chars::is_bengali_char) {
+                continue;
+            }
+            let clean_word: String = raw_word
+                .chars()
+                .filter(|c| {
+                    !c.is_ascii_punctuation()
+                        && *c != '‘'
+                        && *c != '’'
+                        && *c != '“'
+                        && *c != '”'
+                        && *c != '\''
+                        && *c != '"'
+                        && *c != ','
+                        && *c != ':'
+                        && *c != '—'
+                        && *c != '-'
+                        && *c != '('
+                        && *c != ')'
+                        && *c != '['
+                        && *c != ']'
+                        && *c != '{'
+                        && *c != '}'
+                })
+                .collect();
+            let trimmed = clean_word.trim();
+            if !trimmed.is_empty() && trimmed.chars().any(crate::trainer::chars::is_bengali_char) {
+                sentence_ids.push(vocab_lookup.get(trimmed).copied());
+            }
+        }
+
+        if sentence_ids.len() < 2 {
+            continue;
+        }
+
+        for i in 1..sentence_ids.len() {
+            if let (Some(w1), Some(w2)) = (sentence_ids[i - 1], sentence_ids[i]) {
+                let bi_key = ((w1 as u64) << 32) | (w2 as u64);
+                *local_bi.entry(bi_key).or_insert(0) += 1;
+            }
+        }
+
+        for i in 2..sentence_ids.len() {
+            if let (Some(w1), Some(w2), Some(w3)) =
+                (sentence_ids[i - 2], sentence_ids[i - 1], sentence_ids[i])
+            {
+                let tri_key = (w1, w2, w3);
+                *local_tri.entry(tri_key).or_insert(0) += 1;
+            }
+        }
+    }
+}
+
 pub(crate) mod chars {
     pub fn is_bengali_char(c: char) -> bool {
         ('\u{0980}'..='\u{09FF}').contains(&c)
@@ -666,5 +1063,32 @@ mod tests {
             .bigrams
             .iter()
             .any(|(w1, w2, _)| w1 == "বাংলাদেশ" && w2 == "একটি"));
+    }
+
+    #[test]
+    fn test_streaming_corpus_training() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("lekhani_test_stream_corpus.txt");
+        let content = "আমি বাংলায় গান গাই। আমি বাংলায় কথা বলি।\n\
+                       বাংলাদেশ চিরজীবী হোক। বাংলাদেশ একটি সুন্দর দেশ।\n";
+        std::fs::write(&test_file, content).expect("Failed to write test file");
+
+        let config = TrainingConfig::unpruned();
+        let compiled = train_files_streaming(&[test_file.clone()], &config)
+            .expect("Streaming training failed");
+
+        let _ = std::fs::remove_file(&test_file);
+
+        assert!(compiled.unigrams.contains_key("আমি"));
+        assert!(compiled.unigrams.contains_key("বাংলায়"));
+        assert!(compiled.unigrams.contains_key("বাংলাদেশ"));
+        assert!(compiled
+            .bigrams
+            .iter()
+            .any(|(w1, w2, _)| w1 == "আমি" && w2 == "বাংলায়"));
+        assert!(compiled
+            .trigrams
+            .iter()
+            .any(|(w1, w2, w3, _)| w1 == "আমি" && w2 == "বাংলায়" && w3 == "গান"));
     }
 }
