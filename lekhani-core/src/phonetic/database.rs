@@ -1,21 +1,20 @@
-//! Phonetic Database & Trie Dictionary Engine
-
 use crate::emojis::EmojiMap;
 use crate::phonetic::AutonomousLearner;
 use crate::snippets::SnippetManager;
 use crate::trie::PrefixTrie;
 use hashbrown::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct PhoneticDatabase {
-    pub trie: PrefixTrie,
-    pub suffix: HashMap<String, String>,
-    pub autocorrect: HashMap<String, String>,
-    pub shorthand: HashMap<String, String>,
+    pub trie: Arc<PrefixTrie>,
+    pub suffix: Arc<HashMap<String, String>>,
+    pub autocorrect: Arc<HashMap<String, String>>,
+    pub shorthand: Arc<HashMap<String, String>>,
     user_autocorrect: HashMap<String, String>,
-    emojis: EmojiMap,
-    snippets: SnippetManager,
+    emojis: Arc<EmojiMap>,
+    snippets: Arc<SnippetManager>,
     pub learner: AutonomousLearner,
 }
 
@@ -410,13 +409,13 @@ impl PhoneticDatabase {
         }
 
         Self {
-            trie,
-            suffix,
-            autocorrect,
-            shorthand,
+            trie: Arc::new(trie),
+            suffix: Arc::new(suffix),
+            autocorrect: Arc::new(autocorrect),
+            shorthand: Arc::new(shorthand),
             user_autocorrect: HashMap::new(),
-            emojis: EmojiMap::new(),
-            snippets: SnippetManager::new(),
+            emojis: Arc::new(EmojiMap::new()),
+            snippets: Arc::new(SnippetManager::new()),
             learner: AutonomousLearner::new(),
         }
     }
@@ -459,7 +458,7 @@ impl PhoneticDatabase {
                 if let Ok(bytes) = std::fs::read(cand) {
                     if bytes.starts_with(b"LDI3") {
                         if let Ok(bin_trie) = PrefixTrie::from_binary(&bytes) {
-                            self.trie.merge(&bin_trie);
+                            Arc::make_mut(&mut self.trie).merge(&bin_trie);
                             loaded = true;
                             break;
                         }
@@ -469,7 +468,7 @@ impl PhoneticDatabase {
                             .map(|s| s.trim().to_string())
                             .filter(|s| !s.is_empty())
                             .collect();
-                        self.trie.insert_bulk(words);
+                        Arc::make_mut(&mut self.trie).insert_bulk(words);
                         let _ = self.trie.save_binary(cand);
                         loaded = true;
                         break;
@@ -487,7 +486,7 @@ impl PhoneticDatabase {
                     for (_k, v_list) in raw_map {
                         words.extend(v_list);
                     }
-                    self.trie.insert_bulk(words);
+                    Arc::make_mut(&mut self.trie).insert_bulk(words);
                     // Attempt saving adjacent to dictionary.json; if write fails (e.g. read-only system dir), save to user cache
                     if self.trie.save_binary(&dict_bin_path).is_err() {
                         if let Some(parent) = user_cache_bin.parent() {
@@ -503,7 +502,7 @@ impl PhoneticDatabase {
         if suffix_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&suffix_path) {
                 if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
-                    self.suffix.extend(map);
+                    Arc::make_mut(&mut self.suffix).extend(map);
                 }
             }
         }
@@ -512,16 +511,17 @@ impl PhoneticDatabase {
         if ac_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&ac_path) {
                 if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
-                    self.autocorrect.extend(map.into_iter().filter(|(k, v)| k != v));
+                    Arc::make_mut(&mut self.autocorrect).extend(map.into_iter().filter(|(k, v)| k != v));
                 }
             }
         }
 
         // Inject core high-frequency weights into trie
+        let trie = Arc::make_mut(&mut self.trie);
         for &(word, freq) in CORE_BENGALI_FREQUENCIES {
-            self.trie.insert_weighted(word.to_string(), freq);
+            trie.insert_weighted(word.to_string(), freq);
         }
-        self.trie.ensure_sorted();
+        trie.ensure_sorted();
 
         Ok(())
     }
@@ -552,8 +552,9 @@ impl PhoneticDatabase {
     /// Load user-learned vocabulary
     pub fn load_user_learned<P: AsRef<Path>>(&mut self, path: P) {
         self.learner = AutonomousLearner::load_from_path(path);
+        let trie = Arc::make_mut(&mut self.trie);
         for word in &self.learner.learned_words {
-            self.trie.insert_weighted(word.clone(), 9500);
+            trie.insert_weighted(word.clone(), 9500);
         }
     }
 
@@ -564,7 +565,7 @@ impl PhoneticDatabase {
 
     /// Observe committed word and auto-learn new vocabulary / root stems
     pub fn observe_committed_word(&mut self, word: &str) -> Vec<String> {
-        self.learner.observe_and_learn(word, &mut self.trie)
+        self.learner.observe_and_learn(word, Arc::make_mut(&mut self.trie))
     }
 
     /// Add custom user autocorrect entry
