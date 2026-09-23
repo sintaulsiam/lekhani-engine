@@ -328,6 +328,9 @@ impl AutonomousLearner {
                             return learner;
                         }
                     }
+                } else if let Ok(mut learner) = serde_json::from_slice::<AutonomousLearner>(&bytes) {
+                    learner.dirty = true;
+                    return learner;
                 }
             }
         }
@@ -470,6 +473,24 @@ mod tests {
         assert_eq!(l1.candidate_memory.get("tui"), Some(&"তুই".to_string()));
         assert_eq!(l1.candidate_memory.get("apni"), Some(&"আপনি".to_string()));
         assert!(l1.dirty);
+    }
+
+    #[test]
+    fn test_load_from_json_fallback() {
+        let mut original = AutonomousLearner::new();
+        original.observe_committed_pair("বাংলা", "আমার");
+        original.learned_words.insert("মুক্তিযুদ্ধ".to_string());
+
+        let json = serde_json::to_string(&original).unwrap();
+        let temp_dir = std::env::temp_dir();
+        let temp_path = temp_dir.join("lekhani_test_import_from_json.json");
+        std::fs::write(&temp_path, json).unwrap();
+
+        let loaded = AutonomousLearner::load_from_path(&temp_path);
+        assert!(loaded.learned_words.contains("মুক্তিযুদ্ধ"));
+        assert!(loaded.user_bigrams.contains_key("বাংলা\tআমার"));
+
+        let _ = std::fs::remove_file(&temp_path);
     }
 
     #[test]
