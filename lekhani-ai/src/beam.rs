@@ -29,6 +29,10 @@ impl BeamSearchDecoder {
         }
     }
 
+    pub fn with_language_model(lm: LanguageModel, beam_width: usize) -> Self {
+        Self { lm, beam_width }
+    }
+
     /// Decode a sequence of token candidate lists into the globally optimal sentence path
     pub fn decode(&self, sequence_candidates: &[Vec<String>]) -> Vec<String> {
         if sequence_candidates.is_empty() {

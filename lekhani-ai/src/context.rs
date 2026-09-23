@@ -14,6 +14,10 @@ impl ContextScorer {
         }
     }
 
+    pub fn with_language_model(lm: LanguageModel) -> Self {
+        Self { lm }
+    }
+
     /// Access the underlying LanguageModel directly without re-allocating
     pub fn lm(&self) -> &LanguageModel {
         &self.lm

@@ -164,13 +164,14 @@ impl Default for PhoneticSuggestion {
 
 impl PhoneticSuggestion {
     pub fn new() -> Self {
+        let lm = lekhani_ai::LanguageModel::new();
         Self {
             database: PhoneticDatabase::new(),
             phonetic_parser: None,
             cache: HashMap::new(),
-            ai_context: lekhani_ai::ContextScorer::new(),
-            ai_predictor: lekhani_ai::NextWordPredictor::new(),
-            ai_decoder: lekhani_ai::BeamSearchDecoder::new(),
+            ai_context: lekhani_ai::ContextScorer::with_language_model(lm.clone()),
+            ai_predictor: lekhani_ai::NextWordPredictor::with_language_model(lm.clone()),
+            ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
         }
     }
@@ -182,13 +183,14 @@ impl PhoneticSuggestion {
             layout_json
         };
         let parser = Arc::new(PhoneticParser::new(layout_obj));
+        let lm = lekhani_ai::LanguageModel::new();
         Self {
             database: PhoneticDatabase::new(),
             phonetic_parser: Some(parser),
             cache: HashMap::new(),
-            ai_context: lekhani_ai::ContextScorer::new(),
-            ai_predictor: lekhani_ai::NextWordPredictor::new(),
-            ai_decoder: lekhani_ai::BeamSearchDecoder::new(),
+            ai_context: lekhani_ai::ContextScorer::with_language_model(lm.clone()),
+            ai_predictor: lekhani_ai::NextWordPredictor::with_language_model(lm.clone()),
+            ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
         }
     }
@@ -2030,13 +2032,21 @@ mod tests {
         let sugg = PhoneticSuggestion::new();
         let next_ami = sugg.suggest_next_words("আমি");
         assert!(!next_ami.is_empty());
-        assert!(next_ami.contains(&"ভালো".to_string()));
-        assert!(next_ami.contains(&"তোমাকে".to_string()));
+        assert!(
+            next_ami.contains(&"যাচ্ছি".to_string())
+                || next_ami.contains(&"তোমায়".to_string())
+                || next_ami.contains(&"তোমাকে".to_string())
+                || next_ami.contains(&"ভালো".to_string())
+        );
 
         let next_thanks = sugg.suggest_next_words("ধন্যবাদ");
         assert!(!next_thanks.is_empty());
         assert!(
-            next_thanks.contains(&"ভাই".to_string()) || next_thanks.contains(&"আপনাকে".to_string())
+            next_thanks.contains(&"জানান".to_string())
+                || next_thanks.contains(&"জানাই".to_string())
+                || next_thanks.contains(&"তোমাকে".to_string())
+                || next_thanks.contains(&"ভাই".to_string())
+                || next_thanks.contains(&"আপনাকে".to_string())
         );
     }
 

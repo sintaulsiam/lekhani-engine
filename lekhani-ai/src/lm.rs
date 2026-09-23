@@ -4,22 +4,23 @@
 //! interpolation for contextual candidate re-ranking and next-word prediction.
 
 use hashbrown::{Equivalent, HashMap};
+use std::sync::{Arc, OnceLock};
 
 #[derive(Hash, PartialEq, Eq)]
 pub struct BigramKey<'a>(pub &'a str, pub &'a str);
 
-impl<'a> Equivalent<(String, String)> for BigramKey<'a> {
-    fn equivalent(&self, key: &(String, String)) -> bool {
-        self.0 == key.0.as_str() && self.1 == key.1.as_str()
+impl<'a> Equivalent<(Arc<str>, Arc<str>)> for BigramKey<'a> {
+    fn equivalent(&self, key: &(Arc<str>, Arc<str>)) -> bool {
+        self.0 == &*key.0 && self.1 == &*key.1
     }
 }
 
 #[derive(Hash, PartialEq, Eq)]
 pub struct TrigramKey<'a>(pub &'a str, pub &'a str, pub &'a str);
 
-impl<'a> Equivalent<(String, String, String)> for TrigramKey<'a> {
-    fn equivalent(&self, key: &(String, String, String)) -> bool {
-        self.0 == key.0.as_str() && self.1 == key.1.as_str() && self.2 == key.2.as_str()
+impl<'a> Equivalent<(Arc<str>, Arc<str>, Arc<str>)> for TrigramKey<'a> {
+    fn equivalent(&self, key: &(Arc<str>, Arc<str>, Arc<str>)) -> bool {
+        self.0 == &*key.0 && self.1 == &*key.1 && self.2 == &*key.2
     }
 }
 
@@ -1029,11 +1030,16 @@ pub const TRIGRAM_TRANSITIONS: &[((&str, &str, &str), f32)] = &[
 
 #[derive(Debug, Clone)]
 pub struct LanguageModel {
-    unigrams: HashMap<String, f32>,
-    bigrams: HashMap<(String, String), f32>,
-    trigrams: HashMap<(String, String, String), f32>,
-    next_word_map: HashMap<String, Vec<(String, f32)>>,
-    next_trigram_map: HashMap<(String, String), Vec<(String, f32)>>,
+    inner: Arc<LanguageModelInner>,
+}
+
+#[derive(Debug, Clone)]
+struct LanguageModelInner {
+    unigrams: HashMap<Arc<str>, f32>,
+    bigrams: HashMap<(Arc<str>, Arc<str>), f32>,
+    trigrams: HashMap<(Arc<str>, Arc<str>, Arc<str>), f32>,
+    next_word_map: HashMap<Arc<str>, Vec<(Arc<str>, f32)>>,
+    next_trigram_map: HashMap<(Arc<str>, Arc<str>), Vec<(Arc<str>, f32)>>,
     lambda1: f32,
     lambda2: f32,
     lambda3: f32,
@@ -1049,21 +1055,107 @@ impl Default for LanguageModel {
 impl LanguageModel {
     /// Create a language model initialized strictly with hardcoded static baseline tables
     pub fn from_static_tables() -> Self {
+        Self {
+            inner: Arc::new(LanguageModelInner::from_static_tables()),
+        }
+    }
+
+    /// Create default language model with automatic probing of system and user data directories.
+    /// Uses a global singleton cache so the unpacked ~1.4M N-grams are loaded only once in memory.
+    pub fn new() -> Self {
+        static SHARED_MODEL: OnceLock<LanguageModel> = OnceLock::new();
+        SHARED_MODEL
+            .get_or_init(|| {
+                let mut lm = Self::from_static_tables();
+                let _ = lm.load_from_system_paths();
+                lm
+            })
+            .clone()
+    }
+
+    /// Load a binary language model from an explicit file path, falling back to static tables on error
+    pub fn from_binary_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, std::io::Error> {
+        let mut lm = Self::from_static_tables();
+        lm.load_binary_file(path)?;
+        Ok(lm)
+    }
+
+    /// Number of unique unigram tokens stored in the model
+    #[inline]
+    pub fn unigram_count(&self) -> usize {
+        self.inner.unigrams.len()
+    }
+
+    /// Number of unique bigram transitions stored in the model
+    #[inline]
+    pub fn bigram_count(&self) -> usize {
+        self.inner.bigrams.len()
+    }
+
+    /// Number of unique trigram contexts stored in the model
+    #[inline]
+    pub fn trigram_count(&self) -> usize {
+        self.inner.trigrams.len()
+    }
+
+    /// Automatically probe and load bengali_lm.bin from known system and user paths
+    pub fn load_from_system_paths(&mut self) -> bool {
+        Arc::make_mut(&mut self.inner).load_from_system_paths()
+    }
+
+    /// Ingest a trained language model dataset into the live model
+    pub fn load_trained_data(&mut self, data: &crate::trainer::TrainedLanguageModelData) {
+        Arc::make_mut(&mut self.inner).load_trained_data(data);
+    }
+
+    /// Ingest raw text and train the model in real time
+    pub fn train_text(&mut self, text: &str) {
+        Arc::make_mut(&mut self.inner).train_text(text);
+    }
+
+    /// Ingest a pre-compiled binary language model file (.bin) into the live model
+    pub fn load_binary_file<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+        Arc::make_mut(&mut self.inner).load_binary_file(path)
+    }
+
+    /// Calculate interpolated conditional probability P(word | w_t-2, w_t-1) with 0 allocations
+    #[inline]
+    pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
+        self.inner.score_candidate(prev2, prev1, word)
+    }
+
+    /// Query the most likely continuations given previous word
+    #[inline]
+    pub fn get_next_words(&self, previous_word: &str, limit: usize) -> Vec<String> {
+        self.inner.get_next_words(previous_word, limit)
+    }
+
+    /// Query the most likely continuations given previous two words (trigram context)
+    #[inline]
+    pub fn get_next_words_trigram(&self, prev2: &str, prev1: &str, limit: usize) -> Vec<String> {
+        self.inner.get_next_words_trigram(prev2, prev1, limit)
+    }
+}
+
+impl LanguageModelInner {
+    pub fn from_static_tables() -> Self {
         let mut unigrams = HashMap::with_capacity(UNIGRAM_LOG_PROBS.len() + 100);
         for &(w, p) in UNIGRAM_LOG_PROBS {
-            unigrams.insert(w.to_string(), p);
+            unigrams.insert(Arc::from(w), p);
         }
 
         let mut bigrams = HashMap::with_capacity(BIGRAM_TRANSITIONS.len() + 100);
-        let mut next_word_map: HashMap<String, Vec<(String, f32)>> = HashMap::new();
+        let mut next_word_map: HashMap<Arc<str>, Vec<(Arc<str>, f32)>> = HashMap::new();
 
         for &((w1, w2), p) in BIGRAM_TRANSITIONS {
-            bigrams.insert((w1.to_string(), w2.to_string()), p);
-            let entry = next_word_map.entry(w1.to_string()).or_default();
-            if let Some(pos) = entry.iter().position(|(cand, _)| cand == w2) {
+            let a1: Arc<str> = Arc::from(w1);
+            let a2: Arc<str> = Arc::from(w2);
+            bigrams.insert((a1.clone(), a2.clone()), p);
+            let entry = next_word_map.entry(a1).or_default();
+            if let Some(pos) = entry.iter().position(|(cand, _)| cand.as_ref() == w2) {
                 entry[pos].1 = p;
             } else {
-                entry.push((w2.to_string(), p));
+                entry.push((a2, p));
             }
         }
 
@@ -1074,17 +1166,18 @@ impl LanguageModel {
         }
 
         let mut trigrams = HashMap::with_capacity(TRIGRAM_TRANSITIONS.len() + 50);
-        let mut next_trigram_map: HashMap<(String, String), Vec<(String, f32)>> = HashMap::new();
+        let mut next_trigram_map: HashMap<(Arc<str>, Arc<str>), Vec<(Arc<str>, f32)>> = HashMap::new();
 
         for &((w1, w2, w3), p) in TRIGRAM_TRANSITIONS {
-            trigrams.insert((w1.to_string(), w2.to_string(), w3.to_string()), p);
-            let tri_entry = next_trigram_map
-                .entry((w1.to_string(), w2.to_string()))
-                .or_default();
-            if let Some(pos) = tri_entry.iter().position(|(cand, _)| cand == w3) {
+            let a1: Arc<str> = Arc::from(w1);
+            let a2: Arc<str> = Arc::from(w2);
+            let a3: Arc<str> = Arc::from(w3);
+            trigrams.insert((a1.clone(), a2.clone(), a3.clone()), p);
+            let tri_entry = next_trigram_map.entry((a1, a2)).or_default();
+            if let Some(pos) = tri_entry.iter().position(|(cand, _)| cand.as_ref() == w3) {
                 tri_entry[pos].1 = p;
             } else {
-                tri_entry.push((w3.to_string(), p));
+                tri_entry.push((a3, p));
             }
         }
 
@@ -1107,45 +1200,13 @@ impl LanguageModel {
         }
     }
 
-    /// Create default language model with automatic probing of system and user data directories
-    pub fn new() -> Self {
-        let mut lm = Self::from_static_tables();
-        let _ = lm.load_from_system_paths();
-        lm
-    }
-
-    /// Load a binary language model from an explicit file path, falling back to static tables on error
-    pub fn from_binary_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, std::io::Error> {
-        let mut lm = Self::from_static_tables();
-        lm.load_binary_file(path)?;
-        Ok(lm)
-    }
-
-    /// Number of unique unigram tokens stored in the model
-    pub fn unigram_count(&self) -> usize {
-        self.unigrams.len()
-    }
-
-    /// Number of unique bigram transitions stored in the model
-    pub fn bigram_count(&self) -> usize {
-        self.bigrams.len()
-    }
-
-    /// Number of unique trigram contexts stored in the model
-    pub fn trigram_count(&self) -> usize {
-        self.trigrams.len()
-    }
-
-    /// Automatically probe and load bengali_lm.bin from known system and user paths
     pub fn load_from_system_paths(&mut self) -> bool {
         let mut candidates = Vec::new();
 
-        // 1. Explicit environment variable override
         if let Ok(env_path) = std::env::var("LEKHANI_LM_PATH") {
             candidates.push(std::path::PathBuf::from(env_path));
         }
 
-        // 2. Relative executable paths (for portable and installed binaries)
         if let Ok(exe) = std::env::current_exe() {
             if let Some(exe_dir) = exe.parent() {
                 candidates.push(exe_dir.join("data").join("dictionaries").join("bengali_lm.bin"));
@@ -1159,7 +1220,6 @@ impl LanguageModel {
             }
         }
 
-        // 3. User local directory
         if let Some(home) = std::env::var_os("HOME") {
             let u_data = std::path::PathBuf::from(&home).join(".local/share/lekhani/data/bengali_lm.bin");
             candidates.push(u_data);
@@ -1167,17 +1227,13 @@ impl LanguageModel {
             candidates.push(u_dict);
         }
 
-        // 4. Windows AppData / ProgramData
         if let Some(appdata) = std::env::var_os("APPDATA") {
             candidates.push(std::path::PathBuf::from(appdata).join("Lekhani").join("data").join("bengali_lm.bin"));
         }
 
-        // 5. Local workspace development paths
         candidates.push(std::path::PathBuf::from("./data/dictionaries/bengali_lm.bin"));
         candidates.push(std::path::PathBuf::from("../data/dictionaries/bengali_lm.bin"));
         candidates.push(std::path::PathBuf::from("../../data/dictionaries/bengali_lm.bin"));
-
-        // 6. Linux standard system directories
         candidates.push(std::path::PathBuf::from("/usr/share/lekhani/data/bengali_lm.bin"));
         candidates.push(std::path::PathBuf::from("/usr/local/share/lekhani/data/bengali_lm.bin"));
 
@@ -1192,8 +1248,18 @@ impl LanguageModel {
         false
     }
 
-    /// Ingest a trained language model dataset into the live model
     pub fn load_trained_data(&mut self, data: &crate::trainer::TrainedLanguageModelData) {
+        let mut string_pool: hashbrown::HashSet<Arc<str>> = hashbrown::HashSet::with_capacity(data.unigrams.len() + 500);
+        let mut intern = |s: &str| -> Arc<str> {
+            if let Some(existing) = string_pool.get(s) {
+                existing.clone()
+            } else {
+                let arc: Arc<str> = Arc::from(s);
+                string_pool.insert(arc.clone());
+                arc
+            }
+        };
+
         if self.unigrams.len() <= 500 {
             let static_unigrams = std::mem::take(&mut self.unigrams);
             let static_bigrams = std::mem::take(&mut self.bigrams);
@@ -1202,29 +1268,26 @@ impl LanguageModel {
             self.next_trigram_map.clear();
 
             for (w, p) in &data.unigrams {
-                self.unigrams.insert(w.clone(), *p);
+                self.unigrams.insert(intern(w), *p);
             }
             for (w1, w2, p) in &data.bigrams {
-                self.bigrams.insert((w1.clone(), w2.clone()), *p);
-                self.next_word_map
-                    .entry(w1.clone())
-                    .or_default()
-                    .push((w2.clone(), *p));
+                let a1 = intern(w1);
+                let a2 = intern(w2);
+                self.bigrams.insert((a1.clone(), a2.clone()), *p);
+                self.next_word_map.entry(a1).or_default().push((a2, *p));
             }
             for (w1, w2, w3, p) in &data.trigrams {
+                let a1 = intern(w1);
+                let a2 = intern(w2);
+                let a3 = intern(w3);
                 self.trigrams
-                    .insert((w1.clone(), w2.clone(), w3.clone()), *p);
-                self.next_trigram_map
-                    .entry((w1.clone(), w2.clone()))
-                    .or_default()
-                    .push((w3.clone(), *p));
+                    .insert((a1.clone(), a2.clone(), a3.clone()), *p);
+                self.next_trigram_map.entry((a1, a2)).or_default().push((a3, *p));
             }
 
-            // Fallback baseline unigrams smoothed to floor
             for (w, _) in static_unigrams {
                 self.unigrams.entry(w).or_insert(-5.0);
             }
-            // Fallback baseline bigrams
             for (pair, p) in static_bigrams {
                 self.bigrams.entry(pair.clone()).or_insert(p);
                 let entry = self.next_word_map.entry(pair.0).or_default();
@@ -1232,7 +1295,6 @@ impl LanguageModel {
                     entry.push((pair.1, p));
                 }
             }
-            // Fallback baseline trigrams
             for (tri, p) in static_trigrams {
                 self.trigrams.entry(tri.clone()).or_insert(p);
                 let tri_entry = self.next_trigram_map.entry((tri.0, tri.1)).or_default();
@@ -1242,28 +1304,30 @@ impl LanguageModel {
             }
         } else {
             for (w, p) in &data.unigrams {
-                self.unigrams.insert(w.clone(), *p);
+                self.unigrams.insert(intern(w), *p);
             }
             for (w1, w2, p) in &data.bigrams {
-                self.bigrams.insert((w1.clone(), w2.clone()), *p);
-                let entry = self.next_word_map.entry(w1.clone()).or_default();
-                if let Some(pos) = entry.iter().position(|(cand, _)| cand == w2) {
+                let a1 = intern(w1);
+                let a2 = intern(w2);
+                self.bigrams.insert((a1.clone(), a2.clone()), *p);
+                let entry = self.next_word_map.entry(a1).or_default();
+                if let Some(pos) = entry.iter().position(|(cand, _)| cand == &a2) {
                     entry[pos].1 = *p;
                 } else {
-                    entry.push((w2.clone(), *p));
+                    entry.push((a2, *p));
                 }
             }
             for (w1, w2, w3, p) in &data.trigrams {
+                let a1 = intern(w1);
+                let a2 = intern(w2);
+                let a3 = intern(w3);
                 self.trigrams
-                    .insert((w1.clone(), w2.clone(), w3.clone()), *p);
-                let tri_entry = self
-                    .next_trigram_map
-                    .entry((w1.clone(), w2.clone()))
-                    .or_default();
-                if let Some(pos) = tri_entry.iter().position(|(cand, _)| cand == w3) {
+                    .insert((a1.clone(), a2.clone(), a3.clone()), *p);
+                let tri_entry = self.next_trigram_map.entry((a1, a2)).or_default();
+                if let Some(pos) = tri_entry.iter().position(|(cand, _)| cand == &a3) {
                     tri_entry[pos].1 = *p;
                 } else {
-                    tri_entry.push((w3.clone(), *p));
+                    tri_entry.push((a3, *p));
                 }
             }
         }
@@ -1280,7 +1344,6 @@ impl LanguageModel {
         }
     }
 
-    /// Ingest raw text and train the model in real time
     pub fn train_text(&mut self, text: &str) {
         let mut trainer = crate::trainer::CorpusTrainer::new();
         trainer.train_text(text);
@@ -1288,14 +1351,12 @@ impl LanguageModel {
         self.load_trained_data(&compiled);
     }
 
-    /// Ingest a pre-compiled binary language model file (.bin) into the live model
     pub fn load_binary_file<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
         let data = crate::trainer::TrainedLanguageModelData::load_binary(path)?;
         self.load_trained_data(&data);
         Ok(())
     }
 
-    /// Calculate interpolated conditional probability P(word | w_t-2, w_t-1) with 0 allocations
     pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
         let clean_word = word.trim_matches(|c: char| {
             c.is_ascii_punctuation()
@@ -1360,7 +1421,6 @@ impl LanguageModel {
         score.log10()
     }
 
-    /// Query the most likely continuations given previous word
     pub fn get_next_words(&self, previous_word: &str, limit: usize) -> Vec<String> {
         let clean_prev = previous_word.trim_matches(|c: char| {
             c.is_ascii_punctuation()
@@ -1375,13 +1435,12 @@ impl LanguageModel {
                 || c == ','
         });
         if let Some(list) = self.next_word_map.get(clean_prev) {
-            list.iter().take(limit).map(|(w, _)| w.clone()).collect()
+            list.iter().take(limit).map(|(w, _)| w.to_string()).collect()
         } else {
             Vec::new()
         }
     }
 
-    /// Query the most likely continuations given previous two words (trigram context)
     pub fn get_next_words_trigram(&self, prev2: &str, prev1: &str, limit: usize) -> Vec<String> {
         let clean_prev2 = prev2.trim_matches(|c: char| {
             c.is_ascii_punctuation()
@@ -1412,7 +1471,7 @@ impl LanguageModel {
             .next_trigram_map
             .get(&BigramKey(clean_prev2, clean_prev1))
         {
-            list.iter().take(limit).map(|(w, _)| w.clone()).collect()
+            list.iter().take(limit).map(|(w, _)| w.to_string()).collect()
         } else {
             Vec::new()
         }
