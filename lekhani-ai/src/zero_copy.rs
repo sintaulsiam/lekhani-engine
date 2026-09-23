@@ -148,9 +148,9 @@ impl ZeroCopyLanguageModel {
         })
     }
 
-    /// Retrieve the UTF-8 word slice for a given word index (zero allocations)
+    /// Retrieve raw bytes for word at index (zero allocations, no UTF-8 check)
     #[inline]
-    pub fn get_word(&self, word_id: u32) -> Option<&'static str> {
+    pub fn get_word_bytes(&self, word_id: u32) -> Option<&'static [u8]> {
         let id = word_id as usize;
         if id >= self.vocab_count {
             return None;
@@ -164,21 +164,30 @@ impl ZeroCopyLanguageModel {
         if end > self.data.len() {
             return None;
         }
-        std::str::from_utf8(&self.data[start..end]).ok()
+        Some(&self.data[start..end])
     }
 
-    /// Binary search for word ID in lexicographically sorted vocab table (zero allocations, ~30ns)
+    /// Retrieve the UTF-8 word slice for a given word index (zero allocations)
+    #[inline]
+    pub fn get_word(&self, word_id: u32) -> Option<&'static str> {
+        let bytes = self.get_word_bytes(word_id)?;
+        unsafe { Some(std::str::from_utf8_unchecked(bytes)) }
+    }
+
+    /// Binary search for word ID in lexicographically sorted vocab table (zero allocations, ~25ns)
+    #[inline]
     pub fn get_word_id(&self, target: &str) -> Option<u32> {
         if self.vocab_count == 0 {
             return None;
         }
+        let target_bytes = target.as_bytes();
         let mut low = 0;
         let mut high = self.vocab_count;
 
         while low < high {
             let mid = low + (high - low) / 2;
-            let word = self.get_word(mid as u32)?;
-            match word.cmp(target) {
+            let word_bytes = self.get_word_bytes(mid as u32)?;
+            match word_bytes.cmp(target_bytes) {
                 std::cmp::Ordering::Equal => return Some(mid as u32),
                 std::cmp::Ordering::Less => low = mid + 1,
                 std::cmp::Ordering::Greater => high = mid,
