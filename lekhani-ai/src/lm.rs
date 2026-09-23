@@ -1035,6 +1035,7 @@ pub struct LanguageModel {
 
 #[derive(Debug, Clone)]
 struct LanguageModelInner {
+    zero_copy: Option<Arc<crate::zero_copy::ZeroCopyLanguageModel>>,
     unigrams: HashMap<Arc<str>, f32>,
     bigrams: HashMap<(Arc<str>, Arc<str>), f32>,
     trigrams: HashMap<(Arc<str>, Arc<str>, Arc<str>), f32>,
@@ -1083,19 +1084,31 @@ impl LanguageModel {
     /// Number of unique unigram tokens stored in the model
     #[inline]
     pub fn unigram_count(&self) -> usize {
-        self.inner.unigrams.len()
+        if let Some(ref zc) = self.inner.zero_copy {
+            zc.unigram_count()
+        } else {
+            self.inner.unigrams.len()
+        }
     }
 
     /// Number of unique bigram transitions stored in the model
     #[inline]
     pub fn bigram_count(&self) -> usize {
-        self.inner.bigrams.len()
+        if let Some(ref zc) = self.inner.zero_copy {
+            zc.bigram_count()
+        } else {
+            self.inner.bigrams.len()
+        }
     }
 
     /// Number of unique trigram contexts stored in the model
     #[inline]
     pub fn trigram_count(&self) -> usize {
-        self.inner.trigrams.len()
+        if let Some(ref zc) = self.inner.zero_copy {
+            zc.trigram_count()
+        } else {
+            self.inner.trigrams.len()
+        }
     }
 
     /// Automatically probe and load bengali_lm.bin from known system and user paths
@@ -1188,6 +1201,7 @@ impl LanguageModelInner {
         }
 
         Self {
+            zero_copy: None,
             unigrams,
             bigrams,
             trigrams,
@@ -1250,6 +1264,7 @@ impl LanguageModelInner {
     }
 
     pub fn load_trained_data(&mut self, data: &crate::trainer::TrainedLanguageModelData) {
+        self.zero_copy = None;
         let mut string_pool: hashbrown::HashSet<Arc<str>> = hashbrown::HashSet::with_capacity(data.unigrams.len() + 500);
         let mut intern = |s: &str| -> Arc<str> {
             if let Some(existing) = string_pool.get(s) {
@@ -1376,12 +1391,31 @@ impl LanguageModelInner {
     }
 
     pub fn load_binary_file<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
-        let data = crate::trainer::TrainedLanguageModelData::load_binary(path)?;
+        let path_ref = path.as_ref();
+        if let Ok(zc) = crate::zero_copy::ZeroCopyLanguageModel::from_file(path_ref) {
+            self.zero_copy = Some(Arc::new(zc));
+            self.unigrams.clear();
+            self.unigrams.shrink_to_fit();
+            self.bigrams.clear();
+            self.bigrams.shrink_to_fit();
+            self.trigrams.clear();
+            self.trigrams.shrink_to_fit();
+            self.next_word_map.clear();
+            self.next_word_map.shrink_to_fit();
+            self.next_trigram_map.clear();
+            self.next_trigram_map.shrink_to_fit();
+            return Ok(());
+        }
+
+        let data = crate::trainer::TrainedLanguageModelData::load_binary(path_ref)?;
         self.load_trained_data(&data);
         Ok(())
     }
 
     pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
+        if let Some(ref zc) = self.zero_copy {
+            return zc.score_candidate(prev2, prev1, word);
+        }
         let clean_word = word.trim_matches(|c: char| {
             c.is_ascii_punctuation()
                 || c == '।'
@@ -1446,6 +1480,9 @@ impl LanguageModelInner {
     }
 
     pub fn get_next_words(&self, previous_word: &str, limit: usize) -> Vec<String> {
+        if let Some(ref zc) = self.zero_copy {
+            return zc.get_next_words(previous_word, limit);
+        }
         let clean_prev = previous_word.trim_matches(|c: char| {
             c.is_ascii_punctuation()
                 || c == '।'
@@ -1466,6 +1503,9 @@ impl LanguageModelInner {
     }
 
     pub fn get_next_words_trigram(&self, prev2: &str, prev1: &str, limit: usize) -> Vec<String> {
+        if let Some(ref zc) = self.zero_copy {
+            return zc.get_next_words_trigram(prev2, prev1, limit);
+        }
         let clean_prev2 = prev2.trim_matches(|c: char| {
             c.is_ascii_punctuation()
                 || c == '।'

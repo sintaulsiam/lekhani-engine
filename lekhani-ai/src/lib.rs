@@ -9,6 +9,7 @@ pub mod context;
 pub mod lm;
 pub mod prediction;
 pub mod trainer;
+pub mod zero_copy;
 
 pub use beam::BeamSearchDecoder;
 pub use context::ContextScorer;
@@ -17,6 +18,7 @@ pub use prediction::NextWordPredictor;
 pub use trainer::{
     train_files_streaming, CorpusTrainer, TrainedLanguageModelData, TrainingConfig,
 };
+pub use zero_copy::ZeroCopyLanguageModel;
 
 #[cfg(test)]
 mod tests {
