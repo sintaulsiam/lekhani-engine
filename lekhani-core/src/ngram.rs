@@ -100,7 +100,22 @@ impl UserStats {
         list
     }
 
-    /// Save statistics to a JSON file
+    /// Merge another UserStats snapshot monotonically
+    pub fn merge(&mut self, other: &UserStats) {
+        self.total_keystrokes = self.total_keystrokes.max(other.total_keystrokes);
+        self.total_words_typed = self.total_words_typed.max(other.total_words_typed);
+        self.keystrokes_saved = self.keystrokes_saved.max(other.keystrokes_saved);
+        for (w, c) in &other.top_words {
+            let entry = self.top_words.entry(w.clone()).or_insert(0);
+            *entry = (*entry).max(*c);
+        }
+        for (ch, c) in &other.char_frequencies {
+            let entry = self.char_frequencies.entry(*ch).or_insert(0);
+            *entry = (*entry).max(*c);
+        }
+    }
+
+    /// Save statistics to a JSON file safely using atomic rename
     pub fn save_to_path<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
@@ -108,7 +123,12 @@ impl UserStats {
         }
         let data = serde_json::to_string_pretty(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
-        std::fs::write(path, data)
+        let tmp_path = path.with_extension("tmp");
+        if std::fs::write(&tmp_path, &data).is_ok() && std::fs::rename(&tmp_path, path).is_ok() {
+            Ok(())
+        } else {
+            std::fs::write(path, data)
+        }
     }
 
     /// Load statistics from a JSON file
@@ -147,5 +167,22 @@ mod tests {
         assert!(stats.keystrokes_saved > 0);
         let top = stats.get_top_words(5);
         assert_eq!(top.len(), 2);
+    }
+
+    #[test]
+    fn test_user_stats_merge() {
+        let mut s1 = UserStats::new();
+        s1.record_commit(5, "বাংলা");
+        assert_eq!(s1.total_words_typed, 1);
+
+        let mut s2 = UserStats::new();
+        s2.record_commit(10, "বাংলাদেশ");
+        s2.record_commit(4, "ভাষা");
+        assert_eq!(s2.total_words_typed, 2);
+
+        s1.merge(&s2);
+        assert_eq!(s1.total_words_typed, 2);
+        assert!(s1.top_words.contains_key("বাংলাদেশ"));
+        assert!(s1.top_words.contains_key("বাংলা"));
     }
 }

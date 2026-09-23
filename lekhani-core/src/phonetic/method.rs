@@ -6,6 +6,8 @@ use serde_json::Value;
 use super::suggestion::PhoneticSuggestion;
 use crate::keycodes::*;
 
+use std::sync::{Arc, Mutex};
+
 use crate::ngram::UserStats;
 
 #[derive(Debug, Clone, Default)]
@@ -19,7 +21,7 @@ pub struct PhoneticMethod {
     pub include_english: bool,
     pub last_committed_word: Option<String>,
     pub recent_context: Vec<String>,
-    pub stats: UserStats,
+    pub stats: Arc<Mutex<UserStats>>,
     pub is_prediction_mode: bool,
     pub is_prediction_navigated: bool,
 }
@@ -36,7 +38,7 @@ impl PhoneticMethod {
             include_english: true,
             last_committed_word: None,
             recent_context: Vec::with_capacity(8),
-            stats: UserStats::new(),
+            stats: Arc::new(Mutex::new(UserStats::new())),
             is_prediction_mode: false,
             is_prediction_navigated: false,
         }
@@ -185,7 +187,9 @@ impl PhoneticMethod {
             let prev_word = self.last_committed_word.clone();
             self.suggestion_engine
                 .observe_committed(prev_word.as_deref(), committed);
-            self.stats.record_commit(typed_len, committed);
+            if let Ok(mut stats) = self.stats.lock() {
+                stats.record_commit(typed_len, committed);
+            }
             self.recent_context.push(committed.clone());
             if self.recent_context.len() > 6 {
                 self.recent_context.remove(0);

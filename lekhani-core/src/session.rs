@@ -90,19 +90,30 @@ impl InputSession {
     }
 
     pub fn load_stats<P: AsRef<std::path::Path>>(&mut self, path: P) {
-        self.phonetic.stats = crate::ngram::UserStats::load_from_path(path);
+        let loaded = crate::ngram::UserStats::load_from_path(path);
+        if let Ok(mut lock) = self.phonetic.stats.lock() {
+            lock.merge(&loaded);
+        }
     }
 
     pub fn save_stats<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), std::io::Error> {
-        self.phonetic.stats.save_to_path(path)
+        if let Ok(lock) = self.phonetic.stats.lock() {
+            lock.save_to_path(path)
+        } else {
+            Ok(())
+        }
     }
 
-    pub fn get_stats(&self) -> &crate::ngram::UserStats {
-        &self.phonetic.stats
+    pub fn get_stats(&self) -> crate::ngram::UserStats {
+        self.phonetic.stats.lock().map(|s| s.clone()).unwrap_or_default()
     }
 
-    pub fn get_stats_mut(&mut self) -> &mut crate::ngram::UserStats {
-        &mut self.phonetic.stats
+    pub fn set_shared_stats(&mut self, stats: std::sync::Arc<std::sync::Mutex<crate::ngram::UserStats>>) {
+        self.phonetic.stats = stats;
+    }
+
+    pub fn get_shared_stats(&self) -> std::sync::Arc<std::sync::Mutex<crate::ngram::UserStats>> {
+        self.phonetic.stats.clone()
     }
 
     pub fn set_layout(&mut self, layout_type: ActiveLayoutType, layout_json: &Value) {
@@ -202,9 +213,9 @@ impl InputSession {
             ActiveLayoutType::Fixed => {
                 let committed = self.fixed.commit();
                 if !committed.is_empty() {
-                    self.phonetic
-                        .stats
-                        .record_commit(committed.len(), &committed);
+                    if let Ok(mut stats) = self.phonetic.stats.lock() {
+                        stats.record_commit(committed.len(), &committed);
+                    }
                     Some(committed)
                 } else {
                     None
