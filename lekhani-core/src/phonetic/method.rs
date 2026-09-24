@@ -3,6 +3,7 @@
 use hashbrown::HashMap;
 use serde_json::Value;
 
+use super::ranking::RankFeatures;
 use super::suggestion::{AiProfile, PhoneticSuggestion};
 use crate::keycodes::*;
 
@@ -16,6 +17,7 @@ pub struct PhoneticMethod {
     pub suggestion_engine: PhoneticSuggestion,
     pub candidate_memory: HashMap<String, String>,
     pub current_candidates: Vec<String>,
+    pub current_candidate_features: Vec<RankFeatures>,
     pub selected_index: usize,
     pub default_selected_index: usize,
     pub use_dictionary: bool,
@@ -34,6 +36,7 @@ impl PhoneticMethod {
             suggestion_engine: PhoneticSuggestion::new(),
             candidate_memory: HashMap::new(),
             current_candidates: Vec::new(),
+            current_candidate_features: Vec::with_capacity(8),
             selected_index: 0,
             default_selected_index: 0,
             use_dictionary: true,
@@ -124,6 +127,7 @@ impl PhoneticMethod {
             &self.candidate_memory,
         );
         self.current_candidates = candidates;
+        self.current_candidate_features = self.suggestion_engine.get_last_computed_features().to_vec();
         self.selected_index = selected;
         self.default_selected_index = selected;
     }
@@ -185,8 +189,13 @@ impl PhoneticMethod {
             if index != self.default_selected_index && !self.buffer.is_empty() && !self.is_prediction_mode {
                 self.candidate_memory
                     .insert(self.buffer.clone(), committed.clone());
+                let chosen_f = self.current_candidate_features.get(index).copied();
+                let rejected_f = self.current_candidate_features.get(self.default_selected_index).copied();
                 if let Ok(mut l) = self.suggestion_engine.database.learner.write() {
                     l.record_candidate_selection(&self.buffer, committed);
+                    if let (Some(ref chosen), Some(ref rejected)) = (chosen_f, rejected_f) {
+                        l.update_rank_weights(chosen, rejected);
+                    }
                 }
                 self.suggestion_engine.clear_cache();
             }
@@ -213,6 +222,7 @@ impl PhoneticMethod {
     pub fn reset(&mut self) {
         self.buffer.clear();
         self.current_candidates.clear();
+        self.current_candidate_features.clear();
         self.selected_index = 0;
         self.default_selected_index = 0;
         self.is_prediction_mode = false;
@@ -380,6 +390,52 @@ mod tests {
 
         // Verify candidate memory now has the user's explicit preference
         assert_eq!(method.candidate_memory.get("ami"), Some(&chosen));
+    }
+
+    #[test]
+    fn test_candidate_selection_updates_rank_weights() {
+        let mut method = PhoneticMethod::new();
+        let initial_weights = method
+            .suggestion_engine
+            .database
+            .learner
+            .read()
+            .unwrap()
+            .rank_weights;
+
+        method.process_key(VC_A, 0);
+        method.process_key(VC_M, 0);
+        method.process_key(VC_I, 0);
+
+        assert!(method.current_candidates.len() >= 2);
+        assert_eq!(
+            method.current_candidates.len(),
+            method.current_candidate_features.len()
+        );
+
+        // Arrow down to candidate 1 and commit
+        method.select_next();
+        let _ = method.commit(method.selected_index).unwrap();
+
+        let updated_weights = method
+            .suggestion_engine
+            .database
+            .learner
+            .read()
+            .unwrap()
+            .rank_weights;
+
+        // Verify learner was marked dirty and weights were updated
+        let dirty = method
+            .suggestion_engine
+            .database
+            .learner
+            .read()
+            .unwrap()
+            .dirty;
+        assert!(dirty);
+
+        assert_ne!(initial_weights, updated_weights, "Expected rank weights to update on non-default selection");
     }
 
     #[test]

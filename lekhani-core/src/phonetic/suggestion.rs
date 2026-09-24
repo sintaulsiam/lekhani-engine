@@ -5,7 +5,7 @@ use rupantor::parser::PhoneticParser;
 use serde_json::Value;
 
 use super::database::PhoneticDatabase;
-use super::ranking::{CandidateContext, extract_candidate_features};
+use super::ranking::{CandidateContext, RankFeatures, extract_candidate_features};
 use crate::chars::BengaliCharExt;
 
 use std::sync::Arc;
@@ -83,7 +83,7 @@ impl Default for PhoneticSuggestionConfig {
 pub struct PhoneticSuggestion {
     pub database: PhoneticDatabase,
     phonetic_parser: Option<Arc<PhoneticParser>>,
-    cache: HashMap<String, Vec<String>>,
+    cache: HashMap<String, (Vec<String>, Vec<RankFeatures>)>,
     pub ai_context: lekhani_ai::ContextScorer,
     pub ai_predictor: lekhani_ai::NextWordPredictor,
     pub ai_decoder: lekhani_ai::BeamSearchDecoder,
@@ -91,6 +91,8 @@ pub struct PhoneticSuggestion {
     /// Generation number mirroring database.generation. When they diverge the
     /// local cache is stale and must be cleared before the next lookup.
     cache_generation: u64,
+    /// Features computed for the most recently ranked candidates
+    last_computed_features: Vec<RankFeatures>,
 }
 
 impl std::fmt::Debug for PhoneticSuggestion {
@@ -193,6 +195,7 @@ impl PhoneticSuggestion {
             ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
             cache_generation: 0,
+            last_computed_features: Vec::new(),
         }
     }
 
@@ -227,6 +230,7 @@ impl PhoneticSuggestion {
             ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
             cache_generation: 0,
+            last_computed_features: Vec::new(),
         }
     }
 
@@ -254,6 +258,10 @@ impl PhoneticSuggestion {
     /// Clear cached candidate suggestions
     pub fn clear_cache(&mut self) {
         self.cache.clear();
+    }
+
+    pub fn get_last_computed_features(&self) -> &[RankFeatures] {
+        &self.last_computed_features
     }
 
     /// Transliterate directly using Avro phonetic rules
@@ -507,25 +515,27 @@ impl PhoneticSuggestion {
                 cfg_mask
             )
         };
-        if let Some(cached) = self.cache.get(&cache_key) {
+        if let Some((cached_cands, cached_feats)) = self.cache.get(&cache_key) {
+            self.last_computed_features = cached_feats.clone();
             let selected_index = if let Some(fav) = candidate_memory
                 .get(term)
                 .or_else(|| candidate_memory.get(&cache_key))
             {
-                cached
+                cached_cands
                     .iter()
                     .position(|c| c == fav || c.contains(fav))
                     .unwrap_or(0)
             } else {
                 0
             };
-            return (cached.clone(), selected_index);
+            return (cached_cands.clone(), selected_index);
         }
 
         // 2. Direct whole-term special matches (Math `=125*8`, Currency `#usd50`, Snippets `!shubhechha`, Exact Emojis `:smile:`, `:)`, `$$`, `*taka*`)
         if self.config.enable_dynamic_macros || !term.starts_with('!') {
             let literals = self.database.search_special_literals(term);
             if !literals.is_empty() {
+                self.last_computed_features.clear();
                 let mut cands = literals;
                 if include_english && !cands.iter().any(|c| c == term) {
                     cands.push(term.to_string());
@@ -538,6 +548,7 @@ impl PhoneticSuggestion {
         if (term.starts_with(':') || term.starts_with('*')) && term.len() >= 2 {
             let prefix_emojis = self.database.search_emojis_prefix(term, 8);
             if !prefix_emojis.is_empty() {
+                self.last_computed_features.clear();
                 let mut cands = prefix_emojis;
                 if include_english && !cands.iter().any(|c| c == term) {
                     cands.push(term.to_string());
@@ -548,6 +559,7 @@ impl PhoneticSuggestion {
         if self.config.enable_dynamic_macros && term.starts_with('!') && term.len() >= 2 {
             let prefix_snippets = self.database.search_snippets_prefix(term, 8);
             if !prefix_snippets.is_empty() {
+                self.last_computed_features.clear();
                 let mut cands = prefix_snippets;
                 if include_english && !cands.iter().any(|c| c == term) {
                     cands.push(term.to_string());
@@ -565,6 +577,7 @@ impl PhoneticSuggestion {
         let middle = middle_norm.as_str();
 
         if middle.is_empty() {
+            self.last_computed_features.clear();
             let lonely = format!(
                 "{}{}{}",
                 self.convert_phonetic(pre),
@@ -1205,7 +1218,7 @@ impl PhoneticSuggestion {
             Vec::new()
         };
 
-        let mut scored_candidates: Vec<(String, i32)> = Vec::with_capacity(raw_candidates.len());
+        let mut scored_candidates: Vec<(String, i32, RankFeatures)> = Vec::with_capacity(raw_candidates.len());
         let learner_guard = self.database.learner.read().ok();
         let weights = learner_guard.as_ref().map(|l| l.rank_weights).unwrap_or_default();
 
@@ -1244,7 +1257,7 @@ impl PhoneticSuggestion {
 
         for cand in raw_candidates {
             if cand.source == CandidateSource::CodeShield {
-                scored_candidates.push((cand.text, 60000));
+                scored_candidates.push((cand.text, 60000, RankFeatures::default()));
                 continue;
             }
             if cand.source == CandidateSource::SegmentedLattice {
@@ -1253,7 +1266,7 @@ impl PhoneticSuggestion {
                 } else {
                     cand.initial_boost + 2000
                 };
-                scored_candidates.push((cand.text, boost));
+                scored_candidates.push((cand.text, boost, RankFeatures::default()));
                 continue;
             }
 
@@ -1298,19 +1311,19 @@ impl PhoneticSuggestion {
             let features = extract_candidate_features(&cand, is_in_dict, freq, trie_contains, &per_cand_ctx, is_clitic_o);
             let score = cand.initial_boost + weights.compute_score(&features);
 
-            scored_candidates.push((cand.text, score));
+            scored_candidates.push((cand.text, score, features));
         }
 
         // Sort candidates by descending total score
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
 
-        let mut candidates: Vec<String> = Vec::with_capacity(8);
-        let has_english = include_english && scored_candidates.iter().any(|(c, _)| c == term);
-        let has_emoji = scored_candidates.iter().any(|(c, _)| kw_emojis.contains(c));
+        let mut candidates: Vec<(String, RankFeatures)> = Vec::with_capacity(8);
+        let has_english = include_english && scored_candidates.iter().any(|(c, _, _)| c == term);
+        let has_emoji = scored_candidates.iter().any(|(c, _, _)| kw_emojis.contains(c));
         let first_emoji = scored_candidates
             .iter()
-            .find(|(c, _)| kw_emojis.contains(c))
-            .map(|(c, _)| c.clone());
+            .find(|(c, _, _)| kw_emojis.contains(c))
+            .map(|(c, _, f)| (c.clone(), *f));
 
         let text_target_len = match (has_english, has_emoji) {
             (true, true) => 6,
@@ -1318,44 +1331,48 @@ impl PhoneticSuggestion {
             (false, false) => 8,
         };
 
-        for (c, _) in &scored_candidates {
+        for (c, _, f) in &scored_candidates {
             if (c == term && !is_code) || kw_emojis.contains(c) {
                 continue;
             }
             if candidates.len() < text_target_len {
-                candidates.push(c.clone());
+                candidates.push((c.clone(), *f));
             }
         }
 
-        if let Some(em) = first_emoji {
-            if !candidates.contains(&em) {
-                candidates.push(em);
+        if let Some((em, em_f)) = first_emoji {
+            if !candidates.iter().any(|(c, _)| c == &em) {
+                candidates.push((em, em_f));
             }
         }
 
-        if has_english && !candidates.contains(&term.to_string()) {
-            candidates.push(term.to_string());
+        if has_english && !candidates.iter().any(|(c, _)| c == term) {
+            candidates.push((term.to_string(), RankFeatures::default()));
         }
 
         // Apply pre and post punctuation to candidates
         let mut final_candidates = Vec::with_capacity(candidates.len());
+        let mut final_features = Vec::with_capacity(candidates.len());
         let pre_converted = self.convert_phonetic(pre);
         let post_converted = self.convert_phonetic(post);
 
-        for cand in candidates {
+        for (cand, feat) in candidates {
             let norm_cand = fix_chandra_bindu_position(&cand);
             if pre.is_empty() && post.is_empty() {
                 final_candidates.push(norm_cand);
             } else {
                 final_candidates.push(format!("{}{}{}", pre_converted, norm_cand, post_converted));
             }
+            final_features.push(feat);
         }
+
+        self.last_computed_features = final_features;
 
         // Cache the computed candidates for instant sub-millisecond retrieval
         if self.cache.len() > 1000 {
             self.cache.clear();
         }
-        self.cache.insert(cache_key, final_candidates.clone());
+        self.cache.insert(cache_key, (final_candidates.clone(), self.last_computed_features.clone()));
 
         // Determine previously selected candidate index
         let selected_index = if let Some(fav) = candidate_memory
