@@ -1395,24 +1395,31 @@ impl LanguageModelInner {
 
     pub fn load_binary_file<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
         let path_ref = path.as_ref();
-        if let Ok(zc) = crate::zero_copy::ZeroCopyLanguageModel::from_file(path_ref) {
-            self.zero_copy = Some(Arc::new(zc));
-            self.unigrams.clear();
-            self.unigrams.shrink_to_fit();
-            self.bigrams.clear();
-            self.bigrams.shrink_to_fit();
-            self.trigrams.clear();
-            self.trigrams.shrink_to_fit();
-            self.next_word_map.clear();
-            self.next_word_map.shrink_to_fit();
-            self.next_trigram_map.clear();
-            self.next_trigram_map.shrink_to_fit();
-            return Ok(());
+        match crate::zero_copy::ZeroCopyLanguageModel::from_file(path_ref) {
+            Ok(zc) => {
+                self.zero_copy = Some(Arc::new(zc));
+                self.unigrams.clear();
+                self.unigrams.shrink_to_fit();
+                self.bigrams.clear();
+                self.bigrams.shrink_to_fit();
+                self.trigrams.clear();
+                self.trigrams.shrink_to_fit();
+                self.next_word_map.clear();
+                self.next_word_map.shrink_to_fit();
+                self.next_trigram_map.clear();
+                self.next_trigram_map.shrink_to_fit();
+                Ok(())
+            }
+            Err(e) => {
+                let data = crate::trainer::TrainedLanguageModelData::load_binary(path_ref)
+                    .map_err(|e_fb| std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("Failed to load zero-copy ({}) and fallback ({})", e, e_fb),
+                    ))?;
+                self.load_trained_data(&data);
+                Ok(())
+            }
         }
-
-        let data = crate::trainer::TrainedLanguageModelData::load_binary(path_ref)?;
-        self.load_trained_data(&data);
-        Ok(())
     }
 
     pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {

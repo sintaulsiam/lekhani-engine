@@ -109,12 +109,27 @@ impl ZeroCopyLanguageModel {
         let trigram_count = u32::from_le_bytes(data[24..28].try_into().unwrap()) as usize;
         let string_buffer_len = u32::from_le_bytes(data[28..32].try_into().unwrap()) as usize;
 
+        let vocab_bytes = vocab_count.checked_mul(6).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "vocab_count overflow")
+        })?;
+        let unigram_bytes = unigram_count.checked_mul(8).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "unigram_count overflow")
+        })?;
+        let bigram_bytes = bigram_count.checked_mul(12).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "bigram_count overflow")
+        })?;
+        let trigram_bytes = trigram_count.checked_mul(16).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "trigram_count overflow")
+        })?;
+
         let vocab_table_offset = 32;
-        let unigrams_offset = vocab_table_offset + (vocab_count * 6);
-        let bigrams_offset = unigrams_offset + (unigram_count * 8);
-        let trigrams_offset = bigrams_offset + (bigram_count * 12);
-        let string_buf_offset = trigrams_offset + (trigram_count * 16);
-        let expected_size = string_buf_offset + string_buffer_len;
+        let unigrams_offset = vocab_table_offset + vocab_bytes;
+        let bigrams_offset = unigrams_offset + unigram_bytes;
+        let trigrams_offset = bigrams_offset + bigram_bytes;
+        let string_buf_offset = trigrams_offset + trigram_bytes;
+        let expected_size = string_buf_offset.checked_add(string_buffer_len).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "LLM2 file size overflow")
+        })?;
 
         if data.len() < expected_size {
             return Err(std::io::Error::new(
@@ -125,6 +140,37 @@ impl ZeroCopyLanguageModel {
                     data.len()
                 ),
             ));
+        }
+
+        // Validate that string buffer contains valid UTF-8
+        let string_buf = &data[string_buf_offset..expected_size];
+        let string_buf_str = std::str::from_utf8(string_buf).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid UTF-8 in LLM2 string buffer: {}", e),
+            )
+        })?;
+
+        // Validate vocabulary table offsets and lengths
+        for id in 0..vocab_count {
+            let entry_offset = vocab_table_offset + (id * 6);
+            let str_offset = u32::from_le_bytes(data[entry_offset..entry_offset + 4].try_into().unwrap()) as usize;
+            let str_len = u16::from_le_bytes(data[entry_offset + 4..entry_offset + 6].try_into().unwrap()) as usize;
+            let end = str_offset.checked_add(str_len).ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Word entry {} offset overflow", id))
+            })?;
+            if end > string_buffer_len {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Word entry {} extends past string buffer bounds", id),
+                ));
+            }
+            if !string_buf_str.is_char_boundary(str_offset) || !string_buf_str.is_char_boundary(end) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Word entry {} splits a multi-byte UTF-8 character", id),
+                ));
+            }
         }
 
         Ok(Self {
@@ -171,7 +217,7 @@ impl ZeroCopyLanguageModel {
     #[inline]
     pub fn get_word(&self, word_id: u32) -> Option<&'static str> {
         let bytes = self.get_word_bytes(word_id)?;
-        unsafe { Some(std::str::from_utf8_unchecked(bytes)) }
+        std::str::from_utf8(bytes).ok()
     }
 
     /// Binary search for word ID in lexicographically sorted vocab table (zero allocations, ~25ns)
@@ -450,3 +496,60 @@ fn clean_token(s: &str) -> &str {
             || c == ','
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_zero_copy_rejects_invalid_utf8() {
+        // Construct minimum valid header with 1 vocab word
+        let mut buf = Vec::new();
+        buf.extend_from_slice(BINARY_MAGIC_V2); // 0..4
+        buf.extend_from_slice(&BINARY_VERSION_V2.to_le_bytes()); // 4..8
+        buf.extend_from_slice(&1u32.to_le_bytes()); // total_words: 8..12
+        buf.extend_from_slice(&1u32.to_le_bytes()); // vocab_count: 12..16
+        buf.extend_from_slice(&0u32.to_le_bytes()); // unigram_count: 16..20
+        buf.extend_from_slice(&0u32.to_le_bytes()); // bigram_count: 20..24
+        buf.extend_from_slice(&0u32.to_le_bytes()); // trigram_count: 24..28
+        buf.extend_from_slice(&2u32.to_le_bytes()); // string_buf_len: 28..32
+
+        // Vocab table entry: offset = 0, len = 2
+        buf.extend_from_slice(&0u32.to_le_bytes()); // offset
+        buf.extend_from_slice(&2u16.to_le_bytes()); // len
+
+        // Invalid UTF-8 string buffer: [0xFF, 0xFE]
+        buf.push(0xFF);
+        buf.push(0xFE);
+
+        // Leak buffer to get &'static [u8] for test
+        let slice: &'static [u8] = Box::leak(buf.into_boxed_slice());
+        let res = ZeroCopyLanguageModel::from_slice(slice);
+        assert!(res.is_err(), "ZeroCopyLanguageModel must reject invalid UTF-8 string buffer");
+    }
+
+    #[test]
+    fn test_zero_copy_rejects_out_of_bounds_offset() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(BINARY_MAGIC_V2);
+        buf.extend_from_slice(&BINARY_VERSION_V2.to_le_bytes());
+        buf.extend_from_slice(&1u32.to_le_bytes());
+        buf.extend_from_slice(&1u32.to_le_bytes());
+        buf.extend_from_slice(&0u32.to_le_bytes());
+        buf.extend_from_slice(&0u32.to_le_bytes());
+        buf.extend_from_slice(&0u32.to_le_bytes());
+        buf.extend_from_slice(&4u32.to_le_bytes()); // string_buf_len = 4
+
+        // Vocab table entry: offset = 2, len = 5 (exceeds string_buf_len 4!)
+        buf.extend_from_slice(&2u32.to_le_bytes());
+        buf.extend_from_slice(&5u16.to_le_bytes());
+
+        // Valid UTF-8 string buffer of len 4
+        buf.extend_from_slice(b"test");
+
+        let slice: &'static [u8] = Box::leak(buf.into_boxed_slice());
+        let res = ZeroCopyLanguageModel::from_slice(slice);
+        assert!(res.is_err(), "ZeroCopyLanguageModel must reject out-of-bounds vocab entry");
+    }
+}
+
