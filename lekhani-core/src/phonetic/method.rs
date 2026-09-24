@@ -3,7 +3,7 @@
 use hashbrown::HashMap;
 use serde_json::Value;
 
-use super::suggestion::PhoneticSuggestion;
+use super::suggestion::{AiProfile, PhoneticSuggestion};
 use crate::keycodes::*;
 
 use std::sync::{Arc, Mutex};
@@ -53,7 +53,10 @@ impl PhoneticMethod {
     }
 
     pub fn populate_predictions(&mut self) -> bool {
-        if !self.buffer.is_empty() {
+        if !self.buffer.is_empty()
+            || self.suggestion_engine.config.ai_profile == AiProfile::Off
+            || !self.suggestion_engine.config.enable_phrase_prediction
+        {
             return false;
         }
         let ctx_refs: Vec<&str> = self.recent_context.iter().map(|s| s.as_str()).collect();
@@ -372,6 +375,18 @@ mod tests {
 
         // Verify candidate memory now has the user's explicit preference
         assert_eq!(method.candidate_memory.get("ami"), Some(&chosen));
+    }
+
+    #[test]
+    fn test_ai_off_disables_predictions() {
+        let mut method = PhoneticMethod::new();
+        method.recent_context.push("আমি".to_string());
+        method.suggestion_engine.config.ai_profile = AiProfile::Off;
+
+        // Must return false and leave candidates empty
+        assert!(!method.populate_predictions());
+        assert!(method.current_candidates.is_empty());
+        assert!(!method.is_prediction_mode);
     }
 }
 

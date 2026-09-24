@@ -1443,7 +1443,10 @@ impl PhoneticSuggestion {
 
     /// Predict next words given multi-word sentence context (up to trigrams)
     pub fn suggest_next_words_with_context(&self, context: &[&str]) -> Vec<String> {
-        if context.is_empty() {
+        if context.is_empty()
+            || self.config.ai_profile == AiProfile::Off
+            || !self.config.enable_phrase_prediction
+        {
             return Vec::new();
         }
         let mut predictions = self.ai_predictor.predict_next_with_options(
