@@ -246,6 +246,11 @@ impl PhoneticSuggestion {
         self.cache.clear();
     }
 
+    /// Clear cached candidate suggestions
+    pub fn clear_cache(&mut self) {
+        self.cache.clear();
+    }
+
     /// Transliterate directly using Avro phonetic rules
     pub fn convert_phonetic(&self, text: &str) -> String {
         if text.is_empty() {

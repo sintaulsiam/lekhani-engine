@@ -42,6 +42,7 @@ impl InputSession {
             .suggestion_engine
             .database
             .load_user_autocorrect(path);
+        self.phonetic.suggestion_engine.clear_cache();
     }
 
     pub fn load_user_learned<P: AsRef<std::path::Path>>(&mut self, path: P) {
@@ -52,6 +53,7 @@ impl InputSession {
         if let Ok(l) = self.phonetic.suggestion_engine.database.learner.read() {
             self.phonetic.candidate_memory = l.candidate_memory.clone();
         }
+        self.phonetic.suggestion_engine.clear_cache();
     }
 
     pub fn save_user_learned<P: AsRef<std::path::Path>>(
@@ -72,6 +74,7 @@ impl InputSession {
             l.clear_user_data();
         }
         self.phonetic.candidate_memory.clear();
+        self.phonetic.suggestion_engine.clear_cache();
         self.phonetic
             .suggestion_engine
             .database

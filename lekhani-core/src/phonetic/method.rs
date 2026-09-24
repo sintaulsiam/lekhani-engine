@@ -188,6 +188,7 @@ impl PhoneticMethod {
                 if let Ok(mut l) = self.suggestion_engine.database.learner.write() {
                     l.record_candidate_selection(&self.buffer, committed);
                 }
+                self.suggestion_engine.clear_cache();
             }
             let prev_word = self.last_committed_word.clone();
             self.suggestion_engine
@@ -203,6 +204,10 @@ impl PhoneticMethod {
         }
         self.reset();
         text
+    }
+
+    pub fn clear_cache(&mut self) {
+        self.suggestion_engine.clear_cache();
     }
 
     pub fn reset(&mut self) {
