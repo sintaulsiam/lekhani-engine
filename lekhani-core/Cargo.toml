@@ -5,6 +5,9 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Core typing engine for Lekhani supporting Avro Phonetic, fixed layouts, Trie dictionary, Bijoy converter, and autocorrect"
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
 
 [dependencies]
 serde.workspace = true
@@ -14,8 +17,8 @@ rayon.workspace = true
 edit-distance.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-lekhani-parser = { path = "../lekhani-parser" }
+lekhani-parser.workspace = true
 chrono.workspace = true
 bincode.workspace = true
-lekhani-ai = { path = "../lekhani-ai" }
+lekhani-ai.workspace = true
 
