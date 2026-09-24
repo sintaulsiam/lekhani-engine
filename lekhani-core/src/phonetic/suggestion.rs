@@ -1121,29 +1121,63 @@ impl PhoneticSuggestion {
         let is_atomic_syllable = is_atomic_cv_syllable(&phonetic);
         let is_short_token = middle.chars().count() <= 3;
 
-        let has_valid_dict_candidates = raw_candidates.iter().any(|c| {
+        let has_dominant_homophone = raw_candidates.iter().any(|c| {
             c.source != CandidateSource::DirectTransliteration
                 && c.source != CandidateSource::SegmentedLattice
                 && c.source != CandidateSource::TypoFallback
+                && c.source != CandidateSource::TriePrefixAutocomplete
                 && c.text != phonetic
-                && self.database.is_exact_dictionary_word(&c.text)
+                && (c.source == CandidateSource::Autocorrect
+                    || c.source == CandidateSource::Loanword
+                    || self.database.get_frequency(&c.text) >= 1000)
         });
+
+        let is_clitic_o_word = |w: &str| -> bool {
+            w.ends_with('ও')
+                || w == "এখনো"
+                || w == "তখনো"
+                || w == "কখনো"
+                || w == "এমনো"
+                || w == "কোনো"
+        };
 
         let has_clitic_o_candidate = middle.ends_with('o')
             && !(middle.ends_with("yo") && raw_candidates.iter().any(|c| c.text.ends_with("্য")))
             && raw_candidates.iter().any(|c| {
-                (c.text.ends_with('ো') || c.text.ends_with('ও'))
-                    && (self.database.is_exact_dictionary_word(&c.text)
-                        || c.source == CandidateSource::MorphologicalInflection)
+                is_clitic_o_word(&c.text)
+                    && self.database.is_exact_dictionary_word(&c.text)
+                    && c.source != CandidateSource::TriePrefixAutocomplete
+                    && c.source != CandidateSource::TypoFallback
             });
 
         let has_clitic_i_candidate = !has_explicit_rri_digraph
             && middle.ends_with('i')
             && raw_candidates.iter().any(|c| {
-                (c.text.ends_with('ি') || c.text.ends_with('ী') || c.text.ends_with('ই'))
-                    && (self.database.is_exact_dictionary_word(&c.text)
-                        || c.source == CandidateSource::MorphologicalInflection)
+                c.text.ends_with('ই')
+                    && self.database.is_exact_dictionary_word(&c.text)
+                    && c.source != CandidateSource::TriePrefixAutocomplete
+                    && c.source != CandidateSource::TypoFallback
             });
+
+        let clitic_o_targets: Vec<String> = if has_clitic_o_candidate {
+            raw_candidates
+                .iter()
+                .filter(|c| is_clitic_o_word(&c.text))
+                .map(|c| c.text.clone())
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let clitic_i_targets: Vec<String> = if has_clitic_i_candidate {
+            raw_candidates
+                .iter()
+                .filter(|c| c.text.ends_with('ই'))
+                .map(|c| c.text.clone())
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         let mut scored_candidates: Vec<(String, i32)> = Vec::with_capacity(raw_candidates.len());
         let learner_guard = self.database.learner.read().ok();
@@ -1154,7 +1188,7 @@ impl PhoneticSuggestion {
                 continue;
             }
             if cand.source == CandidateSource::SegmentedLattice {
-                let boost = if is_primary_in_dict || has_valid_dict_candidates || preferred_loanword.is_some() {
+                let boost = if is_primary_in_dict || has_dominant_homophone || preferred_loanword.is_some() {
                     cand.initial_boost.min(3000)
                 } else {
                     cand.initial_boost + 2000
@@ -1168,13 +1202,13 @@ impl PhoneticSuggestion {
             let mut score = cand.initial_boost;
 
             // 1. Exact Dictionary Status & Promotion Rule
-            if is_in_dict || cand.source == CandidateSource::MorphologicalInflection {
+            if is_in_dict || cand.source == CandidateSource::MorphologicalInflection || cand.source == CandidateSource::Autocorrect || cand.source == CandidateSource::Loanword {
                 score += 2200;
             } else if cand.source == CandidateSource::DirectTransliteration {
                 // If raw transliteration is NOT in the dictionary, but valid sound-law alternatives exist,
                 // penalize full words so casual homophones (e.g. মানুষ for manus, চা for cha) win.
                 // But NEVER penalize when explicit casing, backticks, or explicit rri digraph are present!
-                if has_valid_dict_candidates
+                if has_dominant_homophone
                     && !has_explicit_casing
                     && !has_backtick
                     && !has_explicit_rri_digraph
@@ -1202,7 +1236,7 @@ impl PhoneticSuggestion {
             if cand.source != CandidateSource::EmojiKeyword {
                 let dist = edit_distance(&phonetic, &cand.text);
                 if cand.text == phonetic || cand.text == *primary {
-                    if is_in_dict || cand.source == CandidateSource::MorphologicalInflection {
+                    if is_in_dict || cand.source == CandidateSource::MorphologicalInflection || cand.source == CandidateSource::Autocorrect || cand.source == CandidateSource::Loanword {
                         score += 3500;
                     } else {
                         score += 1500;
@@ -1257,17 +1291,32 @@ impl PhoneticSuggestion {
 
             // 3b. Clitic preservation vs root-drop resolution (prevent high-frequency roots from suppressing clitics)
             if has_clitic_o_candidate {
-                if cand.text.ends_with('ো') || cand.text.ends_with('ও') {
+                let is_clitic_o = is_clitic_o_word(&cand.text);
+                if is_clitic_o {
                     score += 3500;
-                } else if !cand.text.ends_with('ো') && !cand.text.ends_with('ও') && !cand.text.ends_with("্য") {
+                } else if !cand.text.ends_with("্য")
+                    && clitic_o_targets.iter().any(|t| {
+                        t.strip_prefix(&cand.text).map_or(false, |s| {
+                            s == "ও"
+                                || (s == "ো"
+                                    && (t == "এখনো"
+                                        || t == "তখনো"
+                                        || t == "কখনো"
+                                        || t == "এমনো"
+                                        || t == "কোনো"))
+                        })
+                    })
+                {
                     score -= 3000;
                 }
             }
 
             if has_clitic_i_candidate {
-                if cand.text.ends_with('ি') || cand.text.ends_with('ী') || cand.text.ends_with('ই') {
+                if cand.text.ends_with('ই') {
                     score += 3500;
-                } else if !cand.text.ends_with('ি') && !cand.text.ends_with('ী') && !cand.text.ends_with('ই') {
+                } else if clitic_i_targets.iter().any(|t| {
+                    t.strip_prefix(&cand.text).map_or(false, |s| s == "ই")
+                }) {
                     score -= 3000;
                 }
             }
@@ -1313,7 +1362,7 @@ impl PhoneticSuggestion {
                 .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(middle)))
                 .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(&phonetic)))
             {
-                if &cand.text == fav || cand.text.contains(fav) {
+                if &cand.text == fav {
                     score += 5000;
                 }
             }
@@ -1390,7 +1439,7 @@ impl PhoneticSuggestion {
         {
             final_candidates
                 .iter()
-                .position(|c| c == fav || c.contains(fav))
+                .position(|c| c == fav)
                 .unwrap_or(0)
         } else {
             0
@@ -1649,8 +1698,8 @@ impl PhoneticSuggestion {
                     }
 
                     // Apply stem-level sound-laws (e.g. "manush" in "manusher" -> "মানুষ")
-                    // Only permit fuzzy expansion if base is verified or a multi-syllable stem (>= 4 chars)
-                    if has_verified_base || base_key.chars().count() >= 4 {
+                    // Only permit fuzzy expansion if base is verified or a multi-syllable stem (>= 5 chars)
+                    if has_verified_base || base_key.chars().count() >= 5 {
                         for fz in super::fuzzy::generate_phonetic_variants(base_key) {
                             let conv = self.convert_phonetic(&fz);
                             if self.database.is_exact_dictionary_word(&conv)
