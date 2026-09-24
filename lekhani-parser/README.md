@@ -53,6 +53,19 @@ let layout = CompiledLayout::from_json(&value).unwrap();
 let parser = LekhaniParser::new(Arc::new(layout));
 ```
 
+## Performance vs Rupantor
+
+Direct side-by-side benchmark (`cargo run --release --example compare_rupantor`, 100,000 iterations per test on Linux x86_64):
+
+| Workload | Rupantor | Lekhani (0-alloc) | Speedup |
+| :--- | :---: | :---: | :---: |
+| **Short word** (`"ami"`) | 857 ns/op | **44.5 ns/op** | **19.2× faster** |
+| **Medium word** (`"bangla"`) | 1,836 ns/op | **73.8 ns/op** | **24.9× faster** |
+| **Complex conjunct** (`"shikkhok"`) | 1,720 ns/op | **69.3 ns/op** | **24.8× faster** |
+| **Heavy conjuncts** (`"brriShTi"`) | 1,316 ns/op | **66.4 ns/op** | **19.8× faster** |
+| **Standard sentence** (`"amader bangladesh"`) | 7,125 ns/op | **192.3 ns/op** | **37.1× faster** |
+| **Long sentence** (`"ami banglay gan gai..."`) | 17,798 ns/op | **435.7 ns/op** | **40.8× faster** |
+
 ## Architecture
 
 1. **256-Byte Bitmask Character Classification Table**: Branchless $O(1)$ lookups for vowels, consonants, punctuation, digits, and case-sensitivity.
