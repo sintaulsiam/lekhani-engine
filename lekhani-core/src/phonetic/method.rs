@@ -17,6 +17,7 @@ pub struct PhoneticMethod {
     pub candidate_memory: HashMap<String, String>,
     pub current_candidates: Vec<String>,
     pub selected_index: usize,
+    pub default_selected_index: usize,
     pub use_dictionary: bool,
     pub include_english: bool,
     pub last_committed_word: Option<String>,
@@ -34,6 +35,7 @@ impl PhoneticMethod {
             candidate_memory: HashMap::new(),
             current_candidates: Vec::new(),
             selected_index: 0,
+            default_selected_index: 0,
             use_dictionary: true,
             include_english: true,
             last_committed_word: None,
@@ -120,6 +122,7 @@ impl PhoneticMethod {
         );
         self.current_candidates = candidates;
         self.selected_index = selected;
+        self.default_selected_index = selected;
     }
 
     pub fn get_buffer(&self) -> &str {
@@ -176,7 +179,7 @@ impl PhoneticMethod {
         let text = self.current_candidates.get(index).cloned();
         if let Some(ref committed) = text {
             let typed_len = self.buffer.len();
-            if self.selected_index != index && !self.buffer.is_empty() {
+            if index != self.default_selected_index && !self.buffer.is_empty() && !self.is_prediction_mode {
                 self.candidate_memory
                     .insert(self.buffer.clone(), committed.clone());
                 if let Ok(mut l) = self.suggestion_engine.database.learner.write() {
@@ -203,6 +206,7 @@ impl PhoneticMethod {
         self.buffer.clear();
         self.current_candidates.clear();
         self.selected_index = 0;
+        self.default_selected_index = 0;
         self.is_prediction_mode = false;
         self.is_prediction_navigated = false;
     }
@@ -342,3 +346,32 @@ fn keycode_to_char(key: u16) -> Option<char> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_arrow_navigation_learns_candidate() {
+        let mut method = PhoneticMethod::new();
+        method.process_key(VC_A, 0);
+        method.process_key(VC_M, 0);
+        method.process_key(VC_I, 0);
+
+        assert!(!method.current_candidates.is_empty());
+        assert_eq!(method.default_selected_index, 0);
+
+        // Arrow down to candidate 1
+        method.select_next();
+        assert_eq!(method.selected_index, 1);
+        let chosen = method.current_candidates[1].clone();
+
+        // Commit candidate 1 (as Space/Enter does with self.selected_index)
+        let committed = method.commit(method.selected_index).unwrap();
+        assert_eq!(committed, chosen);
+
+        // Verify candidate memory now has the user's explicit preference
+        assert_eq!(method.candidate_memory.get("ami"), Some(&chosen));
+    }
+}
+
