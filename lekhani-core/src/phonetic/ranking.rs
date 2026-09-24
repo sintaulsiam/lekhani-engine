@@ -132,6 +132,169 @@ impl RankWeights {
     }
 }
 
+use super::suggestion::{CandidateHypothesis, CandidateSource};
+use edit_distance::edit_distance;
+
+/// Per-token contextual properties extracted once per keystroke.
+pub struct CandidateContext<'a> {
+    pub phonetic: &'a str,
+    pub primary: &'a str,
+    pub middle: &'a str,
+    pub term: &'a str,
+    pub has_dominant_homophone: bool,
+    pub has_explicit_casing: bool,
+    pub has_backtick: bool,
+    pub has_explicit_rri_digraph: bool,
+    pub is_atomic_syllable: bool,
+    pub is_primary_in_dict: bool,
+    pub is_short_token: bool,
+    pub has_clitic_o_candidate: bool,
+    pub has_clitic_i_candidate: bool,
+    pub clitic_o_targets: &'a [String],
+    pub clitic_i_targets: &'a [String],
+    pub lm_score: Option<f32>,
+    pub user_bigram_boost: i32,
+    pub is_user_favored: bool,
+    pub is_user_learned: bool,
+}
+
+/// Extract a 12-dimensional normalized feature vector for a candidate hypothesis.
+/// Stack-allocated, zero heap allocations.
+pub fn extract_candidate_features(
+    cand: &CandidateHypothesis,
+    is_in_dict: bool,
+    freq: u32,
+    trie_contains: bool,
+    ctx: &CandidateContext,
+    is_clitic_o: bool,
+) -> RankFeatures {
+    let mut f = RankFeatures::default();
+
+    // 1. Dictionary & Trie Presence
+    if is_in_dict
+        || cand.source == CandidateSource::MorphologicalInflection
+        || cand.source == CandidateSource::Autocorrect
+        || cand.source == CandidateSource::Loanword
+    {
+        f.is_in_dict = 1.0;
+    } else if cand.source == CandidateSource::DirectTransliteration {
+        if ctx.has_dominant_homophone
+            && !ctx.has_explicit_casing
+            && !ctx.has_backtick
+            && !ctx.has_explicit_rri_digraph
+            && (!ctx.is_atomic_syllable || !ctx.is_primary_in_dict)
+            && !ctx.is_short_token
+        {
+            f.is_in_dict = -1.27; // -2800 / 2200
+        }
+    }
+
+    // 2. Frequency
+    if freq > 0 {
+        let log_freq = (freq as f32).log2().clamp(0.0, 16.0);
+        f.normalized_freq = log_freq / 16.0;
+    }
+    if freq >= 8000 {
+        f.is_high_freq = 1.0;
+    } else if trie_contains {
+        f.is_high_freq = 0.5; // +1000
+    }
+
+    // 3. Phonetic Similarity & Length
+    if cand.source != CandidateSource::EmojiKeyword {
+        let dist = edit_distance(ctx.phonetic, &cand.text);
+        let max_len = ctx
+            .phonetic
+            .chars()
+            .count()
+            .max(cand.text.chars().count())
+            .max(1) as f32;
+        f.phonetic_similarity = 1.0 - (dist as f32 / max_len).min(1.0);
+
+        let len_diff = (cand.text.chars().count() as isize - ctx.phonetic.chars().count() as isize)
+            .abs() as f32;
+        f.length_penalty = -(len_diff / max_len).min(1.0);
+
+        if cand.text == ctx.phonetic || cand.text == ctx.primary {
+            f.is_exact_phonetic = 1.0;
+            if ctx.has_backtick {
+                f.intent_modifier_boost = 1.11; // 5000 / 4500
+            } else if ctx.has_explicit_casing || ctx.has_explicit_rri_digraph {
+                f.intent_modifier_boost = 0.78; // 3500 / 4500
+            } else if ctx.is_atomic_syllable && ctx.is_primary_in_dict {
+                f.intent_modifier_boost = 0.67; // 3000 / 4500
+            } else if ctx.is_short_token {
+                f.intent_modifier_boost = 0.27; // 1200 / 4500
+            }
+        } else if cand.source == CandidateSource::TypoFallback {
+            f.source_weight = -1.68; // -4200 / 2500
+        }
+    }
+
+    // 4. Source Priority
+    match cand.source {
+        CandidateSource::Autocorrect | CandidateSource::Loanword => f.source_weight = 1.0,
+        CandidateSource::MorphologicalInflection => f.source_weight = 0.8,
+        CandidateSource::DirectTransliteration => f.source_weight = 0.5,
+        CandidateSource::FuzzySoundLaw => f.source_weight = 0.2,
+        _ => {}
+    }
+
+    // 5. Clitics
+    if ctx.has_clitic_o_candidate {
+        if is_clitic_o {
+            f.clitic_alignment = 1.0;
+        } else if !cand.text.ends_with("্য")
+            && ctx.clitic_o_targets.iter().any(|t| {
+                t.strip_prefix(&cand.text).map_or(false, |s| {
+                    s == "ও"
+                        || (s == "ো"
+                            && (t == "এখনো"
+                                || t == "তখনো"
+                                || t == "কখনো"
+                                || t == "এমনো"
+                                || t == "কোনো"
+                                || t == "যখনো"))
+                })
+            })
+        {
+            f.clitic_alignment = -1.28; // -4500 / 3500
+        }
+    }
+
+    if ctx.has_clitic_i_candidate {
+        if cand.text.ends_with('ই') {
+            f.clitic_alignment = 1.0;
+        } else if ctx
+            .clitic_i_targets
+            .iter()
+            .any(|t| t.strip_prefix(&cand.text).map_or(false, |s| s == "ই"))
+        {
+            f.clitic_alignment = -0.85; // -3000 / 3500
+        }
+    }
+
+    // 6. Language Model
+    if let Some(lm) = ctx.lm_score {
+        // Continuous scale: clamp log-prob to [-6, 0] then map to [0, 1]
+        f.lm_score = (lm.max(-6.0) / 6.0 + 1.0).clamp(0.0, 1.0);
+    }
+
+    // 7. Dynamic User Bigram & Personalization
+    if ctx.user_bigram_boost > 0 {
+        f.user_bigram_prob = (ctx.user_bigram_boost as f32 / 4500.0).clamp(0.0, 1.0);
+    }
+
+    if ctx.is_user_favored {
+        f.user_favored = 1.0;
+    } else if ctx.is_user_learned {
+        f.user_favored = 0.7; // 3500 / 5000
+    }
+
+    f
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,4 +343,43 @@ mod tests {
         }
         assert_eq!(weights.lm_score, 8000.0); // max clamp
     }
+
+    #[test]
+    fn test_extract_candidate_features() {
+        let targets = Vec::new();
+        let ctx = CandidateContext {
+            phonetic: "ami",
+            primary: "আমি",
+            middle: "ami",
+            term: "ami",
+            has_dominant_homophone: false,
+            has_explicit_casing: false,
+            has_backtick: false,
+            has_explicit_rri_digraph: false,
+            is_atomic_syllable: false,
+            is_primary_in_dict: true,
+            is_short_token: false,
+            has_clitic_o_candidate: false,
+            has_clitic_i_candidate: false,
+            clitic_o_targets: &targets,
+            clitic_i_targets: &targets,
+            lm_score: Some(-0.5),
+            user_bigram_boost: 0,
+            is_user_favored: false,
+            is_user_learned: false,
+        };
+
+        let cand = CandidateHypothesis {
+            text: "আমি".to_string(),
+            source: CandidateSource::DirectTransliteration,
+            initial_boost: 0,
+        };
+
+        let f = extract_candidate_features(&cand, true, 10000, true, &ctx, false);
+        assert_eq!(f.is_in_dict, 1.0);
+        assert_eq!(f.is_high_freq, 1.0);
+        assert_eq!(f.is_exact_phonetic, 1.0);
+        assert!(f.lm_score > 0.8);
+    }
 }
+
