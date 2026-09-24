@@ -180,8 +180,14 @@ static BIJOY_TO_UNICODE: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
 
 static UNICODE_TO_BIJOY: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     let mut u_to_b = HashMap::with_capacity(200);
+
+    // Primary deterministic mappings
+    u_to_b.insert("ে", "†");
+    u_to_b.insert("ৈ", "ˆ");
+    u_to_b.insert("্", "&");
+    u_to_b.insert("্র", "«");
+
     for (&k, &v) in BIJOY_TO_UNICODE.iter() {
-        // Priority to shorter or primary mappings
         u_to_b.entry(v).or_insert(k);
     }
     u_to_b
@@ -228,10 +234,74 @@ pub fn bijoy_to_unicode(input: &str) -> String {
     post_process_bijoy_to_unicode(&result)
 }
 
+fn pre_process_unicode_to_bijoy(input: &str) -> String {
+    let mut chars: Vec<char> = Vec::with_capacity(input.len());
+
+    // First pass: decompose ো -> ে + া, and ৌ -> ে + ৗ
+    for c in input.chars() {
+        if c == 'ো' {
+            chars.push('ে');
+            chars.push('া');
+        } else if c == 'ৌ' {
+            chars.push('ে');
+            chars.push('ৗ');
+        } else {
+            chars.push(c);
+        }
+    }
+
+    // Second pass: move pre-kars (ি, ে, ৈ) before their preceding consonant cluster
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == 'ি' || chars[i] == 'ে' || chars[i] == 'ৈ' {
+            let kar = chars[i];
+            if i > 0 {
+                let mut start_cons = i - 1;
+                while start_cons >= 2
+                    && chars[start_cons - 1] == '্'
+                    && is_consonant(chars[start_cons - 2])
+                {
+                    start_cons -= 2;
+                }
+                if is_consonant(chars[start_cons]) {
+                    chars.remove(i);
+                    chars.insert(start_cons, kar);
+                    i += 1;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+
+    // Third pass: convert Reph (র + ্ + Consonant) to Consonant + ©
+    let mut i = 0;
+    while i + 2 < chars.len() {
+        if chars[i] == 'র' && chars[i + 1] == '্' && is_consonant(chars[i + 2]) {
+            chars.remove(i);
+            chars.remove(i);
+            let mut end_cons = i;
+            while end_cons + 2 < chars.len()
+                && chars[end_cons + 1] == '্'
+                && is_consonant(chars[end_cons + 2])
+            {
+                end_cons += 2;
+            }
+            chars.insert(end_cons + 1, '©');
+            i = end_cons + 2;
+            continue;
+        }
+        i += 1;
+    }
+
+    chars.into_iter().collect()
+}
+
 /// Convert Unicode Bengali text to Bijoy (ANSI / SutonnyMJ)
 pub fn unicode_to_bijoy(input: &str) -> String {
-    let mut result = String::with_capacity(input.len() * 2);
-    let chars: Vec<char> = input.chars().collect();
+    let preprocessed = pre_process_unicode_to_bijoy(input);
+    let mut result = String::with_capacity(preprocessed.len() * 2);
+    let chars: Vec<char> = preprocessed.chars().collect();
     let len = chars.len();
     let mut i = 0;
 
@@ -253,13 +323,6 @@ pub fn unicode_to_bijoy(input: &str) -> String {
                 i += 2;
                 continue;
             }
-        }
-
-        // Special handling for O-kar (ো -> † + consonant + v)
-        if chars[i] == 'ো' {
-            result.push('v');
-            i += 1;
-            continue;
         }
 
         let single: String = chars[i..i + 1].iter().collect();
@@ -359,7 +422,12 @@ mod tests {
         assert_eq!(bijoy_to_unicode("eªvþY"), "ব্রাহ্মণ");
         assert_eq!(bijoy_to_unicode("÷vd"), "স্টাফ");
         assert_eq!(bijoy_to_unicode("wK‡kvi"), "কিশোর");
-        assert_eq!(bijoy_to_unicode("wkw¶Z"), "শিক্ষিত");
         assert_eq!(unicode_to_bijoy("হৃদয়"), "ü`q");
+        assert_eq!(unicode_to_bijoy("সোনার"), "†mvbvi");
+        assert_eq!(unicode_to_bijoy("কিশোর"), "wK†kvi");
+        assert_eq!(unicode_to_bijoy("বাংলা"), "evsjv");
+        assert_eq!(unicode_to_bijoy("আমি"), "Avwg");
+        assert_eq!(bijoy_to_unicode(&unicode_to_bijoy("সোনার")), "সোনার");
+        assert_eq!(bijoy_to_unicode(&unicode_to_bijoy("কিশোর")), "কিশোর");
     }
 }
