@@ -192,17 +192,31 @@ impl PhoneticSuggestion {
         }
     }
 
+    /// Check if a layout JSON structure contains valid phonetic patterns
+    pub fn is_valid_phonetic_layout(layout_json: &Value) -> bool {
+        let layout_obj = if let Some(l) = layout_json.get("layout") {
+            l
+        } else {
+            layout_json
+        };
+        layout_obj.is_object() && layout_obj.get("patterns").map_or(false, |p| p.is_array())
+    }
+
     pub fn with_layout(layout_json: &Value) -> Self {
         let layout_obj = if let Some(l) = layout_json.get("layout") {
             l
         } else {
             layout_json
         };
-        let parser = Arc::new(PhoneticParser::new(layout_obj));
+        let parser = if Self::is_valid_phonetic_layout(layout_json) {
+            std::panic::catch_unwind(|| Arc::new(PhoneticParser::new(layout_obj))).ok()
+        } else {
+            None
+        };
         let lm = lekhani_ai::LanguageModel::new();
         Self {
             database: PhoneticDatabase::new(),
-            phonetic_parser: Some(parser),
+            phonetic_parser: parser,
             cache: HashMap::new(),
             ai_context: lekhani_ai::ContextScorer::with_language_model(lm.clone()),
             ai_predictor: lekhani_ai::NextWordPredictor::with_language_model(lm.clone()),
@@ -211,14 +225,20 @@ impl PhoneticSuggestion {
         }
     }
 
-    pub fn set_layout(&mut self, layout_json: &Value) {
+    pub fn set_layout(&mut self, layout_json: &Value) -> bool {
         let layout_obj = if let Some(l) = layout_json.get("layout") {
             l
         } else {
             layout_json
         };
-        self.phonetic_parser = Some(Arc::new(PhoneticParser::new(layout_obj)));
-        self.cache.clear();
+        if Self::is_valid_phonetic_layout(layout_json) {
+            if let Ok(parser) = std::panic::catch_unwind(|| Arc::new(PhoneticParser::new(layout_obj))) {
+                self.phonetic_parser = Some(parser);
+                self.cache.clear();
+                return true;
+            }
+        }
+        false
     }
 
     pub fn update_config(&mut self, config: PhoneticSuggestionConfig) {
@@ -2623,5 +2643,22 @@ mod tests {
         sugg.config.auto_dari = false;
         let (cands_disabled, _) = sugg.suggest("..", true, true, &empty_memory);
         assert_ne!(cands_disabled.first().map(|s| s.as_str()), Some("।"));
+    }
+
+    #[test]
+    fn test_malformed_layout_json_handling() {
+        let mut sugg = PhoneticSuggestion::new();
+
+        // 1. Null layout
+        assert!(!sugg.set_layout(&serde_json::Value::Null));
+
+        // 2. String layout
+        assert!(!sugg.set_layout(&serde_json::json!("invalid layout string")));
+
+        // 3. Object without patterns
+        assert!(!sugg.set_layout(&serde_json::json!({"name": "broken"})));
+
+        // 4. Object with non-array patterns
+        assert!(!sugg.set_layout(&serde_json::json!({"patterns": 123})));
     }
 }
