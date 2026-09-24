@@ -129,6 +129,8 @@ impl InputSession {
     }
 
     pub fn update_suggestion_config(&mut self, config: crate::PhoneticSuggestionConfig) {
+        self.phonetic.use_dictionary = config.use_dictionary;
+        self.phonetic.include_english = config.include_english;
         self.phonetic.suggestion_engine.update_config(config);
     }
 
