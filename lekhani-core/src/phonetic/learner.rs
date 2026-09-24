@@ -302,12 +302,7 @@ impl AutonomousLearner {
         buf.extend_from_slice(&Self::BINARY_VERSION.to_le_bytes());
         buf.extend_from_slice(&payload);
 
-        let tmp_path = path.with_extension("tmp");
-        let res = if std::fs::write(&tmp_path, &buf).is_ok() && std::fs::rename(&tmp_path, path).is_ok() {
-            Ok(())
-        } else {
-            std::fs::write(path, &buf)
-        };
+        let res = crate::fs::atomic_write_secure(path, &buf);
 
         if res.is_ok() {
             self.dirty = false;
