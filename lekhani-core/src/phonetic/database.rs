@@ -4,6 +4,7 @@ use crate::snippets::SnippetManager;
 use crate::trie::PrefixTrie;
 use hashbrown::HashMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone)]
@@ -16,6 +17,11 @@ pub struct PhoneticDatabase {
     emojis: Arc<EmojiMap>,
     snippets: Arc<SnippetManager>,
     pub learner: Arc<RwLock<AutonomousLearner>>,
+    /// Monotonically increasing generation counter.
+    /// Bumped on any mutation that can change candidate output
+    /// (dictionary load, autocorrect reload). Lets per-session suggestion
+    /// caches detect staleness with a single atomic read — zero lock contention.
+    pub generation: Arc<AtomicU64>,
 }
 
 impl Default for PhoneticDatabase {
@@ -430,6 +436,7 @@ impl PhoneticDatabase {
             emojis: Arc::new(EmojiMap::new()),
             snippets: Arc::new(SnippetManager::new()),
             learner: Arc::new(RwLock::new(AutonomousLearner::new())),
+            generation: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -536,6 +543,8 @@ impl PhoneticDatabase {
         }
         trie.ensure_sorted();
 
+        // Signal any cached suggestion engines to invalidate
+        self.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
 
@@ -546,6 +555,7 @@ impl PhoneticDatabase {
             if let Ok(content) = std::fs::read_to_string(path) {
                 if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
                     self.user_autocorrect = map;
+                    self.generation.fetch_add(1, Ordering::Relaxed);
                 }
             }
         }
@@ -598,11 +608,16 @@ impl PhoneticDatabase {
     /// Add custom user autocorrect entry
     pub fn insert_user_autocorrect(&mut self, trigger: String, replacement: String) {
         self.user_autocorrect.insert(trigger, replacement);
+        self.generation.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Remove custom user autocorrect entry
     pub fn remove_user_autocorrect(&mut self, trigger: &str) -> Option<String> {
-        self.user_autocorrect.remove(trigger)
+        let v = self.user_autocorrect.remove(trigger);
+        if v.is_some() {
+            self.generation.fetch_add(1, Ordering::Relaxed);
+        }
+        v
     }
 
     pub fn get_user_autocorrect(&self) -> &HashMap<String, String> {
