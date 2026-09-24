@@ -168,12 +168,12 @@ impl PrefixTrie {
         }
     }
 
-    /// Get frequency weight of a word (defaults to 10 if unindexed)
+    /// Get frequency weight of a word (returns 0 if unindexed)
     pub fn get_frequency(&self, key: &str) -> u32 {
         if let Ok(idx) = self.entries.binary_search_by(|e| self.word_at(e).cmp(key)) {
             self.entries[idx].freq
         } else {
-            10
+            0
         }
     }
 

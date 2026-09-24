@@ -574,6 +574,14 @@ impl PhoneticDatabase {
         }
     }
 
+    /// Explicitly learn a new word into the autonomous learner
+    pub fn learn_word(&self, word: &str) {
+        if let Ok(mut l) = self.learner.write() {
+            l.learned_words.insert(word.to_string());
+            l.dirty = true;
+        }
+    }
+
     /// Add custom user autocorrect entry
     pub fn insert_user_autocorrect(&mut self, trigger: String, replacement: String) {
         self.user_autocorrect.insert(trigger, replacement);
@@ -1537,5 +1545,22 @@ mod tests {
         if let Some(res) = db.get_autocorrect_raw("birthday") {
             assert_eq!(res, "বার্থডে");
         }
+    }
+
+    #[test]
+    fn test_learned_word_frequency_promotion() {
+        let db = PhoneticDatabase::new();
+        let test_word = "একটিঅনন্যনতুনশব্দ৯৯৯";
+
+        // Baseline: completely unknown word has 0 frequency
+        assert_eq!(db.get_frequency(test_word), 0);
+        assert!(!db.is_exact_dictionary_word(test_word));
+
+        // Learn the word
+        db.learn_word(test_word);
+
+        // Word should now have 9500 frequency and be recognized as exact dictionary word
+        assert_eq!(db.get_frequency(test_word), 9500);
+        assert!(db.is_exact_dictionary_word(test_word));
     }
 }
