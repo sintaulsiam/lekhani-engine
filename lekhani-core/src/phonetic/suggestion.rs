@@ -568,12 +568,25 @@ impl PhoneticSuggestion {
                         raw_candidates: &mut Vec<CandidateHypothesis>,
                         seen: &mut hashbrown::HashSet<String>| {
             text = fix_chandra_bindu_position(&text);
-            if !text.is_empty() && seen.insert(text.clone()) {
-                raw_candidates.push(CandidateHypothesis {
-                    text,
-                    source,
-                    initial_boost,
-                });
+            if !text.is_empty() {
+                if seen.insert(text.clone()) {
+                    raw_candidates.push(CandidateHypothesis {
+                        text,
+                        source,
+                        initial_boost,
+                    });
+                } else if source == CandidateSource::MorphologicalInflection
+                    || source == CandidateSource::ExactDictionary
+                {
+                    if let Some(existing) = raw_candidates.iter_mut().find(|c| c.text == text) {
+                        if existing.source == CandidateSource::DirectTransliteration
+                            || existing.source == CandidateSource::TypoFallback
+                        {
+                            existing.source = source;
+                            existing.initial_boost = existing.initial_boost.max(initial_boost);
+                        }
+                    }
+                }
             }
         };
 
@@ -1111,9 +1124,25 @@ impl PhoneticSuggestion {
         let has_valid_dict_candidates = raw_candidates.iter().any(|c| {
             c.source != CandidateSource::DirectTransliteration
                 && c.source != CandidateSource::SegmentedLattice
+                && c.source != CandidateSource::TypoFallback
                 && c.text != phonetic
                 && self.database.is_exact_dictionary_word(&c.text)
         });
+
+        let has_clitic_o_candidate = middle.ends_with('o')
+            && raw_candidates.iter().any(|c| {
+                (c.text.ends_with('ো') || c.text.ends_with('ও'))
+                    && (self.database.is_exact_dictionary_word(&c.text)
+                        || c.source == CandidateSource::MorphologicalInflection)
+            });
+
+        let has_clitic_i_candidate = !has_explicit_rri_digraph
+            && middle.ends_with('i')
+            && raw_candidates.iter().any(|c| {
+                (c.text.ends_with('ি') || c.text.ends_with('ী') || c.text.ends_with('ই'))
+                    && (self.database.is_exact_dictionary_word(&c.text)
+                        || c.source == CandidateSource::MorphologicalInflection)
+            });
 
         let mut scored_candidates: Vec<(String, i32)> = Vec::with_capacity(raw_candidates.len());
         let learner_guard = self.database.learner.read().ok();
@@ -1138,7 +1167,7 @@ impl PhoneticSuggestion {
             let mut score = cand.initial_boost;
 
             // 1. Exact Dictionary Status & Promotion Rule
-            if is_in_dict {
+            if is_in_dict || cand.source == CandidateSource::MorphologicalInflection {
                 score += 2200;
             } else if cand.source == CandidateSource::DirectTransliteration {
                 // If raw transliteration is NOT in the dictionary, but valid sound-law alternatives exist,
@@ -1172,7 +1201,7 @@ impl PhoneticSuggestion {
             if cand.source != CandidateSource::EmojiKeyword {
                 let dist = edit_distance(&phonetic, &cand.text);
                 if cand.text == phonetic || cand.text == *primary {
-                    if is_in_dict {
+                    if is_in_dict || cand.source == CandidateSource::MorphologicalInflection {
                         score += 3500;
                     } else {
                         score += 1500;
@@ -1189,8 +1218,8 @@ impl PhoneticSuggestion {
                 } else if cand.source == CandidateSource::TypoFallback {
                     // Typo fallback candidates alter the user's physical keypresses;
                     // apply motor slip penalty so intentional words aren't hijacked
-                    score -= 2400;
-                    score -= (dist.min(3) as i32) * 100;
+                    score -= 4200;
+                    score -= (dist.min(3) as i32) * 200;
                 } else {
                     score -= (dist as i32) * 200;
                     let len_diff = (cand.text.chars().count() as isize
@@ -1222,6 +1251,23 @@ impl PhoneticSuggestion {
                             score -= 3500;
                         }
                     }
+                }
+            }
+
+            // 3b. Clitic preservation vs root-drop resolution (prevent high-frequency roots from suppressing clitics)
+            if has_clitic_o_candidate {
+                if cand.text.ends_with('ো') || cand.text.ends_with('ও') {
+                    score += 3500;
+                } else if !cand.text.ends_with('ো') && !cand.text.ends_with('ও') {
+                    score -= 3000;
+                }
+            }
+
+            if has_clitic_i_candidate {
+                if cand.text.ends_with('ি') || cand.text.ends_with('ী') || cand.text.ends_with('ই') {
+                    score += 3500;
+                } else if !cand.text.ends_with('ি') && !cand.text.ends_with('ী') && !cand.text.ends_with('ই') {
+                    score -= 3000;
                 }
             }
 
@@ -1694,48 +1740,56 @@ impl PhoneticSuggestion {
                                 "েছিল" => "গিয়েছিল".to_string(),
                                 _ => format!("গে{}", exp),
                             },
-                            "bhab" => match exp {
-                                "ছি" => "ভাবছি".to_string(),
+                            "bhab" | "vab" => match exp {
+                                "ছি" | "চ্ছি" => "ভাবছি".to_string(),
                                 "েছি" => "ভেবেছি".to_string(),
-                                "ছিলাম" => "ভাবছিলাম".to_string(),
+                                "ছিলাম" | "চ্ছিলাম" => "ভাবছিলাম".to_string(),
                                 "েছিলাম" => "ভেবেছিলাম".to_string(),
                                 "ব" => "ভাবব".to_string(),
                                 _ => format!("ভাব{}", exp),
                             },
                             "bujh" => match exp {
-                                "ছি" => "বুঝছি".to_string(),
+                                "ছি" | "চ্ছি" => "বুঝছি".to_string(),
                                 "েছি" => "বুঝেছি".to_string(),
-                                "ছিলাম" => "বুঝছিলাম".to_string(),
+                                "ছিলাম" | "চ্ছিলাম" => "বুঝছিলাম".to_string(),
                                 "েছিলাম" => "বুঝেছিলাম".to_string(),
                                 "ব" => "বুঝব".to_string(),
                                 _ => format!("বুঝ{}", exp),
                             },
                             "ash" | "as" => match exp {
-                                "ছি" => "আসছি".to_string(),
+                                "ছি" | "চ্ছি" => "আসছি".to_string(),
                                 "েছি" => "এসেছি".to_string(),
-                                "ছিলাম" => "আসছিলাম".to_string(),
+                                "ছিলাম" | "চ্ছিলাম" => "আসছিলাম".to_string(),
                                 "েছিলাম" => "এসেছিলাম".to_string(),
                                 "ব" => "আসব".to_string(),
                                 _ => format!("আস{}", exp),
                             },
                             "bol" => match exp {
-                                "ছি" => "বলছি".to_string(),
+                                "ছি" | "চ্ছি" => "বলছি".to_string(),
+                                "ছে" | "চ্ছে" => "বলছে".to_string(),
+                                "ছো" | "চ্ছো" => "বলছো".to_string(),
                                 "েছি" => "বলেছি".to_string(),
-                                "ছিলাম" => "বলছিলাম".to_string(),
+                                "ছিলাম" | "চ্ছিলাম" => "বলছিলাম".to_string(),
                                 "েছিলাম" => "বলেছিলাম".to_string(),
+                                "ছিল" | "চ্ছিল" => "বলছিল".to_string(),
+                                "েছিল" => "বলেছিল".to_string(),
+                                "ছেন" | "চ্ছেন" => "বলছেন".to_string(),
+                                "েছেন" => "বলেছেন".to_string(),
                                 "ব" => "বলব".to_string(),
                                 _ => format!("বল{}", exp),
                             },
                             "kor" => match exp {
-                                "ছি" => "করছি".to_string(),
+                                "ছি" | "চ্ছি" => "করছি".to_string(),
+                                "ছে" | "চ্ছে" => "করছে".to_string(),
+                                "ছো" | "চ্ছো" => "করছো".to_string(),
                                 "েছি" => "করেছি".to_string(),
-                                "ছিলাম" => "করছিলাম".to_string(),
+                                "ছিলাম" | "চ্ছিলাম" => "করছিলাম".to_string(),
                                 "েছিলাম" => "করেছিলাম".to_string(),
-                                "ছিল" => "করছিল".to_string(),
+                                "ছিল" | "চ্ছিল" => "করছিল".to_string(),
                                 "েছিল" => "করেছিল".to_string(),
-                                "ছিলা" => "করছিলা".to_string(),
+                                "ছিলা" | "চ্ছিলা" => "করছিলা".to_string(),
                                 "েছিলা" => "করেছিলা".to_string(),
-                                "ছেন" => "করছেন".to_string(),
+                                "ছেন" | "চ্ছেন" => "করছেন".to_string(),
                                 "েছেন" => "করেছেন".to_string(),
                                 "ব" => "করব".to_string(),
                                 "বা" => "করবা".to_string(),

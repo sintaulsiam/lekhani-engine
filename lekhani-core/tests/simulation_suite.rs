@@ -597,4 +597,34 @@ fn test_emphatic_participle_stems() {
     assert_eq!(c1[0], "করতেই", "Expected 'করতেই' at rank #1 for 'kortei'");
     assert_eq!(c2[0], "ভাবতেই", "Expected 'ভাবতেই' at rank #1 for 'vabtei'");
     assert_eq!(c3[0], "বলতেই", "Expected 'বলতেই' at rank #1 for 'boltei'");
+
+    let (c4, _) = sugg.suggest("korlei", true, true, &empty_memory);
+    assert_eq!(c4[0], "করলেই", "Expected 'করলেই' at rank #1 for 'korlei'");
+
+    let (c5, _) = sugg.suggest("bollei", true, true, &empty_memory);
+    assert_eq!(c5[0], "বললেই", "Expected 'বললেই' at rank #1 for 'bollei'");
+
+    let (c6, _) = sugg.suggest("koreo", true, true, &empty_memory);
+    assert_eq!(c6[0], "করেও", "Expected 'করেও' at rank #1 for 'koreo'");
+
+    let (c7, _) = sugg.suggest("korleo", true, true, &empty_memory);
+    assert_eq!(c7[0], "করলেও", "Expected 'করলেও' at rank #1 for 'korleo'");
+
+    let (c8, _) = sugg.suggest("bolleo", true, true, &empty_memory);
+    assert_eq!(c8[0], "বললেও", "Expected 'বললেও' at rank #1 for 'bolleo'");
+
+    let (c9, _) = sugg.suggest("korssi", true, true, &empty_memory);
+    assert!(c9.contains(&"করছি".to_string()), "Expected 'করছি' for 'korssi'");
+
+    let (c10, _) = sugg.suggest("vabsi", true, true, &empty_memory);
+    assert!(c10.contains(&"ভাবছি".to_string()), "Expected 'ভাবছি' for 'vabsi'");
+
+    let (c_amio, _) = sugg.suggest("amio", true, true, &empty_memory);
+    assert_eq!(c_amio[0], "আমিও", "Expected 'আমিও' for 'amio', got {:?}", c_amio);
+
+    let (c_tumio, _) = sugg.suggest("tumio", true, true, &empty_memory);
+    assert_eq!(c_tumio[0], "তুমিও", "Expected 'তুমিও' for 'tumio', got {:?}", c_tumio);
+
+    let (c_ekhono, _) = sugg.suggest("ekhono", true, true, &empty_memory);
+    assert_eq!(c_ekhono[0], "এখনো", "Expected 'এখনো' for 'ekhono', got {:?}", c_ekhono);
 }
