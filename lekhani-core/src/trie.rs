@@ -48,7 +48,7 @@ impl PrefixTrie {
     pub fn word_at(&self, entry: &TrieEntry) -> &str {
         let start = entry.offset as usize;
         let end = start + entry.len as usize;
-        &self.buffer[start..end]
+        self.buffer.get(start..end).unwrap_or("")
     }
 
     /// Total memory footprint of raw dictionary data in bytes
@@ -308,8 +308,16 @@ impl PrefixTrie {
 
         let entry_count = u32::from_le_bytes(data[8..12].try_into().unwrap()) as usize;
         let buffer_len = u32::from_le_bytes(data[12..16].try_into().unwrap()) as usize;
+        let entries_bytes = entry_count.checked_mul(10).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "entry_count overflow")
+        })?;
+        let expected_size = 16usize
+            .checked_add(entries_bytes)
+            .and_then(|s| s.checked_add(buffer_len))
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "Trie file size overflow")
+            })?;
 
-        let expected_size = 16 + (entry_count * 10) + buffer_len;
         if data.len() < expected_size {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
@@ -317,20 +325,40 @@ impl PrefixTrie {
             ));
         }
 
-        let mut entries = Vec::with_capacity(entry_count);
         let mut cursor = 16;
-        for _ in 0..entry_count {
+
+        let buffer_bytes = &data[cursor + entries_bytes..cursor + entries_bytes + buffer_len];
+        let buffer_str = std::str::from_utf8(buffer_bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Invalid UTF-8 in trie buffer: {}", e)))?;
+
+        let mut entries = Vec::with_capacity(entry_count);
+        for i in 0..entry_count {
             let offset = u32::from_le_bytes(data[cursor..cursor + 4].try_into().unwrap());
             let len = u16::from_le_bytes(data[cursor + 4..cursor + 6].try_into().unwrap());
             let freq = u32::from_le_bytes(data[cursor + 6..cursor + 10].try_into().unwrap());
+
+            let start = offset as usize;
+            let end = start.checked_add(len as usize).ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Entry {} offset overflow", i))
+            })?;
+            if end > buffer_len {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Entry {} extends past buffer bounds ({} > {})", i, end, buffer_len),
+                ));
+            }
+            if !buffer_str.is_char_boundary(start) || !buffer_str.is_char_boundary(end) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Entry {} splits a multi-byte UTF-8 character", i),
+                ));
+            }
+
             entries.push(TrieEntry { offset, len, freq });
             cursor += 10;
         }
 
-        let buffer_bytes = &data[cursor..cursor + buffer_len];
-        let buffer = std::str::from_utf8(buffer_bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
-            .to_string();
+        let buffer = buffer_str.to_string();
 
         Ok(Self {
             buffer,
@@ -408,4 +436,25 @@ mod tests {
             vec!["বাংলাদেশ", "বাংলা"]
         );
     }
+
+    #[test]
+    fn test_malformed_binary_trie_rejected() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"LDI3");
+        buf.extend_from_slice(&1u32.to_le_bytes()); // version = 1
+        buf.extend_from_slice(&1u32.to_le_bytes()); // entry_count = 1
+        buf.extend_from_slice(&4u32.to_le_bytes()); // buffer_len = 4
+
+        // Entry with offset 2, len 5 (extends past buffer_len 4)
+        buf.extend_from_slice(&2u32.to_le_bytes());
+        buf.extend_from_slice(&5u16.to_le_bytes());
+        buf.extend_from_slice(&100u32.to_le_bytes());
+
+        // Buffer bytes
+        buf.extend_from_slice(b"test");
+
+        let res = PrefixTrie::from_binary(&buf);
+        assert!(res.is_err(), "PrefixTrie must reject entry extending past buffer bounds");
+    }
 }
+
