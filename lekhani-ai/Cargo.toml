@@ -10,7 +10,7 @@ repository.workspace = true
 homepage.workspace = true
 documentation = "https://docs.rs/lekhani-ai"
 keywords = ["bengali", "nlp", "language-model", "prediction", "ngram"]
-categories = ["science::nlp", "text-processing"]
+categories = ["text-processing", "algorithms"]
 
 [dependencies]
 serde.workspace = true
