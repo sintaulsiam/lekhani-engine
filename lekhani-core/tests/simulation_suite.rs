@@ -560,3 +560,41 @@ fn test_advanced_ai_ergonomics() {
     assert!(!cands_snip_off.contains(&"আন্তরিক শুভেচ্ছা ও অভিনন্দন".to_string()));
     sugg.config.enable_dynamic_macros = true;
 }
+
+#[test]
+fn test_emphatic_participle_stems() {
+    let mut sugg = PhoneticSuggestion::new();
+    let layout_candidates = [
+        std::path::Path::new("../../data/layouts/avrophonetic.json"),
+        std::path::Path::new("data/layouts/avrophonetic.json"),
+        std::path::Path::new("../data/layouts/avrophonetic.json"),
+    ];
+    for p in layout_candidates {
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(p) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    sugg.set_layout(&json);
+                    break;
+                }
+            }
+        }
+    }
+    let dict_candidates = [
+        std::path::Path::new("../../data/dictionaries"),
+        std::path::Path::new("data/dictionaries"),
+        std::path::Path::new("../data/dictionaries"),
+    ];
+    for p in dict_candidates {
+        if p.exists() {
+            let _ = sugg.database.load_from_dir(p);
+            break;
+        }
+    }
+    let empty_memory = HashMap::new();
+    let (c1, _) = sugg.suggest("kortei", true, true, &empty_memory);
+    let (c2, _) = sugg.suggest("vabtei", true, true, &empty_memory);
+    let (c3, _) = sugg.suggest("boltei", true, true, &empty_memory);
+    assert_eq!(c1[0], "করতেই", "Expected 'করতেই' at rank #1 for 'kortei'");
+    assert_eq!(c2[0], "ভাবতেই", "Expected 'ভাবতেই' at rank #1 for 'vabtei'");
+    assert_eq!(c3[0], "বলতেই", "Expected 'বলতেই' at rank #1 for 'boltei'");
+}

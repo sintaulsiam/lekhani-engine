@@ -334,6 +334,8 @@ pub const BENGALI_INFLECTIONAL_SUFFIXES: &[&str] = &[
     "লেন",
     "তাম",
     "তেন",
+    "তেই",
+    "তেও",
     "দ্বারা",
     "দিয়ে",
     "থেকে",

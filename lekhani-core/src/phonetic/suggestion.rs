@@ -793,7 +793,7 @@ impl PhoneticSuggestion {
             add_cand(
                 primary.to_string(),
                 CandidateSource::ExactDictionary,
-                2800,
+                4200,
                 &mut raw_candidates,
                 &mut seen,
             );
