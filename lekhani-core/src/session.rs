@@ -117,6 +117,7 @@ impl InputSession {
     }
 
     pub fn set_layout(&mut self, layout_type: ActiveLayoutType, layout_json: &Value) {
+        self.reset();
         self.active_layout_type = layout_type;
         match layout_type {
             ActiveLayoutType::Phonetic => {
