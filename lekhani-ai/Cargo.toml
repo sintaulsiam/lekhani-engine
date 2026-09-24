@@ -5,6 +5,12 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Pure Rust On-Device AI & Contextual Language Model for Lekhani Bengali Input Method"
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/lekhani-ai"
+keywords = ["bengali", "nlp", "language-model", "prediction", "ngram"]
+categories = ["science::nlp", "text-processing"]
 
 [dependencies]
 serde.workspace = true
