@@ -10,6 +10,9 @@ pub mod rule;
 pub mod tables;
 pub mod trie;
 
+#[cfg(feature = "wasm")]
+pub mod wasm;
+
 pub use compiler::CompiledLayout;
 pub use engine::LekhaniParser;
 pub use rule::{ConditionScope, MatchType, Pattern, PatternRule, RuleCondition};
