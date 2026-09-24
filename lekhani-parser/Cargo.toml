@@ -5,6 +5,12 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Ultra-fast, zero-allocation pure Rust Bengali phonetic grammar parser and transliterator"
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/lekhani-parser"
+keywords = ["bengali", "avro", "phonetic", "ime", "transliteration"]
+categories = ["text-processing", "internationalization", "parsing"]
 
 [dependencies]
 serde.workspace = true
