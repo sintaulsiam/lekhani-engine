@@ -23,7 +23,7 @@ pub fn segment_concatenated_token(
     let len = lower.len();
 
     // Minimum length for a 2-word compound is 6 letters (e.g. "kiholo", "kemonaso", "dhonnobadbhai")
-    if !(6..=28).contains(&len) || lower.contains(' ') {
+    if !input.is_ascii() || !(6..=28).contains(&len) || lower.contains(' ') {
         return Vec::new();
     }
 
@@ -62,7 +62,7 @@ pub fn segment_concatenated_token(
 
     // Try split point from 2 to len - 2
     for i in 2..=(len - 2) {
-        if cuts_layout_digraph(&lower, i) {
+        if !lower.is_char_boundary(i) || cuts_layout_digraph(&lower, i) {
             continue;
         }
 
@@ -124,5 +124,9 @@ mod tests {
         let res2 = segment_concatenated_token("dhonnobadbhai", &db, convert);
         assert!(!res2.is_empty());
         assert_eq!(res2[0].text, "ধন্যবাদ ভাই");
+
+        // Verify non-ASCII input safely returns empty without slicing panics
+        let res_unicode = segment_concatenated_token("বাংলাশব্দযোজক", &db, convert);
+        assert!(res_unicode.is_empty());
     }
 }
