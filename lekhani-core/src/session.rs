@@ -354,8 +354,10 @@ mod tests {
         let val: serde_json::Value = serde_json::from_str(avro_raw).unwrap();
         session.set_layout(ActiveLayoutType::Phonetic, &val);
 
-        let parser = rupantor::parser::PhoneticParser::new(val.get("layout").unwrap_or(&val));
+        let layout = lekhani_parser::CompiledLayout::from_json(&val).unwrap();
+        let parser = lekhani_parser::LekhaniParser::new(std::sync::Arc::new(layout));
         println!("parser to: {:?}", parser.convert("to"));
+
         println!("parser tom: {:?}", parser.convert("tom"));
         println!("parser toma: {:?}", parser.convert("toma"));
         println!("parser tomar: {:?}", parser.convert("tomar"));

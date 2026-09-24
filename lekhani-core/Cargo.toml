@@ -14,7 +14,8 @@ rayon.workspace = true
 edit-distance.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-rupantor = "0.3"
+lekhani-parser = { path = "../lekhani-parser" }
 chrono.workspace = true
 bincode.workspace = true
 lekhani-ai = { path = "../lekhani-ai" }
+

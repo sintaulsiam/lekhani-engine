@@ -1,7 +1,7 @@
 //! Phonetic Suggestion Generation Engine
 
 use hashbrown::HashMap;
-use rupantor::parser::PhoneticParser;
+use lekhani_parser::{CompiledLayout, LekhaniParser};
 use serde_json::Value;
 
 use super::database::PhoneticDatabase;
@@ -82,7 +82,7 @@ impl Default for PhoneticSuggestionConfig {
 #[derive(Clone)]
 pub struct PhoneticSuggestion {
     pub database: PhoneticDatabase,
-    phonetic_parser: Option<Arc<PhoneticParser>>,
+    phonetic_parser: Option<Arc<LekhaniParser>>,
     cache: HashMap<String, (Vec<String>, Vec<RankFeatures>)>,
     pub ai_context: lekhani_ai::ContextScorer,
     pub ai_predictor: lekhani_ai::NextWordPredictor,
@@ -188,7 +188,7 @@ impl PhoneticSuggestion {
         let lm = lekhani_ai::LanguageModel::new();
         Self {
             database: PhoneticDatabase::new(),
-            phonetic_parser: None,
+            phonetic_parser: Some(Arc::new(lekhani_parser::default_avro_parser())),
             cache: HashMap::new(),
             ai_context: lekhani_ai::ContextScorer::with_language_model(lm.clone()),
             ai_predictor: lekhani_ai::NextWordPredictor::with_language_model(lm.clone()),
@@ -216,7 +216,9 @@ impl PhoneticSuggestion {
             layout_json
         };
         let parser = if Self::is_valid_phonetic_layout(layout_json) {
-            std::panic::catch_unwind(|| Arc::new(PhoneticParser::new(layout_obj))).ok()
+            CompiledLayout::from_json(layout_obj)
+                .ok()
+                .map(|c| Arc::new(LekhaniParser::new(Arc::new(c))))
         } else {
             None
         };
@@ -241,8 +243,8 @@ impl PhoneticSuggestion {
             layout_json
         };
         if Self::is_valid_phonetic_layout(layout_json) {
-            if let Ok(parser) = std::panic::catch_unwind(|| Arc::new(PhoneticParser::new(layout_obj))) {
-                self.phonetic_parser = Some(parser);
+            if let Ok(compiled) = CompiledLayout::from_json(layout_obj) {
+                self.phonetic_parser = Some(Arc::new(LekhaniParser::new(Arc::new(compiled))));
                 self.cache.clear();
                 return true;
             }
@@ -269,71 +271,35 @@ impl PhoneticSuggestion {
         if text.is_empty() {
             return String::new();
         }
-        let norm_text = if text.contains('^') {
-            normalize_chandra_latin(text)
-        } else {
-            text.to_string()
-        };
-        let text = norm_text.as_str();
 
-        if text.is_ascii() {
-            if text.contains('-') && text.len() >= 3 && text.split('-').all(|p| p.len() <= 2) {
-                let parts: Vec<String> = text
-                    .split('-')
-                    .map(|part| match part {
-                        "o" => "ও".to_string(),
-                        "a" => "আ".to_string(),
-                        "i" => "ই".to_string(),
-                        "e" => "এ".to_string(),
-                        "u" => "উ".to_string(),
-                        _ if !part.is_empty() => {
-                            if let Some(ref parser) = self.phonetic_parser {
-                                fix_chandra_bindu_position(&parser.convert(part))
-                            } else {
-                                part.to_string()
-                            }
+        if text.contains('-') && text.len() >= 3 && text.split('-').all(|p| p.len() <= 2) {
+            let parts: Vec<String> = text
+                .split('-')
+                .map(|part| match part {
+                    "o" => "ও".to_string(),
+                    "a" => "আ".to_string(),
+                    "i" => "ই".to_string(),
+                    "e" => "এ".to_string(),
+                    "u" => "উ".to_string(),
+                    _ if !part.is_empty() => {
+                        if let Some(ref parser) = self.phonetic_parser {
+                            parser.convert(part)
+                        } else {
+                            part.to_string()
                         }
-                        _ => String::new(),
-                    })
-                    .collect();
-                return parts.join("-");
-            }
-            if let Some(ref parser) = self.phonetic_parser {
-                return fix_chandra_bindu_position(&parser.convert(text));
-            }
-            return text.to_string();
-        }
-
-        // If string contains mixed ASCII and non-ASCII (e.g. "geleই"),
-        // segment and convert ASCII chunks while preserving non-ASCII parts
-        let mut result = String::with_capacity(text.len() * 2);
-        let mut ascii_chunk = String::new();
-
-        for ch in text.chars() {
-            if ch.is_ascii() {
-                ascii_chunk.push(ch);
-            } else {
-                if !ascii_chunk.is_empty() {
-                    if let Some(ref parser) = self.phonetic_parser {
-                        result.push_str(&fix_chandra_bindu_position(&parser.convert(&ascii_chunk)));
-                    } else {
-                        result.push_str(&ascii_chunk);
                     }
-                    ascii_chunk.clear();
-                }
-                result.push(ch);
-            }
-        }
-        if !ascii_chunk.is_empty() {
-            if let Some(ref parser) = self.phonetic_parser {
-                result.push_str(&fix_chandra_bindu_position(&parser.convert(&ascii_chunk)));
-            } else {
-                result.push_str(&ascii_chunk);
-            }
+                    _ => String::new(),
+                })
+                .collect();
+            return parts.join("-");
         }
 
-        fix_chandra_bindu_position(&result)
+        if let Some(ref parser) = self.phonetic_parser {
+            return parser.convert(text);
+        }
+        text.to_string()
     }
+
 
     /// Generate ranked candidates for typed term with multi-token preceding context
     pub fn suggest_with_multi_context(
