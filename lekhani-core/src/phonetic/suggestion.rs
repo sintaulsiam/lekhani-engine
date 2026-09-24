@@ -1698,8 +1698,9 @@ impl PhoneticSuggestion {
                     }
 
                     // Apply stem-level sound-laws (e.g. "manush" in "manusher" -> "মানুষ")
-                    // Only permit fuzzy expansion if base is verified or a multi-syllable stem (>= 5 chars)
-                    if has_verified_base || base_key.chars().count() >= 5 {
+                    // Permit fuzzy expansion if base is verified or >= 4 chars (covers common
+                    // 4-letter Bengali stems: valo, bhai, maro, gelo, dhoro, etc.)
+                    if has_verified_base || base_key.chars().count() >= 4 {
                         for fz in super::fuzzy::generate_phonetic_variants(base_key) {
                             let conv = self.convert_phonetic(&fz);
                             if self.database.is_exact_dictionary_word(&conv)
