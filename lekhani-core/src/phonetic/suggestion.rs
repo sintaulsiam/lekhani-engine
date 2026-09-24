@@ -1,11 +1,11 @@
 //! Phonetic Suggestion Generation Engine
 
-use edit_distance::edit_distance;
 use hashbrown::HashMap;
 use rupantor::parser::PhoneticParser;
 use serde_json::Value;
 
 use super::database::PhoneticDatabase;
+use super::ranking::{CandidateContext, extract_candidate_features};
 use crate::chars::BengaliCharExt;
 
 use std::sync::Arc;
@@ -1207,6 +1207,40 @@ impl PhoneticSuggestion {
 
         let mut scored_candidates: Vec<(String, i32)> = Vec::with_capacity(raw_candidates.len());
         let learner_guard = self.database.learner.read().ok();
+        let weights = learner_guard.as_ref().map(|l| l.rank_weights).unwrap_or_default();
+
+        let prev = if self.config.ai_profile != AiProfile::Off && !context.is_empty() {
+            context.last().copied()
+        } else {
+            None
+        };
+        let prev_prev = if self.config.ai_profile == AiProfile::Balanced && context.len() >= 2 {
+            context.get(context.len() - 2).copied()
+        } else {
+            None
+        };
+
+        let candidate_ctx = CandidateContext {
+            phonetic: &phonetic,
+            primary,
+            middle,
+            term,
+            has_dominant_homophone,
+            has_explicit_casing,
+            has_backtick,
+            has_explicit_rri_digraph,
+            is_atomic_syllable,
+            is_primary_in_dict,
+            is_short_token,
+            has_clitic_o_candidate,
+            has_clitic_i_candidate,
+            clitic_o_targets: &clitic_o_targets,
+            clitic_i_targets: &clitic_i_targets,
+            lm_score: None,
+            user_bigram_boost: 0,
+            is_user_favored: false,
+            is_user_learned: false,
+        };
 
         for cand in raw_candidates {
             if cand.source == CandidateSource::CodeShield {
@@ -1225,180 +1259,44 @@ impl PhoneticSuggestion {
 
             let is_in_dict = self.database.is_exact_dictionary_word(&cand.text);
             let freq = self.database.get_frequency(&cand.text);
-            let mut score = cand.initial_boost;
+            let trie_contains = self.database.trie.contains_exact(&cand.text);
+            let is_clitic_o = is_clitic_o_word(&cand.text);
 
-            // 1. Exact Dictionary Status & Promotion Rule
-            if is_in_dict || cand.source == CandidateSource::MorphologicalInflection || cand.source == CandidateSource::Autocorrect || cand.source == CandidateSource::Loanword {
-                score += 2200;
-            } else if cand.source == CandidateSource::DirectTransliteration {
-                // If raw transliteration is NOT in the dictionary, but valid sound-law alternatives exist,
-                // penalize full words so casual homophones (e.g. মানুষ for manus, চা for cha) win.
-                // But NEVER penalize when explicit casing, backticks, or explicit rri digraph are present!
-                if has_dominant_homophone
-                    && !has_explicit_casing
-                    && !has_backtick
-                    && !has_explicit_rri_digraph
-                    && (!is_atomic_syllable || !is_primary_in_dict)
-                    && !is_short_token
-                {
-                    score -= 2800;
-                }
-            }
+            let lm_score = if prev.is_some() && cand.source != CandidateSource::EmojiKeyword {
+                Some(self.ai_context.lm().score_candidate(prev_prev, prev, &cand.text))
+            } else {
+                None
+            };
 
-            // 2. Frequency bonus (logarithmic scaling)
-            if freq > 0 {
-                let freq_f = freq as f64;
-                let log_freq = freq_f.log2();
-                score += (log_freq * 130.0) as i32;
-            }
-            if freq >= 8000 {
-                score += 2000;
-            }
-            if self.database.trie.contains_exact(&cand.text) {
-                score += 1000;
-            }
+            let user_bigram_boost = if let (Some(p), Some(ref l)) = (prev, learner_guard.as_ref()) {
+                l.get_user_bigram_boost(p, &cand.text)
+            } else {
+                0
+            };
 
-            // 3. Edit distance & length difference penalty from raw phonetic form
-            if cand.source != CandidateSource::EmojiKeyword {
-                let dist = edit_distance(&phonetic, &cand.text);
-                if cand.text == phonetic || cand.text == *primary {
-                    if is_in_dict || cand.source == CandidateSource::MorphologicalInflection || cand.source == CandidateSource::Autocorrect || cand.source == CandidateSource::Loanword {
-                        score += 3500;
-                    } else {
-                        score += 1500;
-                    }
-                    if has_backtick {
-                        score += 5000;
-                    } else if has_explicit_casing || has_explicit_rri_digraph {
-                        score += 3500;
-                    } else if is_atomic_syllable && is_primary_in_dict {
-                        score += 3000;
-                    } else if is_short_token {
-                        score += 1200;
-                    }
-                } else if cand.source == CandidateSource::TypoFallback {
-                    // Typo fallback candidates alter the user's physical keypresses;
-                    // apply motor slip penalty so intentional words aren't hijacked
-                    score -= 4200;
-                    score -= (dist.min(3) as i32) * 200;
-                } else {
-                    score -= (dist as i32) * 200;
-                    let len_diff = (cand.text.chars().count() as isize
-                        - phonetic.chars().count() as isize)
-                        .abs() as i32;
-                    score -= len_diff * 400;
-
-                    if (is_primary_in_dict || has_explicit_rri_digraph)
-                        && is_atomic_syllable
-                        && dist > 0
-                    {
-                        score -= 3500;
-                    }
-
-                    if cand.source == CandidateSource::FuzzySoundLaw {
-                        if has_backtick {
-                            score -= 4000;
-                        } else if has_explicit_casing {
-                            score -= 2500;
-                        } else if middle.chars().count() <= 2 && dist > 0 {
-                            score -= 3000;
-                        }
-                    }
-
-                    if cand.source == CandidateSource::Autocorrect {
-                        if has_backtick {
-                            score -= 5000;
-                        } else if has_explicit_casing {
-                            score -= 3500;
-                        }
-                    }
-                }
-            }
-
-            // 3b. Clitic preservation vs root-drop resolution (prevent high-frequency roots from suppressing clitics)
-            if has_clitic_o_candidate {
-                let is_clitic_o = is_clitic_o_word(&cand.text);
-                if is_clitic_o {
-                    score += 3500;
-                } else if !cand.text.ends_with("্য")
-                    && clitic_o_targets.iter().any(|t| {
-                        // Penalise the shorter root when a clitic-ও form is a candidate:
-                        // e.g. when "এখনো" is present, demote "এখন" so it doesn't usurp.
-                        t.strip_prefix(&cand.text).map_or(false, |s| {
-                            s == "ও"
-                                || (s == "ো"
-                                    && (t == "এখনো"
-                                        || t == "তখনো"
-                                        || t == "কখনো"
-                                        || t == "এমনো"
-                                        || t == "কোনো"
-                                        || t == "যখনো"))
-                        })
-                    })
-                {
-                    score -= 4500;
-                }
-            }
-
-            if has_clitic_i_candidate {
-                if cand.text.ends_with('ই') {
-                    score += 3500;
-                } else if clitic_i_targets.iter().any(|t| {
-                    t.strip_prefix(&cand.text).map_or(false, |s| s == "ই")
-                }) {
-                    score -= 3000;
-                }
-            }
-
-            // 4. Contextual Homophone & AI Language Model Scoring (Zero Allocations)
-            if self.config.ai_profile != AiProfile::Off && !context.is_empty() && cand.source != CandidateSource::EmojiKeyword {
-                let prev = context.last().copied();
-                let prev_prev = if self.config.ai_profile == AiProfile::Balanced && context.len() >= 2 {
-                    context.get(context.len() - 2).copied()
-                } else {
-                    None
-                };
-
-                let lm_score = self
-                    .ai_context
-                    .lm()
-                    .score_candidate(prev_prev, prev, &cand.text);
-                // Continuous scale: clamp log-prob to [-6, 0] then map to [0, 5000].
-                // Stable across model sizes — no bucket thresholds to re-tune when
-                // switching from the 383-word static table to a corpus-trained model.
-                // Formula: ((lm_score / 6) + 1) * 5000, clamped to [0, 5000].
-                let lm_bonus = ((lm_score.max(-6.0) / 6.0 + 1.0) * 5000.0) as i32;
-                if lm_bonus > 0 {
-                    score += lm_bonus;
-                }
-
-                // 5. Dynamic User Bigram Personalization Boost
-                if let Some(p) = prev {
-                    if let Some(ref l) = learner_guard {
-                        let user_boost = l.get_user_bigram_boost(p, &cand.text);
-                        score += user_boost;
-                    }
-                }
-            }
-
-            // 6. Candidate Memory & Autonomous Learner Boost
-            if let Some(fav) = candidate_memory
+            let is_user_favored = candidate_memory
                 .get(term)
                 .or_else(|| candidate_memory.get(middle))
                 .or_else(|| candidate_memory.get(&phonetic))
                 .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(term)))
                 .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(middle)))
                 .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(&phonetic)))
-            {
-                if &cand.text == fav {
-                    score += 5000;
-                }
-            }
-            if let Some(ref l) = learner_guard {
-                if l.learned_words.contains(&cand.text) {
-                    score += 3500;
-                }
-            }
+                .map_or(false, |fav| &cand.text == fav);
+
+            let is_user_learned = learner_guard
+                .as_ref()
+                .map_or(false, |l| l.learned_words.contains(&cand.text));
+
+            let per_cand_ctx = CandidateContext {
+                lm_score,
+                user_bigram_boost,
+                is_user_favored,
+                is_user_learned,
+                ..candidate_ctx
+            };
+
+            let features = extract_candidate_features(&cand, is_in_dict, freq, trie_contains, &per_cand_ctx, is_clitic_o);
+            let score = cand.initial_boost + weights.compute_score(&features);
 
             scored_candidates.push((cand.text, score));
         }

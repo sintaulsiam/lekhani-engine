@@ -84,9 +84,9 @@ impl Default for RankWeights {
             is_high_freq: 2000.0,
             lm_score: 5000.0,
             is_exact_phonetic: 3500.0,
-            phonetic_similarity: 1600.0,
-            length_penalty: 1200.0,
-            source_weight: 2500.0,
+            phonetic_similarity: 200.0,
+            length_penalty: 400.0,
+            source_weight: 4200.0,
             clitic_alignment: 3500.0,
             intent_modifier_boost: 4500.0,
             user_bigram_prob: 3000.0,
@@ -124,9 +124,9 @@ impl RankWeights {
         self.lm_score = (self.lm_score + lr * (chosen.lm_score - rejected.lm_score))
             .clamp(2500.0, 8000.0);
         self.phonetic_similarity = (self.phonetic_similarity + lr * (chosen.phonetic_similarity - rejected.phonetic_similarity))
-            .clamp(800.0, 3200.0);
-        self.source_weight = (self.source_weight + lr * (chosen.source_weight - rejected.source_weight))
-            .clamp(1200.0, 5000.0);
+            .clamp(100.0, 600.0);
+        self.length_penalty = (self.length_penalty + lr * (chosen.length_penalty - rejected.length_penalty))
+            .clamp(200.0, 800.0);
         self.user_bigram_prob = (self.user_bigram_prob + lr * (chosen.user_bigram_prob - rejected.user_bigram_prob))
             .clamp(1500.0, 6000.0);
     }
@@ -195,28 +195,22 @@ pub fn extract_candidate_features(
         f.normalized_freq = log_freq / 16.0;
     }
     if freq >= 8000 {
-        f.is_high_freq = 1.0;
-    } else if trie_contains {
-        f.is_high_freq = 0.5; // +1000
+        f.is_high_freq += 1.0;
+    }
+    if trie_contains {
+        f.is_high_freq += 0.5; // +1000
     }
 
     // 3. Phonetic Similarity & Length
     if cand.source != CandidateSource::EmojiKeyword {
         let dist = edit_distance(ctx.phonetic, &cand.text);
-        let max_len = ctx
-            .phonetic
-            .chars()
-            .count()
-            .max(cand.text.chars().count())
-            .max(1) as f32;
-        f.phonetic_similarity = 1.0 - (dist as f32 / max_len).min(1.0);
-
-        let len_diff = (cand.text.chars().count() as isize - ctx.phonetic.chars().count() as isize)
-            .abs() as f32;
-        f.length_penalty = -(len_diff / max_len).min(1.0);
-
         if cand.text == ctx.phonetic || cand.text == ctx.primary {
-            f.is_exact_phonetic = 1.0;
+            let is_dict_equiv = is_in_dict
+                || cand.source == CandidateSource::MorphologicalInflection
+                || cand.source == CandidateSource::Autocorrect
+                || cand.source == CandidateSource::Loanword;
+            f.is_exact_phonetic = if is_dict_equiv { 1.0 } else { 0.43 }; // 3500 vs 1500
+
             if ctx.has_backtick {
                 f.intent_modifier_boost = 1.11; // 5000 / 4500
             } else if ctx.has_explicit_casing || ctx.has_explicit_rri_digraph {
@@ -227,18 +221,39 @@ pub fn extract_candidate_features(
                 f.intent_modifier_boost = 0.27; // 1200 / 4500
             }
         } else if cand.source == CandidateSource::TypoFallback {
-            f.source_weight = -1.68; // -4200 / 2500
+            f.source_weight = -1.0; // -4200
+            f.phonetic_similarity = -((dist.min(3)) as f32); // -dist * 200
+        } else {
+            f.phonetic_similarity = -(dist as f32);
+            let len_diff = (cand.text.chars().count() as isize - ctx.phonetic.chars().count() as isize)
+                .abs() as f32;
+            f.length_penalty = -len_diff;
+
+            if (ctx.is_primary_in_dict || ctx.has_explicit_rri_digraph)
+                && ctx.is_atomic_syllable
+                && dist > 0
+            {
+                f.intent_modifier_boost -= 0.78; // -3500 / 4500
+            }
+            if cand.source == CandidateSource::FuzzySoundLaw {
+                if ctx.has_backtick {
+                    f.intent_modifier_boost -= 0.89; // -4000 / 4500
+                } else if ctx.has_explicit_casing {
+                    f.intent_modifier_boost -= 0.56; // -2500 / 4500
+                } else if ctx.middle.chars().count() <= 2 && dist > 0 {
+                    f.intent_modifier_boost -= 0.67; // -3000 / 4500
+                }
+            }
+            if cand.source == CandidateSource::Autocorrect {
+                if ctx.has_backtick {
+                    f.intent_modifier_boost -= 1.11; // -5000 / 4500
+                } else if ctx.has_explicit_casing {
+                    f.intent_modifier_boost -= 0.78; // -3500 / 4500
+                }
+            }
         }
     }
 
-    // 4. Source Priority
-    match cand.source {
-        CandidateSource::Autocorrect | CandidateSource::Loanword => f.source_weight = 1.0,
-        CandidateSource::MorphologicalInflection => f.source_weight = 0.8,
-        CandidateSource::DirectTransliteration => f.source_weight = 0.5,
-        CandidateSource::FuzzySoundLaw => f.source_weight = 0.2,
-        _ => {}
-    }
 
     // 5. Clitics
     if ctx.has_clitic_o_candidate {
@@ -377,7 +392,7 @@ mod tests {
 
         let f = extract_candidate_features(&cand, true, 10000, true, &ctx, false);
         assert_eq!(f.is_in_dict, 1.0);
-        assert_eq!(f.is_high_freq, 1.0);
+        assert_eq!(f.is_high_freq, 1.5);
         assert_eq!(f.is_exact_phonetic, 1.0);
         assert!(f.lm_score > 0.8);
     }
