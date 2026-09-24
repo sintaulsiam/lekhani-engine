@@ -88,6 +88,9 @@ pub struct PhoneticSuggestion {
     pub ai_predictor: lekhani_ai::NextWordPredictor,
     pub ai_decoder: lekhani_ai::BeamSearchDecoder,
     pub config: PhoneticSuggestionConfig,
+    /// Generation number mirroring database.generation. When they diverge the
+    /// local cache is stale and must be cleared before the next lookup.
+    cache_generation: u64,
 }
 
 impl std::fmt::Debug for PhoneticSuggestion {
@@ -189,6 +192,7 @@ impl PhoneticSuggestion {
             ai_predictor: lekhani_ai::NextWordPredictor::with_language_model(lm.clone()),
             ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
+            cache_generation: 0,
         }
     }
 
@@ -222,6 +226,7 @@ impl PhoneticSuggestion {
             ai_predictor: lekhani_ai::NextWordPredictor::with_language_model(lm.clone()),
             ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
+            cache_generation: 0,
         }
     }
 
@@ -333,6 +338,17 @@ impl PhoneticSuggestion {
     ) -> (Vec<String>, usize) {
         if term.is_empty() {
             return (Vec::new(), 0);
+        }
+
+        // Invalidate stale cache if the database was mutated since our last call.
+        // One relaxed atomic load per keystroke — no mutex, no contention.
+        let db_gen = self
+            .database
+            .generation
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if db_gen != self.cache_generation {
+            self.cache.clear();
+            self.cache_generation = db_gen;
         }
 
         // 1. Instant Fast-Path: Smart Typography, Punctuation & Vowel Signs (Zero Allocations)
@@ -1132,13 +1148,22 @@ impl PhoneticSuggestion {
                     || self.database.get_frequency(&c.text) >= 1000)
         });
 
+        // A word is a clitic-ও form when:
+        //   (a) it ends in the emphatic particle ও (e.g. আমিও, বইও), OR
+        //   (b) it ends in ো AND the bare stem without ো is a dictionary word
+        //       (এখনো→এখন✓, তখনো→তখন✓, যখনো→যখন✓, সেখানো→সেখান✓, কখনো→কখন✓)
+        // This is fully general — no word list required.
         let is_clitic_o_word = |w: &str| -> bool {
-            w.ends_with('ও')
-                || w == "এখনো"
-                || w == "তখনো"
-                || w == "কখনো"
-                || w == "এমনো"
-                || w == "কোনো"
+            if w.ends_with('ও') {
+                return true;
+            }
+            // ো-ending: promote only when the bare stem is a known dictionary entry
+            if let Some(stem) = w.strip_suffix('ো') {
+                if stem.chars().count() >= 2 && self.database.trie.contains_exact(stem) {
+                    return true;
+                }
+            }
+            false
         };
 
         let has_clitic_o_candidate = middle.ends_with('o')
@@ -1296,15 +1321,11 @@ impl PhoneticSuggestion {
                     score += 3500;
                 } else if !cand.text.ends_with("্য")
                     && clitic_o_targets.iter().any(|t| {
-                        t.strip_prefix(&cand.text).map_or(false, |s| {
-                            s == "ও"
-                                || (s == "ো"
-                                    && (t == "এখনো"
-                                        || t == "তখনো"
-                                        || t == "কখনো"
-                                        || t == "এমনো"
-                                        || t == "কোনো"))
-                        })
+                        // Penalise the shorter root when a clitic-ও form is a candidate:
+                        // e.g. when "এখনো" is present, demote "এখন" so it doesn't usurp.
+                        // The closure is now dictionary-driven so any ো-stem word qualifies.
+                        t.strip_prefix(&cand.text)
+                            .map_or(false, |s| s == "ও" || s == "ো")
                     })
                 {
                     score -= 3000;
