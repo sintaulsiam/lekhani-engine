@@ -24,21 +24,23 @@ impl LekhaniParser {
 
         // Handle Latin Chandra Bindu pre-normalization: e.g. "c^ad" -> "ca^d"
         let norm_storage: String;
-        let effective_input = if input.contains('^') {
+        let effective_input = if input.as_bytes().contains(&b'^') {
             norm_storage = normalize_chandra_latin(input);
             norm_storage.as_str()
         } else {
             input
         };
 
-        if effective_input.is_ascii() {
-            self.convert_ascii_into(effective_input, output);
+        let has_combining = if effective_input.is_ascii() {
+            self.convert_ascii_into(effective_input, output)
         } else {
-            self.convert_mixed_into(effective_input, output);
-        }
+            self.convert_mixed_into(effective_input, output)
+        };
 
         // Post-process to ensure canonical Unicode Combining Class sequence
-        canonicalize_combining_marks(output);
+        if has_combining {
+            canonicalize_combining_marks(output);
+        }
     }
 
     /// Convert input string using pure raw grammar rules without extra diacritic reordering.
@@ -69,28 +71,36 @@ impl LekhaniParser {
         out
     }
 
-    /// Fast path for pure ASCII input
-    fn convert_ascii_into(&self, input: &str, output: &mut String) {
+    /// Fast path for pure ASCII input. Returns whether any combining marks were emitted.
+    fn convert_ascii_into(&self, input: &str, output: &mut String) -> bool {
         let in_bytes = input.as_bytes();
         let len = in_bytes.len();
 
-        // Stack-allocated case-normalized buffer for up to 128 bytes
+        // Stack-allocated case-normalized buffer for up to 128 bytes only if normalization needed
         let mut stack_buf = [0u8; 128];
         let heap_buf: Vec<u8>;
-        let fixed: &[u8] = if len <= 128 {
-            for i in 0..len {
-                stack_buf[i] = normalize_avro_byte(in_bytes[i]);
+        let fixed: &[u8] = if in_bytes.iter().any(|&b| needs_avro_norm(b)) {
+            if len <= 128 {
+                for i in 0..len {
+                    stack_buf[i] = normalize_avro_byte(in_bytes[i]);
+                }
+                &stack_buf[..len]
+            } else {
+                heap_buf = in_bytes.iter().map(|&b| normalize_avro_byte(b)).collect();
+                &heap_buf
             }
-            &stack_buf[..len]
         } else {
-            heap_buf = in_bytes.iter().map(|&b| normalize_avro_byte(b)).collect();
-            &heap_buf
+            in_bytes
         };
 
+        let mut has_combining = false;
         let mut cur = 0;
         while cur < len {
             if let Some((pat_idx, match_len)) = self.layout.trie.longest_match(fixed, cur) {
                 let pat = &self.layout.patterns[pat_idx as usize];
+                if pat.may_have_combining {
+                    has_combining = true;
+                }
                 let start = cur as isize;
                 let end = (cur + match_len) as isize;
                 let mut matched_rule = false;
@@ -178,18 +188,22 @@ impl LekhaniParser {
                 cur += 1;
             }
         }
+        has_combining
     }
 
     /// Mixed ASCII / non-ASCII path: segments ASCII chunks and passes Unicode directly
-    fn convert_mixed_into(&self, input: &str, output: &mut String) {
+    fn convert_mixed_into(&self, input: &str, output: &mut String) -> bool {
         let mut ascii_chunk = String::with_capacity(input.len());
+        let mut has_combining = false;
 
         for ch in input.chars() {
             if ch.is_ascii() {
                 ascii_chunk.push(ch);
             } else {
                 if !ascii_chunk.is_empty() {
-                    self.convert_ascii_into(&ascii_chunk, output);
+                    if self.convert_ascii_into(&ascii_chunk, output) {
+                        has_combining = true;
+                    }
                     ascii_chunk.clear();
                 }
                 output.push(ch);
@@ -197,8 +211,11 @@ impl LekhaniParser {
         }
 
         if !ascii_chunk.is_empty() {
-            self.convert_ascii_into(&ascii_chunk, output);
+            if self.convert_ascii_into(&ascii_chunk, output) {
+                has_combining = true;
+            }
         }
+        has_combining
     }
 }
 

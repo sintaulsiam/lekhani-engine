@@ -80,6 +80,11 @@ pub fn normalize_avro_byte(b: u8) -> u8 {
 }
 
 #[inline(always)]
+pub fn needs_avro_norm(b: u8) -> bool {
+    b.is_ascii_uppercase() && (ASCII_CLASS_TABLE[b as usize] & FLAG_CASE_SENSITIVE) == 0
+}
+
+#[inline(always)]
 pub fn is_vowel_byte(b: u8) -> bool {
     (ASCII_CLASS_TABLE[b as usize] & FLAG_VOWEL) != 0
 }

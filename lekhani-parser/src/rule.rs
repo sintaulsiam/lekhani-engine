@@ -34,4 +34,5 @@ pub struct Pattern {
     pub find: Box<str>,
     pub default_replace: Box<str>,
     pub rules: Vec<PatternRule>,
+    pub may_have_combining: bool,
 }

@@ -103,6 +103,12 @@ impl CompiledLayout {
                 }
             }
 
+            let may_have_combining = default_replace.contains('\u{09BC}')
+                || default_replace.contains('ঁ')
+                || pattern_rules
+                    .iter()
+                    .any(|r| r.replace.contains('\u{09BC}') || r.replace.contains('ঁ'));
+
             let pat_idx = patterns.len() as u16;
             trie.insert(find.as_bytes(), pat_idx);
 
@@ -110,6 +116,7 @@ impl CompiledLayout {
                 find: find.into(),
                 default_replace: default_replace.into(),
                 rules: pattern_rules,
+                may_have_combining,
             });
         }
 
