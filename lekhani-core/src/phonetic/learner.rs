@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use super::morphology::analyze_morphemes;
+use super::ranking::{RankFeatures, RankWeights};
 use crate::trie::PrefixTrie;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,6 +23,8 @@ pub struct AutonomousLearner {
     pub last_committed_word: Option<String>,
     #[serde(default)]
     pub candidate_memory: HashMap<String, String>,
+    #[serde(default)]
+    pub rank_weights: RankWeights,
     #[serde(skip)]
     pub dirty: bool,
 }
@@ -38,7 +41,7 @@ impl Default for AutonomousLearner {
 
 impl AutonomousLearner {
     pub const BINARY_MAGIC: &'static [u8; 4] = b"LLRN";
-    pub const BINARY_VERSION: u32 = 1;
+    pub const BINARY_VERSION: u32 = 2;
 
     pub fn new() -> Self {
         Self {
@@ -48,6 +51,7 @@ impl AutonomousLearner {
             user_bigrams: HashMap::new(),
             last_committed_word: None,
             candidate_memory: HashMap::new(),
+            rank_weights: RankWeights::default(),
             dirty: false,
         }
     }
@@ -97,6 +101,12 @@ impl AutonomousLearner {
         if self.candidate_memory.len() > 2200 {
             self.prune_if_needed();
         }
+    }
+
+    /// Update ranking weights online based on candidate selection override
+    pub fn update_rank_weights(&mut self, chosen: &RankFeatures, rejected: &RankFeatures) {
+        self.rank_weights.update_online(chosen, rejected, 35.0);
+        self.dirty = true;
     }
 
     /// Retrieve top user-learned continuations following `prev_word` for next-word prediction
@@ -161,6 +171,7 @@ impl AutonomousLearner {
         self.learned_words.clear();
         self.candidate_memory.clear();
         self.user_bigrams.clear();
+        self.rank_weights = RankWeights::default();
         self.last_committed_word = None;
         self.dirty = true;
         self.pretrain_baseline();
