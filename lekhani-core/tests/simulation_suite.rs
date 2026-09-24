@@ -628,3 +628,74 @@ fn test_emphatic_participle_stems() {
     let (c_ekhono, _) = sugg.suggest("ekhono", true, true, &empty_memory);
     assert_eq!(c_ekhono[0], "এখনো", "Expected 'এখনো' for 'ekhono', got {:?}", c_ekhono);
 }
+
+#[test]
+fn test_real_world_writing_experience_and_unforced_uncertainty() {
+    let mut sugg = PhoneticSuggestion::new();
+    let layout_candidates = [
+        std::path::Path::new("../../data/layouts/avrophonetic.json"),
+        std::path::Path::new("data/layouts/avrophonetic.json"),
+        std::path::Path::new("../data/layouts/avrophonetic.json"),
+    ];
+    for p in layout_candidates {
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(p) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    sugg.set_layout(&json);
+                    break;
+                }
+            }
+        }
+    }
+    let dict_candidates = [
+        std::path::Path::new("../../data/dictionaries"),
+        std::path::Path::new("data/dictionaries"),
+        std::path::Path::new("../data/dictionaries"),
+    ];
+    for p in dict_candidates {
+        if p.exists() {
+            let _ = sugg.database.load_from_dir(p);
+            break;
+        }
+    }
+    let empty_memory = HashMap::new();
+
+
+
+    let expected_top = [
+        ("kormo", "কর্ম"),
+        ("dhormo", "ধর্ম"),
+        ("shotto", "সত্য"),
+        ("boro", "বড়"),
+        ("choto", "ছোট"),
+        ("somossa", "সমস্যা"),
+        ("asubidha", "অসুবিধা"),
+        ("shobshomoy", "সবসময়"),
+        ("nafis", "নাফিস"),
+        ("subidha", "সুবিধা"),
+        ("bidesh", "বিদেশ"),
+        ("valo", "ভালো"),
+        ("khub", "খুব"),
+        ("shundor", "সুন্দর"),
+        ("dhonnobad", "ধন্যবাদ"),
+        ("amra", "আমরা"),
+        ("kothay", "কোথায়"),
+        ("kothao", "কোথাও"),
+        ("korlo", "করল"),
+        ("parlo", "পারল"),
+        ("korchilo", "করছিল"),
+        ("kortei", "করতেই"),
+        ("vabtei", "ভাবতেই"),
+        ("boltei", "বলতেই"),
+    ];
+
+    for &(input, expected) in &expected_top {
+        let (cands, _) = sugg.suggest(input, true, true, &empty_memory);
+        assert!(!cands.is_empty(), "Candidates empty for '{}'", input);
+        assert_eq!(
+            cands[0], expected,
+            "Expected '{}' at rank #1 for '{}', but got {:?}",
+            expected, input, cands
+        );
+    }
+}
