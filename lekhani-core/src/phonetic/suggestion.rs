@@ -1130,6 +1130,7 @@ impl PhoneticSuggestion {
         });
 
         let has_clitic_o_candidate = middle.ends_with('o')
+            && !(middle.ends_with("yo") && raw_candidates.iter().any(|c| c.text.ends_with("্য")))
             && raw_candidates.iter().any(|c| {
                 (c.text.ends_with('ো') || c.text.ends_with('ও'))
                     && (self.database.is_exact_dictionary_word(&c.text)
@@ -1258,7 +1259,7 @@ impl PhoneticSuggestion {
             if has_clitic_o_candidate {
                 if cand.text.ends_with('ো') || cand.text.ends_with('ও') {
                     score += 3500;
-                } else if !cand.text.ends_with('ো') && !cand.text.ends_with('ও') {
+                } else if !cand.text.ends_with('ো') && !cand.text.ends_with('ও') && !cand.text.ends_with("্য") {
                     score -= 3000;
                 }
             }
