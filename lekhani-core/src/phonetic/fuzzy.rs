@@ -67,7 +67,7 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("ssh", &["shw", "sw", "sh", "Shw"]),
     ("sh", &["sw", "s", "Sh", "shw"]),
     ("Sh", &["sh", "s", "sw", "Shw"]),
-    ("ss", &["sh", "s", "sw", "shw"]),
+    ("ss", &["sy", "sh", "s", "sw", "shw", "Sh"]),
     ("s", &["sw", "sh", "Sh", "shw"]),
     ("sw", &["shw", "s", "sh"]),
     ("shw", &["sw", "s"]),
@@ -120,7 +120,7 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("ri", &["rri", "ree"]),
     ("rri", &["ri"]),
     ("rre", &["rri", "ri"]),
-    ("r", &["R", "rh"]),
+    ("r", &["rr", "R", "rh"]),
     ("R", &["r", "Rh"]),
     ("nh", &["hn", "n", "nh"]),
     ("nho", &["hn", "nh"]),
@@ -372,6 +372,13 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     } else if lower.ends_with("ewa") && lower.len() >= 4 {
         let glide = format!("{}eoya", &lower[..lower.len() - 3]);
         pass1.insert(glide);
+    }
+
+    // 2b. Initial 'a' representing inherent 'অ' (e.g. asubidha -> osubidha, apurbo -> opurbo, anek -> onek)
+    if lower.starts_with('a') && lower.len() >= 3 && !lower.starts_with("aa") {
+        let initial_o = format!("o{}", &lower[1..]);
+        pass1.insert(initial_o.clone());
+        apply_sound_laws(&initial_o, &mut pass1);
     }
 
     // 3. Second pass for compounding sound laws (e.g. sri -> srri AND st -> ShT => srriShTi)
