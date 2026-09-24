@@ -10,4 +10,7 @@ description = "Ultra-fast, zero-allocation pure Rust Bengali phonetic grammar pa
 serde.workspace = true
 serde_json.workspace = true
 
+[dev-dependencies]
+rupantor = "0.3"
+
 
