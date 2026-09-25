@@ -286,6 +286,51 @@ impl AutonomousLearner {
         self.prune_if_needed();
     }
 
+    /// Explicitly add a user word with high initial frequency boost
+    pub fn add_user_word(&mut self, word: &str) {
+        let clean = word.trim();
+        if clean.chars().count() >= 2 {
+            self.learned_words.insert(clean.to_string());
+            let count = self.observed_counts.entry(clean.to_string()).or_insert(0);
+            *count = (*count + 10).max(10);
+            self.dirty = true;
+        }
+    }
+
+    /// Delete a user word from learned vocabulary and memory
+    pub fn delete_user_word(&mut self, word: &str) -> bool {
+        let clean = word.trim();
+        let r1 = self.learned_words.remove(clean);
+        let r2 = self.observed_counts.remove(clean).is_some();
+        let r3 = self.candidate_memory.remove(clean).is_some();
+        if r1 || r2 || r3 {
+            self.dirty = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Retrieve all learned user words sorted alphabetically
+    pub fn get_user_words(&self) -> Vec<String> {
+        let mut words: Vec<String> = self.learned_words.iter().cloned().collect();
+        words.sort();
+        words
+    }
+
+    /// Import a list of raw words (e.g. from Ridmik Keyboard or Avro export)
+    pub fn import_word_list(&mut self, words: &[String]) -> u32 {
+        let mut count = 0;
+        for w in words {
+            let clean = w.trim();
+            if clean.chars().count() >= 2 {
+                self.add_user_word(clean);
+                count += 1;
+            }
+        }
+        count
+    }
+
     /// Export learned dictionary as formatted JSON for inspection or backup
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
@@ -567,5 +612,20 @@ mod tests {
         assert_eq!(learner.candidate_memory.len(), 0);
         assert!(!learner.user_bigrams.is_empty()); // baseline re-seeded
         assert!(learner.get_user_bigram_boost("কেমন", "আছো") >= 1500);
+    }
+
+    #[test]
+    fn test_dictionary_management() {
+        let mut learner = AutonomousLearner::new();
+        learner.add_user_word("স্মার্টফোন");
+        assert!(learner.get_user_words().contains(&"স্মার্টফোন".to_string()));
+
+        let imported = learner.import_word_list(&vec!["ল্যাপটপ".into(), "ট্যাবলেট".into()]);
+        assert_eq!(imported, 2);
+        assert!(learner.get_user_words().contains(&"ল্যাপটপ".to_string()));
+
+        let deleted = learner.delete_user_word("স্মার্টফোন");
+        assert!(deleted);
+        assert!(!learner.get_user_words().contains(&"স্মার্টফোন".to_string()));
     }
 }
