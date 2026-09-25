@@ -620,7 +620,7 @@ mod tests {
         learner.add_user_word("স্মার্টফোন");
         assert!(learner.get_user_words().contains(&"স্মার্টফোন".to_string()));
 
-        let imported = learner.import_word_list(&vec!["ল্যাপটপ".into(), "ট্যাবলেট".into()]);
+        let imported = learner.import_word_list(&["ল্যাপটপ".into(), "ট্যাবলেট".into()]);
         assert_eq!(imported, 2);
         assert!(learner.get_user_words().contains(&"ল্যাপটপ".to_string()));
 

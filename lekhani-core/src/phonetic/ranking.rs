@@ -177,16 +177,15 @@ pub fn extract_candidate_features(
         || cand.source == CandidateSource::Loanword
     {
         f.is_in_dict = 1.0;
-    } else if cand.source == CandidateSource::DirectTransliteration {
-        if ctx.has_dominant_homophone
-            && !ctx.has_explicit_casing
-            && !ctx.has_backtick
-            && !ctx.has_explicit_rri_digraph
-            && (!ctx.is_atomic_syllable || !ctx.is_primary_in_dict)
-            && !ctx.is_short_token
-        {
-            f.is_in_dict = -1.27; // -2800 / 2200
-        }
+    } else if cand.source == CandidateSource::DirectTransliteration
+        && ctx.has_dominant_homophone
+        && !ctx.has_explicit_casing
+        && !ctx.has_backtick
+        && !ctx.has_explicit_rri_digraph
+        && (!ctx.is_atomic_syllable || !ctx.is_primary_in_dict)
+        && !ctx.is_short_token
+    {
+        f.is_in_dict = -1.27; // -2800 / 2200
     }
 
     // 2. Frequency
@@ -261,7 +260,7 @@ pub fn extract_candidate_features(
             f.clitic_alignment = 1.0;
         } else if !cand.text.ends_with("্য")
             && ctx.clitic_o_targets.iter().any(|t| {
-                t.strip_prefix(&cand.text).map_or(false, |s| {
+                t.strip_prefix(&cand.text).is_some_and(|s| {
                     s == "ও"
                         || (s == "ো"
                             && (t == "এখনো"
@@ -283,7 +282,7 @@ pub fn extract_candidate_features(
         } else if ctx
             .clitic_i_targets
             .iter()
-            .any(|t| t.strip_prefix(&cand.text).map_or(false, |s| s == "ই"))
+            .any(|t| t.strip_prefix(&cand.text) == Some("ই"))
         {
             f.clitic_alignment = -0.85; // -3000 / 3500
         }
@@ -325,10 +324,12 @@ mod tests {
     #[test]
     fn test_baseline_scoring_dot_product() {
         let weights = RankWeights::default();
-        let mut features = RankFeatures::default();
-        features.is_in_dict = 1.0;
-        features.is_exact_phonetic = 1.0;
-        features.lm_score = 0.8;
+        let features = RankFeatures {
+            is_in_dict: 1.0,
+            is_exact_phonetic: 1.0,
+            lm_score: 0.8,
+            ..Default::default()
+        };
 
         let score = weights.compute_score(&features);
         // 2200 + 3500 + 0.8 * 5000 = 2200 + 3500 + 4000 = 9700
@@ -338,13 +339,17 @@ mod tests {
     #[test]
     fn test_perceptron_online_update_and_clamping() {
         let mut weights = RankWeights::default();
-        let mut chosen = RankFeatures::default();
-        chosen.lm_score = 1.0;
-        chosen.user_bigram_prob = 1.0;
+        let chosen = RankFeatures {
+            lm_score: 1.0,
+            user_bigram_prob: 1.0,
+            ..Default::default()
+        };
 
-        let mut rejected = RankFeatures::default();
-        rejected.lm_score = 0.2;
-        rejected.user_bigram_prob = 0.0;
+        let rejected = RankFeatures {
+            lm_score: 0.2,
+            user_bigram_prob: 0.0,
+            ..Default::default()
+        };
 
         let initial_lm = weights.lm_score;
         weights.update_online(&chosen, &rejected, 35.0);

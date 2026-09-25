@@ -32,18 +32,13 @@ pub struct CandidateHypothesis {
     pub initial_boost: i32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AiProfile {
+    #[default]
     Balanced,
     Lite,
     Off,
-}
-
-impl Default for AiProfile {
-    fn default() -> Self {
-        Self::Balanced
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -206,7 +201,7 @@ impl PhoneticSuggestion {
         } else {
             layout_json
         };
-        layout_obj.is_object() && layout_obj.get("patterns").map_or(false, |p| p.is_array())
+        layout_obj.is_object() && layout_obj.get("patterns").is_some_and(|p| p.is_array())
     }
 
     pub fn with_layout(layout_json: &Value) -> Self {
@@ -1247,7 +1242,7 @@ impl PhoneticSuggestion {
                 None
             };
 
-            let user_bigram_boost = if let (Some(p), Some(ref l)) = (prev, learner_guard.as_ref()) {
+            let user_bigram_boost = if let (Some(p), Some(l)) = (prev, learner_guard.as_ref()) {
                 l.get_user_bigram_boost(p, &cand.text)
             } else {
                 0
@@ -1259,12 +1254,11 @@ impl PhoneticSuggestion {
                 .or_else(|| candidate_memory.get(&phonetic))
                 .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(term)))
                 .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(middle)))
-                .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(&phonetic)))
-                .map_or(false, |fav| &cand.text == fav);
+                .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(&phonetic))) == Some(&cand.text);
 
             let is_user_learned = learner_guard
                 .as_ref()
-                .map_or(false, |l| l.learned_words.contains(&cand.text));
+                .is_some_and(|l| l.learned_words.contains(&cand.text));
 
             let per_cand_ctx = CandidateContext {
                 lm_score,

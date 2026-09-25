@@ -685,7 +685,7 @@ pub fn train_files_streaming<P: AsRef<Path>>(
                 }
                 batch.clear();
 
-                if total_lines % 500_000 == 0 {
+                if total_lines.is_multiple_of(500_000) {
                     println!(
                         "      → Pass 1: {} lines processed ({} unique words so far)...",
                         total_lines,
@@ -732,7 +732,7 @@ pub fn train_files_streaming<P: AsRef<Path>>(
         .into_iter()
         .filter(|(_, count)| *count >= config.min_unigram_freq)
         .collect();
-    unigram_vec.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    unigram_vec.sort_unstable_by_key(|a| std::cmp::Reverse(a.1));
     if unigram_vec.len() > config.max_unigrams {
         unigram_vec.truncate(config.max_unigrams);
     }
@@ -804,7 +804,7 @@ pub fn train_files_streaming<P: AsRef<Path>>(
                 }
                 batch.clear();
 
-                if total_lines % 500_000 == 0 {
+                if total_lines.is_multiple_of(500_000) {
                     println!(
                         "      → Pass 2: {} lines processed ({} bigrams, {} trigrams)...",
                         total_lines,
@@ -871,7 +871,7 @@ pub fn train_files_streaming<P: AsRef<Path>>(
         .into_iter()
         .filter(|(_, count)| (*count as usize) >= config.min_bigram_freq)
         .collect();
-    bigram_vec.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    bigram_vec.sort_unstable_by_key(|a| std::cmp::Reverse(a.1));
     if bigram_vec.len() > config.max_bigrams {
         bigram_vec.truncate(config.max_bigrams);
     }
@@ -894,7 +894,7 @@ pub fn train_files_streaming<P: AsRef<Path>>(
         .into_iter()
         .filter(|(_, count)| (*count as usize) >= config.min_trigram_freq)
         .collect();
-    trigram_vec.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    trigram_vec.sort_unstable_by_key(|a| std::cmp::Reverse(a.1));
     if trigram_vec.len() > config.max_trigrams {
         trigram_vec.truncate(config.max_trigrams);
     }
@@ -1111,7 +1111,7 @@ mod tests {
         std::fs::write(&test_file, content).expect("Failed to write test file");
 
         let config = TrainingConfig::unpruned();
-        let compiled = train_files_streaming(&[test_file.clone()], &config)
+        let compiled = train_files_streaming(std::slice::from_ref(&test_file), &config)
             .expect("Streaming training failed");
 
         let _ = std::fs::remove_file(&test_file);

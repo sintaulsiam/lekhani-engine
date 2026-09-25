@@ -210,10 +210,8 @@ impl LekhaniParser {
             }
         }
 
-        if !ascii_chunk.is_empty() {
-            if self.convert_ascii_into(&ascii_chunk, output) {
-                has_combining = true;
-            }
+        if !ascii_chunk.is_empty() && self.convert_ascii_into(&ascii_chunk, output) {
+            has_combining = true;
         }
         has_combining
     }

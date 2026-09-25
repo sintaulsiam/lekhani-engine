@@ -1036,14 +1036,19 @@ pub struct LanguageModel {
     inner: Arc<LanguageModelInner>,
 }
 
+type TrigramEntryKey = (Arc<str>, Arc<str>, Arc<str>);
+type BigramPair = (Arc<str>, Arc<str>);
+type WordCandidate = (Arc<str>, f32);
+type TrigramFollowers = HashMap<BigramPair, Vec<WordCandidate>>;
+
 #[derive(Debug, Clone)]
 struct LanguageModelInner {
     zero_copy: Option<Arc<crate::zero_copy::ZeroCopyLanguageModel>>,
     unigrams: HashMap<Arc<str>, f32>,
-    bigrams: HashMap<(Arc<str>, Arc<str>), f32>,
-    trigrams: HashMap<(Arc<str>, Arc<str>, Arc<str>), f32>,
-    next_word_map: HashMap<Arc<str>, Vec<(Arc<str>, f32)>>,
-    next_trigram_map: HashMap<(Arc<str>, Arc<str>), Vec<(Arc<str>, f32)>>,
+    bigrams: HashMap<BigramPair, f32>,
+    trigrams: HashMap<TrigramEntryKey, f32>,
+    next_word_map: HashMap<Arc<str>, Vec<WordCandidate>>,
+    next_trigram_map: TrigramFollowers,
     lambda1: f32,
     lambda2: f32,
     lambda3: f32,
@@ -1182,7 +1187,7 @@ impl LanguageModelInner {
         }
 
         let mut trigrams = HashMap::with_capacity(TRIGRAM_TRANSITIONS.len() + 50);
-        let mut next_trigram_map: HashMap<(Arc<str>, Arc<str>), Vec<(Arc<str>, f32)>> = HashMap::new();
+        let mut next_trigram_map: TrigramFollowers = HashMap::new();
 
         for &((w1, w2, w3), p) in TRIGRAM_TRANSITIONS {
             let a1: Arc<str> = Arc::from(w1);
