@@ -1252,6 +1252,8 @@ impl LanguageModelInner {
             candidates.push(std::path::PathBuf::from(appdata).join("Lekhani").join("data").join("bengali_lm.bin"));
         }
 
+        candidates.push(std::path::PathBuf::from("/data/data/com.lekhani.android/files/dictionaries/bengali_lm.bin"));
+        candidates.push(std::path::PathBuf::from("/data/user/0/com.lekhani.android/files/dictionaries/bengali_lm.bin"));
         candidates.push(std::path::PathBuf::from("/usr/local/share/lekhani/data/bengali_lm.bin"));
         candidates.push(std::path::PathBuf::from("/usr/share/lekhani/data/bengali_lm.bin"));
 

@@ -9,9 +9,9 @@ pub struct ContextScorer {
 
 impl ContextScorer {
     pub fn new() -> Self {
-        Self {
-            lm: LanguageModel::new(),
-        }
+        let mut lm = LanguageModel::new();
+        lm.load_from_system_paths();
+        Self { lm }
     }
 
     pub fn with_language_model(lm: LanguageModel) -> Self {
