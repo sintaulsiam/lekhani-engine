@@ -132,6 +132,45 @@ impl AutonomousLearner {
             .collect()
     }
 
+    /// Penalize an accidental commit or typo that was immediately erased by rapid backspace
+    pub fn penalize_mistake(&mut self, prev_word: Option<&str>, committed_word: &str) {
+        let clean_curr = committed_word.trim();
+        if clean_curr.is_empty() {
+            return;
+        }
+
+        // 1. Decrement observed counts
+        if let Some(count) = self.observed_counts.get_mut(clean_curr) {
+            if *count > 1 {
+                *count -= 1;
+            } else {
+                self.observed_counts.remove(clean_curr);
+                self.learned_words.remove(clean_curr);
+            }
+            self.dirty = true;
+        }
+
+        // 2. Decrement or remove user bigram transition
+        if let Some(prev) = prev_word {
+            let clean_prev = prev.trim();
+            if !clean_prev.is_empty() {
+                let key = format!("{}\t{}", clean_prev, clean_curr);
+                if let Some(bcount) = self.user_bigrams.get_mut(&key) {
+                    if *bcount > 1 {
+                        *bcount -= 1;
+                    } else {
+                        self.user_bigrams.remove(&key);
+                    }
+                    self.dirty = true;
+                }
+            }
+        }
+
+        if self.last_committed_word.as_deref() == Some(clean_curr) {
+            self.last_committed_word = None;
+        }
+    }
+
     /// Prune low-frequency and excess entries to maintain bounded memory and fast serialization
     pub fn prune_if_needed(&mut self) {
         const MAX_BIGRAMS: usize = 8000;
@@ -627,5 +666,19 @@ mod tests {
         let deleted = learner.delete_user_word("স্মার্টফোন");
         assert!(deleted);
         assert!(!learner.get_user_words().contains(&"স্মার্টফোন".to_string()));
+    }
+
+    #[test]
+    fn test_penalize_mistake() {
+        let mut learner = AutonomousLearner::new();
+        learner.add_user_word("টাইপো");
+        learner.observe_committed_pair("একটি", "টাইপো");
+        assert_eq!(*learner.observed_counts.get("টাইপো").unwrap(), 10);
+        assert!(learner.user_bigrams.contains_key("একটি\tটাইপো"));
+
+        // Mistake penalty applied
+        learner.penalize_mistake(Some("একটি"), "টাইপো");
+        assert_eq!(*learner.observed_counts.get("টাইপো").unwrap(), 9);
+        assert!(!learner.user_bigrams.contains_key("একটি\tটাইপো")); // count was 1, so removed
     }
 }
