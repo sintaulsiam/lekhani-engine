@@ -26,6 +26,66 @@ impl TrainedLanguageModelData {
     pub const BINARY_MAGIC_V3: &'static [u8; 4] = b"LLM3";
     pub const BINARY_VERSION_V3: u32 = 3;
 
+    #[inline]
+    pub fn unigram_count(&self) -> usize {
+        self.unigrams.len()
+    }
+
+    #[inline]
+    pub fn bigram_count(&self) -> usize {
+        self.bigrams.len()
+    }
+
+    #[inline]
+    pub fn trigram_count(&self) -> usize {
+        self.trigrams.len()
+    }
+
+    #[inline]
+    pub fn fourgram_count(&self) -> usize {
+        self.fourgrams.len()
+    }
+
+    /// Merge another trained model into this one, preserving unique N-grams
+    pub fn merge(&mut self, other: &Self) {
+        for (w, p) in &other.unigrams {
+            self.unigrams.entry(w.clone()).or_insert(*p);
+        }
+
+        let mut existing_bi: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
+        let mut new_bi = Vec::new();
+        for (w1, w2, p) in &other.bigrams {
+            if existing_bi.insert((w1.as_str(), w2.as_str())) {
+                new_bi.push((w1.clone(), w2.clone(), *p));
+            }
+        }
+        drop(existing_bi);
+        self.bigrams.extend(new_bi);
+
+        let mut existing_tri: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
+        let mut new_tri = Vec::new();
+        for (w1, w2, w3, p) in &other.trigrams {
+            if existing_tri.insert((w1.as_str(), w2.as_str(), w3.as_str())) {
+                new_tri.push((w1.clone(), w2.clone(), w3.clone(), *p));
+            }
+        }
+        drop(existing_tri);
+        self.trigrams.extend(new_tri);
+
+        let mut existing_four: hashbrown::HashSet<(&str, &str, &str, &str)> = self.fourgrams.iter().map(|(w1, w2, w3, w4, _)| (w1.as_str(), w2.as_str(), w3.as_str(), w4.as_str())).collect();
+        let mut new_four = Vec::new();
+        for (w1, w2, w3, w4, p) in &other.fourgrams {
+            if existing_four.insert((w1.as_str(), w2.as_str(), w3.as_str(), w4.as_str())) {
+                new_four.push((w1.clone(), w2.clone(), w3.clone(), w4.clone(), *p));
+            }
+        }
+        drop(existing_four);
+        self.fourgrams.extend(new_four);
+
+        self.total_words += other.total_words;
+    }
+
+
     /// Load trained model data from a JSON file
     pub fn load_from_json<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
         let content = std::fs::read_to_string(path)?;
@@ -33,32 +93,37 @@ impl TrainedLanguageModelData {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
 
+
     /// Serialize language model data into compact quantized binary format (LLM3)
     pub fn to_binary_llm3(&self) -> Vec<u8> {
         let mut unigrams = self.unigrams.clone();
-        for &(w, p) in crate::lm::UNIGRAM_LOG_PROBS {
-            unigrams.entry(w.to_string()).or_insert(p);
-        }
-
         let mut bigrams = self.bigrams.clone();
-        let bigram_set: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
-        for &((w1, w2), p) in crate::lm::BIGRAM_TRANSITIONS {
-            if !bigram_set.contains(&(w1, w2)) {
-                bigrams.push((w1.to_string(), w2.to_string(), p));
-            }
-        }
-        drop(bigram_set);
-
         let mut trigrams = self.trigrams.clone();
-        let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
-        for &((w1, w2, w3), p) in crate::lm::TRIGRAM_TRANSITIONS {
-            if !trigram_set.contains(&(w1, w2, w3)) {
-                trigrams.push((w1.to_string(), w2.to_string(), w3.to_string(), p));
-            }
-        }
-        drop(trigram_set);
-
         let fourgrams = self.fourgrams.clone();
+
+        let has_bengali = self.unigrams.is_empty()
+            || self.unigrams.keys().any(|k| k.chars().any(crate::trainer::chars::is_bengali_char));
+        if has_bengali {
+            for &(w, p) in crate::lm::UNIGRAM_LOG_PROBS {
+                unigrams.entry(w.to_string()).or_insert(p);
+            }
+
+            let bigram_set: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
+            for &((w1, w2), p) in crate::lm::BIGRAM_TRANSITIONS {
+                if !bigram_set.contains(&(w1, w2)) {
+                    bigrams.push((w1.to_string(), w2.to_string(), p));
+                }
+            }
+            drop(bigram_set);
+
+            let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
+            for &((w1, w2, w3), p) in crate::lm::TRIGRAM_TRANSITIONS {
+                if !trigram_set.contains(&(w1, w2, w3)) {
+                    trigrams.push((w1.to_string(), w2.to_string(), w3.to_string(), p));
+                }
+            }
+            drop(trigram_set);
+        }
 
         let mut words_set = hashbrown::HashSet::new();
         for w in unigrams.keys() {
@@ -223,27 +288,32 @@ impl TrainedLanguageModelData {
     /// Serialize language model data into compact sorted binary format (LLM2)
     pub fn to_binary(&self) -> Vec<u8> {
         let mut unigrams = self.unigrams.clone();
-        for &(w, p) in crate::lm::UNIGRAM_LOG_PROBS {
-            unigrams.entry(w.to_string()).or_insert(p);
-        }
-
         let mut bigrams = self.bigrams.clone();
-        let bigram_set: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
-        for &((w1, w2), p) in crate::lm::BIGRAM_TRANSITIONS {
-            if !bigram_set.contains(&(w1, w2)) {
-                bigrams.push((w1.to_string(), w2.to_string(), p));
-            }
-        }
-        drop(bigram_set);
-
         let mut trigrams = self.trigrams.clone();
-        let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
-        for &((w1, w2, w3), p) in crate::lm::TRIGRAM_TRANSITIONS {
-            if !trigram_set.contains(&(w1, w2, w3)) {
-                trigrams.push((w1.to_string(), w2.to_string(), w3.to_string(), p));
+
+        let has_bengali = self.unigrams.is_empty()
+            || self.unigrams.keys().any(|k| k.chars().any(crate::trainer::chars::is_bengali_char));
+        if has_bengali {
+            for &(w, p) in crate::lm::UNIGRAM_LOG_PROBS {
+                unigrams.entry(w.to_string()).or_insert(p);
             }
+
+            let bigram_set: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
+            for &((w1, w2), p) in crate::lm::BIGRAM_TRANSITIONS {
+                if !bigram_set.contains(&(w1, w2)) {
+                    bigrams.push((w1.to_string(), w2.to_string(), p));
+                }
+            }
+            drop(bigram_set);
+
+            let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
+            for &((w1, w2, w3), p) in crate::lm::TRIGRAM_TRANSITIONS {
+                if !trigram_set.contains(&(w1, w2, w3)) {
+                    trigrams.push((w1.to_string(), w2.to_string(), w3.to_string(), p));
+                }
+            }
+            drop(trigram_set);
         }
-        drop(trigram_set);
 
         let mut words_set = hashbrown::HashSet::new();
         for w in unigrams.keys() {
@@ -737,7 +807,8 @@ impl CorpusTrainer {
 
                 let trimmed = clean_word.trim();
                 if !trimmed.is_empty()
-                    && trimmed.chars().any(crate::trainer::chars::is_bengali_char)
+                    && (trimmed.chars().any(crate::trainer::chars::is_bengali_char)
+                        || trimmed.chars().any(|c| c.is_alphabetic()))
                 {
                     words.push(trimmed.to_string());
                 }
@@ -1254,10 +1325,10 @@ pub fn train_files_streaming<P: AsRef<Path>>(
 }
 
 fn extract_line_words<F: FnMut(&str)>(line: &str, mut on_word: F) {
-    let sentence_delimiters = ['।', '?', '!', '\n', ';'];
+    let sentence_delimiters = ['।', '?', '!', '\n', ';', '.'];
     for raw_sentence in line.split(|c| sentence_delimiters.contains(&c)) {
         for raw_word in raw_sentence.split_whitespace() {
-            if !raw_word.chars().any(crate::trainer::chars::is_bengali_char) {
+            if !raw_word.chars().any(crate::trainer::chars::is_token_char) {
                 continue;
             }
             let clean_word: String = raw_word
@@ -1283,7 +1354,7 @@ fn extract_line_words<F: FnMut(&str)>(line: &str, mut on_word: F) {
                 })
                 .collect();
             let trimmed = clean_word.trim();
-            if !trimmed.is_empty() && trimmed.chars().any(crate::trainer::chars::is_bengali_char) {
+            if !trimmed.is_empty() && trimmed.chars().any(crate::trainer::chars::is_token_char) {
                 on_word(trimmed);
             }
         }
@@ -1296,11 +1367,11 @@ fn process_line_ngrams(
     local_bi: &mut HashMap<u64, u32>,
     local_tri: &mut HashMap<(u32, u32, u32), u32>,
 ) {
-    let sentence_delimiters = ['।', '?', '!', '\n', ';'];
+    let sentence_delimiters = ['।', '?', '!', '\n', ';', '.'];
     for raw_sentence in line.split(|c| sentence_delimiters.contains(&c)) {
         let mut sentence_ids: Vec<Option<u32>> = Vec::new();
         for raw_word in raw_sentence.split_whitespace() {
-            if !raw_word.chars().any(crate::trainer::chars::is_bengali_char) {
+            if !raw_word.chars().any(crate::trainer::chars::is_token_char) {
                 continue;
             }
             let clean_word: String = raw_word
@@ -1326,7 +1397,7 @@ fn process_line_ngrams(
                 })
                 .collect();
             let trimmed = clean_word.trim();
-            if !trimmed.is_empty() && trimmed.chars().any(crate::trainer::chars::is_bengali_char) {
+            if !trimmed.is_empty() && trimmed.chars().any(crate::trainer::chars::is_token_char) {
                 sentence_ids.push(vocab_lookup.get(trimmed).copied());
             }
         }
@@ -1356,6 +1427,10 @@ fn process_line_ngrams(
 pub(crate) mod chars {
     pub fn is_bengali_char(c: char) -> bool {
         ('\u{0980}'..='\u{09FF}').contains(&c)
+    }
+
+    pub fn is_token_char(c: char) -> bool {
+        c.is_alphabetic() || is_bengali_char(c)
     }
 }
 
