@@ -1,0 +1,20 @@
+[package]
+name = "lekhani-neural"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Micro-Neural Recurrent Predictor for Lekhani Bengali IME"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+hashbrown.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+memmap2.workspace = true
+unicode-segmentation.workspace = true
+lekhani-ai = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.8"
