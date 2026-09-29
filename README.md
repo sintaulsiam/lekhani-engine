@@ -7,8 +7,9 @@ Pure Rust engine crates powering the **Lekhani** Bengali input method across all
 | Crate | Description |
 |---|---|
 | [`lekhani-parser`](lekhani-parser/) | Ultra-fast, zero-allocation Avro Phonetic grammar parser and transliterator (11 ns/char) |
-| [`lekhani-core`](lekhani-core/) | Headless IME state machine — fixed layouts, Trie dictionary, Bijoy converter, autocorrect |
-| [`lekhani-ai`](lekhani-ai/) | On-device N-gram LM, beam search, contextual candidate ranking |
+| [`lekhani-core`](lekhani-core/) | Headless IME state machine — fixed layouts, Trie dictionary, Bijoy converter, morphemes, autocorrect |
+| [`lekhani-ai`](lekhani-ai/) | On-device quantized LLM3 N-gram LM, beam search arena, contextual candidate ranking |
+| [`lekhani-neural`](lekhani-neural/) | Micro-neural INT8 GRU recurrent language model and bilingual BPE subword predictor |
 
 ## Usage in your project
 
@@ -18,6 +19,7 @@ Pure Rust engine crates powering the **Lekhani** Bengali input method across all
 lekhani-parser = "1.1.0"
 lekhani-core   = "1.1.0"
 lekhani-ai     = "1.1.0"
+lekhani-neural = "1.1.0"
 ```
 
 ### From git (latest)
@@ -26,6 +28,7 @@ lekhani-ai     = "1.1.0"
 lekhani-parser = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.1.0" }
 lekhani-core   = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.1.0" }
 lekhani-ai     = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.1.0" }
+lekhani-neural = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.1.0" }
 ```
 
 ## Platform consumers
