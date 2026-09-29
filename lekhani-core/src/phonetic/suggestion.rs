@@ -2098,17 +2098,14 @@ mod tests {
         // narrowly outweighs the bigram LM edge for পড়া. We assert the weaker but
         // still linguistically correct property: পড়া must appear in candidates,
         // and the শার্ট context must still produce পরা at rank-1 (that one is robust).
-        // TODO: Promote the first assert to assert_eq!(cands_book[0], "পড়া") after Fix 4B.
-
-        // When previous word is "বই", "পড়া" must be a candidate
+        // When previous word is "বই", "পড়া" must be rank 1
         let (cands_book, _) =
             sugg.suggest_with_context("pora", Some("বই"), true, true, &empty_memory);
         println!("cands_book: {:?}", cands_book);
-        assert!(
-            cands_book.contains(&"পড়া".to_string()),
-            "With context বই, পড়া must be a candidate; got {:?}", cands_book
+        assert_eq!(
+            cands_book[0], "পড়া",
+            "With context বই, পড়া must be ranked #1; got {:?}", cands_book
         );
-        // With a trained LM, this will be: assert!(rank_pora < rank_para)
 
         // When previous word is "শার্ট", "pora" should rank "পরা" first (robust even without trained LM)
         let (cands_shirt, _) =

@@ -242,6 +242,11 @@ pub fn extract_candidate_features(
                 } else if ctx.middle.chars().count() <= 2 && dist > 0 {
                     f.intent_modifier_boost -= 0.67; // -3000 / 4500
                 }
+                // When strong semantic context predicts this sound-law homophone,
+                // grant exact phonetic parity so contextual probability takes precedence.
+                if ctx.lm_score.is_some_and(|s| s > -1.5) && !ctx.has_explicit_casing && !ctx.has_backtick {
+                    f.is_exact_phonetic = 0.9;
+                }
             }
             if cand.source == CandidateSource::Autocorrect {
                 if ctx.has_backtick {

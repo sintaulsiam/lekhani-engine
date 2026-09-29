@@ -3,8 +3,22 @@ use lekhani_ai::{BeamSearchDecoder, ContextScorer, LanguageModel, NextWordPredic
 fn main() {
     println!("=== Lekhani AI: Standalone Bengali Language Intelligence ===\n");
 
-    let lm = LanguageModel::new();
-    let scorer = ContextScorer::new();
+    let mut lm = LanguageModel::new();
+    let candidate_paths = [
+        "/mnt/data/lekhani-android/data/dictionaries/bengali_lm.bin",
+        "../lekhani-android/data/dictionaries/bengali_lm.bin",
+        "../../lekhani-android/data/dictionaries/bengali_lm.bin",
+        "data/dictionaries/bengali_lm.bin",
+    ];
+    for path in candidate_paths {
+        if std::path::Path::new(path).exists() {
+            if let Ok(_) = lm.load_binary_file(path) {
+                println!("Loaded bengali_lm.bin from {} successfully!", path);
+                break;
+            }
+        }
+    }
+    let scorer = ContextScorer::with_language_model(lm.clone());
     let predictor = NextWordPredictor::new();
     let decoder = BeamSearchDecoder::new();
 
@@ -18,11 +32,21 @@ fn main() {
 
     // 2. Homophone Disambiguation
     println!("2. Homophone Context Reranking:");
-    let homophones = vec!["পড়া".to_string(), "পরা".to_string()];
-    let book_context = scorer.rank_candidates(&["বই"], &homophones);
-    let shirt_context = scorer.rank_candidates(&["শার্ট"], &homophones);
-    println!("  Context 'বই': {:?}", book_context);
-    println!("  Context 'শার্ট': {:?}\n", shirt_context);
+    let s_book_poda = lm.score_candidate(None, Some("বই"), "পড়া");
+    let s_book_pora = lm.score_candidate(None, Some("বই"), "পরা");
+    println!("  'বই [পড়া]' log-prob: {:.3}", s_book_poda);
+    println!("  'বই [পরা]' log-prob: {:.3}", s_book_pora);
+
+    let s_shirt_pora = lm.score_candidate(None, Some("শার্ট"), "পরা");
+    let s_shirt_poda = lm.score_candidate(None, Some("শার্ট"), "পড়া");
+    println!("  'শার্ট [পরা]' log-prob: {:.3}", s_shirt_pora);
+    println!("  'শার্ট [পড়া]' log-prob: {:.3}", s_shirt_poda);
+
+    let homophones_rev = vec!["পরা".to_string(), "পড়া".to_string()];
+    let book_context = scorer.rank_candidates(&["বই"], &homophones_rev);
+    let shirt_context = scorer.rank_candidates(&["শার্ট"], &homophones_rev);
+    println!("  Input [\"পরা\", \"পড়া\"] with Context 'বই': {:?}", book_context);
+    println!("  Input [\"পরা\", \"পড়া\"] with Context 'শার্ট': {:?}\n", shirt_context);
 
     // 3. Next-Word Prediction
     println!("3. Next-Word Continuations:");
