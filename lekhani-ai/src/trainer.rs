@@ -7,24 +7,217 @@ use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+use crate::zero_copy::{dequantize_log_prob, quantize_log_prob};
+
 /// Trained statistical N-gram dataset exported by the trainer
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TrainedLanguageModelData {
     pub unigrams: HashMap<String, f32>,
     pub bigrams: Vec<(String, String, f32)>,
     pub trigrams: Vec<(String, String, String, f32)>,
+    #[serde(default)]
+    pub fourgrams: Vec<(String, String, String, String, f32)>,
     pub total_words: usize,
 }
 
 impl TrainedLanguageModelData {
     pub const BINARY_MAGIC: &'static [u8; 4] = b"LLM2";
     pub const BINARY_VERSION: u32 = 2;
+    pub const BINARY_MAGIC_V3: &'static [u8; 4] = b"LLM3";
+    pub const BINARY_VERSION_V3: u32 = 3;
 
     /// Load trained model data from a JSON file
     pub fn load_from_json<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
         let content = std::fs::read_to_string(path)?;
         serde_json::from_str(&content)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
+
+    /// Serialize language model data into compact quantized binary format (LLM3)
+    pub fn to_binary_llm3(&self) -> Vec<u8> {
+        let mut unigrams = self.unigrams.clone();
+        for &(w, p) in crate::lm::UNIGRAM_LOG_PROBS {
+            unigrams.entry(w.to_string()).or_insert(p);
+        }
+
+        let mut bigrams = self.bigrams.clone();
+        let bigram_set: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
+        for &((w1, w2), p) in crate::lm::BIGRAM_TRANSITIONS {
+            if !bigram_set.contains(&(w1, w2)) {
+                bigrams.push((w1.to_string(), w2.to_string(), p));
+            }
+        }
+        drop(bigram_set);
+
+        let mut trigrams = self.trigrams.clone();
+        let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
+        for &((w1, w2, w3), p) in crate::lm::TRIGRAM_TRANSITIONS {
+            if !trigram_set.contains(&(w1, w2, w3)) {
+                trigrams.push((w1.to_string(), w2.to_string(), w3.to_string(), p));
+            }
+        }
+        drop(trigram_set);
+
+        let fourgrams = self.fourgrams.clone();
+
+        let mut words_set = hashbrown::HashSet::new();
+        for w in unigrams.keys() {
+            words_set.insert(w.clone());
+        }
+        for (w1, w2, _) in &bigrams {
+            words_set.insert(w1.clone());
+            words_set.insert(w2.clone());
+        }
+        for (w1, w2, w3, _) in &trigrams {
+            words_set.insert(w1.clone());
+            words_set.insert(w2.clone());
+            words_set.insert(w3.clone());
+        }
+        for (w1, w2, w3, w4, _) in &fourgrams {
+            words_set.insert(w1.clone());
+            words_set.insert(w2.clone());
+            words_set.insert(w3.clone());
+            words_set.insert(w4.clone());
+        }
+
+        let mut words: Vec<String> = words_set.into_iter().collect();
+        words.sort_unstable();
+
+        let mut vocab_map: HashMap<&str, u32> = HashMap::with_capacity(words.len());
+        for (id, w) in words.iter().enumerate() {
+            vocab_map.insert(w.as_str(), id as u32);
+        }
+
+        let mut string_buffer = Vec::new();
+        let mut vocab_entries: Vec<(u32, u16)> = Vec::with_capacity(words.len());
+        for w in &words {
+            let offset = string_buffer.len() as u32;
+            let bytes = w.as_bytes();
+            let len = bytes.len() as u16;
+            string_buffer.extend_from_slice(bytes);
+            vocab_entries.push((offset, len));
+        }
+
+        let vocab_count = words.len() as u32;
+        let unigram_count = words.len() as u32;
+
+        let mut sorted_bigrams = bigrams;
+        sorted_bigrams.sort_unstable_by(|(a1, a2, p1), (b1, b2, p2)| {
+            let id_a1 = vocab_map[a1.as_str()];
+            let id_b1 = vocab_map[b1.as_str()];
+            let id_a2 = vocab_map[a2.as_str()];
+            let id_b2 = vocab_map[b2.as_str()];
+            id_a1.cmp(&id_b1)
+                .then_with(|| p2.partial_cmp(p1).unwrap_or(std::cmp::Ordering::Equal))
+                .then_with(|| id_a2.cmp(&id_b2))
+        });
+        let bigram_count = sorted_bigrams.len() as u32;
+
+        let mut sorted_trigrams = trigrams;
+        sorted_trigrams.sort_unstable_by(|(a1, a2, a3, p1), (b1, b2, b3, p2)| {
+            let id_a1 = vocab_map[a1.as_str()];
+            let id_b1 = vocab_map[b1.as_str()];
+            let id_a2 = vocab_map[a2.as_str()];
+            let id_b2 = vocab_map[b2.as_str()];
+            let id_a3 = vocab_map[a3.as_str()];
+            let id_b3 = vocab_map[b3.as_str()];
+            id_a1.cmp(&id_b1)
+                .then_with(|| id_a2.cmp(&id_b2))
+                .then_with(|| p2.partial_cmp(p1).unwrap_or(std::cmp::Ordering::Equal))
+                .then_with(|| id_a3.cmp(&id_b3))
+        });
+        let trigram_count = sorted_trigrams.len() as u32;
+
+        let mut sorted_fourgrams = fourgrams;
+        sorted_fourgrams.sort_unstable_by(|(a1, a2, a3, a4, p1), (b1, b2, b3, b4, p2)| {
+            let id_a1 = vocab_map[a1.as_str()];
+            let id_b1 = vocab_map[b1.as_str()];
+            let id_a2 = vocab_map[a2.as_str()];
+            let id_b2 = vocab_map[b2.as_str()];
+            let id_a3 = vocab_map[a3.as_str()];
+            let id_b3 = vocab_map[b3.as_str()];
+            let id_a4 = vocab_map[a4.as_str()];
+            let id_b4 = vocab_map[b4.as_str()];
+            id_a1.cmp(&id_b1)
+                .then_with(|| id_a2.cmp(&id_b2))
+                .then_with(|| id_a3.cmp(&id_b3))
+                .then_with(|| p2.partial_cmp(p1).unwrap_or(std::cmp::Ordering::Equal))
+                .then_with(|| id_a4.cmp(&id_b4))
+        });
+        let fourgram_count = sorted_fourgrams.len() as u32;
+        let string_buffer_len = string_buffer.len() as u32;
+
+        let total_size = 36
+            + (vocab_count as usize * 6)
+            + (unigram_count as usize * 5)
+            + (bigram_count as usize * 9)
+            + (trigram_count as usize * 13)
+            + (fourgram_count as usize * 17)
+            + string_buffer.len();
+
+        let mut out = Vec::with_capacity(total_size);
+
+        // Header (36 bytes for LLM3)
+        out.extend_from_slice(Self::BINARY_MAGIC_V3);
+        out.extend_from_slice(&Self::BINARY_VERSION_V3.to_le_bytes());
+        out.extend_from_slice(&(self.total_words as u32).to_le_bytes());
+        out.extend_from_slice(&vocab_count.to_le_bytes());
+        out.extend_from_slice(&unigram_count.to_le_bytes());
+        out.extend_from_slice(&bigram_count.to_le_bytes());
+        out.extend_from_slice(&trigram_count.to_le_bytes());
+        out.extend_from_slice(&fourgram_count.to_le_bytes());
+        out.extend_from_slice(&string_buffer_len.to_le_bytes());
+
+        // Vocab table
+        for (offset, len) in vocab_entries {
+            out.extend_from_slice(&offset.to_le_bytes());
+            out.extend_from_slice(&len.to_le_bytes());
+        }
+
+        // Unigrams (id: u32, quantized: u8)
+        for (id, w) in words.iter().enumerate() {
+            let p = unigrams.get(w).copied().unwrap_or(-6.0);
+            out.extend_from_slice(&(id as u32).to_le_bytes());
+            out.push(quantize_log_prob(p));
+        }
+
+        // Bigrams (w1: u32, w2: u32, quantized: u8)
+        for (w1, w2, p) in &sorted_bigrams {
+            let w1_id = vocab_map[w1.as_str()];
+            let w2_id = vocab_map[w2.as_str()];
+            out.extend_from_slice(&w1_id.to_le_bytes());
+            out.extend_from_slice(&w2_id.to_le_bytes());
+            out.push(quantize_log_prob(*p));
+        }
+
+        // Trigrams (w1: u32, w2: u32, w3: u32, quantized: u8)
+        for (w1, w2, w3, p) in &sorted_trigrams {
+            let w1_id = vocab_map[w1.as_str()];
+            let w2_id = vocab_map[w2.as_str()];
+            let w3_id = vocab_map[w3.as_str()];
+            out.extend_from_slice(&w1_id.to_le_bytes());
+            out.extend_from_slice(&w2_id.to_le_bytes());
+            out.extend_from_slice(&w3_id.to_le_bytes());
+            out.push(quantize_log_prob(*p));
+        }
+
+        // Fourgrams (w1: u32, w2: u32, w3: u32, w4: u32, quantized: u8)
+        for (w1, w2, w3, w4, p) in &sorted_fourgrams {
+            let w1_id = vocab_map[w1.as_str()];
+            let w2_id = vocab_map[w2.as_str()];
+            let w3_id = vocab_map[w3.as_str()];
+            let w4_id = vocab_map[w4.as_str()];
+            out.extend_from_slice(&w1_id.to_le_bytes());
+            out.extend_from_slice(&w2_id.to_le_bytes());
+            out.extend_from_slice(&w3_id.to_le_bytes());
+            out.extend_from_slice(&w4_id.to_le_bytes());
+            out.push(quantize_log_prob(*p));
+        }
+
+        // String buffer
+        out.extend_from_slice(&string_buffer);
+
+        out
     }
 
     /// Serialize language model data into compact sorted binary format (LLM2)
@@ -181,7 +374,7 @@ impl TrainedLanguageModelData {
         std::fs::write(path, bytes)
     }
 
-    /// Load language model data from compact binary bytes
+    /// Load language model data from compact binary bytes (supports LLM1, LLM2, and LLM3)
     pub fn from_binary(data: &[u8]) -> Result<Self, std::io::Error> {
         if data.len() < 32 {
             return Err(std::io::Error::new(
@@ -190,7 +383,11 @@ impl TrainedLanguageModelData {
             ));
         }
 
-        if &data[0..4] != b"LLM1" && &data[0..4] != b"LLM2" {
+        let magic = &data[0..4];
+        let is_v3 = magic == b"LLM3";
+        let is_v2_or_v1 = magic == b"LLM1" || magic == b"LLM2";
+
+        if !is_v3 && !is_v2_or_v1 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Invalid binary language model magic header",
@@ -198,7 +395,14 @@ impl TrainedLanguageModelData {
         }
 
         let version = u32::from_le_bytes(data[4..8].try_into().unwrap());
-        if version != 1 && version != 2 {
+        if is_v3 {
+            if version != 3 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Unsupported binary language model version: {}", version),
+                ));
+            }
+        } else if version != 1 && version != 2 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("Unsupported binary language model version: {}", version),
@@ -210,14 +414,32 @@ impl TrainedLanguageModelData {
         let unigram_count = u32::from_le_bytes(data[16..20].try_into().unwrap()) as usize;
         let bigram_count = u32::from_le_bytes(data[20..24].try_into().unwrap()) as usize;
         let trigram_count = u32::from_le_bytes(data[24..28].try_into().unwrap()) as usize;
-        let string_buffer_len = u32::from_le_bytes(data[28..32].try_into().unwrap()) as usize;
 
-        let expected_size = 32
-            + (vocab_count * 6)
-            + (unigram_count * 8)
-            + (bigram_count * 12)
-            + (trigram_count * 16)
-            + string_buffer_len;
+        let (fourgram_count, string_buffer_len, header_size) = if is_v3 {
+            let four = u32::from_le_bytes(data[28..32].try_into().unwrap()) as usize;
+            let str_len = u32::from_le_bytes(data[32..36].try_into().unwrap()) as usize;
+            (four, str_len, 36)
+        } else {
+            let str_len = u32::from_le_bytes(data[28..32].try_into().unwrap()) as usize;
+            (0, str_len, 32)
+        };
+
+        let expected_size = if is_v3 {
+            header_size
+                + (vocab_count * 6)
+                + (unigram_count * 5)
+                + (bigram_count * 9)
+                + (trigram_count * 13)
+                + (fourgram_count * 17)
+                + string_buffer_len
+        } else {
+            header_size
+                + (vocab_count * 6)
+                + (unigram_count * 8)
+                + (bigram_count * 12)
+                + (trigram_count * 16)
+                + string_buffer_len
+        };
 
         if data.len() < expected_size {
             return Err(std::io::Error::new(
@@ -226,7 +448,7 @@ impl TrainedLanguageModelData {
             ));
         }
 
-        let mut cursor = 32;
+        let mut cursor = header_size;
 
         // Vocab table
         let mut vocab_offsets_lens = Vec::with_capacity(vocab_count);
@@ -239,15 +461,19 @@ impl TrainedLanguageModelData {
 
         // Unigrams cursor
         let unigrams_start = cursor;
-        cursor += unigram_count * 8;
+        cursor += if is_v3 { unigram_count * 5 } else { unigram_count * 8 };
 
         // Bigrams cursor
         let bigrams_start = cursor;
-        cursor += bigram_count * 12;
+        cursor += if is_v3 { bigram_count * 9 } else { bigram_count * 12 };
 
         // Trigrams cursor
         let trigrams_start = cursor;
-        cursor += trigram_count * 16;
+        cursor += if is_v3 { trigram_count * 13 } else { trigram_count * 16 };
+
+        // Fourgrams cursor
+        let fourgrams_start = cursor;
+        cursor += if is_v3 { fourgram_count * 17 } else { 0 };
 
         // String buffer
         let string_buf_bytes = &data[cursor..cursor + string_buffer_len];
@@ -271,11 +497,15 @@ impl TrainedLanguageModelData {
         let mut u_cursor = unigrams_start;
         for _ in 0..unigram_count {
             let wid = u32::from_le_bytes(data[u_cursor..u_cursor + 4].try_into().unwrap()) as usize;
-            let prob = f32::from_le_bytes(data[u_cursor + 4..u_cursor + 8].try_into().unwrap());
+            let prob = if is_v3 {
+                dequantize_log_prob(data[u_cursor + 4])
+            } else {
+                f32::from_le_bytes(data[u_cursor + 4..u_cursor + 8].try_into().unwrap())
+            };
             if wid < words.len() {
                 unigrams.insert(words[wid].clone(), prob);
             }
-            u_cursor += 8;
+            u_cursor += if is_v3 { 5 } else { 8 };
         }
 
         // Parse bigrams
@@ -284,11 +514,15 @@ impl TrainedLanguageModelData {
         for _ in 0..bigram_count {
             let w1_id = u32::from_le_bytes(data[b_cursor..b_cursor + 4].try_into().unwrap()) as usize;
             let w2_id = u32::from_le_bytes(data[b_cursor + 4..b_cursor + 8].try_into().unwrap()) as usize;
-            let prob = f32::from_le_bytes(data[b_cursor + 8..b_cursor + 12].try_into().unwrap());
+            let prob = if is_v3 {
+                dequantize_log_prob(data[b_cursor + 8])
+            } else {
+                f32::from_le_bytes(data[b_cursor + 8..b_cursor + 12].try_into().unwrap())
+            };
             if w1_id < words.len() && w2_id < words.len() {
                 bigrams.push((words[w1_id].clone(), words[w2_id].clone(), prob));
             }
-            b_cursor += 12;
+            b_cursor += if is_v3 { 9 } else { 12 };
         }
 
         // Parse trigrams
@@ -298,17 +532,45 @@ impl TrainedLanguageModelData {
             let w1_id = u32::from_le_bytes(data[t_cursor..t_cursor + 4].try_into().unwrap()) as usize;
             let w2_id = u32::from_le_bytes(data[t_cursor + 4..t_cursor + 8].try_into().unwrap()) as usize;
             let w3_id = u32::from_le_bytes(data[t_cursor + 8..t_cursor + 12].try_into().unwrap()) as usize;
-            let prob = f32::from_le_bytes(data[t_cursor + 12..t_cursor + 16].try_into().unwrap());
+            let prob = if is_v3 {
+                dequantize_log_prob(data[t_cursor + 12])
+            } else {
+                f32::from_le_bytes(data[t_cursor + 12..t_cursor + 16].try_into().unwrap())
+            };
             if w1_id < words.len() && w2_id < words.len() && w3_id < words.len() {
                 trigrams.push((words[w1_id].clone(), words[w2_id].clone(), words[w3_id].clone(), prob));
             }
-            t_cursor += 16;
+            t_cursor += if is_v3 { 13 } else { 16 };
+        }
+
+        // Parse fourgrams
+        let mut fourgrams = Vec::with_capacity(fourgram_count);
+        if is_v3 && fourgram_count > 0 {
+            let mut f_cursor = fourgrams_start;
+            for _ in 0..fourgram_count {
+                let w1_id = u32::from_le_bytes(data[f_cursor..f_cursor + 4].try_into().unwrap()) as usize;
+                let w2_id = u32::from_le_bytes(data[f_cursor + 4..f_cursor + 8].try_into().unwrap()) as usize;
+                let w3_id = u32::from_le_bytes(data[f_cursor + 8..f_cursor + 12].try_into().unwrap()) as usize;
+                let w4_id = u32::from_le_bytes(data[f_cursor + 12..f_cursor + 16].try_into().unwrap()) as usize;
+                let prob = dequantize_log_prob(data[f_cursor + 16]);
+                if w1_id < words.len() && w2_id < words.len() && w3_id < words.len() && w4_id < words.len() {
+                    fourgrams.push((
+                        words[w1_id].clone(),
+                        words[w2_id].clone(),
+                        words[w3_id].clone(),
+                        words[w4_id].clone(),
+                        prob,
+                    ));
+                }
+                f_cursor += 17;
+            }
         }
 
         Ok(Self {
             unigrams,
             bigrams,
             trigrams,
+            fourgrams,
             total_words,
         })
     }
@@ -322,15 +584,22 @@ impl TrainedLanguageModelData {
 
 use rayon::prelude::*;
 
+fn default_min_fourgram_freq() -> usize { 8 }
+fn default_max_fourgrams() -> usize { 30_000 }
+
 /// Configuration options for N-gram pruning and model capacity
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingConfig {
     pub min_unigram_freq: usize,
     pub min_bigram_freq: usize,
     pub min_trigram_freq: usize,
+    #[serde(default = "default_min_fourgram_freq")]
+    pub min_fourgram_freq: usize,
     pub max_unigrams: usize,
     pub max_bigrams: usize,
     pub max_trigrams: usize,
+    #[serde(default = "default_max_fourgrams")]
+    pub max_fourgrams: usize,
 }
 
 impl TrainingConfig {
@@ -340,9 +609,11 @@ impl TrainingConfig {
             min_unigram_freq: 1,
             min_bigram_freq: 1,
             min_trigram_freq: 1,
+            min_fourgram_freq: 1,
             max_unigrams: usize::MAX,
             max_bigrams: usize::MAX,
             max_trigrams: usize::MAX,
+            max_fourgrams: usize::MAX,
         }
     }
 
@@ -352,9 +623,25 @@ impl TrainingConfig {
             min_unigram_freq: 3,
             min_bigram_freq: 5,
             min_trigram_freq: 8,
+            min_fourgram_freq: 10,
             max_unigrams: 65_000,
             max_bigrams: 160_000,
             max_trigrams: 60_000,
+            max_fourgrams: 30_000,
+        }
+    }
+
+    /// Production configuration for LLM3 quantized model with expanded capacity and 4-grams
+    pub fn llm3_production() -> Self {
+        Self {
+            min_unigram_freq: 2,
+            min_bigram_freq: 3,
+            min_trigram_freq: 5,
+            min_fourgram_freq: 8,
+            max_unigrams: 80_000,
+            max_bigrams: 220_000,
+            max_trigrams: 100_000,
+            max_fourgrams: 40_000,
         }
     }
 }
@@ -371,6 +658,7 @@ pub struct CorpusTrainer {
     unigram_counts: HashMap<String, usize>,
     bigram_counts: HashMap<(String, String), usize>,
     trigram_counts: HashMap<(String, String, String), usize>,
+    fourgram_counts: HashMap<(String, String, String, String), usize>,
     total_tokens: usize,
 }
 
@@ -395,6 +683,10 @@ impl CorpusTrainer {
         self.trigram_counts.len()
     }
 
+    pub fn unique_fourgrams(&self) -> usize {
+        self.fourgram_counts.len()
+    }
+
     /// Merge counts from another trainer instance
     pub fn merge(&mut self, other: CorpusTrainer) {
         self.total_tokens += other.total_tokens;
@@ -406,6 +698,9 @@ impl CorpusTrainer {
         }
         for (tri, c) in other.trigram_counts {
             *self.trigram_counts.entry(tri).or_insert(0) += c;
+        }
+        for (four, c) in other.fourgram_counts {
+            *self.fourgram_counts.entry(four).or_insert(0) += c;
         }
     }
 
@@ -514,6 +809,16 @@ impl CorpusTrainer {
                     .entry((prev2.clone(), prev1.clone(), word.clone()))
                     .or_insert(0) += 1;
             }
+
+            if i >= 3 {
+                let prev3 = &words[i - 3];
+                let prev2 = &words[i - 2];
+                let prev1 = &words[i - 1];
+                *self
+                    .fourgram_counts
+                    .entry((prev3.clone(), prev2.clone(), prev1.clone(), word.clone()))
+                    .or_insert(0) += 1;
+            }
         }
     }
 
@@ -587,10 +892,39 @@ impl CorpusTrainer {
             trigrams.push((w1.clone(), w2.clone(), w3.clone(), prob.log10()));
         }
 
+        // 4. Filter and cap fourgrams (only include if words are in vocabulary)
+        let mut fourgram_vec: Vec<_> = self
+            .fourgram_counts
+            .iter()
+            .filter(|((w1, w2, w3, w4), &count)| {
+                count >= config.min_fourgram_freq
+                    && unigrams.contains_key(w1)
+                    && unigrams.contains_key(w2)
+                    && unigrams.contains_key(w3)
+                    && unigrams.contains_key(w4)
+            })
+            .collect();
+        fourgram_vec.sort_unstable_by(|a, b| b.1.cmp(a.1));
+        if fourgram_vec.len() > config.max_fourgrams {
+            fourgram_vec.truncate(config.max_fourgrams);
+        }
+
+        let mut fourgrams = Vec::with_capacity(fourgram_vec.len());
+        for ((w1, w2, w3, w4), count) in fourgram_vec {
+            let tri_count = self
+                .trigram_counts
+                .get(&(w1.clone(), w2.clone(), w3.clone()))
+                .copied()
+                .unwrap_or(1) as f32;
+            let prob = (*count as f32) / tri_count;
+            fourgrams.push((w1.clone(), w2.clone(), w3.clone(), w4.clone(), prob.log10()));
+        }
+
         TrainedLanguageModelData {
             unigrams,
             bigrams,
             trigrams,
+            fourgrams,
             total_words: self.total_tokens,
         }
     }
@@ -914,6 +1248,7 @@ pub fn train_files_streaming<P: AsRef<Path>>(
         unigrams,
         bigrams,
         trigrams,
+        fourgrams: Vec::new(),
         total_words: total_tokens,
     })
 }
@@ -1128,4 +1463,31 @@ mod tests {
             .iter()
             .any(|(w1, w2, w3, _)| w1 == "আমি" && w2 == "বাংলায়" && w3 == "গান"));
     }
+
+    #[test]
+    fn test_llm3_binary_roundtrip() {
+        let mut trainer = CorpusTrainer::new();
+        trainer.train_text("আমি বাংলায় গান গাই। আমি ভাত খাচ্ছি। আমরা সবাই একসাথে থাকি।");
+        let compiled = trainer.compile();
+
+        let bytes = compiled.to_binary_llm3();
+        assert!(!bytes.is_empty());
+        assert_eq!(&bytes[0..4], b"LLM3");
+
+        let loaded = TrainedLanguageModelData::from_binary(&bytes).expect("Failed to load LLM3 binary");
+        assert_eq!(loaded.total_words, compiled.total_words);
+        assert!(loaded.unigrams.len() >= compiled.unigrams.len());
+        assert!(loaded.bigrams.len() >= compiled.bigrams.len());
+        assert!(loaded.trigrams.len() >= compiled.trigrams.len());
+
+        let zc = crate::zero_copy::ZeroCopyLanguageModel::from_slice(bytes.leak()).expect("Failed to parse zero-copy LLM3");
+        assert_eq!(zc.unigram_count(), loaded.unigrams.len());
+        assert_eq!(zc.bigram_count(), loaded.bigrams.len());
+        assert_eq!(zc.trigram_count(), loaded.trigrams.len());
+
+        // Test scoring via zero-copy on LLM3
+        let score = zc.score_candidate(Some("বাংলায়"), Some("গান"), "গাই");
+        assert!(score > -3.0);
+    }
 }
+

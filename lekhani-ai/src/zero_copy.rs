@@ -9,37 +9,60 @@ use std::path::Path;
 
 pub const BINARY_MAGIC_V2: &[u8; 4] = b"LLM2";
 pub const BINARY_VERSION_V2: u32 = 2;
+pub const BINARY_MAGIC_V3: &[u8; 4] = b"LLM3";
+pub const BINARY_VERSION_V3: u32 = 3;
 
-/// Zero-copy reader for pre-compiled Bengali language model binary
+pub const QUANT_FLOOR: f32 = -12.0;
+pub const QUANT_CEIL: f32 = 0.0;
+
+#[inline]
+pub fn quantize_log_prob(p: f32) -> u8 {
+    let clamped = p.clamp(QUANT_FLOOR, QUANT_CEIL);
+    let normalized = (clamped - QUANT_FLOOR) / (QUANT_CEIL - QUANT_FLOOR);
+    (normalized * 255.0).round() as u8
+}
+
+#[inline]
+pub fn dequantize_log_prob(q: u8) -> f32 {
+    QUANT_FLOOR + (q as f32 / 255.0) * (QUANT_CEIL - QUANT_FLOOR)
+}
+
+/// Zero-copy reader for pre-compiled Bengali language model binary (LLM2 and LLM3)
 pub struct ZeroCopyLanguageModel {
     _mmap: Option<Mmap>,
     data: &'static [u8],
     _total_words: usize,
+    pub version: u32,
     vocab_count: usize,
     unigram_count: usize,
     bigram_count: usize,
     trigram_count: usize,
+    fourgram_count: usize,
     // Byte offsets into `data`
     vocab_table_offset: usize,
     unigrams_offset: usize,
     bigrams_offset: usize,
     trigrams_offset: usize,
+    fourgrams_offset: usize,
     string_buf_offset: usize,
     _string_buf_len: usize,
     // Hyperparameters
     pub lambda1: f32,
     pub lambda2: f32,
     pub lambda3: f32,
+    pub lambda4: f32,
     pub unigram_floor: f32,
 }
 
 impl std::fmt::Debug for ZeroCopyLanguageModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ZeroCopyLanguageModel")
+            .field("version", &self.version)
             .field("vocab_count", &self.vocab_count)
             .field("unigram_count", &self.unigram_count)
             .field("bigram_count", &self.bigram_count)
             .field("trigram_count", &self.trigram_count)
+            .field("fourgram_count", &self.fourgram_count)
             .finish()
     }
 }
@@ -67,6 +90,12 @@ impl ZeroCopyLanguageModel {
     pub fn trigram_count(&self) -> usize {
         self.trigram_count
     }
+
+    #[inline]
+    pub fn fourgram_count(&self) -> usize {
+        self.fourgram_count
+    }
+
     /// Open and memory-map a binary model from disk
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
         let file = File::open(path)?;
@@ -83,22 +112,39 @@ impl ZeroCopyLanguageModel {
         if data.len() < 32 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                "Binary data too short for LLM2 header",
+                "Binary data too short for language model header",
             ));
         }
 
-        if &data[0..4] != BINARY_MAGIC_V2 {
+        let magic = &data[0..4];
+        let is_v2 = magic == BINARY_MAGIC_V2;
+        let is_v3 = magic == BINARY_MAGIC_V3;
+
+        if !is_v2 && !is_v3 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("Invalid binary magic: expected LLM2, got {:?}", &data[0..4]),
+                format!("Invalid binary magic: expected LLM2 or LLM3, got {:?}", magic),
             ));
         }
 
         let version = u32::from_le_bytes(data[4..8].try_into().unwrap());
-        if version != BINARY_VERSION_V2 {
+        if is_v2 && version != BINARY_VERSION_V2 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("Unsupported LLM2 version: {}", version),
+            ));
+        }
+        if is_v3 && version != BINARY_VERSION_V3 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Unsupported LLM3 version: {}", version),
+            ));
+        }
+
+        if is_v3 && data.len() < 36 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Binary data too short for LLM3 header",
             ));
         }
 
@@ -107,35 +153,65 @@ impl ZeroCopyLanguageModel {
         let unigram_count = u32::from_le_bytes(data[16..20].try_into().unwrap()) as usize;
         let bigram_count = u32::from_le_bytes(data[20..24].try_into().unwrap()) as usize;
         let trigram_count = u32::from_le_bytes(data[24..28].try_into().unwrap()) as usize;
-        let string_buffer_len = u32::from_le_bytes(data[28..32].try_into().unwrap()) as usize;
+
+        let (fourgram_count, string_buffer_len, header_size) = if is_v3 {
+            let four_count = u32::from_le_bytes(data[28..32].try_into().unwrap()) as usize;
+            let str_len = u32::from_le_bytes(data[32..36].try_into().unwrap()) as usize;
+            (four_count, str_len, 36)
+        } else {
+            let str_len = u32::from_le_bytes(data[28..32].try_into().unwrap()) as usize;
+            (0, str_len, 32)
+        };
 
         let vocab_bytes = vocab_count.checked_mul(6).ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::InvalidData, "vocab_count overflow")
         })?;
-        let unigram_bytes = unigram_count.checked_mul(8).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "unigram_count overflow")
-        })?;
-        let bigram_bytes = bigram_count.checked_mul(12).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "bigram_count overflow")
-        })?;
-        let trigram_bytes = trigram_count.checked_mul(16).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "trigram_count overflow")
-        })?;
 
-        let vocab_table_offset = 32;
+        let (unigram_bytes, bigram_bytes, trigram_bytes, fourgram_bytes) = if is_v3 {
+            (
+                unigram_count.checked_mul(5).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "unigram_count overflow")
+                })?,
+                bigram_count.checked_mul(9).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "bigram_count overflow")
+                })?,
+                trigram_count.checked_mul(13).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "trigram_count overflow")
+                })?,
+                fourgram_count.checked_mul(17).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "fourgram_count overflow")
+                })?,
+            )
+        } else {
+            (
+                unigram_count.checked_mul(8).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "unigram_count overflow")
+                })?,
+                bigram_count.checked_mul(12).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "bigram_count overflow")
+                })?,
+                trigram_count.checked_mul(16).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "trigram_count overflow")
+                })?,
+                0,
+            )
+        };
+
+        let vocab_table_offset = header_size;
         let unigrams_offset = vocab_table_offset + vocab_bytes;
         let bigrams_offset = unigrams_offset + unigram_bytes;
         let trigrams_offset = bigrams_offset + bigram_bytes;
-        let string_buf_offset = trigrams_offset + trigram_bytes;
+        let fourgrams_offset = trigrams_offset + trigram_bytes;
+        let string_buf_offset = fourgrams_offset + fourgram_bytes;
         let expected_size = string_buf_offset.checked_add(string_buffer_len).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "LLM2 file size overflow")
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "LM file size overflow")
         })?;
 
         if data.len() < expected_size {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 format!(
-                    "Truncated LLM2 data: expected at least {} bytes, got {}",
+                    "Truncated LM data: expected at least {} bytes, got {}",
                     expected_size,
                     data.len()
                 ),
@@ -147,7 +223,7 @@ impl ZeroCopyLanguageModel {
         let string_buf_str = std::str::from_utf8(string_buf).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("Invalid UTF-8 in LLM2 string buffer: {}", e),
+                format!("Invalid UTF-8 in LM string buffer: {}", e),
             )
         })?;
 
@@ -177,19 +253,23 @@ impl ZeroCopyLanguageModel {
             _mmap: None,
             data,
             _total_words: total_words,
+            version,
             vocab_count,
             unigram_count,
             bigram_count,
             trigram_count,
+            fourgram_count,
             vocab_table_offset,
             unigrams_offset,
             bigrams_offset,
             trigrams_offset,
+            fourgrams_offset,
             string_buf_offset,
             _string_buf_len: string_buffer_len,
-            lambda1: 0.15,
-            lambda2: 0.35,
-            lambda3: 0.50,
+            lambda1: 0.10,
+            lambda2: 0.25,
+            lambda3: 0.35,
+            lambda4: 0.30,
             unigram_floor: -6.0,
         })
     }
@@ -249,14 +329,23 @@ impl ZeroCopyLanguageModel {
         if id >= self.unigram_count {
             return None;
         }
-        // In LLM2 format, unigrams are stored in direct word_id order
-        let offset = self.unigrams_offset + (id * 8);
-        let stored_id = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
-        if stored_id == word_id {
-            let prob = f32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().unwrap());
-            Some(prob)
+        if self.version == 3 {
+            let offset = self.unigrams_offset + (id * 5);
+            let stored_id = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
+            if stored_id == word_id {
+                Some(dequantize_log_prob(self.data[offset + 4]))
+            } else {
+                None
+            }
         } else {
-            None
+            let offset = self.unigrams_offset + (id * 8);
+            let stored_id = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
+            if stored_id == word_id {
+                let prob = f32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().unwrap());
+                Some(prob)
+            } else {
+                None
+            }
         }
     }
 
@@ -265,14 +354,13 @@ impl ZeroCopyLanguageModel {
         if self.bigram_count == 0 {
             return None;
         }
-        // Bigrams are sorted by w1_id ascending, log_prob descending
-        // Find first occurrence of w1_id via binary search
+        let entry_size = if self.version == 3 { 9 } else { 12 };
         let mut low = 0;
         let mut high = self.bigram_count;
 
         while low < high {
             let mid = low + (high - low) / 2;
-            let offset = self.bigrams_offset + (mid * 12);
+            let offset = self.bigrams_offset + (mid * entry_size);
             let mid_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
             if mid_w1 < w1_id {
                 low = mid + 1;
@@ -281,17 +369,20 @@ impl ZeroCopyLanguageModel {
             }
         }
 
-        // Scan entries with matching w1_id
         let mut idx = low;
         while idx < self.bigram_count {
-            let offset = self.bigrams_offset + (idx * 12);
+            let offset = self.bigrams_offset + (idx * entry_size);
             let cur_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
             if cur_w1 != w1_id {
                 break;
             }
             let cur_w2 = u32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().unwrap());
             if cur_w2 == w2_id {
-                let prob = f32::from_le_bytes(self.data[offset + 8..offset + 12].try_into().unwrap());
+                let prob = if self.version == 3 {
+                    dequantize_log_prob(self.data[offset + 8])
+                } else {
+                    f32::from_le_bytes(self.data[offset + 8..offset + 12].try_into().unwrap())
+                };
                 return Some(prob);
             }
             idx += 1;
@@ -305,14 +396,14 @@ impl ZeroCopyLanguageModel {
         if self.trigram_count == 0 {
             return None;
         }
-        // Trigrams are sorted by (w1_id, w2_id) ascending, log_prob descending
+        let entry_size = if self.version == 3 { 13 } else { 16 };
         let target = ((w1_id as u64) << 32) | (w2_id as u64);
         let mut low = 0;
         let mut high = self.trigram_count;
 
         while low < high {
             let mid = low + (high - low) / 2;
-            let offset = self.trigrams_offset + (mid * 16);
+            let offset = self.trigrams_offset + (mid * entry_size);
             let mid_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
             let mid_w2 = u32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().unwrap());
             let mid_pair = ((mid_w1 as u64) << 32) | (mid_w2 as u64);
@@ -325,7 +416,7 @@ impl ZeroCopyLanguageModel {
 
         let mut idx = low;
         while idx < self.trigram_count {
-            let offset = self.trigrams_offset + (idx * 16);
+            let offset = self.trigrams_offset + (idx * entry_size);
             let cur_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
             let cur_w2 = u32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().unwrap());
             if cur_w1 != w1_id || cur_w2 != w2_id {
@@ -333,7 +424,58 @@ impl ZeroCopyLanguageModel {
             }
             let cur_w3 = u32::from_le_bytes(self.data[offset + 8..offset + 12].try_into().unwrap());
             if cur_w3 == w3_id {
-                let prob = f32::from_le_bytes(self.data[offset + 12..offset + 16].try_into().unwrap());
+                let prob = if self.version == 3 {
+                    dequantize_log_prob(self.data[offset + 12])
+                } else {
+                    f32::from_le_bytes(self.data[offset + 12..offset + 16].try_into().unwrap())
+                };
+                return Some(prob);
+            }
+            idx += 1;
+        }
+
+        None
+    }
+
+    /// Fourgram probability lookup by (w1_id, w2_id, w3_id, w4_id) (zero allocations, ~30ns)
+    pub fn get_fourgram_prob(&self, w1_id: u32, w2_id: u32, w3_id: u32, w4_id: u32) -> Option<f32> {
+        if self.fourgram_count == 0 {
+            return None;
+        }
+        let entry_size = 17;
+        let mut low = 0;
+        let mut high = self.fourgram_count;
+
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let offset = self.fourgrams_offset + (mid * entry_size);
+            let mid_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
+            let mid_w2 = u32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().unwrap());
+            let mid_w3 = u32::from_le_bytes(self.data[offset + 8..offset + 12].try_into().unwrap());
+
+            let cmp = mid_w1.cmp(&w1_id)
+                .then_with(|| mid_w2.cmp(&w2_id))
+                .then_with(|| mid_w3.cmp(&w3_id));
+
+            if cmp == std::cmp::Ordering::Less {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+
+        let mut idx = low;
+        while idx < self.fourgram_count {
+            let offset = self.fourgrams_offset + (idx * entry_size);
+            let cur_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
+            let cur_w2 = u32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().unwrap());
+            let cur_w3 = u32::from_le_bytes(self.data[offset + 8..offset + 12].try_into().unwrap());
+            if cur_w1 != w1_id || cur_w2 != w2_id || cur_w3 != w3_id {
+                break;
+            }
+            let cur_w4 = u32::from_le_bytes(self.data[offset + 12..offset + 16].try_into().unwrap());
+            if cur_w4 == w4_id {
+                let prob = dequantize_log_prob(self.data[offset + 16]);
                 return Some(prob);
             }
             idx += 1;
@@ -354,13 +496,13 @@ impl ZeroCopyLanguageModel {
             return Vec::new();
         }
 
-        // Binary search for first occurrence of w1_id
+        let entry_size = if self.version == 3 { 9 } else { 12 };
         let mut low = 0;
         let mut high = self.bigram_count;
 
         while low < high {
             let mid = low + (high - low) / 2;
-            let offset = self.bigrams_offset + (mid * 12);
+            let offset = self.bigrams_offset + (mid * entry_size);
             let mid_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
             if mid_w1 < w1_id {
                 low = mid + 1;
@@ -372,7 +514,7 @@ impl ZeroCopyLanguageModel {
         let mut results = Vec::with_capacity(limit);
         let mut idx = low;
         while idx < self.bigram_count && results.len() < limit {
-            let offset = self.bigrams_offset + (idx * 12);
+            let offset = self.bigrams_offset + (idx * entry_size);
             let cur_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
             if cur_w1 != w1_id {
                 break;
@@ -404,13 +546,14 @@ impl ZeroCopyLanguageModel {
             return self.get_next_words(prev1, limit);
         }
 
+        let entry_size = if self.version == 3 { 13 } else { 16 };
         let target = ((p2_id as u64) << 32) | (p1_id as u64);
         let mut low = 0;
         let mut high = self.trigram_count;
 
         while low < high {
             let mid = low + (high - low) / 2;
-            let offset = self.trigrams_offset + (mid * 16);
+            let offset = self.trigrams_offset + (mid * entry_size);
             let mid_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
             let mid_w2 = u32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().unwrap());
             let mid_pair = ((mid_w1 as u64) << 32) | (mid_w2 as u64);
@@ -424,7 +567,7 @@ impl ZeroCopyLanguageModel {
         let mut results = Vec::with_capacity(limit);
         let mut idx = low;
         while idx < self.trigram_count && results.len() < limit {
-            let offset = self.trigrams_offset + (idx * 16);
+            let offset = self.trigrams_offset + (idx * entry_size);
             let cur_w1 = u32::from_le_bytes(self.data[offset..offset + 4].try_into().unwrap());
             let cur_w2 = u32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().unwrap());
             if cur_w1 != p2_id || cur_w2 != p1_id {
@@ -444,8 +587,14 @@ impl ZeroCopyLanguageModel {
         }
     }
 
-    /// Interpolated conditional probability scoring with zero heap allocations (~60ns)
-    pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
+    /// Interpolated conditional probability scoring with optional 4-gram context (~60ns)
+    pub fn score_candidate_fourgram(
+        &self,
+        prev3: Option<&str>,
+        prev2: Option<&str>,
+        prev1: Option<&str>,
+        word: &str,
+    ) -> f32 {
         let clean_word = clean_token(word);
         let w_id = match self.get_word_id(clean_word) {
             Some(id) => id,
@@ -456,28 +605,41 @@ impl ZeroCopyLanguageModel {
 
         let p1_id = prev1.map(clean_token).and_then(|p| self.get_word_id(p));
         let p2_id = prev2.map(clean_token).and_then(|p| self.get_word_id(p));
+        let p3_id = prev3.map(clean_token).and_then(|p| self.get_word_id(p));
 
         let bigram_log = p1_id.and_then(|p1| self.get_bigram_prob(p1, w_id));
         let trigram_log = match (p2_id, p1_id) {
             (Some(p2), Some(p1)) => self.get_trigram_prob(p2, p1, w_id),
             _ => None,
         };
+        let fourgram_log = match (p3_id, p2_id, p1_id) {
+            (Some(p3), Some(p2), Some(p1)) => self.get_fourgram_prob(p3, p2, p1, w_id),
+            _ => None,
+        };
 
-        // Linear interpolation in probability domain: P = λ3*P_tri + λ2*P_bi + λ1*P_uni
         let p_uni = 10.0_f32.powf(unigram_log);
         let p_bi = bigram_log.map(|l| 10.0_f32.powf(l)).unwrap_or(0.0);
         let p_tri = trigram_log.map(|l| 10.0_f32.powf(l)).unwrap_or(0.0);
+        let p_four = fourgram_log.map(|l| 10.0_f32.powf(l)).unwrap_or(0.0);
 
-        let interpolated = if trigram_log.is_some() {
-            self.lambda3 * p_tri + self.lambda2 * p_bi + self.lambda1 * p_uni
+        let interpolated = if fourgram_log.is_some() {
+            self.lambda4 * p_four + self.lambda3 * p_tri + self.lambda2 * p_bi + self.lambda1 * p_uni
+        } else if trigram_log.is_some() {
+            let tri_weight = self.lambda3 + self.lambda4;
+            tri_weight * p_tri + self.lambda2 * p_bi + self.lambda1 * p_uni
         } else if bigram_log.is_some() {
-            let bi_weight = self.lambda2 + self.lambda3;
+            let bi_weight = self.lambda2 + self.lambda3 + self.lambda4;
             bi_weight * p_bi + self.lambda1 * p_uni
         } else {
             p_uni
         };
 
         interpolated.max(1e-12).log10()
+    }
+
+    /// Interpolated conditional probability scoring with zero heap allocations (~60ns)
+    pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
+        self.score_candidate_fourgram(None, prev2, prev1, word)
     }
 }
 
