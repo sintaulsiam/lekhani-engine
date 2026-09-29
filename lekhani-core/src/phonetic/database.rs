@@ -734,6 +734,7 @@ impl PhoneticDatabase {
             "network" => Some(("নেটওয়ার্ক", "network")),
             "system" => Some(("সিস্টেম", "system")),
             "file" => Some(("ফাইল", "file")),
+            "copy" => Some(("কপি", "copy")),
             "typing" => Some(("টাইপিং", "typing")),
             "computer" | "pc" => Some(("কম্পিউটার", "computer")),
             "notification" | "notifications" => Some(("নোটিফিকেশন", "notification")),
