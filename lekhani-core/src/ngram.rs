@@ -12,6 +12,7 @@ pub struct UserStats {
     pub keystrokes_saved: u64,
     pub top_words: HashMap<String, u64>,
     pub char_frequencies: HashMap<char, u64>,
+    pub word_last_seen: HashMap<String, u64>,
 }
 
 impl Default for UserStats {
@@ -28,11 +29,26 @@ impl UserStats {
             keystrokes_saved: 0,
             top_words: HashMap::new(),
             char_frequencies: HashMap::new(),
+            word_last_seen: HashMap::new(),
         }
     }
 
-    /// Record a completed word commit
+    /// Record a completed word commit using current system time
     pub fn record_commit(&mut self, typed_len: usize, committed_text: &str) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.record_commit_with_timestamp(typed_len, committed_text, now);
+    }
+
+    /// Record a completed word commit with explicit Unix timestamp in seconds
+    pub fn record_commit_with_timestamp(
+        &mut self,
+        typed_len: usize,
+        committed_text: &str,
+        current_unix_ts: u64,
+    ) {
         if committed_text.is_empty() {
             return;
         }
@@ -49,10 +65,48 @@ impl UserStats {
             .entry(committed_text.to_string())
             .or_insert(0) += 1;
 
+        self.word_last_seen
+            .insert(committed_text.to_string(), current_unix_ts);
+
         for ch in committed_text.chars() {
             if !ch.is_whitespace() && !ch.is_ascii_punctuation() {
                 *self.char_frequencies.entry(ch).or_insert(0) += 1;
             }
+        }
+    }
+
+    /// Compute Ebbinghaus recency-decay-weighted frequency score for a word.
+    /// EffectiveFreq(w, t) = BaseFreq(w) * e^(-lambda * delta_days)
+    /// with 3x recency boost if typed within the last 24 hours.
+    pub fn decay_weighted_score(&self, word: &str, current_unix_ts: u64) -> f32 {
+        let base_freq = match self.top_words.get(word) {
+            Some(&freq) if freq > 0 => freq as f32,
+            _ => return 0.0,
+        };
+
+        let last_ts = self.word_last_seen.get(word).copied().unwrap_or(current_unix_ts);
+        let delta_secs = current_unix_ts.saturating_sub(last_ts);
+        let delta_days = (delta_secs as f32) / 86400.0;
+
+        const LAMBDA: f32 = 0.05;
+        let decay = (-LAMBDA * delta_days).exp();
+
+        let recency_multiplier = if delta_secs <= 86400 {
+            3.0
+        } else {
+            1.0
+        };
+
+        base_freq * decay * recency_multiplier
+    }
+
+    /// Populate a PersonalScoreOverlay from the current UserStats
+    pub fn populate_overlay(&self, overlay: &mut lekhani_ai::PersonalScoreOverlay, current_unix_ts: u64) {
+        for (word, _) in &self.top_words {
+            let score = self.decay_weighted_score(word, current_unix_ts);
+            // Scale score to [0.0, 5.0] boost range
+            let boost = (score.ln_1p() * 0.5).min(5.0);
+            overlay.set_score(word, boost);
         }
     }
 
@@ -112,6 +166,10 @@ impl UserStats {
         for (ch, c) in &other.char_frequencies {
             let entry = self.char_frequencies.entry(*ch).or_insert(0);
             *entry += *c;
+        }
+        for (w, ts) in &other.word_last_seen {
+            let entry = self.word_last_seen.entry(w.clone()).or_insert(0);
+            *entry = (*entry).max(*ts);
         }
     }
 
@@ -176,5 +234,32 @@ mod tests {
         assert_eq!(s1.total_words_typed, 3);
         assert!(s1.top_words.contains_key("বাংলাদেশ"));
         assert!(s1.top_words.contains_key("বাংলা"));
+    }
+
+    #[test]
+    fn test_decay_weighted_score() {
+        let mut stats = UserStats::new();
+        let base_ts = 1_000_000;
+        stats.record_commit_with_timestamp(3, "লেখনী", base_ts);
+
+        // Within 24h (3600 seconds later): should have 3x recency boost
+        let score_recent = stats.decay_weighted_score("লেখনী", base_ts + 3600);
+        assert!(score_recent >= 2.9);
+
+        // 30 days later (2,592,000 seconds later): 1x multiplier and decay
+        let score_old = stats.decay_weighted_score("লেখনী", base_ts + 2_592_000);
+        assert!(score_old < score_recent);
+        assert!(score_old > 0.0);
+    }
+
+    #[test]
+    fn test_populate_overlay() {
+        let mut stats = UserStats::new();
+        let now = 1_000_000;
+        stats.record_commit_with_timestamp(3, "বিশেষ", now);
+
+        let mut overlay = lekhani_ai::PersonalScoreOverlay::new();
+        stats.populate_overlay(&mut overlay, now);
+        assert!(overlay.boost_for("বিশেষ") > 0.0);
     }
 }

@@ -2,20 +2,184 @@
 
 use crate::lm::LanguageModel;
 
+const OVERLAY_CAPACITY: usize = 4096;
+const OVERLAY_MASK: usize = OVERLAY_CAPACITY - 1;
+
+/// Fast, deterministic 64-bit FNV-1a hash for string tokens
+#[inline]
+pub fn hash_word(word: &str) -> u64 {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in word.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    // Reserve 0 as empty slot indicator
+    if hash == 0 {
+        1
+    } else {
+        hash
+    }
+}
+
+/// Zero-allocation, fixed-size hot-vocab overlay table for personalized word boosts
+#[derive(Clone)]
+pub struct PersonalScoreOverlay {
+    /// Fixed-size table of (word_hash, boost_score)
+    table: [(u64, f32); OVERLAY_CAPACITY],
+    count: usize,
+}
+
+impl std::fmt::Debug for PersonalScoreOverlay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PersonalScoreOverlay")
+            .field("count", &self.count)
+            .finish()
+    }
+}
+
+impl Default for PersonalScoreOverlay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PersonalScoreOverlay {
+    pub fn new() -> Self {
+        Self {
+            table: [(0, 0.0); OVERLAY_CAPACITY],
+            count: 0,
+        }
+    }
+
+    /// Reset all personalized boost entries
+    pub fn clear(&mut self) {
+        self.table = [(0, 0.0); OVERLAY_CAPACITY];
+        self.count = 0;
+    }
+
+    #[inline]
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    /// Lookup personalized boost score for a word. Returns 0.0 if not present.
+    #[inline]
+    pub fn boost_for(&self, word: &str) -> f32 {
+        self.boost_for_hash(hash_word(word))
+    }
+
+    /// Fast O(1) lookup by pre-computed 64-bit hash
+    #[inline]
+    pub fn boost_for_hash(&self, word_hash: u64) -> f32 {
+        let mut idx = (word_hash as usize) & OVERLAY_MASK;
+        for _ in 0..16 {
+            let (h, score) = self.table[idx];
+            if h == word_hash {
+                return score;
+            }
+            if h == 0 {
+                return 0.0;
+            }
+            idx = (idx + 1) & OVERLAY_MASK;
+        }
+        0.0
+    }
+
+    /// Set an explicit boost score for a word (e.g. from decayed UserStats)
+    pub fn set_score(&mut self, word: &str, score: f32) {
+        self.set_score_hash(hash_word(word), score);
+    }
+
+    pub fn set_score_hash(&mut self, word_hash: u64, score: f32) {
+        let mut idx = (word_hash as usize) & OVERLAY_MASK;
+        let mut empty_idx = None;
+
+        for _ in 0..16 {
+            let (h, _) = self.table[idx];
+            if h == word_hash {
+                self.table[idx].1 = score;
+                return;
+            }
+            if h == 0 && empty_idx.is_none() {
+                empty_idx = Some(idx);
+            }
+            idx = (idx + 1) & OVERLAY_MASK;
+        }
+
+        if let Some(target) = empty_idx {
+            self.table[target] = (word_hash, score);
+            self.count += 1;
+        } else {
+            // Collision limit reached, overwrite first slot in probe chain
+            let fallback_idx = (word_hash as usize) & OVERLAY_MASK;
+            self.table[fallback_idx] = (word_hash, score);
+        }
+    }
+
+    /// Increment personal score on user word commit (+1.0 boost, capped at 5.0)
+    pub fn record_commit(&mut self, word: &str) {
+        let h = hash_word(word);
+        let curr = self.boost_for_hash(h);
+        let new_score = (curr + 1.0).min(5.0);
+        self.set_score_hash(h, new_score);
+    }
+
+    /// Penalize word score on immediate backspace/undo (-1.5 penalty, clamped at 0.0)
+    pub fn penalize(&mut self, word: &str) {
+        let h = hash_word(word);
+        let curr = self.boost_for_hash(h);
+        if curr > 0.0 {
+            let new_score = (curr - 1.5).max(0.0);
+            self.set_score_hash(h, new_score);
+        }
+    }
+}
+
+/// Truncate preceding context slice at the most recent sentence boundary (। , ? , ! , \n).
+/// Words prior to and including the sentence boundary are removed so they do not
+/// cross-contaminate next-sentence candidate scoring.
+#[inline]
+pub fn truncate_at_sentence_boundary<'a>(context: &'a [&'a str]) -> &'a [&'a str] {
+    for (idx, token) in context.iter().enumerate().rev() {
+        if token.contains('।')
+            || token.contains('?')
+            || token.contains('!')
+            || token.contains('\n')
+        {
+            return &context[idx + 1..];
+        }
+    }
+    context
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ContextScorer {
     lm: LanguageModel,
+    personal_overlay: PersonalScoreOverlay,
 }
 
 impl ContextScorer {
     pub fn new() -> Self {
         let mut lm = LanguageModel::new();
         lm.load_from_system_paths();
-        Self { lm }
+        Self {
+            lm,
+            personal_overlay: PersonalScoreOverlay::new(),
+        }
     }
 
     pub fn with_language_model(lm: LanguageModel) -> Self {
-        Self { lm }
+        Self {
+            lm,
+            personal_overlay: PersonalScoreOverlay::new(),
+        }
+    }
+
+    pub fn with_overlay(lm: LanguageModel, personal_overlay: PersonalScoreOverlay) -> Self {
+        Self {
+            lm,
+            personal_overlay,
+        }
     }
 
     /// Access the underlying LanguageModel directly without re-allocating
@@ -23,19 +187,36 @@ impl ContextScorer {
         &self.lm
     }
 
-    /// Score and re-rank candidate list based on multi-token preceding context
+    /// Access the personal score overlay
+    pub fn personal_overlay(&self) -> &PersonalScoreOverlay {
+        &self.personal_overlay
+    }
+
+    /// Mutable access to the personal score overlay
+    pub fn personal_overlay_mut(&mut self) -> &mut PersonalScoreOverlay {
+        &mut self.personal_overlay
+    }
+
+    /// Record a committed word to personalize scoring
+    pub fn record_commit(&mut self, word: &str) {
+        self.personal_overlay.record_commit(word);
+    }
+
+    /// Penalize a word when reverted on backspace
+    pub fn penalize(&mut self, word: &str) {
+        self.personal_overlay.penalize(word);
+    }
+
+    /// Score and re-rank candidate list based on multi-token preceding context and personal overlay
     pub fn rank_candidates(&self, context: &[&str], candidates: &[String]) -> Vec<String> {
         if candidates.is_empty() {
             return Vec::new();
         }
 
-        if context.is_empty() {
-            return candidates.to_vec();
-        }
-
-        let prev1 = context.last().copied();
-        let prev2 = if context.len() >= 2 {
-            Some(context[context.len() - 2])
+        let clean_context = truncate_at_sentence_boundary(context);
+        let prev1 = clean_context.last().copied();
+        let prev2 = if clean_context.len() >= 2 {
+            Some(clean_context[clean_context.len() - 2])
         } else {
             None
         };
@@ -44,10 +225,15 @@ impl ContextScorer {
             .iter()
             .enumerate()
             .map(|(orig_idx, cand)| {
-                let lm_score = self.lm.score_candidate(prev2, prev1, cand);
-                // Combine original ranking priority with LM score
+                let lm_score = if prev1.is_some() {
+                    self.lm.score_candidate(prev2, prev1, cand)
+                } else {
+                    0.0
+                };
+                let personal_boost = self.personal_overlay.boost_for(cand);
+                // Combine original ranking priority with LM score and personal boost
                 let position_penalty = orig_idx as f32 * 0.15;
-                let total_score = lm_score - position_penalty;
+                let total_score = lm_score + personal_boost - position_penalty;
                 (cand.clone(), total_score, orig_idx)
             })
             .collect();
@@ -63,24 +249,28 @@ impl ContextScorer {
 
     /// Compute context score boost for homophone pairs
     pub fn score_homophone_boost(&self, context: &[&str], candidate: &str) -> i32 {
-        if context.is_empty() {
-            return 0;
+        let clean_context = truncate_at_sentence_boundary(context);
+        let personal = self.personal_overlay.boost_for(candidate);
+        let personal_boost = (personal * 200.0) as i32;
+
+        if clean_context.is_empty() {
+            return personal_boost;
         }
 
-        let prev1 = context.last().copied();
-        let prev2 = if context.len() >= 2 {
-            Some(context[context.len() - 2])
+        let prev1 = clean_context.last().copied();
+        let prev2 = if clean_context.len() >= 2 {
+            Some(clean_context[clean_context.len() - 2])
         } else {
             None
         };
 
         let score = self.lm.score_candidate(prev2, prev1, candidate);
         if score > -1.0 {
-            1000
+            1000 + personal_boost
         } else if score > -2.0 {
-            500
+            500 + personal_boost
         } else {
-            0
+            personal_boost
         }
     }
 }
@@ -101,5 +291,28 @@ mod tests {
         // After "বই", "পড়া" should be ranked #1
         let ranked_book = scorer.rank_candidates(&["বই"], &candidates);
         assert_eq!(ranked_book[0], "পড়া");
+    }
+
+    #[test]
+    fn test_sentence_boundary_reset() {
+        let context = &["তুমি", "কেমন", "আছো?", "আমি"];
+        let truncated = truncate_at_sentence_boundary(context);
+        assert_eq!(truncated, &["আমি"]);
+
+        let context_dari = &["আমি", "ভাত", "খেয়েছি।"];
+        let truncated_dari = truncate_at_sentence_boundary(context_dari);
+        assert_eq!(truncated_dari, &[] as &[&str]);
+    }
+
+    #[test]
+    fn test_personal_score_overlay() {
+        let mut overlay = PersonalScoreOverlay::new();
+        assert_eq!(overlay.boost_for("বিশেষ"), 0.0);
+
+        overlay.record_commit("বিশেষ");
+        assert!(overlay.boost_for("বিশেষ") >= 1.0);
+
+        overlay.penalize("বিশেষ");
+        assert!(overlay.boost_for("বিশেষ") < 1.0);
     }
 }

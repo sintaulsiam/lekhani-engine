@@ -62,6 +62,7 @@ impl NextWordPredictor {
         limit: usize,
         enable_idiom_phrases: bool,
     ) -> Vec<String> {
+        let context = crate::context::truncate_at_sentence_boundary(context);
         if context.is_empty() {
             return vec![
                 "আমি".to_string(),

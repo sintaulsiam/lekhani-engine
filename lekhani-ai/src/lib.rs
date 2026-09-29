@@ -12,7 +12,7 @@ pub mod trainer;
 pub mod zero_copy;
 
 pub use beam::BeamSearchDecoder;
-pub use context::ContextScorer;
+pub use context::{truncate_at_sentence_boundary, ContextScorer, PersonalScoreOverlay};
 pub use lm::LanguageModel;
 pub use prediction::NextWordPredictor;
 pub use trainer::{
