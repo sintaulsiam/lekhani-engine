@@ -315,7 +315,7 @@ mod tests {
 
     #[test]
     fn test_unijoy_layout() {
-        let unijoy_raw = include_str!("../../../../data/layouts/Unijoy.json");
+        let unijoy_raw = include_str!("../../../data/layouts/Unijoy.json");
         let val: serde_json::Value =
             serde_json::from_str(unijoy_raw).expect("Unijoy JSON parse failed");
         let mut method = FixedMethod::with_layout(&val);

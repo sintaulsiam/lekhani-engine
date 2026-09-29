@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn test_session_fixed_layout_typing() {
         let mut session = InputSession::new();
-        let unijoy_raw = include_str!("../../../data/layouts/Unijoy.json");
+        let unijoy_raw = include_str!("../../data/layouts/Unijoy.json");
         let val: serde_json::Value =
             serde_json::from_str(unijoy_raw).expect("Unijoy JSON parse failed");
         session.set_layout(ActiveLayoutType::Fixed, &val);
@@ -350,7 +350,7 @@ mod tests {
     #[test]
     fn test_typing_tomar() {
         let mut session = InputSession::new();
-        let avro_raw = include_str!("../../../data/layouts/avrophonetic.json");
+        let avro_raw = include_str!("../../data/layouts/avrophonetic.json");
         let val: serde_json::Value = serde_json::from_str(avro_raw).unwrap();
         session.set_layout(ActiveLayoutType::Phonetic, &val);
 
