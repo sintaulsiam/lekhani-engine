@@ -7,6 +7,7 @@ pub mod emojis;
 pub mod fixed;
 pub mod fs;
 pub mod keycodes;
+pub mod morpheme;
 pub mod ngram;
 pub mod phonetic;
 pub mod session;
@@ -20,8 +21,10 @@ pub use emojis::EmojiMap;
 pub use fixed::{FixedLayoutParser, FixedMethod};
 pub use fs::atomic_write_secure;
 pub use keycodes::*;
+pub use morpheme::{BengaliMorphAnalyzer, MorphemeDecomposition, SuffixCategory};
 pub use ngram::UserStats;
 pub use phonetic::{AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion, PhoneticSuggestionConfig};
 pub use session::{ActiveLayoutType, InputSession};
 pub use snippets::SnippetManager;
 pub use trie::PrefixTrie;
+

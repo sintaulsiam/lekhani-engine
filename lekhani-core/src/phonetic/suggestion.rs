@@ -1231,16 +1231,40 @@ impl PhoneticSuggestion {
                 continue;
             }
 
+            let morph_analyzer = crate::morpheme::BengaliMorphAnalyzer::new();
             let is_in_dict = self.database.is_exact_dictionary_word(&cand.text);
-            let freq = self.database.get_frequency(&cand.text);
+            let mut freq = self.database.get_frequency(&cand.text);
             let trie_contains = self.database.trie.contains_exact(&cand.text);
             let is_clitic_o = is_clitic_o_word(&cand.text);
 
-            let lm_score = if prev.is_some() && cand.source != CandidateSource::EmojiKeyword {
-                Some(self.ai_context.lm().score_candidate(prev_prev, prev, &cand.text))
+            let decomp = if cand.source == CandidateSource::MorphologicalInflection {
+                morph_analyzer.decompose(&cand.text)
             } else {
                 None
             };
+
+            if !is_in_dict && freq == 0 {
+                if let Some(ref d) = decomp {
+                    let root_freq = self.database.get_frequency(d.root);
+                    if root_freq > 0 {
+                        freq = (root_freq / 10).min(50);
+                    }
+                }
+            }
+
+            let lm_score = if prev.is_some() && cand.source != CandidateSource::EmojiKeyword {
+                let direct_score = self.ai_context.lm().score_candidate(prev_prev, prev, &cand.text);
+                if let Some(ref d) = decomp {
+                    let root_score = self.ai_context.lm().score_candidate(prev_prev, prev, d.root);
+                    let inflected_score = morph_analyzer.estimate_inflected_score(root_score, d.category);
+                    Some(direct_score.max(inflected_score))
+                } else {
+                    Some(direct_score)
+                }
+            } else {
+                None
+            };
+
 
             let user_bigram_boost = if let (Some(p), Some(l)) = (prev, learner_guard.as_ref()) {
                 l.get_user_bigram_boost(p, &cand.text)
