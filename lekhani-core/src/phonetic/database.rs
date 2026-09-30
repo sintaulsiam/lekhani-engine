@@ -13,7 +13,7 @@ pub struct PhoneticDatabase {
     pub suffix: Arc<HashMap<String, String>>,
     pub autocorrect: Arc<HashMap<String, String>>,
     pub shorthand: Arc<HashMap<String, String>>,
-    user_autocorrect: HashMap<String, String>,
+    pub user_autocorrect: Arc<RwLock<HashMap<String, String>>>,
     emojis: Arc<EmojiMap>,
     snippets: Arc<SnippetManager>,
     pub learner: Arc<RwLock<AutonomousLearner>>,
@@ -432,7 +432,7 @@ impl PhoneticDatabase {
             suffix: Arc::new(suffix),
             autocorrect: Arc::new(autocorrect),
             shorthand: Arc::new(shorthand),
-            user_autocorrect: HashMap::new(),
+            user_autocorrect: Arc::new(RwLock::new(HashMap::new())),
             emojis: Arc::new(EmojiMap::new()),
             snippets: Arc::new(SnippetManager::new()),
             learner: Arc::new(RwLock::new(AutonomousLearner::new())),
@@ -549,13 +549,15 @@ impl PhoneticDatabase {
     }
 
     /// Load user-specific autocorrect file
-    pub fn load_user_autocorrect<P: AsRef<Path>>(&mut self, path: P) {
+    pub fn load_user_autocorrect<P: AsRef<Path>>(&self, path: P) {
         let path = path.as_ref();
         if path.exists() {
             if let Ok(content) = std::fs::read_to_string(path) {
                 if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
-                    self.user_autocorrect = map;
-                    self.generation.fetch_add(1, Ordering::Relaxed);
+                    if let Ok(mut uac) = self.user_autocorrect.write() {
+                        *uac = map;
+                        self.generation.fetch_add(1, Ordering::Relaxed);
+                    }
                 }
             }
         }
@@ -567,7 +569,11 @@ impl PhoneticDatabase {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let json = serde_json::to_string_pretty(&self.user_autocorrect)
+        let uac = self
+            .user_autocorrect
+            .read()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        let json = serde_json::to_string_pretty(&*uac)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         std::fs::write(path, json)
     }
@@ -606,22 +612,39 @@ impl PhoneticDatabase {
     }
 
     /// Add custom user autocorrect entry
-    pub fn insert_user_autocorrect(&mut self, trigger: String, replacement: String) {
-        self.user_autocorrect.insert(trigger, replacement);
-        self.generation.fetch_add(1, Ordering::Relaxed);
+    pub fn insert_user_autocorrect(&self, trigger: String, replacement: String) {
+        if let Ok(mut uac) = self.user_autocorrect.write() {
+            uac.insert(trigger, replacement);
+            self.generation.fetch_add(1, Ordering::Relaxed);
+        }
     }
 
     /// Remove custom user autocorrect entry
-    pub fn remove_user_autocorrect(&mut self, trigger: &str) -> Option<String> {
-        let v = self.user_autocorrect.remove(trigger);
-        if v.is_some() {
-            self.generation.fetch_add(1, Ordering::Relaxed);
+    pub fn remove_user_autocorrect(&self, trigger: &str) -> Option<String> {
+        if let Ok(mut uac) = self.user_autocorrect.write() {
+            let v = uac.remove(trigger);
+            if v.is_some() {
+                self.generation.fetch_add(1, Ordering::Relaxed);
+            }
+            v
+        } else {
+            None
         }
-        v
     }
 
-    pub fn get_user_autocorrect(&self) -> &HashMap<String, String> {
-        &self.user_autocorrect
+    /// Clear all custom user autocorrect entries
+    pub fn clear_user_autocorrect(&self) {
+        if let Ok(mut uac) = self.user_autocorrect.write() {
+            uac.clear();
+            self.generation.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    pub fn get_user_autocorrect_map(&self) -> HashMap<String, String> {
+        self.user_autocorrect
+            .read()
+            .map(|m| m.clone())
+            .unwrap_or_default()
     }
 
     pub fn get_system_autocorrect(&self) -> &HashMap<String, String> {
@@ -821,11 +844,13 @@ impl PhoneticDatabase {
 
     pub fn get_autocorrect_raw_filtered(&self, term: &str, include_shorthand: bool) -> Option<String> {
         let lower = term.to_lowercase();
-        if let Some(correct) = self.user_autocorrect.get(term) {
-            return Some(correct.clone());
-        }
-        if let Some(lower_match) = self.user_autocorrect.get(&lower) {
-            return Some(lower_match.clone());
+        if let Ok(uac) = self.user_autocorrect.read() {
+            if let Some(correct) = uac.get(term) {
+                return Some(correct.clone());
+            }
+            if let Some(lower_match) = uac.get(&lower) {
+                return Some(lower_match.clone());
+            }
         }
         if let Some(correct) = self.autocorrect.get(term) {
             return Some(correct.clone());
@@ -872,9 +897,11 @@ impl PhoneticDatabase {
         let mut results = self.search_special_literals(term);
 
         // User / System Autocorrect
-        if let Some(correct) = self.user_autocorrect.get(term) {
-            if !results.contains(correct) {
-                results.push(correct.clone());
+        if let Ok(uac) = self.user_autocorrect.read() {
+            if let Some(correct) = uac.get(term) {
+                if !results.contains(correct) {
+                    results.push(correct.clone());
+                }
             }
         }
         if let Some(correct) = self.autocorrect.get(term) {

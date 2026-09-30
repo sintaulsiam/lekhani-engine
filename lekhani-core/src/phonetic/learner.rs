@@ -7,7 +7,6 @@ use hashbrown::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use super::morphology::analyze_morphemes;
 use super::ranking::{RankFeatures, RankWeights};
 use crate::trie::PrefixTrie;
 
@@ -15,6 +14,8 @@ use crate::trie::PrefixTrie;
 pub struct AutonomousLearner {
     pub observed_counts: HashMap<String, u32>,
     pub learned_words: HashSet<String>,
+    #[serde(default)]
+    pub custom_user_words: HashSet<String>,
     #[serde(default = "default_threshold")]
     pub auto_learn_threshold: u32,
     #[serde(default)]
@@ -30,7 +31,7 @@ pub struct AutonomousLearner {
 }
 
 fn default_threshold() -> u32 {
-    1
+    3
 }
 
 impl Default for AutonomousLearner {
@@ -47,7 +48,8 @@ impl AutonomousLearner {
         Self {
             observed_counts: HashMap::new(),
             learned_words: HashSet::new(),
-            auto_learn_threshold: 1,
+            custom_user_words: HashSet::new(),
+            auto_learn_threshold: 3,
             user_bigrams: HashMap::new(),
             last_committed_word: None,
             candidate_memory: HashMap::new(),
@@ -208,6 +210,7 @@ impl AutonomousLearner {
     pub fn clear_user_data(&mut self) {
         self.observed_counts.clear();
         self.learned_words.clear();
+        self.custom_user_words.clear();
         self.candidate_memory.clear();
         self.user_bigrams.clear();
         self.rank_weights = RankWeights::default();
@@ -216,38 +219,36 @@ impl AutonomousLearner {
         self.pretrain_baseline();
     }
 
-    /// Process a committed word, extract potential root stems, and auto-learn new vocabulary
+    /// Process a committed word and auto-learn new intact vocabulary (without storing broken stems)
     pub fn observe_and_learn(
         &mut self,
         committed_word: &str,
         trie: &PrefixTrie,
     ) -> Vec<String> {
-        let morphemes = analyze_morphemes(committed_word);
+        let clean = committed_word.trim();
         let mut newly_learned = Vec::new();
 
-        for word in morphemes {
-            // Only learn valid Bengali non-trivial terms
-            if word.chars().count() < 2 || word.is_ascii() {
-                continue;
-            }
+        // Only learn valid Bengali non-trivial intact terms
+        if clean.chars().count() < 2 || clean.is_ascii() {
+            return newly_learned;
+        }
 
-            // If already known in learned list, increment count
-            if self.learned_words.contains(&word) {
-                let count = self.observed_counts.entry(word).or_insert(0);
-                *count = (*count + 1).min(10000);
-                self.dirty = true;
-                continue;
-            }
-
-            let count = self.observed_counts.entry(word.clone()).or_insert(0);
-            *count += 1;
+        let word = clean.to_string();
+        if self.learned_words.contains(&word) || self.custom_user_words.contains(&word) {
+            let count = self.observed_counts.entry(word).or_insert(0);
+            *count = (*count + 1).min(10000);
             self.dirty = true;
+            return newly_learned;
+        }
 
-            if *count >= self.auto_learn_threshold && !trie.contains_exact(&word) {
-                self.learned_words.insert(word.clone());
-                self.dirty = true;
-                newly_learned.push(word);
-            }
+        let count = self.observed_counts.entry(word.clone()).or_insert(0);
+        *count += 1;
+        self.dirty = true;
+
+        if *count >= self.auto_learn_threshold && !trie.contains_exact(&word) {
+            self.learned_words.insert(word.clone());
+            self.dirty = true;
+            newly_learned.push(word);
         }
 
         if self.observed_counts.len() > 4200 {
@@ -310,6 +311,9 @@ impl AutonomousLearner {
         for word in &other.learned_words {
             self.learned_words.insert(word.clone());
         }
+        for word in &other.custom_user_words {
+            self.custom_user_words.insert(word.clone());
+        }
         for (word, &count) in &other.observed_counts {
             let entry = self.observed_counts.entry(word.clone()).or_insert(0);
             *entry = (*entry).max(count).min(10000);
@@ -329,6 +333,7 @@ impl AutonomousLearner {
     pub fn add_user_word(&mut self, word: &str) {
         let clean = word.trim();
         if clean.chars().count() >= 2 {
+            self.custom_user_words.insert(clean.to_string());
             self.learned_words.insert(clean.to_string());
             let count = self.observed_counts.entry(clean.to_string()).or_insert(0);
             *count = (*count + 10).max(10);
@@ -339,10 +344,11 @@ impl AutonomousLearner {
     /// Delete a user word from learned vocabulary and memory
     pub fn delete_user_word(&mut self, word: &str) -> bool {
         let clean = word.trim();
+        let r0 = self.custom_user_words.remove(clean);
         let r1 = self.learned_words.remove(clean);
         let r2 = self.observed_counts.remove(clean).is_some();
         let r3 = self.candidate_memory.remove(clean).is_some();
-        if r1 || r2 || r3 {
+        if r0 || r1 || r2 || r3 {
             self.dirty = true;
             true
         } else {
@@ -350,11 +356,39 @@ impl AutonomousLearner {
         }
     }
 
-    /// Retrieve all learned user words sorted alphabetically
+    /// Retrieve personal custom user words (clean, explicitly added or imported) sorted alphabetically
     pub fn get_user_words(&self) -> Vec<String> {
-        let mut words: Vec<String> = self.learned_words.iter().cloned().collect();
+        let mut words: Vec<String> = if !self.custom_user_words.is_empty() {
+            self.custom_user_words.iter().cloned().collect()
+        } else {
+            // Fallback for legacy state before custom_user_words separation:
+            // exclude pre-trained baseline words from display
+            let baseline: HashSet<&str> = PRETRAINED_CONVERSATIONAL_BIGRAMS
+                .iter()
+                .flat_map(|&(w1, w2, _)| vec![w1, w2])
+                .collect();
+            self.learned_words
+                .iter()
+                .filter(|w| !baseline.contains(w.as_str()))
+                .cloned()
+                .collect()
+        };
         words.sort();
         words
+    }
+
+    /// Clear background auto-learned words while preserving explicit user-added words
+    pub fn clear_learned_history(&mut self) {
+        self.learned_words = self.custom_user_words.clone();
+        self.observed_counts.retain(|k, _| self.custom_user_words.contains(k));
+        self.user_bigrams.clear();
+        self.dirty = true;
+        self.pretrain_baseline();
+    }
+
+    /// Retrieve count of auto-learned words
+    pub fn get_learned_words_count(&self) -> usize {
+        self.learned_words.len().saturating_sub(self.custom_user_words.len())
     }
 
     /// Import a list of raw words (e.g. from Ridmik Keyboard or Avro export)
@@ -521,9 +555,19 @@ mod tests {
 
         assert!(!trie.contains_exact("কুয়েট"));
 
-        let learned = learner.observe_and_learn("কুয়েটে", &trie);
-        assert!(learned.contains(&"কুয়েট".to_string()) || learned.contains(&"কুয়েটে".to_string()));
-        assert!(learner.learned_words.contains("কুয়েট") || learner.learned_words.contains("কুয়েটে"));
+        // 1st observation: count = 1 (< 3, no learning)
+        let l1 = learner.observe_and_learn("কুয়েট", &trie);
+        assert!(l1.is_empty());
+        assert!(!learner.learned_words.contains("কুয়েট"));
+
+        // 2nd observation: count = 2 (< 3, no learning)
+        let l2 = learner.observe_and_learn("কুয়েট", &trie);
+        assert!(l2.is_empty());
+
+        // 3rd observation: count = 3 (>= threshold, learned!)
+        let l3 = learner.observe_and_learn("কুয়েট", &trie);
+        assert_eq!(l3, vec!["কুয়েট".to_string()]);
+        assert!(learner.learned_words.contains("কুয়েট"));
     }
 
     #[test]

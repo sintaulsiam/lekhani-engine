@@ -83,7 +83,7 @@ impl InputSession {
 
     pub fn get_learned_counts(&self) -> (usize, usize) {
         if let Ok(l) = self.phonetic.suggestion_engine.database.learner.read() {
-            (l.learned_words.len(), l.user_bigrams.len())
+            (l.observed_counts.len(), l.user_bigrams.len())
         } else {
             (0, 0)
         }
