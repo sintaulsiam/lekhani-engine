@@ -647,6 +647,11 @@ impl PhoneticDatabase {
             .unwrap_or_default()
     }
 
+    /// Backwards-compatible alias for `get_user_autocorrect_map`
+    pub fn get_user_autocorrect(&self) -> HashMap<String, String> {
+        self.get_user_autocorrect_map()
+    }
+
     pub fn get_system_autocorrect(&self) -> &HashMap<String, String> {
         &self.autocorrect
     }
