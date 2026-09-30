@@ -4,8 +4,8 @@
 //! Blends neural semantic candidates with Tier 1 N-gram candidates with an
 //! adaptive weighting factor.
 
-use std::sync::Arc;
-use crate::model::MicroGruModel;
+use std::sync::{Arc, Mutex};
+use crate::model::{MicroGruModel, GruScratchpad};
 use crate::vocab::BpeVocabulary;
 
 /// Candidate predicted by the neural engine
@@ -20,11 +20,13 @@ pub struct NeuralCandidate {
 pub struct NeuralContextPredictor {
     model: Arc<MicroGruModel>,
     vocab: Arc<BpeVocabulary>,
+    pad: Arc<Mutex<GruScratchpad>>,
 }
 
 impl NeuralContextPredictor {
     pub fn new(model: Arc<MicroGruModel>, vocab: Arc<BpeVocabulary>) -> Self {
-        Self { model, vocab }
+        let pad = Arc::new(Mutex::new(GruScratchpad::new(vocab.len(), model.embedding_dim, model.hidden_dim)));
+        Self { model, vocab, pad }
     }
 
     /// Predict top semantic candidates for a conversational context string.
@@ -41,7 +43,8 @@ impl NeuralContextPredictor {
             &token_ids[..]
         };
 
-        let top_tokens = self.model.predict_top_k(window, top_k * 2);
+        let mut pad = self.pad.lock().unwrap();
+        let top_tokens = self.model.predict_top_k(window, top_k * 2, &mut pad);
         let mut candidates = Vec::with_capacity(top_k);
 
         for (id, log_prob) in top_tokens {

@@ -207,10 +207,18 @@ impl ContextScorer {
         self.personal_overlay.penalize(word);
     }
 
-    /// Score and re-rank candidate list based on multi-token preceding context and personal overlay
+    /// Score and re-rank candidate list based on multi-token preceding context and personal overlay.
+    /// This allocates a new Vec. For zero-allocation hot paths, use `rank_candidates_in_place`.
     pub fn rank_candidates(&self, context: &[&str], candidates: &[String]) -> Vec<String> {
-        if candidates.is_empty() {
-            return Vec::new();
+        let mut cloned = candidates.to_vec();
+        self.rank_candidates_in_place(context, &mut cloned);
+        cloned
+    }
+
+    /// Zero-allocation candidate ranking. Modifies the candidates slice in-place.
+    pub fn rank_candidates_in_place(&self, context: &[&str], candidates: &mut [String]) {
+        if candidates.len() <= 1 {
+            return;
         }
 
         let clean_context = truncate_at_sentence_boundary(context);
@@ -221,30 +229,31 @@ impl ContextScorer {
             None
         };
 
-        let mut scored_candidates: Vec<(String, f32, usize)> = candidates
-            .iter()
-            .enumerate()
-            .map(|(orig_idx, cand)| {
-                let lm_score = if prev1.is_some() {
-                    self.lm.score_candidate(prev2, prev1, cand)
-                } else {
-                    self.lm.score_candidate(None, None, cand)
-                };
-                let personal_boost = self.personal_overlay.boost_for(cand);
-                // Combine original ranking priority with LM score and personal boost
-                let position_penalty = orig_idx as f32 * 0.15;
-                let total_score = lm_score + personal_boost - position_penalty;
-                (cand.clone(), total_score, orig_idx)
-            })
-            .collect();
+        // Stack-allocated array for zero-allocation scoring (up to 32 candidates)
+        let len = candidates.len().min(32);
+        let mut scores = [0.0; 32];
+        for i in 0..len {
+            let cand = &candidates[i];
+            let lm_score = if prev1.is_some() {
+                self.lm.score_candidate(prev2, prev1, cand)
+            } else {
+                self.lm.score_candidate(None, None, cand)
+            };
+            let personal_boost = self.personal_overlay.boost_for(cand);
+            let position_penalty = i as f32 * 0.15;
+            scores[i] = lm_score + personal_boost - position_penalty;
+        }
 
-        // Sort by total score descending, preserving stable order on close ties
-        scored_candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(a.2.cmp(&b.2)));
-
-        scored_candidates
-            .into_iter()
-            .map(|(cand, _, _)| cand)
-            .collect()
+        // Simple insertion sort to sort `candidates` and `scores` in tandem.
+        // For N <= 32 this is extremely fast and entirely stack-based.
+        for i in 1..len {
+            let mut j = i;
+            while j > 0 && scores[j] > scores[j - 1] {
+                scores.swap(j, j - 1);
+                candidates.swap(j, j - 1);
+                j -= 1;
+            }
+        }
     }
 
     /// Compute context score boost for homophone pairs

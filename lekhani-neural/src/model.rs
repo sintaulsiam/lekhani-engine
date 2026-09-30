@@ -104,6 +104,32 @@ impl GruLayerWeights {
     }
 }
 
+/// Pre-allocated workspace to eliminate heap allocations during inference
+#[derive(Debug, Clone)]
+pub struct GruScratchpad {
+    pub h1: Vec<f32>,
+    pub h2: Vec<f32>,
+    pub next_h1: Vec<f32>,
+    pub next_h2: Vec<f32>,
+    pub x: Vec<f32>,
+    pub logits: Vec<f32>,
+    pub scored: Vec<(u32, f32)>,
+}
+
+impl GruScratchpad {
+    pub fn new(vocab_size: usize, embedding_dim: usize, hidden_dim: usize) -> Self {
+        Self {
+            h1: vec![0.0; hidden_dim],
+            h2: vec![0.0; hidden_dim],
+            next_h1: vec![0.0; hidden_dim],
+            next_h2: vec![0.0; hidden_dim],
+            x: vec![0.0; embedding_dim],
+            logits: vec![0.0; vocab_size],
+            scored: Vec::with_capacity(vocab_size),
+        }
+    }
+}
+
 /// 2-Layer Micro-GRU Model with Tied Embeddings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MicroGruModel {
@@ -139,14 +165,14 @@ impl MicroGruModel {
     }
 
     /// Forward pass through sequence of tokens.
-    /// Returns the projected logits over the vocabulary for the next token.
-    pub fn forward(&self, token_ids: &[u32]) -> Vec<f32> {
-        let mut h1 = vec![0.0; self.hidden_dim];
-        let mut h2 = vec![0.0; self.hidden_dim];
-        let mut next_h1 = vec![0.0; self.hidden_dim];
-        let mut next_h2 = vec![0.0; self.hidden_dim];
-
-        let mut x = vec![0.0; self.embedding_dim];
+    /// Uses pre-allocated scratchpad for zero-allocation inference.
+    pub fn forward(&self, token_ids: &[u32], pad: &mut GruScratchpad) {
+        pad.h1.fill(0.0);
+        pad.h2.fill(0.0);
+        pad.next_h1.fill(0.0);
+        pad.next_h2.fill(0.0);
+        pad.x.fill(0.0);
+        pad.logits.fill(0.0);
 
         for &id in token_ids {
             let id = (id as usize).min(self.vocab_size.saturating_sub(1));
@@ -154,60 +180,56 @@ impl MicroGruModel {
             let emb_start = id * self.embedding_dim;
             let emb_end = emb_start + self.embedding_dim;
             if emb_end <= self.embeddings.len() {
-                x.copy_from_slice(&self.embeddings[emb_start..emb_end]);
+                pad.x.copy_from_slice(&self.embeddings[emb_start..emb_end]);
             }
 
             // Layer 1
-            self.layer1.step(&x, &h1, &mut next_h1);
-            h1.copy_from_slice(&next_h1);
+            self.layer1.step(&pad.x, &pad.h1, &mut pad.next_h1);
+            pad.h1.copy_from_slice(&pad.next_h1);
 
             // Layer 2
-            self.layer2.step(&h1, &h2, &mut next_h2);
-            h2.copy_from_slice(&next_h2);
+            self.layer2.step(&pad.h1, &pad.h2, &mut pad.next_h2);
+            pad.h2.copy_from_slice(&pad.next_h2);
         }
 
         // Project final hidden state h2 onto vocabulary embeddings (Tied embeddings projection)
-        let mut logits = vec![0.0; self.vocab_size];
-        for (v, logit) in logits.iter_mut().enumerate() {
+        for (v, logit) in pad.logits.iter_mut().enumerate() {
             let emb_start = v * self.embedding_dim;
             let emb_end = emb_start + self.embedding_dim;
             if emb_end <= self.embeddings.len() {
                 let mut dot = 0.0;
                 let emb_slice = &self.embeddings[emb_start..emb_end];
-                for (&h_val, &emb_val) in h2.iter().zip(emb_slice.iter()).take(self.embedding_dim.min(self.hidden_dim)) {
+                for (&h_val, &emb_val) in pad.h2.iter().zip(emb_slice.iter()).take(self.embedding_dim.min(self.hidden_dim)) {
                     dot += h_val * emb_val;
                 }
                 *logit = dot;
             }
         }
-
-
-        logits
     }
 
     /// Top-k next token IDs and log-probabilities
-    pub fn predict_top_k(&self, token_ids: &[u32], k: usize) -> Vec<(u32, f32)> {
+    pub fn predict_top_k(&self, token_ids: &[u32], k: usize, pad: &mut GruScratchpad) -> Vec<(u32, f32)> {
         if token_ids.is_empty() {
             return Vec::new();
         }
 
-        let logits = self.forward(token_ids);
+        self.forward(token_ids, pad);
+        let logits = &pad.logits;
 
         // Compute log-softmax
         let max_logit = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
         let sum_exp: f32 = logits.iter().map(|&l| (l - max_logit).exp()).sum();
         let log_sum_exp = max_logit + sum_exp.ln();
 
-        let mut scored: Vec<(u32, f32)> = logits
-            .iter()
-            .enumerate()
-            .map(|(idx, &l)| (idx as u32, l - log_sum_exp))
-            .collect();
+        pad.scored.clear();
+        for (idx, &l) in logits.iter().enumerate() {
+            pad.scored.push((idx as u32, l - log_sum_exp));
+        }
 
         // Sort descending
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        scored.truncate(k);
-        scored
+        pad.scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let k_actual = k.min(pad.scored.len());
+        pad.scored[..k_actual].to_vec()
     }
 }
 
@@ -218,7 +240,8 @@ mod tests {
     #[test]
     fn test_micro_gru_forward_dimension_safety() {
         let model = MicroGruModel::new(64, 16, 16);
-        let top = model.predict_top_k(&[1, 5, 12], 5);
+        let mut pad = GruScratchpad::new(64, 16, 16);
+        let top = model.predict_top_k(&[1, 5, 12], 5, &mut pad);
         assert_eq!(top.len(), 5);
         assert!(top[0].1 <= 0.0);
     }
