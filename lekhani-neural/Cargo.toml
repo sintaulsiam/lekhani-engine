@@ -15,6 +15,7 @@ tracing.workspace = true
 memmap2.workspace = true
 unicode-segmentation.workspace = true
 lekhani-ai = { workspace = true }
+bincode.workspace = true
 
 [dev-dependencies]
 tempfile = "3.8"

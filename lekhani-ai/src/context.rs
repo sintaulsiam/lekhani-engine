@@ -228,7 +228,7 @@ impl ContextScorer {
                 let lm_score = if prev1.is_some() {
                     self.lm.score_candidate(prev2, prev1, cand)
                 } else {
-                    0.0
+                    self.lm.score_candidate(None, None, cand)
                 };
                 let personal_boost = self.personal_overlay.boost_for(cand);
                 // Combine original ranking priority with LM score and personal boost

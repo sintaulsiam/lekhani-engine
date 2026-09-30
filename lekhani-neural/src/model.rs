@@ -130,6 +130,14 @@ impl MicroGruModel {
         }
     }
 
+    /// Load model weights from a bincode binary file
+    pub fn load_binary<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+        bincode::deserialize_from(reader)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
+
     /// Forward pass through sequence of tokens.
     /// Returns the projected logits over the vocabulary for the next token.
     pub fn forward(&self, token_ids: &[u32]) -> Vec<f32> {
