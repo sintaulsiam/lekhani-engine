@@ -134,6 +134,30 @@ impl BpeVocabulary {
         }
         words.join(" ")
     }
+
+    /// Load vocabulary from a JSON file
+    pub fn load_json<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+        serde_json::from_reader(reader)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
+
+    /// Save vocabulary to a bincode binary file
+    pub fn save_binary<P: AsRef<std::path::Path>>(&self, path: P) -> std::io::Result<()> {
+        let file = std::fs::File::create(path)?;
+        let mut writer = std::io::BufWriter::new(file);
+        bincode::serialize_into(&mut writer, self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
+    /// Load vocabulary from a bincode binary file
+    pub fn load_binary<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+        bincode::deserialize_from(reader)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
 }
 
 #[cfg(test)]

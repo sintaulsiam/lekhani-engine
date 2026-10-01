@@ -240,8 +240,9 @@ impl ContextScorer {
                 self.lm.score_candidate(None, None, cand)
             };
             let personal_boost = self.personal_overlay.boost_for(cand);
+            let grammar_boost = compute_honorific_agreement_boost(prev2, prev1, cand);
             let position_penalty = i as f32 * 0.15;
-            scores[i] = lm_score + personal_boost - position_penalty;
+            scores[i] = lm_score + personal_boost + grammar_boost - position_penalty;
         }
 
         // Simple insertion sort to sort `candidates` and `scores` in tandem.
@@ -284,6 +285,71 @@ impl ContextScorer {
     }
 }
 
+/// Computes grammar boost / penalty based on Bengali honorific concordance.
+///
+/// Ensures formal pronouns (e.g. আপনি) boost formal verb endings (e.g. করবেন, আছেন)
+/// and penalize familiar/intimate inflections (e.g. করবে, করবি).
+#[inline]
+pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str>, cand: &str) -> f32 {
+    let subject = match (prev1, prev2) {
+        (Some("আপনি" | "আপনারা" | "তিনি" | "তাঁরা"), _) => Some(1), // Formal
+        (_, Some("আপনি" | "আপনারা" | "তিনি" | "তাঁরা")) => Some(1),
+        (Some("তুমি" | "তোমরা"), _) => Some(2), // Familiar
+        (_, Some("তুমি" | "তোমরা")) => Some(2),
+        (Some("তুই" | "তোরা"), _) => Some(3), // Intimate
+        (_, Some("তুই" | "তোরা")) => Some(3),
+        _ => None,
+    };
+
+    let Some(honorific_tier) = subject else {
+        return 0.0;
+    };
+
+    let is_formal_verb = cand.ends_with("েন")
+        || cand.ends_with("বেন")
+        || cand.ends_with("ছেন")
+        || cand.ends_with("লেন")
+        || cand.ends_with("তেন")
+        || cand.ends_with("ন");
+    let is_familiar_verb = cand.ends_with("বে")
+        || cand.ends_with("ছো")
+        || cand.ends_with("লে")
+        || cand.ends_with("তে")
+        || cand.ends_with("ও")
+        || cand.ends_with("রো")
+        || cand.ends_with("লো");
+    let is_intimate_verb = cand.ends_with("বি")
+        || cand.ends_with("ছিস")
+        || cand.ends_with("লি")
+        || cand.ends_with("তিস")
+        || cand.ends_with("িস");
+
+    match honorific_tier {
+        1 => {
+            // Formal
+            if is_formal_verb { 2.5 }
+            else if is_intimate_verb { -4.0 }
+            else if is_familiar_verb { -2.5 }
+            else { 0.0 }
+        }
+        2 => {
+            // Familiar
+            if is_familiar_verb { 2.5 }
+            else if is_formal_verb { -2.5 }
+            else if is_intimate_verb { -3.5 }
+            else { 0.0 }
+        }
+        3 => {
+            // Intimate
+            if is_intimate_verb { 3.0 }
+            else if is_formal_verb { -4.0 }
+            else if is_familiar_verb { -3.0 }
+            else { 0.0 }
+        }
+        _ => 0.0,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323,5 +389,19 @@ mod tests {
 
         overlay.penalize("বিশেষ");
         assert!(overlay.boost_for("বিশেষ") < 1.0);
+    }
+
+    #[test]
+    fn test_honorific_agreement() {
+        let scorer = ContextScorer::new();
+        let candidates = vec!["করবে".to_string(), "করবেন".to_string()];
+
+        // After formal "আপনি", "করবেন" must outrank "করবে"
+        let formal_ranked = scorer.rank_candidates(&["আপনি"], &candidates);
+        assert_eq!(formal_ranked[0], "করবেন");
+
+        // After familiar "তুমি", "করবে" must outrank "করবেন"
+        let familiar_ranked = scorer.rank_candidates(&["তুমি"], &candidates);
+        assert_eq!(familiar_ranked[0], "করবে");
     }
 }

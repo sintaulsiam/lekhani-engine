@@ -1180,7 +1180,7 @@ impl PhoneticSuggestion {
         };
 
         let mut scored_candidates: Vec<(String, i32, RankFeatures)> = Vec::with_capacity(raw_candidates.len());
-        let learner_guard = self.database.learner.read().ok();
+        let learner_guard = self.database.learner.try_read().ok();
         let weights = learner_guard.as_ref().map(|l| l.rank_weights).unwrap_or_default();
 
         let prev = if self.config.ai_profile != AiProfile::Off && !context.is_empty() {
@@ -1488,7 +1488,7 @@ impl PhoneticSuggestion {
             let clean_last = last_word.trim_matches(|c: char| {
                 c.is_ascii_punctuation() || c == '।' || c == '—' || c == ','
             });
-            let user_conts = if let Ok(l) = self.database.learner.read() {
+            let user_conts = if let Ok(l) = self.database.learner.try_read() {
                 l.get_top_user_continuations(clean_last, 4)
             } else {
                 Vec::new()

@@ -164,6 +164,22 @@ impl MicroGruModel {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
 
+    /// Load model weights from a JSON file
+    pub fn load_json<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+        serde_json::from_reader(reader)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
+
+    /// Save model weights to a bincode binary file
+    pub fn save_binary<P: AsRef<std::path::Path>>(&self, path: P) -> std::io::Result<()> {
+        let file = std::fs::File::create(path)?;
+        let mut writer = std::io::BufWriter::new(file);
+        bincode::serialize_into(&mut writer, self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
     /// Forward pass through sequence of tokens.
     /// Uses pre-allocated scratchpad for zero-allocation inference.
     pub fn forward(&self, token_ids: &[u32], pad: &mut GruScratchpad) {
