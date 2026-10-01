@@ -310,9 +310,9 @@ impl EmojiMap {
         add_emoji!(
             ":brishti:",
             "🌧️",
-            ["brishti", "বৃষ্টি", "বর্ষা", "rain", "rainy", "shower"]
+            ["brishti", "bristi", "বৃষ্টি", "বর্ষা", "rain", "rainy", "shower"]
         );
-        add_emoji!(":megh:", "☁️", ["megh", "মেঘ", "আকাশ", "cloud", "cloudy"]);
+        add_emoji!(":megh:", "☁️", ["megh", "মেঘ", "আকাশ", "akash", "cloud", "cloudy", "sky"]);
         add_emoji!(
             ":jhor:",
             "🌪️",
@@ -332,7 +332,7 @@ impl EmojiMap {
         add_emoji!(
             ":biryani:",
             "🍲",
-            ["biryani", "বিরিয়ানি", "বিরিয়ানি", "খাবার", "food", "dish"]
+            ["biryani", "khabar", "খাবার", "বিরিয়ানি", "বিরিয়ানি", "food", "dish"]
         );
         add_emoji!(":dudh:", "🥛", ["dudh", "দুধ", "milk", "drink"]);
         add_emoji!(
@@ -395,7 +395,7 @@ impl EmojiMap {
         add_emoji!(
             ":bari:",
             "🏠",
-            ["bari", "বাড়ি", "বাড়ি", "ঘর", "home", "house"]
+            ["bari", "basha", "basa", "বাড়ি", "বাড়ি", "বাসা", "ঘর", "home", "house"]
         );
         add_emoji!(
             ":alo:",

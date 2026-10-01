@@ -1315,19 +1315,29 @@ impl PhoneticSuggestion {
             (false, false) => 8,
         };
 
+        let mut text_cands = Vec::with_capacity(8);
         for (c, _, f) in &scored_candidates {
             if (c == term && !is_code) || kw_emojis.contains(c) {
                 continue;
             }
-            if candidates.len() < text_target_len {
-                candidates.push((c.clone(), *f));
+            if text_cands.len() < text_target_len {
+                text_cands.push((c.clone(), *f));
             }
         }
 
         if let Some((em, em_f)) = first_emoji {
-            if !candidates.iter().any(|(c, _)| c == &em) {
+            let insert_pos = 3.min(text_cands.len());
+            for (idx, (c, f)) in text_cands.into_iter().enumerate() {
+                if idx == insert_pos {
+                    candidates.push((em.clone(), em_f));
+                }
+                candidates.push((c, f));
+            }
+            if candidates.len() <= insert_pos && !candidates.iter().any(|(c, _)| c == &em) {
                 candidates.push((em, em_f));
             }
+        } else {
+            candidates.extend(text_cands);
         }
 
         if has_english && !candidates.iter().any(|(c, _)| c == term) {
