@@ -7,12 +7,15 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, RwLock};
 
+pub type PhoneticOverrideMap = HashMap<String, Vec<(String, f32)>>;
+
 #[derive(Debug, Clone)]
 pub struct PhoneticDatabase {
     pub trie: Arc<PrefixTrie>,
     pub suffix: Arc<HashMap<String, String>>,
     pub autocorrect: Arc<HashMap<String, String>>,
     pub shorthand: Arc<HashMap<String, String>>,
+    pub overrides: Arc<PhoneticOverrideMap>,
     pub user_autocorrect: Arc<RwLock<HashMap<String, String>>>,
     emojis: Arc<EmojiMap>,
     snippets: Arc<SnippetManager>,
@@ -406,6 +409,50 @@ pub const BANGLISH_SHORTHAND: &[(&str, &str)] = &[
 
 const EMBEDDED_AUTOCORRECT_JSON: &[u8] = include_bytes!("../../../data/dictionaries/autocorrect.json");
 const EMBEDDED_SUFFIX_JSON: &[u8] = include_bytes!("../../../data/dictionaries/suffix.json");
+const EMBEDDED_OVERRIDES_JSON: &[u8] = include_bytes!("../../../data/dictionaries/phonetic_overrides.json");
+
+pub fn parse_binary_overrides(bytes: &[u8]) -> Option<PhoneticOverrideMap> {
+    if bytes.len() < 12 || &bytes[0..4] != b"POVR" {
+        return None;
+    }
+    let version = u32::from_le_bytes(bytes[4..8].try_into().ok()?);
+    if version != 1 {
+        return None;
+    }
+    let count = u32::from_le_bytes(bytes[8..12].try_into().ok()?) as usize;
+    let mut cursor = 12;
+    let mut map = HashMap::with_capacity(count);
+
+    for _ in 0..count {
+        if cursor + 2 > bytes.len() { break; }
+        let latin_len = u16::from_le_bytes(bytes[cursor..cursor+2].try_into().ok()?) as usize;
+        cursor += 2;
+        if cursor + latin_len > bytes.len() { break; }
+        let latin = std::str::from_utf8(&bytes[cursor..cursor+latin_len]).ok()?.to_string();
+        cursor += latin_len;
+
+        if cursor + 2 > bytes.len() { break; }
+        let cand_count = u16::from_le_bytes(bytes[cursor..cursor+2].try_into().ok()?) as usize;
+        cursor += 2;
+
+        let mut cands = Vec::with_capacity(cand_count);
+        for _ in 0..cand_count {
+            if cursor + 2 > bytes.len() { break; }
+            let bengali_len = u16::from_le_bytes(bytes[cursor..cursor+2].try_into().ok()?) as usize;
+            cursor += 2;
+            if cursor + bengali_len > bytes.len() { break; }
+            let bengali = std::str::from_utf8(&bytes[cursor..cursor+bengali_len]).ok()?.to_string();
+            cursor += bengali_len;
+
+            if cursor + 4 > bytes.len() { break; }
+            let conf = f32::from_le_bytes(bytes[cursor..cursor+4].try_into().ok()?);
+            cursor += 4;
+            cands.push((bengali, conf));
+        }
+        map.insert(latin, cands);
+    }
+    Some(map)
+}
 
 fn get_static_suffix() -> Arc<HashMap<String, String>> {
     static STATIC_SUFFIX: OnceLock<Arc<HashMap<String, String>>> = OnceLock::new();
@@ -452,6 +499,19 @@ fn get_static_shorthand() -> Arc<HashMap<String, String>> {
         .clone()
 }
 
+fn get_static_overrides() -> Arc<PhoneticOverrideMap> {
+    static STATIC_OVERRIDES: OnceLock<Arc<PhoneticOverrideMap>> = OnceLock::new();
+    STATIC_OVERRIDES
+        .get_or_init(|| {
+            let mut overrides = HashMap::new();
+            if let Ok(map) = serde_json::from_slice::<PhoneticOverrideMap>(EMBEDDED_OVERRIDES_JSON) {
+                overrides.extend(map);
+            }
+            Arc::new(overrides)
+        })
+        .clone()
+}
+
 impl PhoneticDatabase {
     pub fn new() -> Self {
         let mut trie = PrefixTrie::new();
@@ -465,12 +525,19 @@ impl PhoneticDatabase {
             suffix: get_static_suffix(),
             autocorrect: get_static_autocorrect(),
             shorthand: get_static_shorthand(),
+            overrides: get_static_overrides(),
             user_autocorrect: Arc::new(RwLock::new(HashMap::new())),
             emojis: Arc::new(EmojiMap::new()),
             snippets: Arc::new(SnippetManager::new()),
             learner: Arc::new(RwLock::new(AutonomousLearner::new())),
             generation: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    /// Fast zero-copy lookup for supervised phonetic overrides (colloquialisms, texting slang, proper nouns)
+    #[inline]
+    pub fn lookup_override(&self, input: &str) -> Option<&[(String, f32)]> {
+        self.overrides.get(input).map(|v| v.as_slice())
     }
 
     /// Load database from a directory containing dictionary.json, suffix.json, autocorrect.json
@@ -565,6 +632,24 @@ impl PhoneticDatabase {
             if let Ok(content) = std::fs::read_to_string(&ac_path) {
                 if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
                     Arc::make_mut(&mut self.autocorrect).extend(map.into_iter().filter(|(k, v)| k != v));
+                }
+            }
+        }
+
+        let pov_bin_path = dir.join("phonetic_overrides.bin");
+        if pov_bin_path.exists() {
+            if let Ok(bytes) = std::fs::read(&pov_bin_path) {
+                if let Some(map) = parse_binary_overrides(&bytes) {
+                    Arc::make_mut(&mut self.overrides).extend(map);
+                }
+            }
+        } else {
+            let pov_json_path = dir.join("phonetic_overrides.json");
+            if pov_json_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&pov_json_path) {
+                    if let Ok(map) = serde_json::from_str::<HashMap<String, Vec<(String, f32)>>>(&content) {
+                        Arc::make_mut(&mut self.overrides).extend(map);
+                    }
                 }
             }
         }

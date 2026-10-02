@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CandidateSource {
+    PhoneticOverride,
     Autocorrect,
     Loanword,
     ExactDictionary,
@@ -599,6 +600,38 @@ impl PhoneticSuggestion {
             );
         }
 
+        // 3c. Supervised Phonetic Overrides (e.g. colloquialisms, texting slang, proper nouns)
+        let is_shorthand = self.database.shorthand.contains_key(middle)
+            || self.database.shorthand.contains_key(&middle.to_lowercase());
+        let allow_override = if is_shorthand {
+            self.config.enable_banglish_shorthand && !post.contains('`') && !term.contains('`')
+        } else {
+            !post.contains('`') && !term.contains('`')
+        };
+
+        if allow_override {
+            let ov_opt = self.database.lookup_override(middle).or_else(|| {
+                let lower = middle.to_lowercase();
+                if lower != middle {
+                    self.database.lookup_override(&lower)
+                } else {
+                    None
+                }
+            });
+            if let Some(overrides) = ov_opt {
+                for (ov_cand, conf) in overrides {
+                    let boost = (7000.0 * conf) as i32;
+                    add_cand(
+                        ov_cand.clone(),
+                        CandidateSource::PhoneticOverride,
+                        boost,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+            }
+        }
+
         // 4. Bilingual Loanword Code-Mixing (e.g. "meeting" -> "মিটিং", "meeting")
         let mut preferred_loanword = None;
         let loan_opt = PhoneticDatabase::get_bilingual_loanword(middle).or_else(|| {
@@ -1127,6 +1160,7 @@ impl PhoneticSuggestion {
                 && c.text != phonetic
                 && (c.source == CandidateSource::Autocorrect
                     || c.source == CandidateSource::Loanword
+                    || c.source == CandidateSource::PhoneticOverride
                     || self.database.get_frequency(&c.text) >= 1000)
         });
 

@@ -175,6 +175,7 @@ pub fn extract_candidate_features(
         || cand.source == CandidateSource::MorphologicalInflection
         || cand.source == CandidateSource::Autocorrect
         || cand.source == CandidateSource::Loanword
+        || cand.source == CandidateSource::PhoneticOverride
     {
         f.is_in_dict = 1.0;
     } else if cand.source == CandidateSource::DirectTransliteration
@@ -207,7 +208,8 @@ pub fn extract_candidate_features(
             let is_dict_equiv = is_in_dict
                 || cand.source == CandidateSource::MorphologicalInflection
                 || cand.source == CandidateSource::Autocorrect
-                || cand.source == CandidateSource::Loanword;
+                || cand.source == CandidateSource::Loanword
+                || cand.source == CandidateSource::PhoneticOverride;
             f.is_exact_phonetic = if is_dict_equiv { 1.0 } else { 0.43 }; // 3500 vs 1500
 
             if ctx.has_backtick {
