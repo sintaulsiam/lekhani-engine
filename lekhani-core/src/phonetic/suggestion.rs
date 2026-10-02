@@ -813,7 +813,9 @@ impl PhoneticSuggestion {
             found_collapsed
         };
 
-        let primary = preferred_word.as_deref().unwrap_or(&phonetic);
+        let primary_raw = preferred_word.as_deref().unwrap_or(&phonetic);
+        let primary_norm = fix_chandra_bindu_position(primary_raw);
+        let primary = primary_norm.as_str();
         let is_primary_in_dict = self.database.is_exact_dictionary_word(primary);
 
         // 7. Direct Transliterations
@@ -1229,9 +1231,9 @@ impl PhoneticSuggestion {
                     && self.database.trie.contains_exact(&c.text)
             });
 
-        for cand in raw_candidates {
+        for cand in &raw_candidates {
             if cand.source == CandidateSource::CodeShield {
-                scored_candidates.push((cand.text, 60000, RankFeatures::default()));
+                scored_candidates.push((cand.text.clone(), 60000, RankFeatures::default()));
                 continue;
             }
             if cand.source == CandidateSource::SegmentedLattice {
@@ -1240,7 +1242,7 @@ impl PhoneticSuggestion {
                 } else {
                     cand.initial_boost + 2000
                 };
-                scored_candidates.push((cand.text, boost, RankFeatures::default()));
+                scored_candidates.push((cand.text.clone(), boost, RankFeatures::default()));
                 continue;
             }
 
@@ -1305,10 +1307,10 @@ impl PhoneticSuggestion {
                 ..candidate_ctx
             };
 
-            let features = extract_candidate_features(&cand, is_in_dict, freq, trie_contains, &per_cand_ctx, is_clitic_o);
+            let features = extract_candidate_features(cand, is_in_dict, freq, trie_contains, &per_cand_ctx, is_clitic_o);
             let score = cand.initial_boost + weights.compute_score(&features);
 
-            scored_candidates.push((cand.text, score, features));
+            scored_candidates.push((cand.text.clone(), score, features));
         }
 
         // Sort candidates by descending total score
@@ -2205,7 +2207,7 @@ mod tests {
 
         // 2. Full sentence beam search decoding
         let sentence = sugg.transliterate_phrase_or_sentence("ami banglay gaan gai");
-        assert!(sentence.contains("বাংলা") || sentence.contains("বাংলায়"));
+        assert!(sentence.contains("বাংলা") || sentence.contains("বাংলায়"));
         assert!(sentence.contains("গান"));
         assert!(sentence.contains("গাই"));
     }
@@ -2408,7 +2410,7 @@ mod tests {
         let (cands_biddaloy, _) = sugg.suggest("biddaloy", true, true, &empty_memory);
         assert!(
             cands_biddaloy.contains(&"বিদ্যালয়".to_string())
-                || cands_biddaloy.contains(&"বিদ্যালয়".to_string())
+                || cands_biddaloy.contains(&"বিদ্যালয়".to_string())
         );
 
         let (cands_jonne, _) = sugg.suggest("jonne", true, true, &empty_memory);
@@ -2632,7 +2634,7 @@ mod tests {
         assert_eq!(cands_manusher[0], "মানুষের");
 
         let (cands_porikkhay, _) = sugg.suggest("porikkhay", true, true, &empty_memory);
-        assert!(cands_porikkhay[0] == "পরীক্ষায়" || cands_porikkhay[0] == "পরীক্ষায়");
+        assert!(cands_porikkhay[0] == "পরীক্ষায়" || cands_porikkhay[0] == "পরীক্ষায়");
 
         // 5. Casual Phonetic Typing
         let (cands_ektu, _) = sugg.suggest("ektu", true, true, &empty_memory);
@@ -2700,6 +2702,9 @@ mod tests {
 
         let (cands_phone, _) = sugg.suggest("smartphonete", true, true, &empty_memory);
         assert!(cands_phone[0] == "স্মার্টফোনে" || cands_phone.contains(&"স্মার্টফোনে".to_string()));
+
+        let (cands_chair, _) = sugg.suggest("chaire", false, true, &empty_memory);
+        assert_eq!(cands_chair[0], "চেয়ারে");
     }
 
     #[test]
