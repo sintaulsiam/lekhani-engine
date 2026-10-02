@@ -1,0 +1,300 @@
+{
+  "timestamp": "2026-10-02T17:12:22.163208427+00:00",
+  "total_cases": 253,
+  "top1_accuracy": 83.79446640316206,
+  "top3_accuracy": 88.53754940711462,
+  "eval_duration_ms": 612.3885740000001,
+  "avg_latency_us": 2420.505928853755,
+  "categories": {
+    "formal": {
+      "total": 50,
+      "top1_correct": 47,
+      "top3_correct": 48,
+      "top1_accuracy": 94.0,
+      "top3_accuracy": 96.0
+    },
+    "texting_slang": {
+      "total": 45,
+      "top1_correct": 34,
+      "top3_correct": 34,
+      "top1_accuracy": 75.55555555555556,
+      "top3_accuracy": 75.55555555555556
+    },
+    "proper_noun": {
+      "total": 25,
+      "top1_correct": 9,
+      "top3_correct": 13,
+      "top1_accuracy": 36.0,
+      "top3_accuracy": 52.0
+    },
+    "colloquial": {
+      "total": 50,
+      "top1_correct": 46,
+      "top3_correct": 48,
+      "top1_accuracy": 92.0,
+      "top3_accuracy": 96.0
+    },
+    "loanword": {
+      "total": 30,
+      "top1_correct": 29,
+      "top3_correct": 29,
+      "top1_accuracy": 96.66666666666667,
+      "top3_accuracy": 96.66666666666667
+    },
+    "verbal_conjugation": {
+      "total": 53,
+      "top1_correct": 47,
+      "top3_correct": 52,
+      "top1_accuracy": 88.67924528301887,
+      "top3_accuracy": 98.11320754716981
+    }
+  },
+  "top_disagreements": [
+    {
+      "input": "chandro",
+      "expected": "চন্দ্র",
+      "got_top1": "চান্দ্র",
+      "category": "formal"
+    },
+    {
+      "input": "bhobisshot",
+      "expected": "ভবিষ্যৎ",
+      "got_top1": "ভবিসশত",
+      "category": "formal"
+    },
+    {
+      "input": "dharona",
+      "expected": "ধারণা",
+      "got_top1": "ধারনা",
+      "category": "formal"
+    },
+    {
+      "input": "bikol",
+      "expected": "বিকাল",
+      "got_top1": "বিকল",
+      "category": "colloquial"
+    },
+    {
+      "input": "halka",
+      "expected": "হালকা",
+      "got_top1": "হাল্কা",
+      "category": "colloquial"
+    },
+    {
+      "input": "aro",
+      "expected": "আরও",
+      "got_top1": "আর",
+      "category": "colloquial"
+    },
+    {
+      "input": "ashole",
+      "expected": "আসলে",
+      "got_top1": "আশলে",
+      "category": "colloquial"
+    },
+    {
+      "input": "kmn",
+      "expected": "কেমন",
+      "got_top1": "কম্ন",
+      "category": "texting_slang"
+    },
+    {
+      "input": "bujchi",
+      "expected": "বুঝেছি",
+      "got_top1": "বুজছি",
+      "category": "texting_slang"
+    },
+    {
+      "input": "gesil",
+      "expected": "গেছিল",
+      "got_top1": "গেশীল",
+      "category": "texting_slang"
+    },
+    {
+      "input": "jaina",
+      "expected": "যাই না",
+      "got_top1": "জানা",
+      "category": "texting_slang"
+    },
+    {
+      "input": "parina",
+      "expected": "পারি না",
+      "got_top1": "পারিনা",
+      "category": "texting_slang"
+    },
+    {
+      "input": "hobena",
+      "expected": "হবে না",
+      "got_top1": "হবেনা",
+      "category": "texting_slang"
+    },
+    {
+      "input": "lagbena",
+      "expected": "লাগবে না",
+      "got_top1": "লাগবেনা",
+      "category": "texting_slang"
+    },
+    {
+      "input": "thnx",
+      "expected": "ধন্যবাদ",
+      "got_top1": "থনক্স",
+      "category": "texting_slang"
+    },
+    {
+      "input": "tnx",
+      "expected": "ধন্যবাদ",
+      "got_top1": "ত্নক্স",
+      "category": "texting_slang"
+    },
+    {
+      "input": "ok",
+      "expected": "ঠিক আছে",
+      "got_top1": "ওকে",
+      "category": "texting_slang"
+    },
+    {
+      "input": "sry",
+      "expected": "দুঃখিত",
+      "got_top1": "স্রজ",
+      "category": "texting_slang"
+    },
+    {
+      "input": "korishna",
+      "expected": "করিস না",
+      "got_top1": "করিশ্না",
+      "category": "verbal_conjugation"
+    },
+    {
+      "input": "jachhilam",
+      "expected": "যাচ্ছিলাম",
+      "got_top1": "যাছিলাম",
+      "category": "verbal_conjugation"
+    },
+    {
+      "input": "jan",
+      "expected": "যান",
+      "got_top1": "জান",
+      "category": "verbal_conjugation"
+    },
+    {
+      "input": "jao",
+      "expected": "যাও",
+      "got_top1": "জাও",
+      "category": "verbal_conjugation"
+    },
+    {
+      "input": "jete",
+      "expected": "যেতে",
+      "got_top1": "জেতে",
+      "category": "verbal_conjugation"
+    },
+    {
+      "input": "ashte",
+      "expected": "আসতে",
+      "got_top1": "আস্তে",
+      "category": "verbal_conjugation"
+    },
+    {
+      "input": "university",
+      "expected": "বিশ্ববিদ্যালয়",
+      "got_top1": "ইউনিভার্সিটি",
+      "category": "loanword"
+    },
+    {
+      "input": "chittagong",
+      "expected": "চট্টগ্রাম",
+      "got_top1": "চট্রগ্রাম",
+      "category": "proper_noun"
+    },
+    {
+      "input": "chattogram",
+      "expected": "চট্টগ্রাম",
+      "got_top1": "ছাত্তগ্রাম",
+      "category": "proper_noun"
+    },
+    {
+      "input": "barisal",
+      "expected": "বরিশাল",
+      "got_top1": "বারিসাল",
+      "category": "proper_noun"
+    },
+    {
+      "input": "sylhet",
+      "expected": "সিলেট",
+      "got_top1": "স্যলহেত",
+      "category": "proper_noun"
+    },
+    {
+      "input": "rangpur",
+      "expected": "রংপুর",
+      "got_top1": "রাংপুর",
+      "category": "proper_noun"
+    },
+    {
+      "input": "narayanganj",
+      "expected": "নারায়ণগঞ্জ",
+      "got_top1": "নারায়াঙ্গাঞ্জ",
+      "category": "proper_noun"
+    },
+    {
+      "input": "coxsbazar",
+      "expected": "কক্সবাজার",
+      "got_top1": "চক্সসবাযার",
+      "category": "proper_noun"
+    },
+    {
+      "input": "padma",
+      "expected": "পদ্মা",
+      "got_top1": "পাদ্মা",
+      "category": "proper_noun"
+    },
+    {
+      "input": "meghna",
+      "expected": "মেঘনা",
+      "got_top1": "মেঘ্না",
+      "category": "proper_noun"
+    },
+    {
+      "input": "jamuna",
+      "expected": "যমুনা",
+      "got_top1": "জামুনা",
+      "category": "proper_noun"
+    },
+    {
+      "input": "karnaphuli",
+      "expected": "কর্ণফুলী",
+      "got_top1": "কারনাফুলি",
+      "category": "proper_noun"
+    },
+    {
+      "input": "rabindranath",
+      "expected": "রবীন্দ্রনাথ",
+      "got_top1": "রাবিন্দ্রানাথ",
+      "category": "proper_noun"
+    },
+    {
+      "input": "nazrul",
+      "expected": "নজরুল",
+      "got_top1": "নায্রুল",
+      "category": "proper_noun"
+    },
+    {
+      "input": "bangabandhu",
+      "expected": "বঙ্গবন্ধু",
+      "got_top1": "বাঙ্গাবান্ধু",
+      "category": "proper_noun"
+    },
+    {
+      "input": "bhashani",
+      "expected": "ভাসানী",
+      "got_top1": "ভাসানই",
+      "category": "proper_noun"
+    },
+    {
+      "input": "titumir",
+      "expected": "তিতুমীর",
+      "got_top1": "তিতুমির",
+      "category": "proper_noun"
+    }
+  ]
+}
