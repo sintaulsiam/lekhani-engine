@@ -410,6 +410,7 @@ pub const BANGLISH_SHORTHAND: &[(&str, &str)] = &[
 const EMBEDDED_AUTOCORRECT_JSON: &[u8] = include_bytes!("../../../data/dictionaries/autocorrect.json");
 const EMBEDDED_SUFFIX_JSON: &[u8] = include_bytes!("../../../data/dictionaries/suffix.json");
 const EMBEDDED_OVERRIDES_JSON: &[u8] = include_bytes!("../../../data/dictionaries/phonetic_overrides.json");
+const EMBEDDED_OVERRIDES_BIN: &[u8] = include_bytes!("../../../data/dictionaries/phonetic_overrides.bin");
 
 pub fn parse_binary_overrides(bytes: &[u8]) -> Option<PhoneticOverrideMap> {
     if bytes.len() < 12 || &bytes[0..4] != b"POVR" {
@@ -504,7 +505,9 @@ fn get_static_overrides() -> Arc<PhoneticOverrideMap> {
     STATIC_OVERRIDES
         .get_or_init(|| {
             let mut overrides = HashMap::new();
-            if let Ok(map) = serde_json::from_slice::<PhoneticOverrideMap>(EMBEDDED_OVERRIDES_JSON) {
+            if let Some(map) = parse_binary_overrides(EMBEDDED_OVERRIDES_BIN) {
+                overrides.extend(map);
+            } else if let Ok(map) = serde_json::from_slice::<PhoneticOverrideMap>(EMBEDDED_OVERRIDES_JSON) {
                 overrides.extend(map);
             }
             Arc::new(overrides)
