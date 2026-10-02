@@ -148,7 +148,7 @@ impl BpeVocabulary {
         let file = std::fs::File::create(path)?;
         let mut writer = std::io::BufWriter::new(file);
         bincode::serialize_into(&mut writer, self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            .map_err(std::io::Error::other)
     }
 
     /// Load vocabulary from a bincode binary file

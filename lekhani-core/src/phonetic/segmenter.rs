@@ -36,6 +36,11 @@ pub fn segment_concatenated_token(
             return None;
         }
 
+        // Bound inflectional suffixes cannot act as standalone independent words in a segmented phrase
+        if database.suffix.contains_key(part) {
+            return None;
+        }
+
         // 1. Check autocorrect / Banglish shorthand
         if let Some(ac) = database.get_autocorrect_raw(part) {
             if is_isolated_consonant(&ac) {

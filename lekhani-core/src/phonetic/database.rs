@@ -572,7 +572,7 @@ impl PhoneticDatabase {
         let uac = self
             .user_autocorrect
             .read()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         let json = serde_json::to_string_pretty(&*uac)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         std::fs::write(path, json)

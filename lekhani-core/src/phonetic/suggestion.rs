@@ -1052,13 +1052,19 @@ impl PhoneticSuggestion {
 
         // 12c. Concatenated Word Lattice Segmentation (e.g. "kemonaso" -> "কেমন আছো", "dhonnobadbhai" -> "ধন্যবাদ ভাই")
         if self.config.enable_word_segmentation && middle.len() >= 6 && !middle.contains(' ') {
+            let has_exact_single_word = is_primary_in_dict
+                || raw_candidates.iter().any(|c| {
+                    c.source != CandidateSource::SegmentedLattice
+                        && !c.text.contains(' ')
+                        && self.database.trie.contains_exact(&c.text)
+                });
             let segmented = super::segmenter::segment_concatenated_token(
                 middle,
                 &self.database,
                 |s| self.convert_phonetic(s),
             );
             for seg in segmented {
-                let boost = if is_primary_in_dict { 3000 } else { 12000 };
+                let boost = if has_exact_single_word { 3000 } else { 12000 };
                 add_cand(
                     seg.text,
                     CandidateSource::SegmentedLattice,
@@ -1216,13 +1222,20 @@ impl PhoneticSuggestion {
             is_user_learned: false,
         };
 
+        let has_exact_single_word = is_primary_in_dict
+            || raw_candidates.iter().any(|c| {
+                c.source != CandidateSource::SegmentedLattice
+                    && !c.text.contains(' ')
+                    && self.database.trie.contains_exact(&c.text)
+            });
+
         for cand in raw_candidates {
             if cand.source == CandidateSource::CodeShield {
                 scored_candidates.push((cand.text, 60000, RankFeatures::default()));
                 continue;
             }
             if cand.source == CandidateSource::SegmentedLattice {
-                let boost = if is_primary_in_dict || has_dominant_homophone || preferred_loanword.is_some() {
+                let boost = if has_exact_single_word || has_dominant_homophone || preferred_loanword.is_some() {
                     cand.initial_boost.min(3000)
                 } else {
                     cand.initial_boost + 2000

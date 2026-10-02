@@ -11,11 +11,9 @@ fn main() {
         "data/dictionaries/bengali_lm.bin",
     ];
     for path in candidate_paths {
-        if std::path::Path::new(path).exists() {
-            if let Ok(_) = lm.load_binary_file(path) {
-                println!("Loaded bengali_lm.bin from {} successfully!", path);
-                break;
-            }
+        if std::path::Path::new(path).exists() && lm.load_binary_file(path).is_ok() {
+            println!("Loaded bengali_lm.bin from {} successfully!", path);
+            break;
         }
     }
     let scorer = ContextScorer::with_language_model(lm.clone());

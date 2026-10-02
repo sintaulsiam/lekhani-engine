@@ -177,7 +177,7 @@ impl MicroGruModel {
         let file = std::fs::File::create(path)?;
         let mut writer = std::io::BufWriter::new(file);
         bincode::serialize_into(&mut writer, self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            .map_err(std::io::Error::other)
     }
 
     /// Forward pass through sequence of tokens.
