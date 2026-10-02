@@ -27,6 +27,10 @@ pub struct AutonomousLearner {
     #[serde(default)]
     pub candidate_selection_counts: HashMap<String, u32>,
     #[serde(default)]
+    pub input_error_map: HashMap<String, String>,
+    #[serde(default)]
+    pub input_error_counts: HashMap<String, u32>,
+    #[serde(default)]
     pub rank_weights: RankWeights,
     #[serde(skip)]
     pub dirty: bool,
@@ -44,7 +48,7 @@ impl Default for AutonomousLearner {
 
 impl AutonomousLearner {
     pub const BINARY_MAGIC: &'static [u8; 4] = b"LLRN";
-    pub const BINARY_VERSION: u32 = 2;
+    pub const BINARY_VERSION: u32 = 3;
 
     pub fn new() -> Self {
         Self {
@@ -56,6 +60,8 @@ impl AutonomousLearner {
             last_committed_word: None,
             candidate_memory: HashMap::new(),
             candidate_selection_counts: HashMap::new(),
+            input_error_map: HashMap::new(),
+            input_error_counts: HashMap::new(),
             rank_weights: RankWeights::default(),
             dirty: false,
         }
@@ -147,6 +153,46 @@ impl AutonomousLearner {
                 self.prune_if_needed();
             }
         }
+    }
+
+    /// Record user's personal typo / error pattern (e.g. typing "bhlao" and selecting "ভালো").
+    /// Requires at least 2 manual selections for inputs > 2 characters before pinning to input_error_map,
+    /// preventing accidental tap poisoning.
+    pub fn record_input_error(&mut self, raw_input: &str, candidate: &str) {
+        self.record_input_error_with_threshold(raw_input, candidate, 2);
+    }
+
+    /// Record personal error pattern with explicit frequency threshold
+    pub fn record_input_error_with_threshold(&mut self, raw_input: &str, candidate: &str, threshold: u32) {
+        let clean_raw = raw_input.trim().to_lowercase();
+        let clean_cand = candidate.trim();
+        if clean_raw.is_empty() || clean_cand.is_empty() || clean_raw == clean_cand {
+            return;
+        }
+
+        // Short inputs (<= 2 characters) like "oi", "k", "to", "na" are immune
+        if clean_raw.chars().count() <= 2 {
+            self.dirty = true;
+            return;
+        }
+
+        let key = format!("{}\t{}", clean_raw, clean_cand);
+        let count = self.input_error_counts.entry(key).or_insert(0);
+        *count += 1;
+        self.dirty = true;
+
+        if *count >= threshold {
+            self.input_error_map.insert(clean_raw, clean_cand.to_string());
+            if self.input_error_map.len() > 2200 {
+                self.prune_if_needed();
+            }
+        }
+    }
+
+    /// Lookup a learned personal error/typo override for the given raw input.
+    pub fn lookup_input_error(&self, raw_input: &str) -> Option<&str> {
+        let clean_raw = raw_input.trim().to_lowercase();
+        self.input_error_map.get(&clean_raw).map(|s| s.as_str())
     }
 
     /// Update ranking weights online based on candidate selection override
@@ -248,6 +294,13 @@ impl AutonomousLearner {
             entries.truncate(MAX_CANDIDATES - 200);
             self.candidate_memory = entries.into_iter().collect();
         }
+
+        const MAX_INPUT_ERRORS: usize = 2000;
+        if self.input_error_map.len() > MAX_INPUT_ERRORS {
+            let mut entries: Vec<(String, String)> = self.input_error_map.drain().collect();
+            entries.truncate(MAX_INPUT_ERRORS - 200);
+            self.input_error_map = entries.into_iter().collect();
+        }
     }
 
     /// Clear all user-learned data and reset baseline
@@ -257,6 +310,8 @@ impl AutonomousLearner {
         self.custom_user_words.clear();
         self.candidate_memory.clear();
         self.candidate_selection_counts.clear();
+        self.input_error_map.clear();
+        self.input_error_counts.clear();
         self.user_bigrams.clear();
         self.rank_weights = RankWeights::default();
         self.last_committed_word = None;
@@ -498,12 +553,42 @@ impl AutonomousLearner {
                     if version == Self::BINARY_VERSION {
                         if let Ok(mut learner) = bincode::deserialize::<AutonomousLearner>(&bytes[8..]) {
                             learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
+                            learner.input_error_map.retain(|k, _| k.chars().count() > 2);
                             learner.dirty = false;
+                            return learner;
+                        }
+                    } else if version == 2 {
+                        #[derive(Deserialize)]
+                        struct AutonomousLearnerV2 {
+                            observed_counts: HashMap<String, u32>,
+                            learned_words: HashSet<String>,
+                            custom_user_words: HashSet<String>,
+                            auto_learn_threshold: u32,
+                            user_bigrams: HashMap<String, u32>,
+                            last_committed_word: Option<String>,
+                            candidate_memory: HashMap<String, String>,
+                            candidate_selection_counts: HashMap<String, u32>,
+                            rank_weights: RankWeights,
+                        }
+                        if let Ok(old) = bincode::deserialize::<AutonomousLearnerV2>(&bytes[8..]) {
+                            let mut learner = Self::new();
+                            learner.observed_counts = old.observed_counts;
+                            learner.learned_words = old.learned_words;
+                            learner.custom_user_words = old.custom_user_words;
+                            learner.auto_learn_threshold = old.auto_learn_threshold;
+                            learner.user_bigrams = old.user_bigrams;
+                            learner.last_committed_word = old.last_committed_word;
+                            learner.candidate_memory = old.candidate_memory;
+                            learner.candidate_selection_counts = old.candidate_selection_counts;
+                            learner.rank_weights = old.rank_weights;
+                            learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
+                            learner.dirty = true;
                             return learner;
                         }
                     }
                 } else if let Ok(mut learner) = serde_json::from_slice::<AutonomousLearner>(&bytes) {
                     learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
+                    learner.input_error_map.retain(|k, _| k.chars().count() > 2);
                     learner.dirty = true;
                     return learner;
                 }
@@ -789,5 +874,31 @@ mod tests {
         learner.penalize_mistake(Some("একটি"), "টাইপো");
         assert_eq!(*learner.observed_counts.get("টাইপো").unwrap(), 9);
         assert!(!learner.user_bigrams.contains_key("একটি\tটাইপো")); // count was 1, so removed
+    }
+
+    #[test]
+    fn test_personal_error_pattern_learning() {
+        let mut learner = AutonomousLearner::new();
+
+        // 1st selection for typo "bhlao" -> "ভালো": count = 1 (< 2 threshold), not pinned yet
+        learner.record_input_error("bhlao", "ভালো");
+        assert_eq!(learner.lookup_input_error("bhlao"), None);
+
+        // 2nd selection: count = 2 (>= 2 threshold), now remembered!
+        learner.record_input_error("bhlao", "ভালো");
+        assert_eq!(learner.lookup_input_error("bhlao"), Some("ভালো"));
+
+        // Case insensitivity: "Bhlao" should also find "ভালো"
+        assert_eq!(learner.lookup_input_error("Bhlao"), Some("ভালো"));
+
+        // Short typo immunity: "oi" (<= 2 chars) must NEVER be pinned
+        learner.record_input_error("oi", "ঐ");
+        learner.record_input_error("oi", "ঐ");
+        assert_eq!(learner.lookup_input_error("oi"), None);
+
+        // Serialization check
+        let json = serde_json::to_string(&learner).expect("JSON serialization must succeed");
+        let deserialized: AutonomousLearner = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.lookup_input_error("bhlao"), Some("ভালো"));
     }
 }
