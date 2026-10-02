@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-10-02T17:18:36.848933946+00:00",
+  "timestamp": "2026-10-02T17:51:39.987861183+00:00",
   "total_cases": 253,
   "top1_accuracy": 93.2806324110672,
   "top3_accuracy": 99.60474308300395,
-  "eval_duration_ms": 216.312645,
-  "avg_latency_us": 854.9881422924901,
+  "eval_duration_ms": 885.454567,
+  "avg_latency_us": 3499.818181818182,
   "categories": {
     "formal": {
       "total": 50,
