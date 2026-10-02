@@ -78,3 +78,18 @@ fn test_zero_alloc_convert_into() {
     parser.convert_into("bangladesh", &mut buf);
     assert_eq!(buf, "বাংলাদেশ");
 }
+
+#[test]
+fn test_backtick_conjunct_breaker_and_zwnj() {
+    let parser = default_avro_parser();
+
+    // r`y and r`yab should produce র‍্য and র‍্যাব
+    assert_eq!(parser.convert("r`y"), "র‍্য");
+    assert_eq!(parser.convert("r`yab"), "র‍্যাব");
+    assert_eq!(parser.convert("ryab"), "র‍্যাব");
+
+    // Backtick disjoining consonants
+    assert_eq!(parser.convert("k`k"), "কক");
+    assert_eq!(parser.convert("p`p"), "পপ");
+}
+

@@ -1507,6 +1507,76 @@
                 ]
             },
             {
+                "find": "r`y",
+                "replace": "র‍্য",
+                "rules": [
+                    {
+                        "matches": [
+                            {
+                                "scope": "consonant",
+                                "type": "prefix"
+                            },
+                            {
+                                "scope": "!exact",
+                                "type": "prefix",
+                                "value": "r"
+                            },
+                            {
+                                "scope": "!exact",
+                                "type": "prefix",
+                                "value": "y"
+                            },
+                            {
+                                "scope": "!exact",
+                                "type": "prefix",
+                                "value": "w"
+                            },
+                            {
+                                "scope": "!exact",
+                                "type": "prefix",
+                                "value": "x"
+                            }
+                        ],
+                        "replace": "্র্য"
+                    }
+                ]
+            },
+            {
+                "find": "r`Z",
+                "replace": "র‍্য",
+                "rules": [
+                    {
+                        "matches": [
+                            {
+                                "scope": "consonant",
+                                "type": "prefix"
+                            },
+                            {
+                                "scope": "!exact",
+                                "type": "prefix",
+                                "value": "r"
+                            },
+                            {
+                                "scope": "!exact",
+                                "type": "prefix",
+                                "value": "y"
+                            },
+                            {
+                                "scope": "!exact",
+                                "type": "prefix",
+                                "value": "w"
+                            },
+                            {
+                                "scope": "!exact",
+                                "type": "prefix",
+                                "value": "x"
+                            }
+                        ],
+                        "replace": "্র্য"
+                    }
+                ]
+            },
+            {
                 "find": "ry",
                 "replace": "র‍্য",
                 "rules": [

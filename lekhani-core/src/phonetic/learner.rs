@@ -114,6 +114,10 @@ impl AutonomousLearner {
         if clean_buf.is_empty() || clean_cand.is_empty() {
             return;
         }
+        // Never allow verbatim Latin selections or Latin words to overwrite phonetic mappings
+        if clean_buf.eq_ignore_ascii_case(clean_cand) || (clean_cand.is_ascii() && !clean_buf.is_empty()) {
+            return;
+        }
         self.candidate_memory
             .insert(clean_buf.to_string(), clean_cand.to_string());
         self.dirty = true;
@@ -132,6 +136,11 @@ impl AutonomousLearner {
         let clean_buf = buffer.trim();
         let clean_cand = candidate.trim();
         if clean_buf.is_empty() || clean_cand.is_empty() {
+            return;
+        }
+
+        // Never allow verbatim Latin selections or Latin words to overwrite phonetic mappings
+        if clean_buf.eq_ignore_ascii_case(clean_cand) || (clean_cand.is_ascii() && !clean_buf.is_empty()) {
             return;
         }
 
@@ -166,7 +175,7 @@ impl AutonomousLearner {
     pub fn record_input_error_with_threshold(&mut self, raw_input: &str, candidate: &str, threshold: u32) {
         let clean_raw = raw_input.trim().to_lowercase();
         let clean_cand = candidate.trim();
-        if clean_raw.is_empty() || clean_cand.is_empty() || clean_raw == clean_cand {
+        if clean_raw.is_empty() || clean_cand.is_empty() || clean_raw == clean_cand || clean_cand.is_ascii() {
             return;
         }
 
