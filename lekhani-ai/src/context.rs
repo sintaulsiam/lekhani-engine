@@ -210,13 +210,34 @@ impl ContextScorer {
     /// Score and re-rank candidate list based on multi-token preceding context and personal overlay.
     /// This allocates a new Vec. For zero-allocation hot paths, use `rank_candidates_in_place`.
     pub fn rank_candidates(&self, context: &[&str], candidates: &[String]) -> Vec<String> {
+        self.rank_candidates_bidirectional(context, None, candidates)
+    }
+
+    /// Score and re-rank candidate list with bidirectional context (preceding words + following word).
+    pub fn rank_candidates_bidirectional(
+        &self,
+        context: &[&str],
+        right_word: Option<&str>,
+        candidates: &[String],
+    ) -> Vec<String> {
         let mut cloned = candidates.to_vec();
-        self.rank_candidates_in_place(context, &mut cloned);
+        self.rank_candidates_in_place_bidirectional(context, right_word, &mut cloned);
         cloned
     }
 
     /// Zero-allocation candidate ranking. Modifies the candidates slice in-place.
     pub fn rank_candidates_in_place(&self, context: &[&str], candidates: &mut [String]) {
+        self.rank_candidates_in_place_bidirectional(context, None, candidates);
+    }
+
+    /// Bi-directional zero-allocation candidate ranking.
+    /// Modifies `candidates` in-place taking into account preceding context and following word.
+    pub fn rank_candidates_in_place_bidirectional(
+        &self,
+        context: &[&str],
+        right_word: Option<&str>,
+        candidates: &mut [String],
+    ) {
         if candidates.len() <= 1 {
             return;
         }
@@ -228,6 +249,26 @@ impl ContextScorer {
         } else {
             None
         };
+
+        let clean_next = right_word.and_then(|w| {
+            let trimmed = w.trim_matches(|c: char| {
+                c.is_ascii_punctuation()
+                    || c == '।'
+                    || c == '—'
+                    || c == '‘'
+                    || c == '’'
+                    || c == '“'
+                    || c == '”'
+                    || c == '\''
+                    || c == '"'
+                    || c == ','
+            });
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        });
 
         // Stack-allocated array for zero-allocation scoring (up to 32 candidates)
         let len = candidates.len().min(32);
@@ -241,8 +282,15 @@ impl ContextScorer {
             };
             let personal_boost = self.personal_overlay.boost_for(cand);
             let grammar_boost = compute_honorific_agreement_boost(prev2, prev1, cand);
+            let right_boost = if let Some(next) = clean_next {
+                // Score transition from candidate to following word: P(next | cand)
+                let p = self.lm.score_candidate(None, Some(cand), next);
+                (p + 3.0) * 0.4
+            } else {
+                0.0
+            };
             let position_penalty = i as f32 * 0.15;
-            scores[i] = lm_score + personal_boost + grammar_boost - position_penalty;
+            scores[i] = lm_score + personal_boost + grammar_boost + right_boost - position_penalty;
         }
 
         // Simple insertion sort to sort `candidates` and `scores` in tandem.
@@ -366,6 +414,15 @@ mod tests {
         // After "বই", "পড়া" should be ranked #1
         let ranked_book = scorer.rank_candidates(&["বই"], &candidates);
         assert_eq!(ranked_book[0], "পড়া");
+    }
+
+    #[test]
+    fn test_bidirectional_ranking() {
+        let scorer = ContextScorer::new();
+        let mut candidates = vec!["পড়া".to_string(), "পরা".to_string()];
+        // With right context "হচ্ছে", bigram "পড়া হচ্ছে" is much more plausible than "পরা হচ্ছে"
+        scorer.rank_candidates_in_place_bidirectional(&["একটি", "বই"], Some("হচ্ছে"), &mut candidates);
+        assert_eq!(candidates[0], "পড়া");
     }
 
     #[test]
