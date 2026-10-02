@@ -25,6 +25,8 @@ pub struct AutonomousLearner {
     #[serde(default)]
     pub candidate_memory: HashMap<String, String>,
     #[serde(default)]
+    pub candidate_selection_counts: HashMap<String, u32>,
+    #[serde(default)]
     pub rank_weights: RankWeights,
     #[serde(skip)]
     pub dirty: bool,
@@ -53,6 +55,7 @@ impl AutonomousLearner {
             user_bigrams: HashMap::new(),
             last_committed_word: None,
             candidate_memory: HashMap::new(),
+            candidate_selection_counts: HashMap::new(),
             rank_weights: RankWeights::default(),
             dirty: false,
         }
@@ -90,8 +93,16 @@ impl AutonomousLearner {
         }
     }
 
-    /// Record user's candidate selection override permanently
+    /// Record user's candidate selection override with smart frequency threshold.
+    /// Requires at least 2 manual selections for inputs > 2 characters before pinning to candidate_memory,
+    /// preventing accidental tap poisoning.
+    /// Short inputs (<= 2 characters) like "oi", "k", "kn", "to", "na" are immune from candidate memory.
     pub fn record_candidate_selection(&mut self, buffer: &str, candidate: &str) {
+        self.record_candidate_selection_with_threshold(buffer, candidate, 2);
+    }
+
+    /// Explicitly record a candidate selection override directly bypassing frequency threshold
+    pub fn record_candidate_selection_direct(&mut self, buffer: &str, candidate: &str) {
         let clean_buf = buffer.trim();
         let clean_cand = candidate.trim();
         if clean_buf.is_empty() || clean_cand.is_empty() {
@@ -102,6 +113,39 @@ impl AutonomousLearner {
         self.dirty = true;
         if self.candidate_memory.len() > 2200 {
             self.prune_if_needed();
+        }
+    }
+
+    /// Record candidate selection with explicit frequency threshold
+    pub fn record_candidate_selection_with_threshold(
+        &mut self,
+        buffer: &str,
+        candidate: &str,
+        threshold: u32,
+    ) {
+        let clean_buf = buffer.trim();
+        let clean_cand = candidate.trim();
+        if clean_buf.is_empty() || clean_cand.is_empty() {
+            return;
+        }
+
+        // Short inputs (<= 2 characters) like "oi", "k", "to", "na" are immune from sticky memory
+        if clean_buf.chars().count() <= 2 {
+            self.dirty = true;
+            return;
+        }
+
+        let key = format!("{}\t{}", clean_buf, clean_cand);
+        let count = self.candidate_selection_counts.entry(key).or_insert(0);
+        *count += 1;
+        self.dirty = true;
+
+        if *count >= threshold {
+            self.candidate_memory
+                .insert(clean_buf.to_string(), clean_cand.to_string());
+            if self.candidate_memory.len() > 2200 {
+                self.prune_if_needed();
+            }
         }
     }
 
@@ -212,6 +256,7 @@ impl AutonomousLearner {
         self.learned_words.clear();
         self.custom_user_words.clear();
         self.candidate_memory.clear();
+        self.candidate_selection_counts.clear();
         self.user_bigrams.clear();
         self.rank_weights = RankWeights::default();
         self.last_committed_word = None;
@@ -324,6 +369,10 @@ impl AutonomousLearner {
         }
         for (k, v) in &other.candidate_memory {
             self.candidate_memory.insert(k.clone(), v.clone());
+        }
+        for (k, &count) in &other.candidate_selection_counts {
+            let entry = self.candidate_selection_counts.entry(k.clone()).or_insert(0);
+            *entry = (*entry).max(count).min(100);
         }
         self.dirty = true;
         self.prune_if_needed();
@@ -448,11 +497,13 @@ impl AutonomousLearner {
                     let version = u32::from_le_bytes(bytes[4..8].try_into().unwrap_or([0; 4]));
                     if version == Self::BINARY_VERSION {
                         if let Ok(mut learner) = bincode::deserialize::<AutonomousLearner>(&bytes[8..]) {
+                            learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
                             learner.dirty = false;
                             return learner;
                         }
                     }
                 } else if let Ok(mut learner) = serde_json::from_slice::<AutonomousLearner>(&bytes) {
+                    learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
                     learner.dirty = true;
                     return learner;
                 }
@@ -574,7 +625,7 @@ mod tests {
     fn test_binary_roundtrip_and_dirty_flag() {
         let mut learner = AutonomousLearner::new();
         learner.observe_committed_pair("বাংলা", "ভাষা");
-        learner.record_candidate_selection("amr", "আমার");
+        learner.record_candidate_selection_direct("amr", "আমার");
         assert!(learner.dirty);
 
         let temp_dir = std::env::temp_dir();
@@ -595,11 +646,11 @@ mod tests {
     fn test_merge() {
         let mut l1 = AutonomousLearner::new();
         l1.observe_committed_pair("আমি", "ভাত");
-        l1.record_candidate_selection("tui", "তুই");
+        l1.record_candidate_selection_direct("tui", "তুই");
 
         let mut l2 = AutonomousLearner::new();
         l2.observe_committed_pair("আমি", "চা");
-        l2.record_candidate_selection("apni", "আপনি");
+        l2.record_candidate_selection_direct("apni", "আপনি");
 
         l1.merge(&l2);
         assert!(l1.user_bigrams.contains_key("আমি\tভাত"));
@@ -666,12 +717,25 @@ mod tests {
     #[test]
     fn test_candidate_selection_memory() {
         let mut learner = AutonomousLearner::new();
+
+        // 1st selection: count = 1 (< 2 threshold), protects from accidental tap!
+        learner.record_candidate_selection("kormo", "কর্ম");
+        assert_eq!(learner.candidate_memory.get("kormo"), None);
+
+        // 2nd selection: count = 2 (>= 2 threshold), now remembered!
         learner.record_candidate_selection("kormo", "কর্ম");
         assert_eq!(learner.candidate_memory.get("kormo"), Some(&"কর্ম".to_string()));
+
+        // Short token immunity: "oi" (<= 2 chars) must NEVER be pinned even after multiple selections
+        learner.record_candidate_selection("oi", "ঐ");
+        learner.record_candidate_selection("oi", "ঐ");
+        learner.record_candidate_selection("oi", "ঐ");
+        assert_eq!(learner.candidate_memory.get("oi"), None);
 
         let json = serde_json::to_string(&learner).expect("JSON serialization must succeed");
         let deserialized: AutonomousLearner = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.candidate_memory.get("kormo"), Some(&"কর্ম".to_string()));
+        assert_eq!(deserialized.candidate_memory.get("oi"), None);
     }
 
     #[test]
@@ -689,10 +753,11 @@ mod tests {
     fn test_clear_user_data() {
         let mut learner = AutonomousLearner::new();
         learner.observe_committed_pair("কাস্টম", "শব্দ");
-        learner.record_candidate_selection("test", "টেস্ট");
+        learner.record_candidate_selection_direct("test", "টেস্ট");
         learner.clear_user_data();
 
         assert_eq!(learner.candidate_memory.len(), 0);
+        assert_eq!(learner.candidate_selection_counts.len(), 0);
         assert!(!learner.user_bigrams.is_empty()); // baseline re-seeded
         assert!(learner.get_user_bigram_boost("কেমন", "আছো") >= 1500);
     }

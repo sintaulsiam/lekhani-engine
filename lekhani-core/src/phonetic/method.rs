@@ -192,7 +192,7 @@ impl PhoneticMethod {
                 let chosen_f = self.current_candidate_features.get(index).copied();
                 let rejected_f = self.current_candidate_features.get(self.default_selected_index).copied();
                 if let Ok(mut l) = self.suggestion_engine.database.learner.write() {
-                    l.record_candidate_selection(&self.buffer, committed);
+                    l.record_candidate_selection_direct(&self.buffer, committed);
                     if let (Some(ref chosen), Some(ref rejected)) = (chosen_f, rejected_f) {
                         l.update_rank_weights(chosen, rejected);
                     }
