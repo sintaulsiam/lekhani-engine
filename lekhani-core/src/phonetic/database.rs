@@ -5,7 +5,7 @@ use crate::trie::PrefixTrie;
 use hashbrown::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct PhoneticDatabase {
@@ -404,6 +404,54 @@ pub const BANGLISH_SHORTHAND: &[(&str, &str)] = &[
     ("korba", "করবা"),
 ];
 
+const EMBEDDED_AUTOCORRECT_JSON: &[u8] = include_bytes!("../../../data/dictionaries/autocorrect.json");
+const EMBEDDED_SUFFIX_JSON: &[u8] = include_bytes!("../../../data/dictionaries/suffix.json");
+
+fn get_static_suffix() -> Arc<HashMap<String, String>> {
+    static STATIC_SUFFIX: OnceLock<Arc<HashMap<String, String>>> = OnceLock::new();
+    STATIC_SUFFIX
+        .get_or_init(|| {
+            let mut suffix = HashMap::new();
+            for &(k, v) in CORE_SUFFIXES {
+                suffix.insert(k.to_string(), v.to_string());
+            }
+            if let Ok(map) = serde_json::from_slice::<HashMap<String, String>>(EMBEDDED_SUFFIX_JSON) {
+                suffix.extend(map);
+            }
+            Arc::new(suffix)
+        })
+        .clone()
+}
+
+fn get_static_autocorrect() -> Arc<HashMap<String, String>> {
+    static STATIC_AUTOCORRECT: OnceLock<Arc<HashMap<String, String>>> = OnceLock::new();
+    STATIC_AUTOCORRECT
+        .get_or_init(|| {
+            let mut autocorrect = HashMap::new();
+            for &(k, v) in CORE_AUTOCORRECT {
+                autocorrect.insert(k.to_string(), v.to_string());
+            }
+            if let Ok(map) = serde_json::from_slice::<HashMap<String, String>>(EMBEDDED_AUTOCORRECT_JSON) {
+                autocorrect.extend(map.into_iter().filter(|(k, v)| k != v));
+            }
+            Arc::new(autocorrect)
+        })
+        .clone()
+}
+
+fn get_static_shorthand() -> Arc<HashMap<String, String>> {
+    static STATIC_SHORTHAND: OnceLock<Arc<HashMap<String, String>>> = OnceLock::new();
+    STATIC_SHORTHAND
+        .get_or_init(|| {
+            let mut shorthand = HashMap::new();
+            for &(k, v) in BANGLISH_SHORTHAND {
+                shorthand.insert(k.to_string(), v.to_string());
+            }
+            Arc::new(shorthand)
+        })
+        .clone()
+}
+
 impl PhoneticDatabase {
     pub fn new() -> Self {
         let mut trie = PrefixTrie::new();
@@ -412,26 +460,11 @@ impl PhoneticDatabase {
         }
         trie.ensure_sorted();
 
-        let mut suffix = HashMap::new();
-        for &(k, v) in CORE_SUFFIXES {
-            suffix.insert(k.to_string(), v.to_string());
-        }
-
-        let mut autocorrect = HashMap::new();
-        for &(k, v) in CORE_AUTOCORRECT {
-            autocorrect.insert(k.to_string(), v.to_string());
-        }
-
-        let mut shorthand = HashMap::new();
-        for &(k, v) in BANGLISH_SHORTHAND {
-            shorthand.insert(k.to_string(), v.to_string());
-        }
-
         Self {
             trie: Arc::new(trie),
-            suffix: Arc::new(suffix),
-            autocorrect: Arc::new(autocorrect),
-            shorthand: Arc::new(shorthand),
+            suffix: get_static_suffix(),
+            autocorrect: get_static_autocorrect(),
+            shorthand: get_static_shorthand(),
             user_autocorrect: Arc::new(RwLock::new(HashMap::new())),
             emojis: Arc::new(EmojiMap::new()),
             snippets: Arc::new(SnippetManager::new()),
