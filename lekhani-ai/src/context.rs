@@ -1,5 +1,4 @@
-//! Multi-Token Deep Context Engine & Homophone Disambiguator
-
+use crate::embeddings::WordEmbeddings;
 use crate::lm::LanguageModel;
 
 const OVERLAY_CAPACITY: usize = 4096;
@@ -156,6 +155,7 @@ pub fn truncate_at_sentence_boundary<'a>(context: &'a [&'a str]) -> &'a [&'a str
 pub struct ContextScorer {
     lm: LanguageModel,
     personal_overlay: PersonalScoreOverlay,
+    embeddings: WordEmbeddings,
 }
 
 impl ContextScorer {
@@ -165,6 +165,7 @@ impl ContextScorer {
         Self {
             lm,
             personal_overlay: PersonalScoreOverlay::new(),
+            embeddings: WordEmbeddings::new(),
         }
     }
 
@@ -172,6 +173,7 @@ impl ContextScorer {
         Self {
             lm,
             personal_overlay: PersonalScoreOverlay::new(),
+            embeddings: WordEmbeddings::new(),
         }
     }
 
@@ -179,6 +181,19 @@ impl ContextScorer {
         Self {
             lm,
             personal_overlay,
+            embeddings: WordEmbeddings::new(),
+        }
+    }
+
+    pub fn with_embeddings(
+        lm: LanguageModel,
+        personal_overlay: PersonalScoreOverlay,
+        embeddings: WordEmbeddings,
+    ) -> Self {
+        Self {
+            lm,
+            personal_overlay,
+            embeddings,
         }
     }
 
@@ -195,6 +210,16 @@ impl ContextScorer {
     /// Mutable access to the personal score overlay
     pub fn personal_overlay_mut(&mut self) -> &mut PersonalScoreOverlay {
         &mut self.personal_overlay
+    }
+
+    /// Access the static word embeddings engine
+    pub fn embeddings(&self) -> &WordEmbeddings {
+        &self.embeddings
+    }
+
+    /// Mutable access to the static word embeddings engine
+    pub fn embeddings_mut(&mut self) -> &mut WordEmbeddings {
+        &mut self.embeddings
     }
 
     /// Record a committed word to personalize scoring
@@ -289,8 +314,17 @@ impl ContextScorer {
             } else {
                 0.0
             };
+            let semantic_boost = match (prev1, clean_next) {
+                (Some(prev), Some(next)) => {
+                    self.embeddings.semantic_boost(prev, cand)
+                        + self.embeddings.semantic_boost(next, cand) * 0.5
+                }
+                (Some(prev), None) => self.embeddings.semantic_boost(prev, cand),
+                (None, Some(next)) => self.embeddings.semantic_boost(next, cand) * 0.5,
+                (None, None) => 0.0,
+            };
             let position_penalty = i as f32 * 0.15;
-            scores[i] = lm_score + personal_boost + grammar_boost + right_boost - position_penalty;
+            scores[i] = lm_score + personal_boost + grammar_boost + right_boost + semantic_boost - position_penalty;
         }
 
         // Simple insertion sort to sort `candidates` and `scores` in tandem.
@@ -322,13 +356,19 @@ impl ContextScorer {
             None
         };
 
+        let sem_boost = if let Some(p) = prev1 {
+            (self.embeddings.semantic_boost(p, candidate) * 400.0) as i32
+        } else {
+            0
+        };
+
         let score = self.lm.score_candidate(prev2, prev1, candidate);
         if score > -1.0 {
-            1000 + personal_boost
+            1000 + personal_boost + sem_boost
         } else if score > -2.0 {
-            500 + personal_boost
+            500 + personal_boost + sem_boost
         } else {
-            personal_boost
+            personal_boost + sem_boost
         }
     }
 }
@@ -460,5 +500,27 @@ mod tests {
         // After familiar "তুমি", "করবে" must outrank "করবেন"
         let familiar_ranked = scorer.rank_candidates(&["তুমি"], &candidates);
         assert_eq!(familiar_ranked[0], "করবে");
+    }
+
+    #[test]
+    fn test_semantic_ranking_with_embeddings() {
+        let scorer = ContextScorer::new();
+
+        // 1. Semantic boost for temporal words:
+        // After "আজ", "কাল" should get a significant semantic boost over unrelated "ভাত"
+        let mut temporal_cands = vec!["ভাত".to_string(), "কাল".to_string()];
+        scorer.rank_candidates_in_place_bidirectional(&["আজ"], None, &mut temporal_cands);
+        assert_eq!(temporal_cands[0], "কাল");
+
+        // 2. Homophone boost with semantic context:
+        // In context of "বই", "পড়া" (reading) gets higher homophone boost than "পরা" (wearing)
+        let boost_reading = scorer.score_homophone_boost(&["বই"], "পড়া");
+        let boost_wearing = scorer.score_homophone_boost(&["বই"], "পরা");
+        assert!(boost_reading > boost_wearing, "Expected reading boost {} > wearing boost {}", boost_reading, boost_wearing);
+
+        // In context of "শার্ট", "পরা" (wearing) gets higher homophone boost than "পড়া" (reading)
+        let boost_shirt_wearing = scorer.score_homophone_boost(&["শার্ট"], "পরা");
+        let boost_shirt_reading = scorer.score_homophone_boost(&["শার্ট"], "পড়া");
+        assert!(boost_shirt_wearing > boost_shirt_reading, "Expected shirt wearing boost {} > reading boost {}", boost_shirt_wearing, boost_shirt_reading);
     }
 }

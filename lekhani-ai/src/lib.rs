@@ -6,6 +6,7 @@
 
 pub mod beam;
 pub mod context;
+pub mod embeddings;
 pub mod lm;
 pub mod prediction;
 pub mod trainer;
@@ -13,6 +14,7 @@ pub mod zero_copy;
 
 pub use beam::BeamSearchDecoder;
 pub use context::{truncate_at_sentence_boundary, ContextScorer, PersonalScoreOverlay};
+pub use embeddings::WordEmbeddings;
 pub use lm::LanguageModel;
 pub use prediction::NextWordPredictor;
 pub use trainer::{
