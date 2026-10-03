@@ -664,6 +664,14 @@ impl PhoneticDatabase {
         }
         trie.ensure_sorted();
 
+        // Warm-start ranking perceptron weights if pre-trained weights exist in dictionary directory
+        let rank_weights_path = dir.join("rank_weights_v2.json");
+        if rank_weights_path.exists() {
+            if let Ok(mut l) = self.learner.write() {
+                l.load_pretrained_rank_weights(&rank_weights_path);
+            }
+        }
+
         // Signal any cached suggestion engines to invalidate
         self.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())

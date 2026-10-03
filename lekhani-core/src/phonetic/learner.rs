@@ -609,6 +609,27 @@ impl AutonomousLearner {
         let _ = learner.save_to_path(path);
         learner
     }
+
+    /// Load pre-trained rank weights from a JSON file at the given path.
+    /// If the file does not exist or fails to parse, silently keeps the current weights.
+    /// Called during PhoneticDatabase initialization to warm-start the ranker for fresh installs.
+    pub fn load_pretrained_rank_weights<P: AsRef<Path>>(&mut self, path: P) {
+        let path = path.as_ref();
+        if !path.exists() {
+            return;
+        }
+        if let Ok(data) = std::fs::read_to_string(path) {
+            if let Ok(weights) = serde_json::from_str::<RankWeights>(&data) {
+                // Only apply pre-trained weights on a fresh install (i.e., weights are still default).
+                // If the user has already adapted their weights, we do not override them.
+                let default_weights = RankWeights::default();
+                if (self.rank_weights.lm_score - default_weights.lm_score).abs() < 1.0 {
+                    self.rank_weights = weights;
+                    self.dirty = true;
+                }
+            }
+        }
+    }
 }
 
 /// Pre-trained high-frequency Bengali conversational word pairs
@@ -909,5 +930,31 @@ mod tests {
         let json = serde_json::to_string(&learner).expect("JSON serialization must succeed");
         let deserialized: AutonomousLearner = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.lookup_input_error("bhlao"), Some("ভালো"));
+    }
+
+    #[test]
+    fn test_pretrained_weights_load_and_apply() {
+        let dir = std::env::temp_dir().join("lekhani_test_pretrain");
+        let _ = std::fs::create_dir_all(&dir);
+        let weights_path = dir.join("rank_weights_v2.json");
+
+        // Write a custom weights JSON
+        let custom = RankWeights {
+            lm_score: 6000.0,
+            ..RankWeights::default()
+        };
+        let json = serde_json::to_string(&custom).unwrap();
+        std::fs::write(&weights_path, json).unwrap();
+
+        // Load learner from scratch and apply pre-trained weights
+        let mut learner = AutonomousLearner::new();
+        learner.load_pretrained_rank_weights(&weights_path);
+        assert_eq!(learner.rank_weights.lm_score, 6000.0);
+
+        // Ensure existing adapted weights are NOT overwritten
+        let mut adapted = AutonomousLearner::new();
+        adapted.rank_weights.lm_score = 7500.0; // user has already adapted
+        adapted.load_pretrained_rank_weights(&weights_path);
+        assert_eq!(adapted.rank_weights.lm_score, 7500.0, "Must not overwrite adapted weights");
     }
 }
