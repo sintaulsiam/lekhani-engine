@@ -1411,8 +1411,8 @@ impl PhoneticSuggestion {
 
         self.last_computed_features = final_features;
 
-        // Cache the computed candidates for instant sub-millisecond retrieval
-        if self.cache.len() > 1000 {
+        // Cache the computed candidates for instant sub-millisecond retrieval (bounded to 128 entries)
+        if self.cache.len() >= 128 {
             self.cache.clear();
         }
         self.cache.insert(cache_key, (final_candidates.clone(), self.last_computed_features.clone()));

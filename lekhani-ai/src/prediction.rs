@@ -55,37 +55,46 @@ impl NextWordPredictor {
         self.predict_next_with_options(context, limit, true)
     }
 
-    /// Predict the top-K probable next words given preceding sentence context with optional idiom phrases
-    pub fn predict_next_with_options(
+    /// Predict the top-K probable next words with explicit scores given preceding sentence context
+    pub fn predict_next_scored(&self, context: &[&str], limit: usize) -> Vec<(String, f32)> {
+        self.predict_next_scored_with_options(context, limit, true)
+    }
+
+    /// Predict the top-K probable next words with scores given preceding sentence context with optional idiom phrases
+    pub fn predict_next_scored_with_options(
         &self,
         context: &[&str],
         limit: usize,
         enable_idiom_phrases: bool,
-    ) -> Vec<String> {
+    ) -> Vec<(String, f32)> {
         let context = crate::context::truncate_at_sentence_boundary(context);
         if context.is_empty() {
-            return vec![
-                "আমি".to_string(),
-                "আপনি".to_string(),
-                "তুমি".to_string(),
-                "আমরা".to_string(),
-                "ধন্যবাদ".to_string(),
-            ]
-            .into_iter()
-            .take(limit)
-            .collect();
+            let defaults = [
+                ("আমি", -1.8),
+                ("আপনি", -2.3),
+                ("তুমি", -2.1),
+                ("আমরা", -2.4),
+                ("ধন্যবাদ", -2.5),
+            ];
+            return defaults
+                .iter()
+                .take(limit)
+                .map(|(w, s)| (w.to_string(), *s))
+                .collect();
         }
 
         // 0. Match high-confidence conversational idioms and phrases
-        let mut idiom_matches = Vec::new();
+        let mut idiom_matches: Vec<(String, f32)> = Vec::new();
+        let mut seen: hashbrown::HashSet<String> = hashbrown::HashSet::new();
+
         if enable_idiom_phrases {
             for &(pattern, continuations) in BENGALI_IDIOM_PHRASES {
                 if context.len() >= pattern.len() {
                     let tail = &context[context.len() - pattern.len()..];
                     if tail == pattern {
-                        for &cont in continuations {
-                            if !idiom_matches.contains(&cont.to_string()) {
-                                idiom_matches.push(cont.to_string());
+                        for (idx, &cont) in continuations.iter().enumerate() {
+                            if seen.insert(cont.to_string()) {
+                                idiom_matches.push((cont.to_string(), 0.5 - 0.1 * (idx as f32)));
                             }
                         }
                     }
@@ -94,90 +103,79 @@ impl NextWordPredictor {
         }
 
         let pool_size = (limit * 3).max(12);
-        let mut candidate_set: Vec<String> = Vec::with_capacity(pool_size);
+        let mut raw_candidates: Vec<String> = Vec::with_capacity(pool_size);
 
-        if context.len() >= 2 {
-            let prev2 = context[context.len() - 2];
-            let prev1 = context[context.len() - 1];
-
-            // 1. Trigram continuations
-            for w in self.lm.get_next_words_trigram(prev2, prev1, pool_size) {
-                if !candidate_set.contains(&w) {
-                    candidate_set.push(w);
-                }
-            }
-
-            // 2. Bigram continuations
-            for w in self.lm.get_next_words(prev1, pool_size) {
-                if !candidate_set.contains(&w) {
-                    candidate_set.push(w);
-                }
-            }
-
-            // Score and sort candidates
-            candidate_set.sort_by(|a, b| {
-                let score_a = self.lm.score_candidate(Some(prev2), Some(prev1), a);
-                let score_b = self.lm.score_candidate(Some(prev2), Some(prev1), b);
-                score_b
-                    .partial_cmp(&score_a)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+        let (prev2, prev1) = if context.len() >= 2 {
+            (Some(context[context.len() - 2]), Some(context[context.len() - 1]))
         } else {
-            let prev1 = context[context.len() - 1];
+            (None, Some(context[context.len() - 1]))
+        };
 
-            // Bigram continuations
-            for w in self.lm.get_next_words(prev1, pool_size) {
-                if !candidate_set.contains(&w) {
-                    candidate_set.push(w);
+        if let (Some(p2), Some(p1)) = (prev2, prev1) {
+            // 1. Trigram continuations
+            for w in self.lm.get_next_words_trigram(p2, p1, pool_size) {
+                if seen.insert(w.clone()) {
+                    raw_candidates.push(w);
                 }
             }
-
-            // Score and sort candidates
-            candidate_set.sort_by(|a, b| {
-                let score_a = self.lm.score_candidate(None, Some(prev1), a);
-                let score_b = self.lm.score_candidate(None, Some(prev1), b);
-                score_b
-                    .partial_cmp(&score_a)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
         }
+
+        if let Some(p1) = prev1 {
+            // 2. Bigram continuations
+            for w in self.lm.get_next_words(p1, pool_size) {
+                if seen.insert(w.clone()) {
+                    raw_candidates.push(w);
+                }
+            }
+        }
+
+        // Score candidates
+        let mut scored_candidates: Vec<(String, f32)> = raw_candidates
+            .into_iter()
+            .map(|cand| {
+                let score = self.lm.score_candidate(prev2, prev1, &cand);
+                (cand, score)
+            })
+            .collect();
+
+        scored_candidates.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Fill remaining slots with high-frequency contextual fallbacks
-        if candidate_set.len() < limit {
+        if idiom_matches.len() + scored_candidates.len() < limit {
             let fallbacks = [
-                "হবে",
-                "আছে",
-                "করব",
-                "যাব",
-                "ভালো",
-                "চাই",
-                "কথা",
-                "দেখা",
-                "ছিল",
-                "করছি",
+                "হবে", "আছে", "করব", "যাব", "ভালো",
+                "চাই", "কথা", "দেখা", "ছিল", "করছি",
             ];
             for fb in fallbacks {
-                if candidate_set.len() >= limit {
+                if idiom_matches.len() + scored_candidates.len() >= limit {
                     break;
                 }
-                if !candidate_set.contains(&fb.to_string()) && !context.contains(&fb) {
-                    candidate_set.push(fb.to_string());
+                if seen.insert(fb.to_string()) && !context.contains(&fb) {
+                    let score = self.lm.score_candidate(prev2, prev1, fb);
+                    scored_candidates.push((fb.to_string(), score));
                 }
             }
         }
 
-        if !idiom_matches.is_empty() {
-            let mut final_set = idiom_matches;
-            for c in candidate_set {
-                if !final_set.contains(&c) {
-                    final_set.push(c);
-                }
-            }
-            candidate_set = final_set;
-        }
+        let mut final_result = idiom_matches;
+        final_result.extend(scored_candidates);
+        final_result.truncate(limit);
+        final_result
+    }
 
-        candidate_set.truncate(limit);
-        candidate_set
+    /// Predict the top-K probable next words given preceding sentence context with optional idiom phrases
+    pub fn predict_next_with_options(
+        &self,
+        context: &[&str],
+        limit: usize,
+        enable_idiom_phrases: bool,
+    ) -> Vec<String> {
+        self.predict_next_scored_with_options(context, limit, enable_idiom_phrases)
+            .into_iter()
+            .map(|(w, _)| w)
+            .collect()
     }
 }
 

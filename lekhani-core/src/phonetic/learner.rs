@@ -91,12 +91,24 @@ impl AutonomousLearner {
         if clean_prev.is_empty() || clean_cand.is_empty() {
             return 0;
         }
-        let key = format!("{}\t{}", clean_prev, clean_cand);
-        if let Some(&count) = self.user_bigrams.get(&key) {
-            (1500 + count.min(6) as i32 * 500).min(4500)
+        let total_len = clean_prev.len() + 1 + clean_cand.len();
+        if total_len <= 256 {
+            let mut buf = [0u8; 256];
+            buf[..clean_prev.len()].copy_from_slice(clean_prev.as_bytes());
+            buf[clean_prev.len()] = b'\t';
+            buf[clean_prev.len() + 1..total_len].copy_from_slice(clean_cand.as_bytes());
+            if let Ok(key_str) = std::str::from_utf8(&buf[..total_len]) {
+                if let Some(&count) = self.user_bigrams.get(key_str) {
+                    return (1500 + count.min(6) as i32 * 500).min(4500);
+                }
+            }
         } else {
-            0
+            let key = format!("{}\t{}", clean_prev, clean_cand);
+            if let Some(&count) = self.user_bigrams.get(&key) {
+                return (1500 + count.min(6) as i32 * 500).min(4500);
+            }
         }
+        0
     }
 
     /// Record user's candidate selection override with smart frequency threshold.
@@ -267,6 +279,29 @@ impl AutonomousLearner {
             }
         }
 
+        // 3. Decrement candidate_selection_counts and prune accidental candidate_memory
+        let suffix = format!("\t{}", clean_curr);
+        let mut keys_to_remove = Vec::new();
+        for (key, count) in self.candidate_selection_counts.iter_mut() {
+            if key.ends_with(&suffix) {
+                if *count > 1 {
+                    *count -= 1;
+                } else {
+                    keys_to_remove.push(key.clone());
+                }
+                self.dirty = true;
+            }
+        }
+        for k in keys_to_remove {
+            self.candidate_selection_counts.remove(&k);
+            if let Some(buf) = k.split('\t').next() {
+                if self.candidate_memory.get(buf).map(|s| s.as_str()) == Some(clean_curr) {
+                    self.candidate_memory.remove(buf);
+                    self.dirty = true;
+                }
+            }
+        }
+
         if self.last_committed_word.as_deref() == Some(clean_curr) {
             self.last_committed_word = None;
         }
@@ -300,6 +335,14 @@ impl AutonomousLearner {
 
         if self.candidate_memory.len() > MAX_CANDIDATES {
             let mut entries: Vec<(String, String)> = self.candidate_memory.drain().collect();
+            // Sort by selection count descending so highest-selected entries are retained
+            entries.sort_unstable_by(|a, b| {
+                let key_a = format!("{}\t{}", a.0, a.1);
+                let key_b = format!("{}\t{}", b.0, b.1);
+                let count_a = self.candidate_selection_counts.get(&key_a).copied().unwrap_or(1);
+                let count_b = self.candidate_selection_counts.get(&key_b).copied().unwrap_or(1);
+                count_b.cmp(&count_a)
+            });
             entries.truncate(MAX_CANDIDATES - 200);
             self.candidate_memory = entries.into_iter().collect();
         }

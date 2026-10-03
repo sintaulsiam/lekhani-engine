@@ -5,6 +5,7 @@
 
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
+use unicode_segmentation::UnicodeSegmentation;
 
 pub const PAD_TOKEN_ID: u32 = 0;
 pub const UNK_TOKEN_ID: u32 = 1;
@@ -98,14 +99,19 @@ impl BpeVocabulary {
                 continue;
             }
 
-            // Subword prefix / character fallback
-            let chars: Vec<char> = word.chars().collect();
+            // Grapheme-cluster-aware subword matching using byte slices (zero allocations)
+            let boundaries: Vec<usize> = word
+                .grapheme_indices(true)
+                .map(|(i, _)| i)
+                .chain(std::iter::once(word.len()))
+                .collect();
+
             let mut start = 0;
-            while start < chars.len() {
+            while start < boundaries.len() - 1 {
                 let mut matched = false;
-                for end in (start + 1..=chars.len()).rev() {
-                    let sub: String = chars[start..end].iter().collect();
-                    if let Some(&id) = self.token_to_id.get(&sub) {
+                for end in (start + 1..boundaries.len()).rev() {
+                    let sub = &word[boundaries[start]..boundaries[end]];
+                    if let Some(&id) = self.token_to_id.get(sub) {
                         ids.push(id);
                         start = end;
                         matched = true;

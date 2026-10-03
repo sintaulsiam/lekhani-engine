@@ -4,9 +4,14 @@
 //! Blends neural semantic candidates with Tier 1 N-gram candidates with an
 //! adaptive weighting factor.
 
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::sync::Arc;
 use crate::model::{MicroGruModel, GruScratchpad};
 use crate::vocab::BpeVocabulary;
+
+thread_local! {
+    static LOCAL_SCRATCHPAD: RefCell<Option<GruScratchpad>> = const { RefCell::new(None) };
+}
 
 /// Candidate predicted by the neural engine
 #[derive(Debug, Clone, PartialEq)]
@@ -54,17 +59,26 @@ pub fn compute_neural_alpha(
 }
 
 /// Asynchronous Semantic Predictor wrapping GRU model and BPE vocabulary
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct NeuralContextPredictor {
     model: Arc<MicroGruModel>,
     vocab: Arc<BpeVocabulary>,
-    pad: Arc<Mutex<GruScratchpad>>,
 }
 
 impl NeuralContextPredictor {
+    pub fn try_new(model: Arc<MicroGruModel>, vocab: Arc<BpeVocabulary>) -> Result<Self, String> {
+        if model.vocab_size() != vocab.len() {
+            return Err(format!(
+                "MicroGruModel vocab_size ({}) does not match BpeVocabulary len ({})",
+                model.vocab_size(),
+                vocab.len()
+            ));
+        }
+        Ok(Self { model, vocab })
+    }
+
     pub fn new(model: Arc<MicroGruModel>, vocab: Arc<BpeVocabulary>) -> Self {
-        let pad = Arc::new(Mutex::new(GruScratchpad::new(vocab.len(), model.embedding_dim, model.hidden_dim)));
-        Self { model, vocab, pad }
+        Self::try_new(model, vocab).expect("MicroGruModel vocab_size must match BpeVocabulary len")
     }
 
     /// Predict top semantic candidates for a conversational context string.
@@ -81,8 +95,17 @@ impl NeuralContextPredictor {
             &token_ids[..]
         };
 
-        let mut pad = self.pad.lock().unwrap();
-        let top_tokens = self.model.predict_top_k(window, top_k * 2, &mut pad);
+        let top_tokens = LOCAL_SCRATCHPAD.with(|cell| {
+            let mut pad_opt = cell.borrow_mut();
+            let pad = pad_opt.get_or_insert_with(|| {
+                GruScratchpad::new(self.vocab.len(), self.model.embedding_dim, self.model.hidden_dim)
+            });
+            if pad.logits.len() != self.vocab.len() {
+                *pad = GruScratchpad::new(self.vocab.len(), self.model.embedding_dim, self.model.hidden_dim);
+            }
+            self.model.predict_top_k(window, top_k * 2, pad)
+        });
+
         let mut candidates = Vec::with_capacity(top_k);
 
         for (id, log_prob) in top_tokens {
@@ -122,45 +145,42 @@ impl NeuralContextPredictor {
         neural_candidates: &[NeuralCandidate],
         alpha: f32,
     ) -> Vec<String> {
-        let mut merged: Vec<String> = Vec::with_capacity(ngram_candidates.len() + neural_candidates.len());
-
         let alpha = alpha.clamp(0.0, 1.0);
+        let mut scores: std::collections::HashMap<&str, f32> =
+            std::collections::HashMap::with_capacity(ngram_candidates.len() + neural_candidates.len());
+        let mut seen = std::collections::HashSet::with_capacity(ngram_candidates.len() + neural_candidates.len());
+        let mut ordered_candidates = Vec::with_capacity(ngram_candidates.len() + neural_candidates.len());
 
-        if alpha >= 0.5 {
-            // Neural-dominant: place top neural candidates first, then fill with N-grams
-            for nc in neural_candidates {
-                if !merged.contains(&nc.word) {
-                    merged.push(nc.word.clone());
-                }
+        let min_neural = neural_candidates.iter().map(|c| c.log_prob).fold(0.0f32, |m, v| m.min(v)) - 2.0;
+
+        for (rank, ng) in ngram_candidates.iter().enumerate() {
+            let ng_score = -0.3 * (rank as f32);
+            scores.insert(ng.as_str(), (1.0 - alpha) * ng_score + alpha * min_neural);
+            if seen.insert(ng.as_str()) {
+                ordered_candidates.push(ng.clone());
             }
-            for ng in ngram_candidates {
-                if !merged.contains(ng) {
-                    merged.push(ng.clone());
-                }
-            }
-        } else {
-            // Ngram-dominant: preserve N-gram rank 1, interleave high-confidence neural
-            for (idx, ng) in ngram_candidates.iter().enumerate() {
-                if !merged.contains(ng) {
-                    merged.push(ng.clone());
-                }
-                // Interleave neural candidate after top-1 N-gram
-                if idx == 0 {
-                    if let Some(top_neural) = neural_candidates.first() {
-                        if !merged.contains(&top_neural.word) {
-                            merged.push(top_neural.word.clone());
-                        }
-                    }
-                }
-            }
-            for nc in neural_candidates {
-                if !merged.contains(&nc.word) {
-                    merged.push(nc.word.clone());
+        }
+
+        for (rank, nc) in neural_candidates.iter().enumerate() {
+            let w = nc.word.as_str();
+            if let Some(existing) = scores.get_mut(w) {
+                *existing += alpha * (nc.log_prob - min_neural);
+            } else {
+                let ng_penalty = -0.5 - 0.5 * (rank as f32);
+                scores.insert(w, (1.0 - alpha) * ng_penalty + alpha * nc.log_prob);
+                if seen.insert(w) {
+                    ordered_candidates.push(nc.word.clone());
                 }
             }
         }
 
-        merged
+        ordered_candidates.sort_by(|a, b| {
+            let sa = scores.get(a.as_str()).copied().unwrap_or(f32::NEG_INFINITY);
+            let sb = scores.get(b.as_str()).copied().unwrap_or(f32::NEG_INFINITY);
+            sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        ordered_candidates
     }
 }
 
@@ -214,5 +234,14 @@ mod tests {
         // N-gram uncertain → balanced
         let alpha = compute_neural_alpha(-2.5, true, 4);
         assert!(alpha >= 0.4 && alpha <= 0.6, "Expected balanced alpha, got {}", alpha);
+    }
+
+    #[test]
+    fn test_vocab_mismatch_rejects_model() {
+        let vocab = Arc::new(BpeVocabulary::from_tokens(vec!["ক".into(), "খ".into()]));
+        let mismatched_model = Arc::new(MicroGruModel::new(2048, 16, 16));
+        let res = NeuralContextPredictor::try_new(mismatched_model, vocab);
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("vocab_size (2048) does not match"));
     }
 }

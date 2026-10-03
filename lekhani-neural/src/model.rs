@@ -156,6 +156,12 @@ impl MicroGruModel {
         }
     }
 
+    /// Returns the vocabulary size supported by this model
+    #[inline(always)]
+    pub fn vocab_size(&self) -> usize {
+        self.vocab_size
+    }
+
     /// Load model weights from a bincode binary file
     pub fn load_binary<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
         let file = std::fs::File::open(path)?;

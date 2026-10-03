@@ -133,7 +133,41 @@ impl RankWeights {
 }
 
 use super::suggestion::{CandidateHypothesis, CandidateSource};
-use edit_distance::edit_distance;
+use unicode_segmentation::UnicodeSegmentation;
+
+/// Calculates the Levenshtein edit distance between two strings based on
+/// extended Unicode grapheme clusters, preventing corruption or miscalculation
+/// of multi-codepoint Bengali conjuncts (juktoborno) and modified letters.
+pub fn grapheme_edit_distance(a: &str, b: &str) -> usize {
+    let a_graphemes: Vec<&str> = a.graphemes(true).collect();
+    let b_graphemes: Vec<&str> = b.graphemes(true).collect();
+
+    let len_a = a_graphemes.len();
+    let len_b = b_graphemes.len();
+
+    if len_a == 0 {
+        return len_b;
+    }
+    if len_b == 0 {
+        return len_a;
+    }
+
+    let mut prev_row: Vec<usize> = (0..=len_b).collect();
+    let mut curr_row: Vec<usize> = vec![0; len_b + 1];
+
+    for (i, &g_a) in a_graphemes.iter().enumerate() {
+        curr_row[0] = i + 1;
+        for (j, &g_b) in b_graphemes.iter().enumerate() {
+            let cost = if g_a == g_b { 0 } else { 1 };
+            curr_row[j + 1] = (prev_row[j + 1] + 1)
+                .min(curr_row[j] + 1)
+                .min(prev_row[j] + cost);
+        }
+        prev_row.copy_from_slice(&curr_row);
+    }
+
+    prev_row[len_b]
+}
 
 /// Per-token contextual properties extracted once per keystroke.
 pub struct CandidateContext<'a> {
@@ -203,7 +237,7 @@ pub fn extract_candidate_features(
 
     // 3. Phonetic Similarity & Length
     if cand.source != CandidateSource::EmojiKeyword {
-        let dist = edit_distance(ctx.phonetic, &cand.text);
+        let dist = grapheme_edit_distance(ctx.phonetic, &cand.text);
         if cand.text == ctx.phonetic || cand.text == ctx.primary {
             let is_dict_equiv = is_in_dict
                 || cand.source == CandidateSource::MorphologicalInflection
@@ -228,7 +262,7 @@ pub fn extract_candidate_features(
             f.phonetic_similarity = -((dist.min(3)) as f32); // -dist * 200
         } else {
             f.phonetic_similarity = -(dist as f32);
-            let len_diff = (cand.text.chars().count() as isize - ctx.phonetic.chars().count() as isize)
+            let len_diff = (cand.text.graphemes(true).count() as isize - ctx.phonetic.graphemes(true).count() as isize)
                 .abs() as f32;
             f.length_penalty = -len_diff;
 
@@ -409,6 +443,22 @@ mod tests {
         assert_eq!(f.is_high_freq, 1.5);
         assert_eq!(f.is_exact_phonetic, 1.0);
         assert!(f.lm_score > 0.8);
+    }
+
+    #[test]
+    fn test_grapheme_edit_distance_bengali_conjuncts() {
+        // "ক্ষ" (k + hasanta + ssa) is 1 grapheme cluster vs "ক" (1 grapheme) -> distance = 1
+        assert_eq!(grapheme_edit_distance("ক্ষ", "ক"), 1);
+
+        // "পড়া" vs "পরা": substitution of 1 grapheme ("ড়" vs "র") -> distance = 1
+        assert_eq!(grapheme_edit_distance("পড়া", "পরা"), 1);
+
+        // Identical strings -> distance = 0
+        assert_eq!(grapheme_edit_distance("বাংলাদেশ", "বাংলাদেশ"), 0);
+
+        // Empty string cases: "আমি" has 2 graphemes ("আ", "মি"); "তুমি" has 2 graphemes ("তু", "মি")
+        assert_eq!(grapheme_edit_distance("", "আমি"), 2);
+        assert_eq!(grapheme_edit_distance("তুমি", ""), 2);
     }
 }
 

@@ -21,6 +21,7 @@ lekhani-parser.workspace = true
 chrono.workspace = true
 bincode.workspace = true
 lekhani-ai.workspace = true
+unicode-segmentation.workspace = true
 
 [[bin]]
 name = "pretrain_rank_weights"

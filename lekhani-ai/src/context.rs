@@ -323,7 +323,7 @@ impl ContextScorer {
                 (None, Some(next)) => self.embeddings.semantic_boost(next, cand) * 0.5,
                 (None, None) => 0.0,
             };
-            let position_penalty = i as f32 * 0.15;
+            let position_penalty = i as f32 * 0.05;
             scores[i] = lm_score + personal_boost + grammar_boost + right_boost + semantic_boost - position_penalty;
         }
 
