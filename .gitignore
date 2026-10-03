@@ -13,3 +13,5 @@ Thumbs.db
 
 # Intermediate training artifacts
 *neural_weights*.json
+__pycache__/
+*.py[cod]

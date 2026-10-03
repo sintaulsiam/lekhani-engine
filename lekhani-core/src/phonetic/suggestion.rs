@@ -613,7 +613,14 @@ impl PhoneticSuggestion {
             let ov_opt = self.database.lookup_override(middle).or_else(|| {
                 let lower = middle.to_lowercase();
                 if lower != middle {
-                    self.database.lookup_override(&lower)
+                    let is_title_case = middle.len() >= 3
+                        && middle.chars().next().is_some_and(|c| c.is_uppercase())
+                        && middle.chars().skip(1).all(|c| c.is_lowercase() || !c.is_alphabetic());
+                    if is_title_case {
+                        self.database.lookup_override(&lower)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }

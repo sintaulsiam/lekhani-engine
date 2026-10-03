@@ -409,7 +409,7 @@ pub const BANGLISH_SHORTHAND: &[(&str, &str)] = &[
 
 const EMBEDDED_AUTOCORRECT_JSON: &[u8] = include_bytes!("../../../data/dictionaries/autocorrect.json");
 const EMBEDDED_SUFFIX_JSON: &[u8] = include_bytes!("../../../data/dictionaries/suffix.json");
-const EMBEDDED_OVERRIDES_JSON: &[u8] = include_bytes!("../../../data/dictionaries/phonetic_overrides.json");
+const EMBEDDED_OVERRIDES_JSON: &[u8] = b"{}";
 const EMBEDDED_OVERRIDES_BIN: &[u8] = include_bytes!("../../../data/dictionaries/phonetic_overrides.bin");
 
 pub fn parse_binary_overrides(bytes: &[u8]) -> Option<PhoneticOverrideMap> {
