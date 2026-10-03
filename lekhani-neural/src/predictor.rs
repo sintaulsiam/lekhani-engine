@@ -15,6 +15,44 @@ pub struct NeuralCandidate {
     pub log_prob: f32,
 }
 
+/// Compute the neural blending weight based on N-gram confidence and context.
+///
+/// - `ngram_top_log_prob`: log-probability of the N-gram's top candidate.
+///   Range: negative floats. -0.0 = certain, -2.0 = uncertain, < -4.0 = no data.
+/// - `word_boundary`: true if we are predicting after a committed word (next-word mode).
+/// - `context_word_count`: number of committed words in context.
+///
+/// Returns alpha in [0.1, 0.7] where higher = more neural weight.
+pub fn compute_neural_alpha(
+    ngram_top_log_prob: f32,
+    word_boundary: bool,
+    context_word_count: usize,
+) -> f32 {
+    // No context: N-gram has nothing to go on, neural also unreliable — stay conservative.
+    if context_word_count < 2 {
+        return 0.1;
+    }
+    if !word_boundary {
+        // Mid-word mode: N-gram dominates, neural adds minimal diversity.
+        return 0.2;
+    }
+    // After a word boundary:
+    if ngram_top_log_prob < -3.0 {
+        // N-gram has no real data for this context → let neural contribute more.
+        return 0.65;
+    }
+    if ngram_top_log_prob < -2.0 {
+        // N-gram is uncertain → blend more equally.
+        return 0.5;
+    }
+    if ngram_top_log_prob > -0.5 {
+        // N-gram is very confident → keep it dominant, minimal neural noise.
+        return 0.15;
+    }
+    // Default: N-gram moderately confident.
+    0.35
+}
+
 /// Asynchronous Semantic Predictor wrapping GRU model and BPE vocabulary
 #[derive(Clone)]
 pub struct NeuralContextPredictor {
@@ -156,5 +194,25 @@ mod tests {
         let blended_pause = predictor.blend_candidates(&ngrams, &neurals, 0.6);
         assert_eq!(blended_pause[0], "আসব");
         assert_eq!(blended_pause[1], "যাব");
+    }
+
+    #[test]
+    fn test_compute_neural_alpha_ranges() {
+        // No context → very conservative
+        assert_eq!(compute_neural_alpha(-2.0, true, 0), 0.1);
+        assert_eq!(compute_neural_alpha(-2.0, true, 1), 0.1);
+
+        // Mid-word → N-gram dominant
+        assert_eq!(compute_neural_alpha(-3.5, false, 5), 0.2);
+
+        // N-gram has no data (very negative log-prob) → neural gets more weight
+        assert!(compute_neural_alpha(-4.0, true, 3) >= 0.6);
+
+        // N-gram highly confident → minimal neural
+        assert!(compute_neural_alpha(-0.1, true, 4) <= 0.2);
+
+        // N-gram uncertain → balanced
+        let alpha = compute_neural_alpha(-2.5, true, 4);
+        assert!(alpha >= 0.4 && alpha <= 0.6, "Expected balanced alpha, got {}", alpha);
     }
 }

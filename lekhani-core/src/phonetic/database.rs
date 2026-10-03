@@ -788,7 +788,7 @@ impl PhoneticDatabase {
     /// Search dictionary using fast prefix trie and learned vocabulary
     pub fn search_dictionary(&self, prefix: &str, limit: usize) -> Vec<String> {
         let mut res = self.trie.find_prefix_matches(prefix, limit);
-        if let Ok(l) = self.learner.read() {
+        if let Ok(l) = self.learner.try_read() {
             for lw in &l.learned_words {
                 if lw.starts_with(prefix) && !res.contains(lw) {
                     res.push(lw.clone());
@@ -821,7 +821,7 @@ impl PhoneticDatabase {
         if freq > 0 {
             return freq;
         }
-        if let Ok(l) = self.learner.read() {
+        if let Ok(l) = self.learner.try_read() {
             if l.learned_words.contains(word) {
                 return 9500;
             }
@@ -834,7 +834,7 @@ impl PhoneticDatabase {
         if self.trie.contains_exact(word) {
             return true;
         }
-        if let Ok(l) = self.learner.read() {
+        if let Ok(l) = self.learner.try_read() {
             if l.learned_words.contains(word) {
                 return true;
             }
