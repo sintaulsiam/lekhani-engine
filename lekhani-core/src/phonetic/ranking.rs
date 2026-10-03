@@ -222,7 +222,9 @@ pub fn extract_candidate_features(
                 f.intent_modifier_boost = 0.27; // 1200 / 4500
             }
         } else if cand.source == CandidateSource::TypoFallback {
-            f.source_weight = -1.0; // -4200
+            // Reduce penalty from -4200 to -1800: demote typo fallbacks but do not bury them.
+            // They must still lose to confirmed dictionary matches but must appear in the strip.
+            f.source_weight = -0.43; // -1800 (was -4200)
             f.phonetic_similarity = -((dist.min(3)) as f32); // -dist * 200
         } else {
             f.phonetic_similarity = -(dist as f32);
