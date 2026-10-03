@@ -233,7 +233,7 @@ mod tests {
 
         // N-gram uncertain → balanced
         let alpha = compute_neural_alpha(-2.5, true, 4);
-        assert!(alpha >= 0.4 && alpha <= 0.6, "Expected balanced alpha, got {}", alpha);
+        assert!((0.4..=0.6).contains(&alpha), "Expected balanced alpha, got {}", alpha);
     }
 
     #[test]

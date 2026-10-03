@@ -262,7 +262,7 @@ pub fn extract_candidate_features(
             f.phonetic_similarity = -((dist.min(3)) as f32); // -dist * 200
         } else {
             f.phonetic_similarity = -(dist as f32);
-            let len_diff = (cand.text.graphemes(true).count() as isize - ctx.phonetic.graphemes(true).count() as isize)
+            let len_diff = (cand.text.chars().count() as isize - ctx.phonetic.chars().count() as isize)
                 .abs() as f32;
             f.length_penalty = -len_diff;
 
