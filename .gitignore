@@ -10,3 +10,6 @@ Cargo.lock
 # OS
 .DS_Store
 Thumbs.db
+
+# Intermediate training artifacts
+*neural_weights*.json

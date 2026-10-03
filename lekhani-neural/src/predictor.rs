@@ -81,6 +81,12 @@ impl NeuralContextPredictor {
         Self::try_new(model, vocab).expect("MicroGruModel vocab_size must match BpeVocabulary len")
     }
 
+    /// Returns the vocabulary size of the underlying model.
+    #[inline(always)]
+    pub fn vocab_size(&self) -> usize {
+        self.model.vocab_size()
+    }
+
     /// Predict top semantic candidates for a conversational context string.
     pub fn predict_candidates(&self, context: &str, top_k: usize) -> Vec<NeuralCandidate> {
         let token_ids = self.vocab.encode(context);
