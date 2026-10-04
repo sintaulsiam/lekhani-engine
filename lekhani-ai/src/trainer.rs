@@ -778,8 +778,15 @@ impl CorpusTrainer {
     pub fn tokenize_text(text: &str) -> Vec<Vec<String>> {
         let mut sentences = Vec::new();
         let sentence_delimiters = ['।', '?', '!', '\n', ';'];
+        let canonical_storage: String;
+        let effective_text = if text.contains('\u{09bc}') || text.contains("\u{0985}\u{09be}") {
+            canonical_storage = chars::canonicalize_bengali_str(text);
+            canonical_storage.as_str()
+        } else {
+            text
+        };
 
-        for raw_sentence in text.split(|c| sentence_delimiters.contains(&c)) {
+        for raw_sentence in effective_text.split(|c| sentence_delimiters.contains(&c)) {
             let mut words = Vec::new();
             for raw_word in raw_sentence.split_whitespace() {
                 let clean_word: String = raw_word
@@ -1326,7 +1333,15 @@ pub fn train_files_streaming<P: AsRef<Path>>(
 
 fn extract_line_words<F: FnMut(&str)>(line: &str, mut on_word: F) {
     let sentence_delimiters = ['।', '?', '!', '\n', ';', '.'];
-    for raw_sentence in line.split(|c| sentence_delimiters.contains(&c)) {
+    let canonical_storage: String;
+    let effective_line = if line.contains('\u{09bc}') || line.contains("\u{0985}\u{09be}") {
+        canonical_storage = chars::canonicalize_bengali_str(line);
+        canonical_storage.as_str()
+    } else {
+        line
+    };
+
+    for raw_sentence in effective_line.split(|c| sentence_delimiters.contains(&c)) {
         for raw_word in raw_sentence.split_whitespace() {
             if !raw_word.chars().any(crate::trainer::chars::is_token_char) {
                 continue;
@@ -1368,7 +1383,15 @@ fn process_line_ngrams(
     local_tri: &mut HashMap<(u32, u32, u32), u32>,
 ) {
     let sentence_delimiters = ['।', '?', '!', '\n', ';', '.'];
-    for raw_sentence in line.split(|c| sentence_delimiters.contains(&c)) {
+    let canonical_storage: String;
+    let effective_line = if line.contains('\u{09bc}') || line.contains("\u{0985}\u{09be}") {
+        canonical_storage = chars::canonicalize_bengali_str(line);
+        canonical_storage.as_str()
+    } else {
+        line
+    };
+
+    for raw_sentence in effective_line.split(|c| sentence_delimiters.contains(&c)) {
         let mut sentence_ids: Vec<Option<u32>> = Vec::new();
         for raw_word in raw_sentence.split_whitespace() {
             if !raw_word.chars().any(crate::trainer::chars::is_token_char) {
@@ -1432,6 +1455,13 @@ pub(crate) mod chars {
     pub fn is_token_char(c: char) -> bool {
         c.is_alphabetic() || is_bengali_char(c)
     }
+
+    pub fn canonicalize_bengali_str(text: &str) -> String {
+        text.replace("\u{09a1}\u{09bc}", "\u{09dc}") // ড়
+            .replace("\u{09a2}\u{09bc}", "\u{09dd}") // ঢ়
+            .replace("\u{09af}\u{09bc}", "\u{09df}") // য়
+            .replace("\u{0985}\u{09be}", "\u{0986}") // অ + া -> আ
+    }
 }
 
 #[cfg(test)]
@@ -1441,20 +1471,21 @@ mod tests {
     #[test]
     fn test_corpus_training() {
         let mut trainer = CorpusTrainer::new();
-        trainer.train_text("আমি বাংলায় গান গাই। আমি ভাত খাচ্ছি।");
+        trainer.train_text("আমি বাংলায় গান গাই। আমি ভাত খাচ্ছি।");
 
         assert!(trainer.unigram_counts.contains_key("আমি"));
-        assert!(trainer.unigram_counts.contains_key("বাংলায়"));
+        assert!(trainer.unigram_counts.contains_key("বাংলায়"));
         assert!(trainer.unigram_counts.contains_key("গান"));
         assert!(trainer.unigram_counts.contains_key("গাই"));
         assert!(trainer.unigram_counts.contains_key("ভাত"));
+
         assert!(trainer.unigram_counts.contains_key("খাচ্ছি"));
 
         assert_eq!(*trainer.unigram_counts.get("আমি").unwrap(), 2);
         assert_eq!(
             *trainer
                 .bigram_counts
-                .get(&("বাংলায়".to_string(), "গান".to_string()))
+                .get(&("বাংলায়".to_string(), "গান".to_string()))
                 .unwrap(),
             1
         );
@@ -1464,17 +1495,17 @@ mod tests {
         assert!(compiled
             .bigrams
             .iter()
-            .any(|(w1, w2, _)| w1 == "বাংলায়" && w2 == "গান"));
+            .any(|(w1, w2, _)| w1 == "বাংলায়" && w2 == "গান"));
         assert!(compiled
             .trigrams
             .iter()
-            .any(|(w1, w2, w3, _)| w1 == "বাংলায়" && w2 == "গান" && w3 == "গাই"));
+            .any(|(w1, w2, w3, _)| w1 == "বাংলায়" && w2 == "গান" && w3 == "গাই"));
     }
 
     #[test]
     fn test_binary_roundtrip() {
         let mut trainer = CorpusTrainer::new();
-        trainer.train_text("আমি বাংলায় গান গাই। আমি ভাত খাচ্ছি।");
+        trainer.train_text("আমি বাংলায় গান গাই। আমি ভাত খাচ্ছি।");
         let compiled = trainer.compile();
 
         let bytes = compiled.to_binary();
@@ -1516,7 +1547,7 @@ mod tests {
     fn test_streaming_corpus_training() {
         let temp_dir = std::env::temp_dir();
         let test_file = temp_dir.join("lekhani_test_stream_corpus.txt");
-        let content = "আমি বাংলায় গান গাই। আমি বাংলায় কথা বলি।\n\
+        let content = "আমি বাংলায় গান গাই। আমি বাংলায় কথা বলি।\n\
                        বাংলাদেশ চিরজীবী হোক। বাংলাদেশ একটি সুন্দর দেশ।\n";
         std::fs::write(&test_file, content).expect("Failed to write test file");
 
@@ -1527,22 +1558,22 @@ mod tests {
         let _ = std::fs::remove_file(&test_file);
 
         assert!(compiled.unigrams.contains_key("আমি"));
-        assert!(compiled.unigrams.contains_key("বাংলায়"));
+        assert!(compiled.unigrams.contains_key("বাংলায়"));
         assert!(compiled.unigrams.contains_key("বাংলাদেশ"));
         assert!(compiled
             .bigrams
             .iter()
-            .any(|(w1, w2, _)| w1 == "আমি" && w2 == "বাংলায়"));
+            .any(|(w1, w2, _)| w1 == "আমি" && w2 == "বাংলায়"));
         assert!(compiled
             .trigrams
             .iter()
-            .any(|(w1, w2, w3, _)| w1 == "আমি" && w2 == "বাংলায়" && w3 == "গান"));
+            .any(|(w1, w2, w3, _)| w1 == "আমি" && w2 == "বাংলায়" && w3 == "গান"));
     }
 
     #[test]
     fn test_llm3_binary_roundtrip() {
         let mut trainer = CorpusTrainer::new();
-        trainer.train_text("আমি বাংলায় গান গাই। আমি ভাত খাচ্ছি। আমরা সবাই একসাথে থাকি।");
+        trainer.train_text("আমি বাংলায় গান গাই। আমি ভাত খাচ্ছি। আমরা সবাই একসাথে থাকি।");
         let compiled = trainer.compile();
 
         let bytes = compiled.to_binary_llm3();
@@ -1561,8 +1592,19 @@ mod tests {
         assert_eq!(zc.trigram_count(), loaded.trigrams.len());
 
         // Test scoring via zero-copy on LLM3
-        let score = zc.score_candidate(Some("বাংলায়"), Some("গান"), "গাই");
+        let score = zc.score_candidate(Some("বাংলায়"), Some("গান"), "গাই");
         assert!(score > -3.0);
+    }
+
+    #[test]
+    fn test_decomposed_nukta_canonicalization_during_training() {
+        let mut trainer = CorpusTrainer::new();
+        // Train text containing decomposed nuktas (ড + ় -> ড়) and (অ + া -> আ)
+        let decomposed_text = "ব\u{09a1}\u{09bc} গাছ। \u{0985}\u{09be}মি আসছি।";
+        trainer.train_text(decomposed_text);
+        assert!(trainer.unigram_counts.contains_key("বড়"), "Must be canonicalized to atomic U+09DC ড়");
+        assert!(trainer.unigram_counts.contains_key("আমি"), "Must be canonicalized to atomic U+0986 আ");
+        assert!(!trainer.unigram_counts.contains_key("ব\u{09a1}\u{09bc}"), "Decomposed token must not exist in LM vocab");
     }
 }
 
