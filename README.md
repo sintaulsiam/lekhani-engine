@@ -16,19 +16,19 @@ Pure Rust engine crates powering the **Lekhani** Bengali input method across all
 ### From crates.io
 
 ```toml
-lekhani-parser = "1.1.0"
-lekhani-core   = "1.1.0"
-lekhani-ai     = "1.1.0"
-lekhani-neural = "1.1.0"
+lekhani-parser = "1.2.0"
+lekhani-core   = "1.2.0"
+lekhani-ai     = "1.2.0"
+lekhani-neural = "1.2.0"
 ```
 
 ### From git (latest)
 
 ```toml
-lekhani-parser = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.1.0" }
-lekhani-core   = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.1.0" }
-lekhani-ai     = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.1.0" }
-lekhani-neural = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.1.0" }
+lekhani-parser = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.2.0" }
+lekhani-core   = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.2.0" }
+lekhani-ai     = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.2.0" }
+lekhani-neural = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = "v1.2.0" }
 ```
 
 ## Platform consumers
