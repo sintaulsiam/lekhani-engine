@@ -953,8 +953,9 @@ impl PhoneticSuggestion {
             // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
             let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
             let mut valid_fuzzy_stems = Vec::new();
+            let variant_limit = if is_primary_in_dict { 16 } else { 32 };
 
-            for variant in &fuzzy_variants {
+            for variant in fuzzy_variants.iter().take(variant_limit) {
                 let var_phonetic = self.convert_phonetic(variant);
                 if self.database.is_exact_dictionary_word(&var_phonetic) {
                     let len_diff = (var_phonetic.chars().count() as isize
@@ -1052,20 +1053,12 @@ impl PhoneticSuggestion {
 
                 // 12a. Physical QWERTY key adjacency slips and adjacent transpositions
                 let qwerty_variants = super::fuzzy::generate_qwerty_typo_variants(middle);
-                for qv in &qwerty_variants {
+                for qv in qwerty_variants.iter().take(12) {
                     let conv = self.convert_phonetic(qv);
                     if self.database.is_exact_dictionary_word(&conv)
                         && !typo_matches.contains(&conv)
                     {
                         typo_matches.push(conv);
-                    }
-                    for fz in super::fuzzy::generate_phonetic_variants(qv) {
-                        let fz_conv = self.convert_phonetic(&fz);
-                        if self.database.is_exact_dictionary_word(&fz_conv)
-                            && !typo_matches.contains(&fz_conv)
-                        {
-                            typo_matches.push(fz_conv);
-                        }
                     }
                 }
 
