@@ -89,6 +89,8 @@ pub struct PhoneticSuggestion {
     cache_generation: u64,
     /// Features computed for the most recently ranked candidates
     last_computed_features: Vec<RankFeatures>,
+    /// Candidates computed for the most recently ranked candidates
+    last_computed_candidates: Vec<String>,
 }
 
 impl std::fmt::Debug for PhoneticSuggestion {
@@ -192,6 +194,7 @@ impl PhoneticSuggestion {
             config: PhoneticSuggestionConfig::default(),
             cache_generation: 0,
             last_computed_features: Vec::new(),
+            last_computed_candidates: Vec::new(),
         }
     }
 
@@ -229,6 +232,7 @@ impl PhoneticSuggestion {
             config: PhoneticSuggestionConfig::default(),
             cache_generation: 0,
             last_computed_features: Vec::new(),
+            last_computed_candidates: Vec::new(),
         }
     }
 
@@ -260,6 +264,10 @@ impl PhoneticSuggestion {
 
     pub fn get_last_computed_features(&self) -> &[RankFeatures] {
         &self.last_computed_features
+    }
+
+    pub fn get_last_computed_candidates(&self) -> &[String] {
+        &self.last_computed_candidates
     }
 
     /// Transliterate directly using Avro phonetic rules
@@ -479,6 +487,7 @@ impl PhoneticSuggestion {
         };
         if let Some((cached_cands, cached_feats)) = self.cache.get(&cache_key) {
             self.last_computed_features = cached_feats.clone();
+            self.last_computed_candidates = cached_cands.clone();
             let selected_index = if let Some(fav) = candidate_memory
                 .get(term)
                 .or_else(|| candidate_memory.get(&cache_key))
@@ -498,6 +507,7 @@ impl PhoneticSuggestion {
             let literals = self.database.search_special_literals(term);
             if !literals.is_empty() {
                 self.last_computed_features.clear();
+                self.last_computed_candidates.clear();
                 let mut cands = literals;
                 if include_english && !cands.iter().any(|c| c == term) {
                     cands.push(term.to_string());
@@ -511,6 +521,7 @@ impl PhoneticSuggestion {
             let prefix_emojis = self.database.search_emojis_prefix(term, 8);
             if !prefix_emojis.is_empty() {
                 self.last_computed_features.clear();
+                self.last_computed_candidates.clear();
                 let mut cands = prefix_emojis;
                 if include_english && !cands.iter().any(|c| c == term) {
                     cands.push(term.to_string());
@@ -522,6 +533,7 @@ impl PhoneticSuggestion {
             let prefix_snippets = self.database.search_snippets_prefix(term, 8);
             if !prefix_snippets.is_empty() {
                 self.last_computed_features.clear();
+                self.last_computed_candidates.clear();
                 let mut cands = prefix_snippets;
                 if include_english && !cands.iter().any(|c| c == term) {
                     cands.push(term.to_string());
@@ -540,6 +552,7 @@ impl PhoneticSuggestion {
 
         if middle.is_empty() {
             self.last_computed_features.clear();
+            self.last_computed_candidates.clear();
             let lonely = format!(
                 "{}{}{}",
                 self.convert_phonetic(pre),
@@ -1228,6 +1241,44 @@ impl PhoneticSuggestion {
             Vec::new()
         };
 
+        // Phase 3: Formal Vocabulary Segmented Beam Expansion for Long Words (>= 8 chars)
+        // For inputs >= 8 characters where candidate coverage is thin, test compound/sandhi splits
+        // to discover formal words composed of prefix/root or root/suffix (e.g. চিকিৎসা+বিজ্ঞান, পরিবর্তন+শীলতা).
+        if middle.len() >= 8 && raw_candidates.len() < 5 {
+            let min_split = 3;
+            let max_split = middle.len().saturating_sub(3);
+            for split_idx in min_split..=max_split {
+                let part1 = &middle[..split_idx];
+                let part2 = &middle[split_idx..];
+                let conv1 = self.convert_phonetic(part1);
+                let conv2 = self.convert_phonetic(part2);
+
+                let composite = format!("{}{}", conv1, conv2);
+                if self.database.is_exact_dictionary_word(&composite) {
+                    add_cand(
+                        composite,
+                        CandidateSource::ExactDictionary,
+                        3000,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+
+                let sandhi_joined = crate::phonetic::morphology::apply_sandhi_join(&conv1, &conv2);
+                if sandhi_joined != format!("{}{}", conv1, conv2)
+                    && self.database.is_exact_dictionary_word(&sandhi_joined)
+                {
+                    add_cand(
+                        sandhi_joined,
+                        CandidateSource::MorphologicalInflection,
+                        3200,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+            }
+        }
+
         let mut scored_candidates: Vec<(String, i32, RankFeatures)> = Vec::with_capacity(raw_candidates.len());
         let learner_guard = self.database.learner.try_read().ok();
         let weights = learner_guard.as_ref().map(|l| l.rank_weights).unwrap_or_default();
@@ -1357,6 +1408,48 @@ impl PhoneticSuggestion {
         // Sort candidates by descending total score
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
 
+        // Phase 1: Context-Gated Bidirectional LM Re-sort Pass
+        //
+        // If we have preceding context AND there are ≥2 dictionary candidates competing
+        // (i.e. potential homophones), run a final pass through ContextScorer which applies
+        // a richer bidirectional LM model + personal overlay — both of which are NOT
+        // captured by the per-candidate `lm_score` feature baked into the initial sort.
+        //
+        // This re-sort is zero-allocation (in-place) and runs only when it can make
+        // a meaningful difference: ≥2 non-trivial candidates with context available.
+        //
+        // Examples disambiguated by this pass:
+        //   "পরা" vs "পড়া"  — after "শার্ট" → "পরা" promoted to Slot 0
+        //   "কর"  vs "কড়"  — after "নখ"   → "নখ কড়া" promoted
+        //   "বলা" vs "বলআ" — context prunes non-words automatically
+        if self.config.ai_profile != AiProfile::Off
+            && !context.is_empty()
+            && scored_candidates.len() >= 2
+        {
+            let top_is_exact = scored_candidates[0].2.is_exact_phonetic > 0.5;
+            let rerank_limit = scored_candidates.len().min(8);
+            let mut top_texts: Vec<String> = scored_candidates[..rerank_limit]
+                .iter()
+                .filter(|(_, _, f)| !top_is_exact || f.is_exact_phonetic > 0.5)
+                .map(|(t, _, _)| t.clone())
+                .collect();
+
+            if top_texts.len() >= 2 {
+                self.ai_context
+                    .rank_candidates_in_place_bidirectional(context, None, &mut top_texts);
+
+                let mut reordered = Vec::with_capacity(top_texts.len());
+                for text in &top_texts {
+                    if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == text) {
+                        reordered.push(scored_candidates.remove(pos));
+                    }
+                }
+                for item in reordered.into_iter().rev() {
+                    scored_candidates.insert(0, item);
+                }
+            }
+        }
+
         let mut candidates: Vec<(String, RankFeatures)> = Vec::with_capacity(8);
         let has_english = include_english && scored_candidates.iter().any(|(c, _, _)| c == term);
         let has_emoji = scored_candidates.iter().any(|(c, _, _)| kw_emojis.contains(c));
@@ -1417,6 +1510,7 @@ impl PhoneticSuggestion {
         }
 
         self.last_computed_features = final_features;
+        self.last_computed_candidates = final_candidates.clone();
 
         // Cache the computed candidates for instant sub-millisecond retrieval (bounded to 128 entries)
         if self.cache.len() >= 128 {
