@@ -622,6 +622,7 @@ impl PhoneticSuggestion {
             !post.contains('`') && !term.contains('`')
         };
 
+        let mut preferred_override = None;
         if allow_override {
             let ov_opt = self.database.lookup_override(middle).or_else(|| {
                 let lower = middle.to_lowercase();
@@ -639,6 +640,11 @@ impl PhoneticSuggestion {
                 }
             });
             if let Some(overrides) = ov_opt {
+                if let Some((top_ov, top_conf)) = overrides.first() {
+                    if *top_conf >= 0.80 {
+                        preferred_override = Some(top_ov.clone());
+                    }
+                }
                 for (ov_cand, conf) in overrides {
                     let boost = (7000.0 * conf) as i32;
                     add_cand(
@@ -818,6 +824,8 @@ impl PhoneticSuggestion {
             } else {
                 None
             }
+        } else if let Some(ref ov_pref) = preferred_override {
+            Some(ov_pref.clone())
         } else if let Some(ref loan_pref) = preferred_loanword {
             Some(loan_pref.clone())
         } else if let Some(verbal_word) = if self.config.enable_colloquial_dialects {

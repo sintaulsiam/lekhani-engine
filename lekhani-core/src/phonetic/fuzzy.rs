@@ -382,13 +382,11 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     }
 
     // 3. Second pass for compounding sound laws (e.g. sri -> srri AND st -> ShT => srriShTi)
-    let mut pass2 = HashSet::with_capacity(256);
     let pass1_list: Vec<String> = pass1.iter().cloned().collect();
+    let mut pass2 = HashSet::with_capacity(128);
     for var in &pass1_list {
         apply_sound_laws(var, &mut pass2);
     }
-
-    pass1.extend(pass2);
 
     let base_len = if let Some(first_collapsed) = collapsed_variants.first() {
         first_collapsed.len()
@@ -396,15 +394,26 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
         input.len()
     };
 
-    let mut results: Vec<String> = pass1.into_iter().collect();
-    results.sort_unstable_by(|a, b| {
+    let mut p1_vec: Vec<String> = pass1.into_iter().collect();
+    p1_vec.sort_unstable_by(|a, b| {
         let diff_a = (a.len() as isize - base_len as isize).abs();
         let diff_b = (b.len() as isize - base_len as isize).abs();
         diff_a.cmp(&diff_b).then_with(|| a.len().cmp(&b.len()))
     });
 
-    results.truncate(256);
-    results
+    let mut p2_vec: Vec<String> = pass2
+        .into_iter()
+        .filter(|v| !pass1_list.contains(v))
+        .collect();
+    p2_vec.sort_unstable_by(|a, b| {
+        let diff_a = (a.len() as isize - base_len as isize).abs();
+        let diff_b = (b.len() as isize - base_len as isize).abs();
+        diff_a.cmp(&diff_b).then_with(|| a.len().cmp(&b.len()))
+    });
+
+    p1_vec.extend(p2_vec);
+    p1_vec.truncate(64);
+    p1_vec
 }
 
 /// Compute a canonical Bengali phonetic soundex key
