@@ -124,6 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("shunbo", &[("শুনব", 1.0), ("শুনবো", 0.95)]),
         ("holo", &[("হলো", 1.0), ("হল", 0.90)]),
         ("hol", &[("হল", 1.0)]),
+        ("laglo", &[("লাগল", 1.0), ("লাগলো", 0.95)]),
         // Sacred collision guards: Avro phonetic word ALWAYS candidate #1, Banglish #2
         ("bal", &[("বাল", 1.0), ("বল", 0.70)]),
         ("fal", &[("ফাল", 1.0), ("ফল", 0.70)]),
@@ -333,16 +334,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Collision Guard:
         // If native Avro output is a legitimate dictionary word, but Dakshina annotators
         // transcribed something different (e.g. Banglish short vowels):
-        if dict_words.contains(&avro_out) && top_bn != &avro_out {
-            if latin.len() <= 4 && lekhani_core::phonetic::PhoneticDatabase::get_bilingual_loanword(&latin).is_none() {
-                // Sacred short-stem: keep native Avro as candidate #1, Dakshina as candidate #2
-                collision_guarded += 1;
-                let c1 = (avro_out, 1.0_f32);
-                let c2_conf = (compute_confidence(top_count, total_count) * 0.85).clamp(0.50, 0.75);
-                let c2 = (top_bn.clone(), c2_conf);
-                merged_overrides.insert(latin, vec![c1, c2]);
-                continue;
-            }
+        if dict_words.contains(&avro_out)
+            && top_bn != &avro_out
+            && latin.len() <= 4
+            && lekhani_core::phonetic::PhoneticDatabase::get_bilingual_loanword(&latin).is_none()
+        {
+            // Sacred short-stem: keep native Avro as candidate #1, Dakshina as candidate #2
+            collision_guarded += 1;
+            let c1 = (avro_out, 1.0_f32);
+            let c2_conf = (compute_confidence(top_count, total_count) * 0.85).clamp(0.50, 0.75);
+            let c2 = (top_bn.clone(), c2_conf);
+            merged_overrides.insert(latin, vec![c1, c2]);
+            continue;
         }
 
         // Build candidate list (up to 2 candidates with sufficient agreement)

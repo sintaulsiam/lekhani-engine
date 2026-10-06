@@ -15,3 +15,7 @@ Thumbs.db
 *neural_weights*.json
 __pycache__/
 *.py[cod]
+*.corpus
+*.bz2
+data/corpus/*.txt
+data/corpus/*.raw

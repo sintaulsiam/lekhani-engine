@@ -369,6 +369,7 @@ pub const BANGLISH_SHORTHAND: &[(&str, &str)] = &[
     ("hbe", "হবে"),
     ("accha", "আচ্ছা"),
     ("acha", "আচ্ছা"),
+    ("laglo", "লাগল"),
     ("thikase", "ঠিক আছে"),
     ("thikache", "ঠিক আছে"),
     ("shotti", "সত্যি"),

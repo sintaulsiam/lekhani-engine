@@ -1515,7 +1515,11 @@ impl PhoneticSuggestion {
             let rerank_limit = scored_candidates.len().min(8);
             let mut top_texts: Vec<String> = scored_candidates[..rerank_limit]
                 .iter()
-                .filter(|(_, _, f)| !top_is_exact || f.is_exact_phonetic > 0.5)
+                .filter(|(_, _, f)| {
+                    !top_is_exact
+                        || f.is_exact_phonetic > 0.5
+                        || (f.is_in_dict > 0.5 && f.phonetic_similarity >= -1.0)
+                })
                 .map(|(t, _, _)| t.clone())
                 .collect();
 

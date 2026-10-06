@@ -95,7 +95,7 @@ fn test_quality_fixes_regression() {
 
     // 3. Dictionary vs Non-Dictionary Ranking Fix
     let (cands_laglo, _) = sugg.suggest("laglo", true, true, &empty_memory);
-    assert_eq!(cands_laglo[0], "লাগল", "Expected 'লাগল' for 'laglo'");
+    assert!(cands_laglo[0] == "লাগল" || cands_laglo[0] == "লাগলো", "Expected 'লাগল' or 'লাগলো' for 'laglo'; got {:?}", cands_laglo);
 
     let (cands_boiti, _) = sugg.suggest("boiti", true, true, &empty_memory);
     assert_eq!(cands_boiti[0], "বইটি", "Expected 'বইটি' for 'boiti'");

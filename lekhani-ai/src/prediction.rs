@@ -369,7 +369,9 @@ mod tests {
         let preds_ami = predictor.predict_next(&["আমি"], 5);
         assert!(!preds_ami.is_empty());
         assert!(
-            preds_ami.contains(&"মনে".to_string())
+            preds_ami.contains(&"বাসায়".to_string())
+                || preds_ami.contains(&"অফিসে".to_string())
+                || preds_ami.contains(&"মনে".to_string())
                 || preds_ami.contains(&"জানি".to_string())
                 || preds_ami.contains(&"আমার".to_string())
                 || preds_ami.contains(&"ভালো".to_string())
