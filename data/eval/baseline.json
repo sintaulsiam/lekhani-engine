@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-10-06T09:58:31.253235834+00:00",
+  "timestamp": "2026-10-06T14:07:31.043788537+00:00",
   "total_cases": 253,
-  "top1_accuracy": 99.2094861660079,
+  "top1_accuracy": 100.0,
   "top3_accuracy": 100.0,
-  "eval_duration_ms": 69.925266,
-  "avg_latency_us": 276.3833992094862,
+  "eval_duration_ms": 66.453047,
+  "avg_latency_us": 262.6600790513834,
   "categories": {
     "formal": {
       "total": 50,
@@ -15,9 +15,9 @@
     },
     "texting_slang": {
       "total": 45,
-      "top1_correct": 44,
+      "top1_correct": 45,
       "top3_correct": 45,
-      "top1_accuracy": 97.77777777777777,
+      "top1_accuracy": 100.0,
       "top3_accuracy": 100.0
     },
     "proper_noun": {
@@ -29,9 +29,9 @@
     },
     "colloquial": {
       "total": 50,
-      "top1_correct": 49,
+      "top1_correct": 50,
       "top3_correct": 50,
-      "top1_accuracy": 98.0,
+      "top1_accuracy": 100.0,
       "top3_accuracy": 100.0
     },
     "loanword": {
@@ -49,18 +49,5 @@
       "top3_accuracy": 100.0
     }
   },
-  "top_disagreements": [
-    {
-      "input": "kothai",
-      "expected": "কোথায়",
-      "got_top1": "কথাই",
-      "category": "colloquial"
-    },
-    {
-      "input": "ok",
-      "expected": "ঠিক আছে",
-      "got_top1": "ওকে",
-      "category": "texting_slang"
-    }
-  ]
+  "top_disagreements": []
 }

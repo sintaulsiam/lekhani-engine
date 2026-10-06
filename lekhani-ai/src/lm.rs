@@ -1145,6 +1145,18 @@ impl LanguageModel {
         self.inner.score_candidate(prev2, prev1, word)
     }
 
+    /// Calculate interpolated conditional probability P(word | w_t-3, w_t-2, w_t-1) with 0 allocations
+    #[inline]
+    pub fn score_candidate_fourgram(
+        &self,
+        prev3: Option<&str>,
+        prev2: Option<&str>,
+        prev1: Option<&str>,
+        word: &str,
+    ) -> f32 {
+        self.inner.score_candidate_fourgram(prev3, prev2, prev1, word)
+    }
+
     /// Query the most likely continuations given previous word
     #[inline]
     pub fn get_next_words(&self, previous_word: &str, limit: usize) -> Vec<String> {
@@ -1494,6 +1506,19 @@ impl LanguageModelInner {
         }
 
         score.log10()
+    }
+
+    pub fn score_candidate_fourgram(
+        &self,
+        prev3: Option<&str>,
+        prev2: Option<&str>,
+        prev1: Option<&str>,
+        word: &str,
+    ) -> f32 {
+        if let Some(ref zc) = self.zero_copy {
+            return zc.score_candidate_fourgram(prev3, prev2, prev1, word);
+        }
+        self.score_candidate(prev2, prev1, word)
     }
 
     pub fn get_next_words(&self, previous_word: &str, limit: usize) -> Vec<String> {

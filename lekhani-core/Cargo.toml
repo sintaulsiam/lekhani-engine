@@ -21,6 +21,7 @@ lekhani-parser.workspace = true
 chrono.workspace = true
 bincode.workspace = true
 lekhani-ai.workspace = true
+lekhani-neural.workspace = true
 unicode-segmentation.workspace = true
 
 [[bin]]

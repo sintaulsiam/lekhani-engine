@@ -36,6 +36,7 @@ fn main() {
                 intent_modifier_boost: if chosen_score >= 0.9 { 1.0 } else { 0.5 },
                 user_bigram_prob: 0.0,
                 user_favored: if chosen_score >= 0.95 { 1.0 } else { 0.5 },
+                ..Default::default()
             };
 
             let rejected = RankFeatures {
@@ -51,6 +52,7 @@ fn main() {
                 intent_modifier_boost: 0.0,
                 user_bigram_prob: 0.0,
                 user_favored: 0.0,
+                ..Default::default()
             };
 
             (chosen, rejected)

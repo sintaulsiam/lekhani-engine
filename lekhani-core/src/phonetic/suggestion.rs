@@ -1321,6 +1321,46 @@ impl PhoneticSuggestion {
         } else {
             None
         };
+        let prev_3 = if self.config.ai_profile == AiProfile::Balanced && context.len() >= 3 {
+            context.get(context.len() - 3).copied()
+        } else {
+            None
+        };
+
+        // Extended context fields ────────────────────────────────────────────
+        //
+        // is_sentence_initial: true when context is empty (start of text) OR the
+        // last committed word ends with a sentence boundary marker (।, !, ?).
+        let is_sentence_initial = context.is_empty() || context.last().copied().is_some_and(|w: &str| {
+            let w = w.trim_end();
+            w.ends_with('।') || w.ends_with('!') || w.ends_with('?')
+        });
+
+        // is_formal_register_context: true when the last committed word is a known
+        // Bengali formal/academic discourse connector.
+        const FORMAL_DISCOURSE_HEADS: &[&str] = &[
+            "প্রসঙ্গত", "উল্লেখ্য", "উল্লেখযোগ্য", "বিবেচনায়", "বিবেচনা",
+            "পরিপ্রেক্ষিতে", "প্রেক্ষাপটে", "সংক্ষেপে", "তদুপরি", "অন্যদিকে",
+            "পাশাপাশি", "তবে", "যদিও", "তথাপি", "অর্থাৎ", "যেমন",
+            "এতদসত্ত্বেও", "তাছাড়া", "এমনকি", "যেহেতু", "সেহেতু",
+        ];
+        let is_formal_register_context = context.last().copied().is_some_and(|w: &str| {
+            FORMAL_DISCOURSE_HEADS.contains(&w.trim_matches('।'))
+        });
+
+        // neural_alpha: adaptive blending weight based on N-gram LM confidence and context.
+        // Computed once here so it can be used both in ranking and as a feature.
+        let ngram_top_log = prev.map(|p| self.ai_context.lm().score_candidate(prev_prev, None, p));
+        let neural_alpha = if self.config.ai_profile == AiProfile::Balanced {
+            lekhani_neural::compute_neural_alpha(
+                ngram_top_log.unwrap_or(-6.0),
+                true,
+                context.len(),
+            )
+        } else {
+            0.0
+        };
+        // ─────────────────────────────────────────────────────────────────────
 
         let candidate_ctx = CandidateContext {
             phonetic: &phonetic,
@@ -1342,6 +1382,12 @@ impl PhoneticSuggestion {
             user_bigram_boost: 0,
             is_user_favored: false,
             is_user_learned: false,
+            // Extended
+            context_lm_score: None,
+            gru_log_prob: None,
+            neural_alpha,
+            is_sentence_initial,
+            is_formal_register_context,
         };
 
         let has_exact_single_word = is_primary_in_dict
@@ -1400,6 +1446,16 @@ impl PhoneticSuggestion {
                 None
             };
 
+            // Context-conditioned LM score using 3-word context (fourgram) for extended feature.
+            let context_lm_score = if prev.is_some()
+                && self.config.ai_profile == AiProfile::Balanced
+                && cand.source != CandidateSource::EmojiKeyword
+            {
+                let s = self.ai_context.lm().score_candidate_fourgram(prev_3, prev_prev, prev, &cand.text);
+                Some(s)
+            } else {
+                None
+            };
 
             let user_bigram_boost = if let (Some(p), Some(l)) = (prev, learner_guard.as_ref()) {
                 l.get_user_bigram_boost(p, &cand.text)
@@ -1424,6 +1480,7 @@ impl PhoneticSuggestion {
                 user_bigram_boost,
                 is_user_favored,
                 is_user_learned,
+                context_lm_score,
                 ..candidate_ctx
             };
 
