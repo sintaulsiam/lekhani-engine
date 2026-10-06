@@ -64,6 +64,8 @@ fn test_phonetic_eval_baseline_guard() {
         let (cands, _) = sugg.suggest(inp, true, true, &empty_memory);
         if cands.first().map(|s| s == exp).unwrap_or(false) {
             top1_correct += 1;
+        } else {
+            eprintln!("MISMATCH: [{inp}] expected='{exp}', top_cands={:?}", cands.iter().take(3).collect::<Vec<_>>());
         }
         if cands.iter().take(3).any(|s| s == exp) {
             top3_correct += 1;

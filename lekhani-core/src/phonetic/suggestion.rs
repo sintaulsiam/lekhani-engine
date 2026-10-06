@@ -641,7 +641,12 @@ impl PhoneticSuggestion {
             });
             if let Some(overrides) = ov_opt {
                 if let Some((top_ov, top_conf)) = overrides.first() {
-                    if top_conf >= 0.80 {
+                    let is_valid_override = top_conf >= 0.70
+                        || (top_conf >= 0.50
+                            && (self.database.is_exact_dictionary_word(top_ov)
+                                || self.database.trie.contains_exact(top_ov))
+                            && !self.database.is_exact_dictionary_word(&phonetic));
+                    if is_valid_override {
                         preferred_override = Some(top_ov.to_string());
                     }
                 }
@@ -1236,6 +1241,7 @@ impl PhoneticSuggestion {
 
         let has_clitic_i_candidate = !has_explicit_rri_digraph
             && middle.ends_with('i')
+            && !raw_candidates.iter().any(|c| c.text.ends_with('ি') && self.database.is_exact_dictionary_word(&c.text))
             && raw_candidates.iter().any(|c| {
                 c.text.ends_with('ই')
                     && self.database.is_exact_dictionary_word(&c.text)

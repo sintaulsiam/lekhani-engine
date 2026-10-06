@@ -10,36 +10,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reader = BufReader::new(file);
     let raw_map: HashMap<String, Vec<String>> = serde_json::from_reader(reader)?;
 
-    let mut words = Vec::with_capacity(160000);
+    let mut word_freq_map: HashMap<String, u32> = HashMap::with_capacity(180000);
     for (_k, v_list) in raw_map {
-        words.extend(v_list);
+        for word in v_list {
+            word_freq_map.insert(word, 100);
+        }
     }
-    println!("Loaded {} words from dictionary.json", words.len());
+    println!("Loaded {} unique words from dictionary.json", word_freq_map.len());
 
     let lm_path = "/mnt/data/lekhani-engine/data/dictionaries/bengali_lm.bin";
-    let lm = if std::path::Path::new(lm_path).exists() {
-        println!("Loading 74M-word language model from {}...", lm_path);
-        lekhani_ai::zero_copy::ZeroCopyLanguageModel::from_file(lm_path).ok()
-    } else {
-        None
-    };
-
-    let mut weighted_words = Vec::with_capacity(words.len());
     let mut mapped_lm_count = 0;
-    for word in words {
-        let mut freq = 100;
-        if let Some(ref model) = lm {
-            if let Some(w_id) = model.get_word_id(&word) {
-                let log_p = model.get_unigram_prob(w_id).unwrap_or(-7.0);
-                // log_p ranges roughly from -1.7 (super frequent) to -7.0 (rare)
-                let norm = ((log_p - (-7.0)) / (-2.0 - (-7.0))).clamp(0.0, 1.0);
-                freq = (1000.0 + norm * 8800.0) as u32;
-                mapped_lm_count += 1;
+    if let Ok(model) = lekhani_ai::zero_copy::ZeroCopyLanguageModel::from_file(lm_path) {
+        println!("Loading 74M-word language model from {}...", lm_path);
+        for id in 0..model.vocab_count() as u32 {
+            if let Some(word_str) = model.get_word(id) {
+                if !word_str.is_empty() && word_str.chars().all(|c| ('\u{0980}'..='\u{09FF}').contains(&c)) {
+                    let log_p = model.get_unigram_prob(id).unwrap_or(-7.0);
+                    let norm = ((log_p - (-7.0)) / (-2.0 - (-7.0))).clamp(0.0, 1.0);
+                    let freq = (1000.0 + norm * 8800.0) as u32;
+                    word_freq_map.insert(word_str.to_string(), freq);
+                    mapped_lm_count += 1;
+                }
             }
         }
-        weighted_words.push((word, freq));
     }
-    println!("Mapped authentic corpus frequencies for {} / {} words from 74M-word LM.", mapped_lm_count, weighted_words.len());
+    println!("Mapped authentic corpus frequencies for {} words from 74M-word LM. Total dictionary entries: {}", mapped_lm_count, word_freq_map.len());
+
+    let weighted_words: Vec<(String, u32)> = word_freq_map.into_iter().collect();
 
     let mut trie = PrefixTrie::new();
     trie.insert_bulk_weighted(weighted_words);

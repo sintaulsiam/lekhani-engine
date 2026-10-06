@@ -84,6 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("somriddhi", &[("সমৃদ্ধি", 1.0)]),
         ("dhonno", &[("ধন্য", 1.0)]),
         ("bikol", &[("বিকাল", 1.0), ("বিকল", 0.90)]),
+        ("karon", &[("কারণ", 1.0), ("কারন", 0.90)]),
         ("halka", &[("হালকা", 1.0), ("হাল্কা", 0.90)]),
         ("aro", &[("আরও", 1.0), ("আর", 0.90)]),
         ("ashole", &[("আসলে", 1.0), ("আশলে", 0.85)]),
@@ -142,6 +143,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("tmr", &[("তোমার", 1.0)]),
         ("apnr", &[("আপনার", 1.0)]),
         ("ekhn", &[("এখন", 1.0)]),
+        ("ekhono", &[("এখনো", 1.0), ("এখনও", 0.95)]),
+        ("tokhono", &[("তখনো", 1.0), ("তখনও", 0.95)]),
+        ("kokhono", &[("কখনো", 1.0), ("কখনও", 0.95)]),
+        ("jokhono", &[("যখনো", 1.0), ("যখনও", 0.95)]),
+        ("emono", &[("এমনো", 1.0), ("এমনও", 0.95)]),
+        ("kono", &[("কোনো", 1.0), ("কোন", 0.95)]),
         ("kno", &[("কেন", 1.0)]),
         ("kn", &[("কেন", 1.0)]),
         ("sb", &[("সব", 1.0)]),
@@ -170,6 +177,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("hobena", &[("হবে না", 1.0), ("হবেনা", 0.90)]),
         ("lagbena", &[("লাগবে না", 1.0), ("লাগবেনা", 0.90)]),
         ("korishna", &[("করিস না", 1.0)]),
+        ("jachchi", &[("যাচ্ছি", 1.0)]),
+        ("jacchi", &[("যাচ্ছি", 1.0)]),
+        ("jachhilam", &[("যাচ্ছিলাম", 1.0)]),
+        ("jachilam", &[("যাচ্ছিলাম", 1.0)]),
+        ("jacche", &[("যাচ্ছে", 1.0)]),
+        ("jachche", &[("যাচ্ছে", 1.0)]),
+        ("jan", &[("যান", 1.0), ("জান", 0.95)]),
+        ("jete", &[("যেতে", 1.0), ("জেতে", 0.85)]),
+        ("adhikar", &[("অধিকার", 1.0)]),
+        ("fan", &[("ফ্যান", 1.0), ("ফান", 0.80)]),
         ("thnx", &[("ধন্যবাদ", 1.0)]),
         ("tnx", &[("ধন্যবাদ", 1.0)]),
         ("sry", &[("দুঃখিত", 1.0)]),
@@ -316,7 +333,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // If native Avro output is a legitimate dictionary word, but Dakshina annotators
         // transcribed something different (e.g. Banglish short vowels):
         if dict_words.contains(&avro_out) && top_bn != &avro_out {
-            if latin.len() <= 4 {
+            if latin.len() <= 4 && lekhani_core::phonetic::PhoneticDatabase::get_bilingual_loanword(&latin).is_none() {
                 // Sacred short-stem: keep native Avro as candidate #1, Dakshina as candidate #2
                 collision_guarded += 1;
                 let c1 = (avro_out, 1.0_f32);

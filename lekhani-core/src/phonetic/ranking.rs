@@ -227,6 +227,15 @@ pub fn extract_candidate_features(
     if freq > 0 {
         let log_freq = (freq as f32).log2().clamp(0.0, 16.0);
         f.normalized_freq = log_freq / 16.0;
+    } else if (cand.source == CandidateSource::PhoneticOverride
+        || cand.source == CandidateSource::Autocorrect)
+        && cand.text.contains(' ')
+    {
+        // Multi-word supervised overrides (e.g. "পারি না", "হবে না", "ঠিক আছে")
+        // cannot exist in a unigram trie; grant standard frequency baseline so they
+        // aren't penalized compared to single-word colloquial forms.
+        f.normalized_freq = 0.80;
+        f.is_high_freq += 0.5;
     }
     if freq >= 8000 {
         f.is_high_freq += 1.0;
