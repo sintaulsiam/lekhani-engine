@@ -1,5 +1,6 @@
 use crate::emojis::EmojiMap;
 use crate::phonetic::AutonomousLearner;
+use crate::phonetic::overrides::{OverrideEntry, ZeroCopyOverrides};
 use crate::snippets::SnippetManager;
 use crate::trie::PrefixTrie;
 use hashbrown::HashMap;
@@ -15,7 +16,7 @@ pub struct PhoneticDatabase {
     pub suffix: Arc<HashMap<String, String>>,
     pub autocorrect: Arc<HashMap<String, String>>,
     pub shorthand: Arc<HashMap<String, String>>,
-    pub overrides: Arc<PhoneticOverrideMap>,
+    pub overrides: ZeroCopyOverrides,
     pub user_autocorrect: Arc<RwLock<HashMap<String, String>>>,
     emojis: Arc<EmojiMap>,
     snippets: Arc<SnippetManager>,
@@ -409,7 +410,6 @@ pub const BANGLISH_SHORTHAND: &[(&str, &str)] = &[
 
 const EMBEDDED_AUTOCORRECT_JSON: &[u8] = include_bytes!("../../../data/dictionaries/autocorrect.json");
 const EMBEDDED_SUFFIX_JSON: &[u8] = include_bytes!("../../../data/dictionaries/suffix.json");
-const EMBEDDED_OVERRIDES_JSON: &[u8] = b"{}";
 const EMBEDDED_OVERRIDES_BIN: &[u8] = include_bytes!("../../../data/dictionaries/phonetic_overrides.bin");
 
 pub fn parse_binary_overrides(bytes: &[u8]) -> Option<PhoneticOverrideMap> {
@@ -500,17 +500,11 @@ fn get_static_shorthand() -> Arc<HashMap<String, String>> {
         .clone()
 }
 
-fn get_static_overrides() -> Arc<PhoneticOverrideMap> {
-    static STATIC_OVERRIDES: OnceLock<Arc<PhoneticOverrideMap>> = OnceLock::new();
+fn get_static_overrides() -> ZeroCopyOverrides {
+    static STATIC_OVERRIDES: OnceLock<ZeroCopyOverrides> = OnceLock::new();
     STATIC_OVERRIDES
         .get_or_init(|| {
-            let mut overrides = HashMap::new();
-            if let Some(map) = parse_binary_overrides(EMBEDDED_OVERRIDES_BIN) {
-                overrides.extend(map);
-            } else if let Ok(map) = serde_json::from_slice::<PhoneticOverrideMap>(EMBEDDED_OVERRIDES_JSON) {
-                overrides.extend(map);
-            }
-            Arc::new(overrides)
+            ZeroCopyOverrides::from_static(EMBEDDED_OVERRIDES_BIN).unwrap_or_default()
         })
         .clone()
 }
@@ -539,8 +533,8 @@ impl PhoneticDatabase {
 
     /// Fast zero-copy lookup for supervised phonetic overrides (colloquialisms, texting slang, proper nouns)
     #[inline]
-    pub fn lookup_override(&self, input: &str) -> Option<&[(String, f32)]> {
-        self.overrides.get(input).map(|v| v.as_slice())
+    pub fn lookup_override(&self, input: &str) -> Option<OverrideEntry<'_>> {
+        self.overrides.lookup(input)
     }
 
     /// Load database from a directory containing dictionary.json, suffix.json, autocorrect.json
@@ -642,8 +636,8 @@ impl PhoneticDatabase {
         let pov_bin_path = dir.join("phonetic_overrides.bin");
         if pov_bin_path.exists() {
             if let Ok(bytes) = std::fs::read(&pov_bin_path) {
-                if let Some(map) = parse_binary_overrides(&bytes) {
-                    Arc::make_mut(&mut self.overrides).extend(map);
+                if let Ok(zc) = ZeroCopyOverrides::from_bytes(bytes.into()) {
+                    self.overrides = zc;
                 }
             }
         } else {
@@ -651,7 +645,7 @@ impl PhoneticDatabase {
             if pov_json_path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&pov_json_path) {
                     if let Ok(map) = serde_json::from_str::<HashMap<String, Vec<(String, f32)>>>(&content) {
-                        Arc::make_mut(&mut self.overrides).extend(map);
+                        self.overrides = ZeroCopyOverrides::from_hashbrown_map(&map);
                     }
                 }
             }

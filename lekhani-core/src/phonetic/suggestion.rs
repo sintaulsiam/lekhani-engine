@@ -641,14 +641,14 @@ impl PhoneticSuggestion {
             });
             if let Some(overrides) = ov_opt {
                 if let Some((top_ov, top_conf)) = overrides.first() {
-                    if *top_conf >= 0.80 {
-                        preferred_override = Some(top_ov.clone());
+                    if top_conf >= 0.80 {
+                        preferred_override = Some(top_ov.to_string());
                     }
                 }
                 for (ov_cand, conf) in overrides {
                     let boost = (7000.0 * conf) as i32;
                     add_cand(
-                        ov_cand.clone(),
+                        ov_cand.to_string(),
                         CandidateSource::PhoneticOverride,
                         boost,
                         &mut raw_candidates,
@@ -810,7 +810,15 @@ impl PhoneticSuggestion {
             }
         };
 
-        let preferred_word = if let Some(raw_ac) = self.database.get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand) {
+        let learner_guard = self.database.learner.try_read().ok();
+        let preferred_word = if let Some(fav) = candidate_memory
+            .get(term)
+            .or_else(|| candidate_memory.get(middle))
+            .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(term)))
+            .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(middle)))
+        {
+            Some(fav.clone())
+        } else if let Some(raw_ac) = self.database.get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand) {
             let converted_ac = resolve_ac(&raw_ac);
             if !converted_ac.is_empty() {
                 add_cand(
@@ -828,6 +836,19 @@ impl PhoneticSuggestion {
             Some(ov_pref.clone())
         } else if let Some(ref loan_pref) = preferred_loanword {
             Some(loan_pref.clone())
+        } else if let Some(morph_pref) = if use_dictionary && !self.database.is_exact_dictionary_word(&phonetic) {
+            self.decompose_stem_suffix_override(middle)
+        } else {
+            None
+        } {
+            add_cand(
+                morph_pref.clone(),
+                CandidateSource::ExactDictionary,
+                6400,
+                &mut raw_candidates,
+                &mut seen,
+            );
+            Some(morph_pref)
         } else if let Some(verbal_word) = if self.config.enable_colloquial_dialects {
             super::morphology::decompose_verbal_form(middle)
         } else {
@@ -1785,6 +1806,16 @@ impl PhoneticSuggestion {
                         base_candidates.push(base_phonetic);
                     }
 
+                    // Supervised phonetic override stem support (e.g. "bristi" in "bristite" -> "বৃষ্টি")
+                    if let Some(ov) = self.database.lookup_override(base_key) {
+                        for (stem, _) in ov {
+                            if !base_candidates.iter().any(|c| c == stem) {
+                                base_candidates.push(stem.to_string());
+                                has_verified_base = true;
+                            }
+                        }
+                    }
+
                     // Apply stem-level sound-laws (e.g. "manush" in "manusher" -> "মানুষ")
                     // Permit fuzzy expansion if base is verified or >= 4 chars (covers common
                     // 4-letter Bengali stems: valo, bhai, maro, gelo, dhoro, etc.)
@@ -1813,6 +1844,33 @@ impl PhoneticSuggestion {
         }
 
         list
+    }
+
+    /// Decompose an inflected input into stem with supervised override + morphological suffix
+    fn decompose_stem_suffix_override(&self, middle: &str) -> Option<String> {
+        if middle.chars().count() <= 3 {
+            return None;
+        }
+        for (i, _) in middle.char_indices().skip(2) {
+            if super::fuzzy::cuts_layout_digraph(middle, i) {
+                continue;
+            }
+            let suffix_key = &middle[i..];
+            if let Some(suffix) = self.database.find_suffix(suffix_key) {
+                let base_key = &middle[..i];
+                if let Some(ov) = self.database.lookup_override(base_key) {
+                    for (stem, conf) in ov {
+                        if conf >= 0.70 {
+                            let joined = super::morphology::apply_sandhi_join(stem, suffix);
+                            if self.database.is_exact_dictionary_word(&joined) {
+                                return Some(joined);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 
     fn add_colloquial_verbs(&self, middle: &str) -> Vec<String> {
