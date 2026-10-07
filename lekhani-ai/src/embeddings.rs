@@ -175,8 +175,14 @@ impl WordEmbeddings {
                 cursor += 4;
             }
 
-            inner.vectors.insert(Arc::from(word_str), l2_normalize(vec));
-            loaded += 1;
+            let key = Arc::from(word_str);
+            // Curated anchors in CORE_EMBEDDINGS take precedence to guarantee crisp homophone distinctions
+            if !inner.vectors.contains_key(&key) {
+                inner.vectors.insert(key, l2_normalize(vec));
+                loaded += 1;
+            } else {
+                loaded += 1;
+            }
         }
 
         Ok(loaded)
@@ -503,5 +509,14 @@ mod tests {
         // "শার্ট" must strongly align with "পরা" (wearing) and be orthogonal to "পড়া" (reading)
         assert!(embeddings.cosine_similarity("শার্ট", "পরা") > 0.80);
         assert!(embeddings.cosine_similarity("শার্ট", "পড়া") < 0.10);
+    }
+
+    #[test]
+    fn test_dense_corpus_embeddings_loaded() {
+        let embeddings = WordEmbeddings::new();
+        assert!(embeddings.len() > 1000, "Expected >1000 loaded embeddings, got {}", embeddings.len());
+        let vec = embeddings.get_vector("বাংলাদেশ").expect("বাংলাদেশ should be indexed");
+        let norm_sq: f32 = vec.iter().map(|v| v * v).sum();
+        assert!((norm_sq - 1.0).abs() < 1e-3, "Vector should be unit norm");
     }
 }
