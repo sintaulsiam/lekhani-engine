@@ -141,6 +141,8 @@ pub const BENGALI_VERB_ROOTS: &[(&str, &str)] = &[
     ("kha", "খা"),
     ("khe", "খে"),
     ("de", "দে"),
+    ("di", "দি"),
+    ("fel", "ফেল"),
     ("ne", "নে"),
     ("ho", "হ"),
     ("dak", "ডাক"),
@@ -250,17 +252,99 @@ pub const BENGALI_VERBAL_CONJUGATIONS: &[(&str, &str)] = &[
     ("e", "ে"),
 ];
 
-/// Decompose a compound verbal form into root stem and conjugation to prevent false Juktoborno
+/// Non-finite conjunctive participles (অসমাপিকা ক্রিয়া) commonly compounded in Bengali texting
+pub const BENGALI_ASPECTUAL_PARTICIPLES: &[(&str, &str)] = &[
+    ("kore", "করে"),
+    ("eshe", "এসে"),
+    ("ese", "এসে"),
+    ("chole", "চলে"),
+    ("bole", "বলে"),
+    ("dekhe", "দেখে"),
+    ("niye", "নিয়ে"),
+    ("nie", "নিয়ে"),
+    ("diye", "দিয়ে"),
+    ("die", "দিয়ে"),
+    ("boshe", "বসে"),
+    ("bose", "বসে"),
+    ("fele", "ফেলে"),
+    ("rekhe", "রেখে"),
+    ("shune", "শুনে"),
+    ("sune", "শুনে"),
+    ("pathiye", "পাঠিয়ে"),
+    ("pathie", "পাঠিয়ে"),
+    ("dhore", "ধরে"),
+    ("uthhe", "উঠে"),
+    ("uthe", "উঠে"),
+];
+
+/// Decompose a compound verbal form into root stem and conjugation to prevent false Juktoborno.
+/// Supports both single inflections (korsilam -> করছিলাম, koresilam -> করেছিলাম) and
+/// aspectual compounds (koredesi -> করে দিয়েছি, eshegesi -> এসে গেছি, cholejabo -> চলে যাব).
 pub fn decompose_verbal_form(input: &str) -> Option<String> {
     let lower = input.to_ascii_lowercase();
+
+    // 1. Aspectual Compound Verbal Deconstruction (e.g. koredesi -> করে দিয়েছি, eshegesi -> এসে গেছি)
+    for &(part_en, part_bn) in BENGALI_ASPECTUAL_PARTICIPLES {
+        if lower.starts_with(part_en) && lower.len() > part_en.len() + 1 {
+            let aux_part = &lower[part_en.len()..];
+            if let Some(aux_decomp) = decompose_verbal_form_simple(aux_part) {
+                let mut compound = String::with_capacity(part_bn.len() + 1 + aux_decomp.len());
+                compound.push_str(part_bn);
+                compound.push(' ');
+                compound.push_str(&aux_decomp);
+                return Some(compound);
+            }
+        }
+    }
+
+    decompose_verbal_form_simple(&lower)
+}
+
+fn decompose_verbal_form_simple(lower: &str) -> Option<String> {
     for &(conj_en, conj_bn) in BENGALI_VERBAL_CONJUGATIONS {
         if lower.len() > conj_en.len() && lower.ends_with(conj_en) {
             let root_part = &lower[..lower.len() - conj_en.len()];
+
+            // Direct root match (e.g. kor + lam -> করলাম)
             for &(root_en, root_bn) in BENGALI_VERB_ROOTS {
                 if root_part == root_en {
                     let mut result = root_bn.to_string();
+                    // Auxiliary root overrides for casual texting variants
+                    if root_en == "de" && matches!(conj_en, "si" | "se" | "so" | "sen") {
+                        let ending = match conj_en {
+                            "si" => "দিয়েছি",
+                            "se" => "দিয়েছে",
+                            "so" => "দিয়েছো",
+                            "sen" => "দিয়েছেন",
+                            _ => "দিয়েছি",
+                        };
+                        return Some(ending.to_string());
+                    }
+                    if root_en == "fel" && matches!(conj_en, "si" | "se" | "so" | "sen") {
+                        let ending = match conj_en {
+                            "si" => "ফেলেছি",
+                            "se" => "ফেলেছে",
+                            "so" => "ফেলেছো",
+                            "sen" => "ফেলেছেন",
+                            _ => "ফেলেছি",
+                        };
+                        return Some(ending.to_string());
+                    }
                     result.push_str(conj_bn);
                     return Some(result);
+                }
+            }
+
+            // Connective vowel '-e-' match (e.g. kore + silam -> করেছিলাম, dekhe + silam -> দেখেছিলাম)
+            if root_part.ends_with('e') && root_part.len() > 1 {
+                let base_root = &root_part[..root_part.len() - 1];
+                for &(root_en, root_bn) in BENGALI_VERB_ROOTS {
+                    if base_root == root_en {
+                        let mut result = root_bn.to_string();
+                        result.push('ে');
+                        result.push_str(conj_bn);
+                        return Some(result);
+                    }
                 }
             }
         }
@@ -561,5 +645,20 @@ mod tests {
     fn test_recursive_peel_stems() {
         let peeled = peel_all_stems("বইগুলোতেই");
         assert!(peeled.contains(&"বইগুলো".to_string()) || peeled.contains(&"বই".to_string()));
+    }
+
+    #[test]
+    fn test_aspectual_compound_verbal_decomposition() {
+        assert_eq!(decompose_verbal_form("koredesi"), Some("করে দিয়েছি".to_string()));
+        assert_eq!(decompose_verbal_form("koredilam"), Some("করে দিলাম".to_string()));
+        assert_eq!(decompose_verbal_form("eshegesi"), Some("এসে গেছি".to_string()));
+        assert_eq!(decompose_verbal_form("cholejabo"), Some("চলে যাব".to_string()));
+        assert_eq!(decompose_verbal_form("bolefelse"), Some("বলে ফেলেছে".to_string()));
+    }
+
+    #[test]
+    fn test_connective_inflected_verbal_decomposition() {
+        assert_eq!(decompose_verbal_form("koresilam"), Some("করেছিলাম".to_string()));
+        assert_eq!(decompose_verbal_form("dekhesilam"), Some("দেখেছিলাম".to_string()));
     }
 }
