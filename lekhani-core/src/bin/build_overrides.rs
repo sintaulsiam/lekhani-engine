@@ -17,7 +17,7 @@ fn is_valid_bengali(word: &str) -> bool {
 }
 
 fn is_valid_latin(key: &str) -> bool {
-    key.len() >= 2 && key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    !key.is_empty() && key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
 }
 
 /// Compute Bayesian smoothed & frequency scaled confidence
@@ -123,8 +123,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("likhbo", &[("লিখব", 1.0), ("লিখবো", 0.95)]),
         ("shunbo", &[("শুনব", 1.0), ("শুনবো", 0.95)]),
         ("holo", &[("হলো", 1.0), ("হল", 0.90)]),
-        ("hol", &[("হল", 1.0)]),
+        ("hol", &[("হল", 1.0), ("হলো", 0.95)]),
         ("laglo", &[("লাগল", 1.0), ("লাগলো", 0.95)]),
+        ("bolbo", &[("বলব", 1.0), ("বলবো", 0.95)]),
+        ("jaba", &[("যাবা", 1.0)]),
+        ("khaba", &[("খাবা", 1.0)]),
+        ("ashba", &[("আসবা", 1.0)]),
+        ("dekha", &[("দেখা", 1.0)]),
+        ("hobe", &[("হবে", 1.0)]),
+        ("pouche", &[("পৌঁছে", 1.0)]),
+        ("pouchhe", &[("পৌঁছে", 1.0)]),
+        ("shomossha", &[("সমস্যা", 1.0)]),
+        ("r", &[("আর", 1.0), ("র", 0.85)]),
+        ("asi", &[("আছি", 1.0), ("আসি", 0.95)]),
+        ("aso", &[("আছো", 1.0), ("আসো", 0.95)]),
+        ("asen", &[("আছেন", 1.0), ("আসেন", 0.95)]),
+        ("asis", &[("আছিস", 1.0), ("আসিস", 0.95)]),
         // Sacred collision guards: Avro phonetic word ALWAYS candidate #1, Banglish #2
         ("bal", &[("বাল", 1.0), ("বল", 0.70)]),
         ("fal", &[("ফাল", 1.0), ("ফল", 0.70)]),

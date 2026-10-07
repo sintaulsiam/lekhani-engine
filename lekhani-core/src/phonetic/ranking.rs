@@ -84,6 +84,7 @@ impl Default for RankFeatures {
 
 /// Linear weight vector corresponding to each feature dimension in `RankFeatures`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 #[repr(C)]
 pub struct RankWeights {
     pub is_in_dict: f32,

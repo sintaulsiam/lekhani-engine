@@ -68,7 +68,7 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("sh", &["sw", "s", "Sh", "shw"]),
     ("Sh", &["sh", "s", "sw", "Shw"]),
     ("ss", &["sy", "sh", "s", "sw", "shw", "Sh"]),
-    ("s", &["sw", "sh", "Sh", "shw"]),
+    ("s", &["sw", "sh", "Sh", "shw", "chh", "ch"]),
     ("sw", &["shw", "s", "sh"]),
     ("shw", &["sw", "s"]),
     ("sm", &["Shm", "shm", "s"]),

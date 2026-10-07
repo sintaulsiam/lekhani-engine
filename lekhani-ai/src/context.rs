@@ -379,63 +379,170 @@ impl ContextScorer {
 /// and penalize familiar/intimate inflections (e.g. করবে, করবি).
 #[inline]
 pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str>, cand: &str) -> f32 {
+    let mut boost = 0.0;
+
+    // ── 1. Syntactic Postposition Concordance: Genitive + মতো vs মত ───────────
+    if let Some(p1) = prev1 {
+        // Genitive marker check: ends with র or এর, or is a genitive pronoun
+        let is_genitive = (p1.ends_with('র') || p1.ends_with("এর"))
+            && !matches!(p1, "ভিন্ন" | "দ্বি" | "জন" | "সম্মতি" | "নিজের");
+        if is_genitive {
+            if cand == "মতো" || cand == "মতন" {
+                boost += 3.5;
+            } else if cand == "মত" {
+                boost -= 2.0;
+            }
+        }
+
+        // ── 2. Interrogative Wh-Head vs Polar Question: কী vs কি ─────────────
+        const WH_INQUIRY_HEADS: &[&str] = &[
+            "নাম", "কারণ", "কথা", "বিষয়", "অবস্থা", "খবর", "সমস্যা",
+            "উদ্দেশ্য", "অর্থ", "মানে", "ধরনের", "রকম", "জানি", "হলো", "হল",
+        ];
+        if WH_INQUIRY_HEADS.contains(&p1) {
+            if cand == "কী" {
+                boost += 3.5;
+            } else if cand == "কি" {
+                boost -= 2.5;
+            }
+        } else if matches!(p1, "তুমি" | "তোমরা" | "আপনি" | "আপনারা" | "তুই" | "তোরা" | "সে" | "তারা" | "হবে" | "যাবে" | "আছে" | "নাকি") {
+            if cand == "কি" {
+                boost += 3.0;
+            } else if cand == "কী" {
+                boost -= 2.0;
+            }
+        }
+
+        // ── 3. Colloquial Discourse Status: হলো vs হল ────────────────────────
+        const COLLOQUIAL_STATUS_HEADS: &[&str] = &[
+            "কী", "দেরি", "শুরু", "শেষ", "দেখা", "কথা", "ভালো", "খারাপ", "কেমন", "কখন",
+        ];
+        if COLLOQUIAL_STATUS_HEADS.contains(&p1) {
+            if cand == "হলো" {
+                boost += 2.5;
+            }
+        }
+
+        // ── 4. S-for-CH Casual Sibilant Resolution: ভালো + আছি vs আসি ────────
+        if p1 == "ভালো" {
+            if cand == "আছি" {
+                boost += 4.0;
+            } else if cand == "আসি" {
+                boost -= 3.0;
+            }
+        }
+    }
+
+    // ── 5. Subject-Verb Person Concordance ──────────────────────────────────
     let subject = match (prev1, prev2) {
-        (Some("আপনি" | "আপনারা" | "তিনি" | "তাঁরা"), _) => Some(1), // Formal
+        (Some("আমি" | "আমরা" | "মোরা" | "মুই"), _) => Some(0), // 1st Person
+        (_, Some("আমি" | "আমরা" | "মোরা" | "মুই")) => Some(0),
+        (Some("আপনি" | "আপনারা" | "তিনি" | "তাঁরা"), _) => Some(1), // 2nd/3rd Formal
         (_, Some("আপনি" | "আপনারা" | "তিনি" | "তাঁরা")) => Some(1),
-        (Some("তুমি" | "তোমরা"), _) => Some(2), // Familiar
+        (Some("তুমি" | "তোমরা"), _) => Some(2), // 2nd Familiar
         (_, Some("তুমি" | "তোমরা")) => Some(2),
-        (Some("তুই" | "তোরা"), _) => Some(3), // Intimate
+        (Some("তুই" | "তোরা"), _) => Some(3), // 2nd Intimate
         (_, Some("তুই" | "তোরা")) => Some(3),
+        (Some("সে" | "তারা" | "ও" | "ওরা" | "যে" | "যারা"), _) => Some(4), // 3rd Ordinary
+        (_, Some("সে" | "তারা" | "ও" | "ওরা" | "যে" | "যারা")) => Some(4),
         _ => None,
     };
 
-    let Some(honorific_tier) = subject else {
-        return 0.0;
+    let Some(person) = subject else {
+        return boost;
     };
 
-    let is_formal_verb = cand.ends_with("েন")
+    let is_p1_verb = cand.ends_with('ব')
+        || cand.ends_with("বো")
+        || cand.ends_with("ছি")
+        || cand.ends_with("তেছি")
+        || cand.ends_with("েছি")
+        || cand.ends_with("লাম")
+        || cand.ends_with("তাম")
+        || cand.ends_with('ি');
+
+    let is_p2_formal_verb = cand.ends_with("েন")
         || cand.ends_with("বেন")
         || cand.ends_with("ছেন")
         || cand.ends_with("লেন")
         || cand.ends_with("তেন")
-        || cand.ends_with("ন");
-    let is_familiar_verb = cand.ends_with("বে")
+        || cand.ends_with('ন');
+
+    let is_p2_familiar_verb = cand.ends_with("বে")
+        || cand.ends_with("বা")
         || cand.ends_with("ছো")
         || cand.ends_with("লে")
         || cand.ends_with("তে")
-        || cand.ends_with("ও")
+        || cand.ends_with('ও')
         || cand.ends_with("রো")
         || cand.ends_with("লো");
-    let is_intimate_verb = cand.ends_with("বি")
+
+    let is_p2_intimate_verb = cand.ends_with("বি")
         || cand.ends_with("ছিস")
         || cand.ends_with("লি")
         || cand.ends_with("তিস")
         || cand.ends_with("িস");
 
-    match honorific_tier {
+    let is_p3_verb = cand.ends_with('ে')
+        || cand.ends_with("বে")
+        || cand.ends_with("ছে")
+        || cand.ends_with('ল')
+        || cand.ends_with("লো")
+        || cand.ends_with('ত')
+        || cand.ends_with("তো");
+
+    match person {
+        0 => {
+            // 1st Person: আমি, আমরা
+            if is_p1_verb {
+                boost += 3.5;
+            }
+            if is_p2_formal_verb || is_p2_intimate_verb || cand.ends_with("বে") || cand.ends_with("েন") {
+                boost -= 4.5;
+            }
+        }
         1 => {
-            // Formal
-            if is_formal_verb { 2.5 }
-            else if is_intimate_verb { -4.0 }
-            else if is_familiar_verb { -2.5 }
-            else { 0.0 }
+            // 2nd/3rd Formal: আপনি, আপনারা, তিনি, তাঁরা
+            if is_p2_formal_verb {
+                boost += 3.0;
+            } else if is_p2_intimate_verb {
+                boost -= 4.0;
+            } else if is_p2_familiar_verb || is_p1_verb {
+                boost -= 3.0;
+            }
         }
         2 => {
-            // Familiar
-            if is_familiar_verb { 2.5 }
-            else if is_formal_verb { -2.5 }
-            else if is_intimate_verb { -3.5 }
-            else { 0.0 }
+            // 2nd Familiar: তুমি, তোমরা
+            if is_p2_familiar_verb {
+                boost += 3.0;
+            } else if is_p2_formal_verb {
+                boost -= 3.5;
+            } else if is_p2_intimate_verb || cand.ends_with("লাম") {
+                boost -= 3.5;
+            }
         }
         3 => {
-            // Intimate
-            if is_intimate_verb { 3.0 }
-            else if is_formal_verb { -4.0 }
-            else if is_familiar_verb { -3.0 }
-            else { 0.0 }
+            // 2nd Intimate: তুই, তোরা
+            if is_p2_intimate_verb {
+                boost += 3.5;
+            } else if is_p2_formal_verb {
+                boost -= 4.5;
+            } else if is_p2_familiar_verb || is_p1_verb {
+                boost -= 3.5;
+            }
         }
-        _ => 0.0,
+        4 => {
+            // 3rd Ordinary: সে, তারা, ও, ওরা
+            if is_p3_verb && !is_p1_verb {
+                boost += 2.5;
+            } else if is_p1_verb || is_p2_formal_verb {
+                boost -= 3.5;
+            }
+        }
+        _ => {}
     }
+
+    boost
 }
 
 #[cfg(test)]

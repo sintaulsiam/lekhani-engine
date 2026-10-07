@@ -1446,24 +1446,71 @@ pub fn is_junk_token(w: &str) -> bool {
         return true;
     }
 
-    let has_bengali = trimmed.chars().any(crate::trainer::chars::is_bengali_char);
-    let has_ascii_letter = trimmed.chars().any(|c| c.is_ascii_alphabetic());
-    let has_ascii_digit = trimmed.chars().any(|c| c.is_ascii_digit());
-
-    if has_bengali {
-        if has_ascii_letter || has_ascii_digit {
-            return true;
-        }
-        if lower.ends_with("lt") || lower.ends_with("gt") {
-            return true;
-        }
-        if trimmed.chars().count() > 22 {
-            return true;
-        }
+    let char_count = trimmed.chars().count();
+    if !(1..=22).contains(&char_count) {
+        return true;
     }
 
-    if trimmed.chars().any(|c| "<>{}[]|\\=_/~^$#@*+=;%".contains(c)) {
+    // Must consist exclusively of authentic Bengali characters or ZWJ/ZWNJ
+    let is_valid_char = |c: char| -> bool {
+        matches!(c,
+            '\u{0981}'..='\u{0983}'
+            | '\u{0985}'..='\u{098C}'
+            | '\u{098F}'..='\u{0990}'
+            | '\u{0993}'..='\u{0994}'
+            | '\u{0995}'..='\u{09A8}'
+            | '\u{09AA}'..='\u{09B0}'
+            | '\u{09B2}'
+            | '\u{09B6}'..='\u{09B9}'
+            | '\u{09BC}'..='\u{09C4}'
+            | '\u{09C7}'..='\u{09C8}'
+            | '\u{09CB}'..='\u{09CD}'
+            | '\u{09CE}'
+            | '\u{09D7}'
+            | '\u{09DC}'..='\u{09DD}'
+            | '\u{09DF}'..='\u{09E3}'
+            | '\u{200C}'
+            | '\u{200D}'
+        )
+    };
+
+    if !trimmed.chars().all(is_valid_char) {
         return true;
+    }
+
+    // Must have at least one base consonant or independent vowel
+    let has_base = trimmed.chars().any(|c| {
+        matches!(c,
+            '\u{0985}'..='\u{098C}'
+            | '\u{098F}'..='\u{0990}'
+            | '\u{0993}'..='\u{0994}'
+            | '\u{0995}'..='\u{09A8}'
+            | '\u{09AA}'..='\u{09B0}'
+            | '\u{09B2}'
+            | '\u{09B6}'..='\u{09B9}'
+            | '\u{09CE}'
+            | '\u{09DC}'..='\u{09DD}'
+            | '\u{09DF}'
+        )
+    });
+    if !has_base {
+        return true;
+    }
+
+    // First char cannot be a combining mark, nukta, virama, or zero-width joiner
+    if let Some(first) = trimmed.chars().next() {
+        if matches!(first,
+            '\u{0981}'..='\u{0983}'
+            | '\u{09BC}'..='\u{09C4}'
+            | '\u{09C7}'..='\u{09C8}'
+            | '\u{09CB}'..='\u{09CD}'
+            | '\u{09D7}'
+            | '\u{09E2}'..='\u{09E3}'
+            | '\u{200C}'
+            | '\u{200D}'
+        ) {
+            return true;
+        }
     }
 
     false

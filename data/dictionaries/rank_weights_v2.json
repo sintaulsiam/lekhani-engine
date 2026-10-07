@@ -10,5 +10,13 @@
   "clitic_alignment": 3500.0,
   "intent_modifier_boost": 4500.0,
   "user_bigram_prob": 3000.0,
-  "user_favored": 5000.0
+  "user_favored": 5000.0,
+  "context_lm_score": 1800.0,
+  "gru_log_prob": 1200.0,
+  "neural_alpha": 0.0,
+  "morpheme_depth": -400.0,
+  "is_named_entity": 1500.0,
+  "is_colloquial": 600.0,
+  "sentence_initial": 800.0,
+  "register_match": 1200.0
 }
