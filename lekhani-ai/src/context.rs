@@ -274,6 +274,13 @@ impl ContextScorer {
         } else {
             None
         };
+        let prev3 = if clean_context.len() >= 3 {
+            Some(clean_context[clean_context.len() - 3])
+        } else {
+            None
+        };
+
+        let register_momentum = compute_register_momentum(clean_context);
 
         let clean_next = right_word.and_then(|w| {
             let trimmed = w.trim_matches(|c: char| {
@@ -301,12 +308,13 @@ impl ContextScorer {
         for i in 0..len {
             let cand = &candidates[i];
             let lm_score = if prev1.is_some() {
-                self.lm.score_candidate(prev2, prev1, cand)
+                self.lm.score_candidate_fourgram(prev3, prev2, prev1, cand)
             } else {
                 self.lm.score_candidate(None, None, cand)
             };
             let personal_boost = self.personal_overlay.boost_for(cand);
             let grammar_boost = compute_honorific_agreement_boost(prev2, prev1, cand);
+            let register_boost = compute_register_calibration_boost(register_momentum, cand);
             let right_boost = if let Some(next) = clean_next {
                 // Score transition from candidate to following word: P(next | cand)
                 let p = self.lm.score_candidate(None, Some(cand), next);
@@ -324,7 +332,7 @@ impl ContextScorer {
                 (None, None) => 0.0,
             };
             let position_penalty = i as f32 * 0.05;
-            scores[i] = lm_score + personal_boost + grammar_boost + right_boost + semantic_boost - position_penalty;
+            scores[i] = lm_score + personal_boost + grammar_boost + register_boost + right_boost + semantic_boost - position_penalty;
         }
 
         // Simple insertion sort to sort `candidates` and `scores` in tandem.
@@ -355,6 +363,11 @@ impl ContextScorer {
         } else {
             None
         };
+        let prev3 = if clean_context.len() >= 3 {
+            Some(clean_context[clean_context.len() - 3])
+        } else {
+            None
+        };
 
         let sem_boost = if let Some(p) = prev1 {
             (self.embeddings.semantic_boost(p, candidate) * 400.0) as i32
@@ -362,7 +375,7 @@ impl ContextScorer {
             0
         };
 
-        let score = self.lm.score_candidate(prev2, prev1, candidate);
+        let score = self.lm.score_candidate_fourgram(prev3, prev2, prev1, candidate);
         if score > -1.0 {
             1000 + personal_boost + sem_boost
         } else if score > -2.0 {
@@ -371,6 +384,111 @@ impl ContextScorer {
             personal_boost + sem_boost
         }
     }
+}
+
+/// Computes the exponential tone and register momentum of the conversational context.
+///
+/// Returns a continuous scalar $\rho \in [-1.0, 1.0]$:
+/// - $\rho > +0.1$: Formal / Honorific discourse (e.g. আপনি, তিনি, জনাব, আবেদন, -বেন, -লেন)
+/// - $\rho < -0.1$: Colloquial / Chat discourse (e.g. তুই, দোস্ত, মামা, প্যারা, -বা, -বি, হলো)
+/// - $\rho \approx 0.0$: Neutral or mixed context
+///
+/// Evaluates up to the last 8 tokens with an exponential decay factor $\lambda = 0.65$.
+/// Zero heap allocations, pure stack arithmetic.
+#[inline]
+pub fn compute_register_momentum(context: &[&str]) -> f32 {
+    if context.is_empty() {
+        return 0.0;
+    }
+
+    let take = context.len().min(8);
+    let start = context.len() - take;
+    let slice = &context[start..];
+
+    let mut weight_sum = 0.0f32;
+    let mut momentum_sum = 0.0f32;
+    let mut weight = 1.0f32; // Most recent token has weight 1.0
+
+    // Traverse backwards from most recent to older tokens
+    for &tok in slice.iter().rev() {
+        let bias = word_register_bias(tok);
+        if bias != 0.0 {
+            momentum_sum += bias * weight;
+        }
+        weight_sum += weight;
+        weight *= 0.65;
+    }
+
+    if weight_sum > 0.0 {
+        (momentum_sum / weight_sum).clamp(-1.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+/// Evaluates the inherent sociolinguistic register bias of a single Bengali token.
+/// Positive = formal/honorific, Negative = colloquial/intimate chat.
+#[inline]
+pub fn word_register_bias(word: &str) -> f32 {
+    let clean = word.trim_matches(|c: char| {
+        c.is_ascii_punctuation()
+            || c == '।'
+            || c == '—'
+            || c == '‘'
+            || c == '’'
+            || c == '“'
+            || c == '”'
+            || c == '\''
+            || c == '"'
+            || c == ','
+    });
+
+    if clean.is_empty() {
+        return 0.0;
+    }
+
+    // High-confidence formal lexical markers
+    match clean {
+        "আপনি" | "আপনারা" | "আপনার" | "আপনাদের" | "তিনি" | "তাঁরা" | "তাঁর" | "তাঁদের"
+        | "জনাব" | "মহোদয়" | "মহোদয়া" | "সম্মানিত" | "বিনীত" | "নিবেদন" | "আবেদন"
+        | "দয়া" | "অনুগ্রহ" | "উপস্থিত" | "কর্তৃপক্ষ" | "প্রতিবেদন" => return 0.85,
+        _ => {}
+    }
+
+    // High-confidence colloquial / chat / intimate lexical markers
+    match clean {
+        "তুই" | "তোরা" | "তোর" | "তোদের" | "দোস্ত" | "মামা" | "ব্রো" | "ভাইয়া" | "ভাই"
+        | "চিল" | "প্যারা" | "সেরা" | "সেইরকম" | "কিরে" | "রে" | "নাহ" | "ধুর" | "আরে" => return -0.85,
+        _ => {}
+    }
+
+    // Suffix-based register analysis for verbs
+    if clean.ends_with("বেন") || clean.ends_with("লেন") || clean.ends_with("তেন") || clean.ends_with("ছেন") {
+        return 0.45;
+    }
+    if clean.ends_with("বা") || clean.ends_with("বি") || clean.ends_with("িস") || clean.ends_with("ছিস") || clean == "হলো" {
+        return -0.45;
+    }
+
+    0.0
+}
+
+/// Computes candidate calibration boost based on the ongoing register momentum.
+#[inline]
+pub fn compute_register_calibration_boost(momentum: f32, cand: &str) -> f32 {
+    if momentum.abs() < 0.08 {
+        return 0.0;
+    }
+
+    let cand_bias = word_register_bias(cand);
+    if cand_bias == 0.0 {
+        return 0.0;
+    }
+
+    // If momentum and candidate bias align, reward smoothly:
+    // e.g. momentum -0.6 (chat) * cand_bias -0.45 (colloquial verb) = +0.27 * 3.5 = +0.94 boost.
+    // If they clash (formal context with colloquial verb): -0.27 * 3.5 = -0.94 penalty.
+    (momentum * cand_bias) * 3.5
 }
 
 /// Computes grammar boost / penalty based on Bengali honorific concordance.
@@ -629,5 +747,29 @@ mod tests {
         let boost_shirt_wearing = scorer.score_homophone_boost(&["শার্ট"], "পরা");
         let boost_shirt_reading = scorer.score_homophone_boost(&["শার্ট"], "পড়া");
         assert!(boost_shirt_wearing > boost_shirt_reading, "Expected shirt wearing boost {} > reading boost {}", boost_shirt_wearing, boost_shirt_reading);
+    }
+
+    #[test]
+    fn test_register_momentum_and_calibration() {
+        // Chat register context
+        let chat_ctx = &["কিরে", "দোস্ত", "প্যারা", "নাই"];
+        let chat_momentum = compute_register_momentum(chat_ctx);
+        assert!(chat_momentum < -0.2, "Expected negative chat momentum, got {}", chat_momentum);
+
+        // Formal register context
+        let formal_ctx = &["জনাব", "মহোদয়", "বিনীত", "নিবেদন"];
+        let formal_momentum = compute_register_momentum(formal_ctx);
+        assert!(formal_momentum > 0.2, "Expected positive formal momentum, got {}", formal_momentum);
+
+        let scorer = ContextScorer::new();
+        let candidates = vec!["করবেন".to_string(), "করবা".to_string()];
+
+        // In informal chat context, "করবা" should receive higher boost than in formal context
+        let ranked_chat = scorer.rank_candidates(&["দোস্ত", "তুই", "কাজটা"], &candidates);
+        assert_eq!(ranked_chat[0], "করবা");
+
+        // In formal context, "করবেন" should clearly dominate
+        let ranked_formal = scorer.rank_candidates(&["জনাব", "আপনি", "কাজটা"], &candidates);
+        assert_eq!(ranked_formal[0], "করবেন");
     }
 }
