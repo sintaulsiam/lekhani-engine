@@ -85,6 +85,24 @@ impl TrainedLanguageModelData {
         self.total_words += other.total_words;
     }
 
+    /// Filter out corrupted crawl artifacts, Wikipedia citation tags, and unsegmented garbage tokens.
+    /// Returns the number of removed unigrams.
+    pub fn sanitize(&mut self) -> usize {
+        let before_unigrams = self.unigrams.len();
+        self.unigrams.retain(|w, _| !is_junk_token(w));
+        let removed_unigrams = before_unigrams - self.unigrams.len();
+
+        self.bigrams
+            .retain(|(w1, w2, _)| !is_junk_token(w1) && !is_junk_token(w2));
+        self.trigrams
+            .retain(|(w1, w2, w3, _)| !is_junk_token(w1) && !is_junk_token(w2) && !is_junk_token(w3));
+        self.fourgrams.retain(|(w1, w2, w3, w4, _)| {
+            !is_junk_token(w1) && !is_junk_token(w2) && !is_junk_token(w3) && !is_junk_token(w4)
+        });
+
+        removed_unigrams
+    }
+
 
     /// Load trained model data from a JSON file
     pub fn load_from_json<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
@@ -788,34 +806,12 @@ impl CorpusTrainer {
 
         for raw_sentence in effective_text.split(|c| sentence_delimiters.contains(&c)) {
             let mut words = Vec::new();
-            for raw_word in raw_sentence.split_whitespace() {
-                let clean_word: String = raw_word
-                    .chars()
-                    .filter(|c| {
-                        !c.is_ascii_punctuation()
-                            && *c != '‘'
-                            && *c != '’'
-                            && *c != '“'
-                            && *c != '”'
-                            && *c != '\''
-                            && *c != '"'
-                            && *c != ','
-                            && *c != ':'
-                            && *c != '—'
-                            && *c != '-'
-                            && *c != '('
-                            && *c != ')'
-                            && *c != '['
-                            && *c != ']'
-                            && *c != '{'
-                            && *c != '}'
-                    })
-                    .collect();
-
-                let trimmed = clean_word.trim();
+            for raw_word in raw_sentence.split(|c: char| is_word_delimiter(c)) {
+                let trimmed = raw_word.trim();
                 if !trimmed.is_empty()
                     && (trimmed.chars().any(crate::trainer::chars::is_bengali_char)
                         || trimmed.chars().any(|c| c.is_alphabetic()))
+                    && !is_junk_token(trimmed)
                 {
                     words.push(trimmed.to_string());
                 }
@@ -1342,34 +1338,12 @@ fn extract_line_words<F: FnMut(&str)>(line: &str, mut on_word: F) {
     };
 
     for raw_sentence in effective_line.split(|c| sentence_delimiters.contains(&c)) {
-        for raw_word in raw_sentence.split_whitespace() {
-            if !raw_word.chars().any(crate::trainer::chars::is_token_char) {
-                continue;
-            }
-            let clean_word: String = raw_word
-                .chars()
-                .filter(|c| {
-                    !c.is_ascii_punctuation()
-                        && *c != '‘'
-                        && *c != '’'
-                        && *c != '“'
-                        && *c != '”'
-                        && *c != '\''
-                        && *c != '"'
-                        && *c != ','
-                        && *c != ':'
-                        && *c != '—'
-                        && *c != '-'
-                        && *c != '('
-                        && *c != ')'
-                        && *c != '['
-                        && *c != ']'
-                        && *c != '{'
-                        && *c != '}'
-                })
-                .collect();
-            let trimmed = clean_word.trim();
-            if !trimmed.is_empty() && trimmed.chars().any(crate::trainer::chars::is_token_char) {
+        for raw_word in raw_sentence.split(|c: char| is_word_delimiter(c)) {
+            let trimmed = raw_word.trim();
+            if !trimmed.is_empty()
+                && trimmed.chars().any(crate::trainer::chars::is_token_char)
+                && !is_junk_token(trimmed)
+            {
                 on_word(trimmed);
             }
         }
@@ -1393,34 +1367,12 @@ fn process_line_ngrams(
 
     for raw_sentence in effective_line.split(|c| sentence_delimiters.contains(&c)) {
         let mut sentence_ids: Vec<Option<u32>> = Vec::new();
-        for raw_word in raw_sentence.split_whitespace() {
-            if !raw_word.chars().any(crate::trainer::chars::is_token_char) {
-                continue;
-            }
-            let clean_word: String = raw_word
-                .chars()
-                .filter(|c| {
-                    !c.is_ascii_punctuation()
-                        && *c != '‘'
-                        && *c != '’'
-                        && *c != '“'
-                        && *c != '”'
-                        && *c != '\''
-                        && *c != '"'
-                        && *c != ','
-                        && *c != ':'
-                        && *c != '—'
-                        && *c != '-'
-                        && *c != '('
-                        && *c != ')'
-                        && *c != '['
-                        && *c != ']'
-                        && *c != '{'
-                        && *c != '}'
-                })
-                .collect();
-            let trimmed = clean_word.trim();
-            if !trimmed.is_empty() && trimmed.chars().any(crate::trainer::chars::is_token_char) {
+        for raw_word in raw_sentence.split(|c: char| is_word_delimiter(c)) {
+            let trimmed = raw_word.trim();
+            if !trimmed.is_empty()
+                && trimmed.chars().any(crate::trainer::chars::is_token_char)
+                && !is_junk_token(trimmed)
+            {
                 sentence_ids.push(vocab_lookup.get(trimmed).copied());
             }
         }
@@ -1447,7 +1399,77 @@ fn process_line_ngrams(
     }
 }
 
-pub(crate) mod chars {
+/// Returns true if a character serves as a token/word delimiter during corpus ingestion.
+#[inline]
+pub fn is_word_delimiter(c: char) -> bool {
+    c.is_whitespace()
+        || c.is_ascii_punctuation()
+        || matches!(
+            c,
+            '‘' | '’'
+                | '“'
+                | '”'
+                | '—'
+                | '–'
+                | '…'
+                | '•'
+                | '«'
+                | '»'
+                | '।'
+                | '?'
+                | '!'
+                | ';'
+        )
+}
+
+/// Returns true if a token represents corrupted crawl artifacts, wiki markup, or unsegmented garbage.
+pub fn is_junk_token(w: &str) -> bool {
+    let trimmed = w.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+
+    let lower = trimmed.to_lowercase();
+    const JUNK_SUBSTRINGS: &[&str] = &[
+        "&lt;", "&gt;", "&amp;", "&quot;", "http", "www.", ".com", ".org", ".php", "quot", "nbsp",
+        "href", "cite", "ইউআরএল", "আর্কাইভের", "আর্কাইভ", "ওয়েব্যাক", "আইএসবিএন",
+        "অবস্থাকার্যকর", "অবস্থাঅকার্যকর", "সংগ্রহেরতারিখ", "অনূদিতশিরোনাম",
+    ];
+
+    for junk in JUNK_SUBSTRINGS {
+        if lower.contains(junk) {
+            return true;
+        }
+    }
+
+    if matches!(lower.as_str(), "lt" | "gt" | "amp" | "ref" | "nbsp") {
+        return true;
+    }
+
+    let has_bengali = trimmed.chars().any(crate::trainer::chars::is_bengali_char);
+    let has_ascii_letter = trimmed.chars().any(|c| c.is_ascii_alphabetic());
+    let has_ascii_digit = trimmed.chars().any(|c| c.is_ascii_digit());
+
+    if has_bengali {
+        if has_ascii_letter || has_ascii_digit {
+            return true;
+        }
+        if lower.ends_with("lt") || lower.ends_with("gt") {
+            return true;
+        }
+        if trimmed.chars().count() > 22 {
+            return true;
+        }
+    }
+
+    if trimmed.chars().any(|c| "<>{}[]|\\=_/~^$#@*+=;%".contains(c)) {
+        return true;
+    }
+
+    false
+}
+
+pub mod chars {
     pub fn is_bengali_char(c: char) -> bool {
         ('\u{0980}'..='\u{09FF}').contains(&c)
     }
