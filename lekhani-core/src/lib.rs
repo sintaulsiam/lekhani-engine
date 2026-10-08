@@ -21,7 +21,10 @@ pub use emojis::EmojiMap;
 pub use fixed::{FixedLayoutParser, FixedMethod};
 pub use fs::atomic_write_secure;
 pub use keycodes::*;
-pub use morpheme::{BengaliMorphAnalyzer, MorphemeDecomposition, SuffixCategory};
+pub use morpheme::{
+    BengaliMorphAnalyzer, MorphemeDecomposition, RupmulDecomposition, RupmulGraphSynthesizer,
+    RupmulTier, SuffixCategory,
+};
 pub use ngram::UserStats;
 pub use phonetic::{AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion, PhoneticSuggestionConfig};
 pub use session::{ActiveLayoutType, InputSession};

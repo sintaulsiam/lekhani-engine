@@ -663,6 +663,46 @@ impl PhoneticSuggestion {
             }
         }
 
+        // 3d. Project "অন্বয়" (Anvaya) — Dynamic Concordant Verb Synthesis
+        let anvaya_state = lekhani_ai::AnvayaAgreementEngine::extract_state(context);
+        let mut preferred_anvaya = None;
+        if anvaya_state.honorific_tier != lekhani_ai::HonorificRegister::Neutral {
+            if let Some(concordant_verb) =
+                lekhani_ai::AnvayaAgreementEngine::synthesize_concordant_verb(
+                    middle,
+                    anvaya_state.honorific_tier,
+                )
+            {
+                add_cand(
+                    concordant_verb.to_string(),
+                    CandidateSource::ExactDictionary,
+                    8500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+                preferred_anvaya = Some(concordant_verb.to_string());
+            }
+        }
+
+        // 3e. Project "রূপমূল" (Rupmul) — Multi-Tier Agglutinative DAG Verification
+        if preferred_override.is_none() {
+            let rupmul_synth = crate::morpheme::RupmulGraphSynthesizer::new();
+            if let Some(decomp) = rupmul_synth.decompose_dag(&phonetic) {
+                if decomp.root.chars().count() >= 2
+                    && (self.database.is_exact_dictionary_word(&decomp.root)
+                        || self.database.trie.contains_exact(&decomp.root))
+                {
+                    add_cand(
+                        phonetic.clone(),
+                        CandidateSource::MorphologicalInflection,
+                        4000,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+            }
+        }
+
         // 4. Bilingual Loanword Code-Mixing (e.g. "meeting" -> "মিটিং", "meeting")
         let mut preferred_loanword = None;
         let loan_opt = PhoneticDatabase::get_bilingual_loanword(middle).or_else(|| {
@@ -837,6 +877,8 @@ impl PhoneticSuggestion {
             } else {
                 None
             }
+        } else if let Some(ref anv_pref) = preferred_anvaya {
+            Some(anv_pref.clone())
         } else if let Some(ref ov_pref) = preferred_override {
             Some(ov_pref.clone())
         } else if let Some(ref loan_pref) = preferred_loanword {
