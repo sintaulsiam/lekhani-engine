@@ -56,7 +56,7 @@ fn main() -> anyhow::Result<()> {
 
     println!("[2/5] Selecting top {} vocabulary words...", VOCAB_SIZE);
     let mut sorted_vocab: Vec<(String, u32)> = unigram_counts.into_iter().collect();
-    sorted_vocab.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted_vocab.sort_by_key(|a| std::cmp::Reverse(a.1));
     sorted_vocab.truncate(VOCAB_SIZE);
 
     let mut word_to_id: HashMap<String, usize> = HashMap::with_capacity(VOCAB_SIZE);
@@ -100,9 +100,8 @@ fn main() -> anyhow::Result<()> {
             let id_i = sentence_ids[i];
             let start = i.saturating_sub(WINDOW_SIZE);
             let end = (i + WINDOW_SIZE + 1).min(len);
-            for j in start..end {
+            for (j, &id_j) in sentence_ids.iter().enumerate().take(end).skip(start) {
                 if i != j {
-                    let id_j = sentence_ids[j];
                     cooccur[id_i * VOCAB_SIZE + id_j] += 1;
                 }
             }
@@ -113,13 +112,13 @@ fn main() -> anyhow::Result<()> {
     let mut row_sums = vec![0.0f64; VOCAB_SIZE];
     let mut total_cooccur = 0.0f64;
 
-    for i in 0..VOCAB_SIZE {
+    for (i, row_sum) in row_sums.iter_mut().enumerate().take(VOCAB_SIZE) {
         let mut r = 0.0f64;
         let row_start = i * VOCAB_SIZE;
         for j in 0..VOCAB_SIZE {
             r += cooccur[row_start + j] as f64;
         }
-        row_sums[i] = r;
+        *row_sum = r;
         total_cooccur += r;
     }
 

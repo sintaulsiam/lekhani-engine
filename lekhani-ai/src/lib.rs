@@ -4,6 +4,7 @@
 //! multi-token context scoring, homophone disambiguation, beam search decoding,
 //! and next-word predictive typing for the Lekhani Bengali typing ecosystem.
 
+pub mod anvaya;
 pub mod beam;
 pub mod context;
 pub mod embeddings;
@@ -12,6 +13,7 @@ pub mod prediction;
 pub mod trainer;
 pub mod zero_copy;
 
+pub use anvaya::{AnvayaAgreementEngine, AnvayaState, HonorificRegister, VerbConjugationTier};
 pub use beam::BeamSearchDecoder;
 pub use context::{truncate_at_sentence_boundary, ContextScorer, PersonalScoreOverlay};
 pub use embeddings::WordEmbeddings;

@@ -302,6 +302,8 @@ impl ContextScorer {
             }
         });
 
+        let anvaya_state = crate::anvaya::AnvayaAgreementEngine::extract_state(clean_context);
+
         // Stack-allocated array for zero-allocation scoring (up to 32 candidates)
         let len = candidates.len().min(32);
         let mut scores = [0.0; 32];
@@ -314,6 +316,7 @@ impl ContextScorer {
             };
             let personal_boost = self.personal_overlay.boost_for(cand);
             let grammar_boost = compute_honorific_agreement_boost(prev2, prev1, cand);
+            let anvaya_boost = crate::anvaya::AnvayaAgreementEngine::compute_agreement_score(&anvaya_state, cand);
             let register_boost = compute_register_calibration_boost(register_momentum, cand);
             let right_boost = if let Some(next) = clean_next {
                 // Score transition from candidate to following word: P(next | cand)
@@ -332,7 +335,7 @@ impl ContextScorer {
                 (None, None) => 0.0,
             };
             let position_penalty = i as f32 * 0.05;
-            scores[i] = lm_score + personal_boost + grammar_boost + register_boost + right_boost + semantic_boost - position_penalty;
+            scores[i] = lm_score + personal_boost + grammar_boost + anvaya_boost + register_boost + right_boost + semantic_boost - position_penalty;
         }
 
         // Simple insertion sort to sort `candidates` and `scores` in tandem.
@@ -535,10 +538,8 @@ pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str
         const COLLOQUIAL_STATUS_HEADS: &[&str] = &[
             "কী", "দেরি", "শুরু", "শেষ", "দেখা", "কথা", "ভালো", "খারাপ", "কেমন", "কখন",
         ];
-        if COLLOQUIAL_STATUS_HEADS.contains(&p1) {
-            if cand == "হলো" {
-                boost += 2.5;
-            }
+        if COLLOQUIAL_STATUS_HEADS.contains(&p1) && cand == "হলো" {
+            boost += 2.5;
         }
 
         // ── 4. S-for-CH Casual Sibilant Resolution: ভালো + আছি vs আসি ────────
@@ -633,9 +634,7 @@ pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str
             // 2nd Familiar: তুমি, তোমরা
             if is_p2_familiar_verb {
                 boost += 3.0;
-            } else if is_p2_formal_verb {
-                boost -= 3.5;
-            } else if is_p2_intimate_verb || cand.ends_with("লাম") {
+            } else if is_p2_formal_verb || is_p2_intimate_verb || cand.ends_with("লাম") {
                 boost -= 3.5;
             }
         }
