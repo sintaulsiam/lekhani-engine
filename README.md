@@ -36,6 +36,14 @@ lekhani-neural = { git = "https://github.com/sintaulsiam/lekhani-engine", tag = 
 - **Android IME**: [sintaulsiam/lekhani-android](https://github.com/sintaulsiam/lekhani-android)
 - **Linux / Windows keyboard**: [sintaulsiam/lekhani](https://github.com/sintaulsiam/lekhani)
 
+## Core Innovations: Project বোধ (Bodh)
+
+1. **Project "অন্বয়" (Anvaya)**: Pragmatic & Honorific Agreement Finite State Lattice (`lekhani-ai::anvaya`). Evaluates sociolinguistic honorific tiers (Formal `আপনি`, Familiar `তুমি`, Intimate `তুই`) and discourse styles (Cholit vs Sadhu) with zero heap allocations in < 50 ns, proactively generating and scoring concordant verbs (e.g. `[আপনি, কেমন] + aso` ➔ `আছেন`).
+2. **Project "রূপমূল" (Rupmul)**: Multi-Tier Agglutinative Morphological Synthesizer & DAG Verification (`lekhani-core::morpheme`). Verifies strict Bengali morpheme transition DAGs (Root ➔ Classifier ➔ Plural ➔ Case ➔ Particle) and synthesizes valid Sandhi compound inflections (e.g. `মানুষগুলোরও`) without manual dictionary explosion.
+3. **Project "ধ্বনি-সেতু" (Dhvani-Setu)**: Phonological Acoustic-Spatial Latent Distance Engine (`lekhani-core::phonetic::fuzzy`). Clusters phonetic consonant families (sibilants, palatals, aspirates) and syncope vowel reductions, unifying Romanized phonetic variations (`shundor`, `sundor`, `shndr`) in $O(1)$ space.
+4. **Project "পশ্চাৎ-শোধন" (Retro-Correction)**: Clause-level contextual retro-correction engine (`lekhani-core::session::RetroCorrection`, `AndroidLekhaniSession`). Surfaces non-intrusive 1-tap quick fix chips for honorific mismatches and homophone errors (`পরা বই` ➔ `পড়া`, `আপনি আছো` ➔ `আছেন`).
+
 ## License
 
 GPL-3.0-or-later © Sintaul Mahdi Siam
+
