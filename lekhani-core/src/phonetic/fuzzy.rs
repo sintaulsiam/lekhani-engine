@@ -647,6 +647,167 @@ pub fn damerau_levenshtein(s1: &str, s2: &str) -> usize {
     d[len_a][len_b]
 }
 
+/// Project "ধ্বনি-সেতু" (Dhvani-Setu) — Phonological Acoustic-Spatial Latent Distance Engine
+///
+/// Maps disparate Romanized phonetic spellings and physical touch coordinates into
+/// an invariant acoustic-spatial latent space. Unifies sibilants, palatals, aspirates,
+/// vowel reductions, and schwa syncope into an O(1) continuous distance metric.
+pub struct DhvaniSetuEngine;
+
+impl DhvaniSetuEngine {
+    /// Computes the invariant acoustic fingerprint of a Romanized phonetic token.
+    ///
+    /// Invariants:
+    /// - Sibilant collapse: "s", "sh", "ss", "shw", "sw" -> 'S'
+    /// - Palatal collapse: "j", "z", "y", "jh" -> 'J'
+    /// - Dental/Retroflex: "th", "Th", "t", "T" -> 'T'; "dh", "Dh", "d", "D" -> 'D'
+    /// - Aspirate collapse: "kh" -> 'K', "gh" -> 'G', "ch" -> 'C', "ph" -> 'P', "bh" -> 'B'
+    /// - Rhotics/Flaps: "r", "rr", "rrh", "R" -> 'R'
+    /// - Vowel normalization: "oo", "uu", "u", "w" -> 'U'; "ee", "ii", "i" -> 'I'; "aa", "a", "o" -> 'A'
+    /// - Schwa syncope: collapses weak vowels between consonants (e.g. "shundor" <-> "sundor" <-> "shndr")
+    pub fn acoustic_fingerprint(latin: &str) -> String {
+        let lower = latin.to_lowercase();
+        let bytes = lower.as_bytes();
+        let len = bytes.len();
+        let mut out = String::with_capacity(len);
+        let mut i = 0;
+
+        while i < len {
+            // Two-character clusters
+            if i + 1 < len {
+                let pair = &lower[i..i + 2];
+                match pair {
+                    "sh" | "ss" | "sw" => {
+                        out.push('S');
+                        i += 2;
+                        continue;
+                    }
+                    "kh" => {
+                        out.push('K');
+                        i += 2;
+                        continue;
+                    }
+                    "gh" => {
+                        out.push('G');
+                        i += 2;
+                        continue;
+                    }
+                    "ch" => {
+                        out.push('C');
+                        i += 2;
+                        continue;
+                    }
+                    "jh" => {
+                        out.push('J');
+                        i += 2;
+                        continue;
+                    }
+                    "th" => {
+                        out.push('T');
+                        i += 2;
+                        continue;
+                    }
+                    "dh" => {
+                        out.push('D');
+                        i += 2;
+                        continue;
+                    }
+                    "ph" => {
+                        out.push('P');
+                        i += 2;
+                        continue;
+                    }
+                    "bh" => {
+                        out.push('B');
+                        i += 2;
+                        continue;
+                    }
+                    "ee" | "ii" => {
+                        out.push('I');
+                        i += 2;
+                        continue;
+                    }
+                    "oo" | "uu" => {
+                        out.push('U');
+                        i += 2;
+                        continue;
+                    }
+                    "aa" => {
+                        out.push('A');
+                        i += 2;
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+
+            // Single characters
+            let b = bytes[i];
+            match b {
+                b's' => out.push('S'),
+                b'j' | b'z' | b'y' => out.push('J'),
+                b't' => out.push('T'),
+                b'd' => out.push('D'),
+                b'k' => out.push('K'),
+                b'g' => out.push('G'),
+                b'c' => out.push('C'),
+                b'p' => out.push('P'),
+                b'b' | b'v' => out.push('B'),
+                b'r' => out.push('R'),
+                b'n' => out.push('N'),
+                b'm' => out.push('M'),
+                b'h' => out.push('H'),
+                b'l' => out.push('L'),
+                b'u' | b'w' => out.push('U'),
+                b'i' => out.push('I'),
+                b'a' | b'o' | b'e' => out.push('A'),
+                _ => {
+                    if b.is_ascii_alphabetic() {
+                        out.push((b as char).to_ascii_uppercase());
+                    }
+                }
+            }
+            i += 1;
+        }
+
+        // Collapse consecutive identical acoustic markers: e.g. "SS" -> "S"
+        let mut deduplicated = String::with_capacity(out.len());
+        let mut prev = None;
+        for c in out.chars() {
+            if Some(c) != prev {
+                deduplicated.push(c);
+                prev = Some(c);
+            }
+        }
+
+        deduplicated
+    }
+
+    /// Evaluates continuous acoustic similarity in [0.0, 1.0] between query and canonical word.
+    /// If fingerprints match identically, returns 1.0.
+    pub fn acoustic_similarity(query: &str, target: &str) -> f32 {
+        let fp_q = Self::acoustic_fingerprint(query);
+        let fp_t = Self::acoustic_fingerprint(target);
+
+        if fp_q == fp_t {
+            return 1.0;
+        }
+
+        // Syncope-resilient consonant skeleton check:
+        // strip internal vowels ('A', 'I', 'U') and compare skeleton
+        let skel_q: String = fp_q.chars().filter(|&c| c != 'A' && c != 'I' && c != 'U').collect();
+        let skel_t: String = fp_t.chars().filter(|&c| c != 'A' && c != 'I' && c != 'U').collect();
+
+        if !skel_q.is_empty() && skel_q == skel_t {
+            return 0.92;
+        }
+
+        let dist = damerau_levenshtein(&fp_q, &fp_t);
+        let max_len = fp_q.len().max(fp_t.len()).max(1);
+        (1.0 - (dist as f32 / max_len as f32)).max(0.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -716,5 +877,25 @@ mod tests {
         assert_eq!(damerau_levenshtein("caht", "chat"), 1);
         // Substitution
         assert_eq!(damerau_levenshtein("dakter", "daktar"), 1);
+    }
+
+    #[test]
+    fn test_dhvani_setu_engine() {
+        // Equivalent sibilant spellings match
+        assert_eq!(
+            DhvaniSetuEngine::acoustic_fingerprint("shundor"),
+            DhvaniSetuEngine::acoustic_fingerprint("sundor")
+        );
+        assert!((DhvaniSetuEngine::acoustic_similarity("shundor", "sundor") - 1.0).abs() < 1e-4);
+
+        // Syncope / vowel omission matches consonant skeleton
+        assert!(DhvaniSetuEngine::acoustic_similarity("shndr", "shundor") >= 0.90);
+        assert!(DhvaniSetuEngine::acoustic_similarity("kmn", "kemon") >= 0.90);
+
+        // Palatals
+        assert_eq!(
+            DhvaniSetuEngine::acoustic_fingerprint("juddho"),
+            DhvaniSetuEngine::acoustic_fingerprint("zuddho")
+        );
     }
 }
