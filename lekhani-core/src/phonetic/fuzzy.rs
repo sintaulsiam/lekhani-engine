@@ -817,17 +817,17 @@ impl DhvaniSetuEngine {
         let lower = input.to_lowercase();
 
         // 1. Sibilant and bilabial alternations
-        if lower.starts_with("sh") {
-            variants.push(format!("s{}", &lower[2..]));
-        } else if lower.starts_with('s') && !lower.starts_with("sh") {
-            variants.push(format!("sh{}", &lower[1..]));
+        if let Some(rest) = lower.strip_prefix("sh") {
+            variants.push(format!("s{}", rest));
+        } else if let Some(rest) = lower.strip_prefix('s') {
+            variants.push(format!("sh{}", rest));
         }
 
-        if lower.starts_with('v') {
-            variants.push(format!("bh{}", &lower[1..]));
-            variants.push(format!("b{}", &lower[1..]));
-        } else if lower.starts_with("bh") {
-            variants.push(format!("v{}", &lower[2..]));
+        if let Some(rest) = lower.strip_prefix('v') {
+            variants.push(format!("bh{}", rest));
+            variants.push(format!("b{}", rest));
+        } else if let Some(rest) = lower.strip_prefix("bh") {
+            variants.push(format!("v{}", rest));
         }
 
         // 2. Syncope reconstruction for vowel-less short tokens (e.g. "shndr" -> "shundor", "kmn" -> "kemon")

@@ -103,11 +103,22 @@ impl AnvayaAgreementEngine {
                 || clean.ends_with("িতেছিলেন")
                 || clean.ends_with("িয়া")
                 || clean.ends_with("িবার")
-                || clean == "হইল"
+                || clean == " হইল"
                 || clean == "তাহাকে"
                 || clean == "তাহারা"
             {
                 stylistic_tier = StylisticRegister::Sadhu;
+            }
+
+            // Detect First Person subjects (আমি, আমরা) -> Neutral agreement, do not inherit 2nd/3rd person honorifics
+            if matches!(
+                clean,
+                "আমি" | "আমরা" | "আমার" | "আমাকে" | "আমাদের" | "আমায়" | "আমারে"
+            ) {
+                honorific_tier = HonorificRegister::Neutral;
+                confidence = 0.95;
+                subject_offset = Some(idx);
+                break;
             }
 
             // Detect Honorific subjects
@@ -131,6 +142,7 @@ impl AnvayaAgreementEngine {
                     | "জনাব"
                     | "মহোদয়"
                     | "স্যার"
+                    | "ম্যাডাম"
             ) {
                 honorific_tier = HonorificRegister::FormalHonorific;
                 confidence = 0.95;
@@ -151,6 +163,11 @@ impl AnvayaAgreementEngine {
                     | "তার"
                     | "তাকে"
                     | "তাদের"
+                    | "ও"
+                    | "ওরা"
+                    | "ওর"
+                    | "ওকে"
+                    | "ওদের"
             ) {
                 honorific_tier = HonorificRegister::Familiar;
                 confidence = 0.90;
@@ -171,10 +188,21 @@ impl AnvayaAgreementEngine {
                     | "এর"
                     | "একে"
                     | "এদের"
+                    | "দোস্ত"
             ) {
                 honorific_tier = HonorificRegister::Intimate;
                 confidence = 0.95;
                 subject_offset = Some(idx);
+                break;
+            }
+
+            // If an earlier token has sentence boundary punctuation, do not cross into previous sentence
+            if idx < slice.len() - 1
+                && (token.contains('।')
+                    || token.contains('?')
+                    || token.contains('!')
+                    || token.contains('\n'))
+            {
                 break;
             }
         }
@@ -294,14 +322,25 @@ impl AnvayaAgreementEngine {
             }
 
             // Do (কর-)
-            ("korso" | "korcho" | "করছো" | "করছেন" | "করছিস", HonorificRegister::FormalHonorific) => {
+            ("koro" | "koren" | "koris" | "korso" | "korcho" | "করো" | "করেন" | "করিস" | "করছো" | "করছেন" | "করছিস", HonorificRegister::FormalHonorific) => {
                 Some("করছেন")
             }
-            ("korso" | "korcho" | "করছো" | "করছেন" | "করছিস", HonorificRegister::Familiar) => {
+            ("koro" | "koren" | "koris" | "korso" | "korcho" | "করো" | "করেন" | "করিস" | "করছো" | "করছেন" | "করছিস", HonorificRegister::Familiar) => {
                 Some("করছো")
             }
-            ("korso" | "korcho" | "করছো" | "করছেন" | "করছিস", HonorificRegister::Intimate) => {
+            ("koro" | "koren" | "koris" | "korso" | "korcho" | "করো" | "করেন" | "করিস" | "করছো" | "করছেন" | "করছিস", HonorificRegister::Intimate) => {
                 Some("করছিস")
+            }
+
+            // Do Future (করবে / করবেন / করবি)
+            ("korbe" | "korben" | "korbi" | "করবে" | "করবেন" | "করবি", HonorificRegister::FormalHonorific) => {
+                Some("করবেন")
+            }
+            ("korbe" | "korben" | "korbi" | "করবে" | "করবেন" | "করবি", HonorificRegister::Familiar) => {
+                Some("করবে")
+            }
+            ("korbe" | "korben" | "korbi" | "করবে" | "করবেন" | "করবি", HonorificRegister::Intimate) => {
+                Some("করবি")
             }
 
             // Go (যা-)
@@ -315,6 +354,17 @@ impl AnvayaAgreementEngine {
                 Some("যাচ্ছিস")
             }
 
+            // Go Future (যাবে / যাবেন / যাবি)
+            ("jabe" | "jaben" | "jabi" | "যাবে" | "যাবেন" | "যাবি", HonorificRegister::FormalHonorific) => {
+                Some("যাবেন")
+            }
+            ("jabe" | "jaben" | "jabi" | "যাবে" | "যাবেন" | "যাবি", HonorificRegister::Familiar) => {
+                Some("যাবে")
+            }
+            ("jabe" | "jaben" | "jabi" | "যাবে" | "যাবেন" | "যাবি", HonorificRegister::Intimate) => {
+                Some("যাবি")
+            }
+
             // Eat (খা-)
             ("khaitaso" | "khachho" | "খাচ্ছো" | "খাচ্ছেন" | "খাচ্ছিস", HonorificRegister::FormalHonorific) => {
                 Some("খাচ্ছেন")
@@ -326,6 +376,17 @@ impl AnvayaAgreementEngine {
                 Some("খাচ্ছিস")
             }
 
+            // Eat Future (খাবে / খাবেন / খাবি)
+            ("khabe" | "khaben" | "khabi" | "খাবে" | "খাবেন" | "খাবি", HonorificRegister::FormalHonorific) => {
+                Some("খাবেন")
+            }
+            ("khabe" | "khaben" | "khabi" | "খাবে" | "খাবেন" | "খাবি", HonorificRegister::Familiar) => {
+                Some("খাবে")
+            }
+            ("khabe" | "khaben" | "khabi" | "খাবে" | "খাবেন" | "খাবি", HonorificRegister::Intimate) => {
+                Some("খাবি")
+            }
+
             // Say (বল-)
             ("boltaso" | "bolcho" | "বলছো" | "বলছেন" | "বলছিস", HonorificRegister::FormalHonorific) => {
                 Some("বলছেন")
@@ -335,6 +396,61 @@ impl AnvayaAgreementEngine {
             }
             ("boltaso" | "bolcho" | "বলছো" | "বলছেন" | "বলছিস", HonorificRegister::Intimate) => {
                 Some("বলছিস")
+            }
+
+            // Say Future (বলবে / বলবেন / বলবি)
+            ("bolbe" | "bolben" | "bolbi" | "বলবে" | "বলবেন" | "বলবি", HonorificRegister::FormalHonorific) => {
+                Some("বলবেন")
+            }
+            ("bolbe" | "bolben" | "bolbi" | "বলবে" | "বলবেন" | "বলবি", HonorificRegister::Familiar) => {
+                Some("বলবে")
+            }
+            ("bolbe" | "bolben" | "bolbi" | "বলবে" | "বলবেন" | "বলবি", HonorificRegister::Intimate) => {
+                Some("বলবি")
+            }
+
+            // See (দেখ-)
+            ("dekho" | "dekhen" | "dekhis" | "dekhso" | "dekhcho" | "দেখো" | "দেখেন" | "দেখিস" | "দেখছো" | "দেখছেন" | "দেখছিস", HonorificRegister::FormalHonorific) => {
+                Some("দেখছেন")
+            }
+            ("dekho" | "dekhen" | "dekhis" | "dekhso" | "dekhcho" | "দেখো" | "দেখেন" | "দেখিস" | "দেখছো" | "দেখছেন" | "দেখছিস", HonorificRegister::Familiar) => {
+                Some("দেখছো")
+            }
+            ("dekho" | "dekhen" | "dekhis" | "dekhso" | "dekhcho" | "দেখো" | "দেখেন" | "দেখিস" | "দেখছো" | "দেখছেন" | "দেখছিস", HonorificRegister::Intimate) => {
+                Some("দেখছিস")
+            }
+
+            // Stay / Live (থাক-)
+            ("thako" | "thaken" | "thakis" | "থাকো" | "থাকেন" | "থাকিস" | "থাকছেন" | "থাকছো" | "থাকছিস", HonorificRegister::FormalHonorific) => {
+                Some("থাকেন")
+            }
+            ("thako" | "thaken" | "thakis" | "থাকো" | "থাকেন" | "থাকিস" | "থাকছেন" | "থাকছো" | "থাকছিস", HonorificRegister::Familiar) => {
+                Some("থাকো")
+            }
+            ("thako" | "thaken" | "thakis" | "থাকো" | "থাকেন" | "থাকিস" | "থাকছেন" | "থাকছো" | "থাকছিস", HonorificRegister::Intimate) => {
+                Some("থাকিস")
+            }
+
+            // Come (আসা / এসো / আসেন / আয়)
+            ("ashen" | "esho" | "aay" | "আসেন" | "এসো" | "আয়", HonorificRegister::FormalHonorific) => {
+                Some("আসেন")
+            }
+            ("ashen" | "esho" | "aay" | "আসেন" | "এসো" | "আয়", HonorificRegister::Familiar) => {
+                Some("এসো")
+            }
+            ("ashen" | "esho" | "aay" | "আসেন" | "এসো" | "আয়", HonorificRegister::Intimate) => {
+                Some("আয়")
+            }
+
+            // Give (দেওয়া / দিন / দাও / দে)
+            ("din" | "dao" | "de" | "দিন" | "দাও" | "দে", HonorificRegister::FormalHonorific) => {
+                Some("দিন")
+            }
+            ("din" | "dao" | "de" | "দিন" | "দাও" | "দে", HonorificRegister::Familiar) => {
+                Some("দাও")
+            }
+            ("din" | "dao" | "de" | "দিন" | "দাও" | "দে", HonorificRegister::Intimate) => {
+                Some("দে")
             }
 
             _ => None,
@@ -413,5 +529,37 @@ mod tests {
             AnvayaAgreementEngine::synthesize_concordant_verb("aso", HonorificRegister::Intimate),
             Some("আছিস")
         );
+        assert_eq!(
+            AnvayaAgreementEngine::synthesize_concordant_verb("korbe", HonorificRegister::FormalHonorific),
+            Some("করবেন")
+        );
+        assert_eq!(
+            AnvayaAgreementEngine::synthesize_concordant_verb("korbe", HonorificRegister::Intimate),
+            Some("করবি")
+        );
+        assert_eq!(
+            AnvayaAgreementEngine::synthesize_concordant_verb("dao", HonorificRegister::FormalHonorific),
+            Some("দিন")
+        );
+    }
+
+    #[test]
+    fn test_anvaya_first_person_neutrality() {
+        let state_ami = AnvayaAgreementEngine::extract_state(&["আমি", "ভালো"]);
+        assert_eq!(state_ami.honorific_tier, HonorificRegister::Neutral);
+
+        let state_amra = AnvayaAgreementEngine::extract_state(&["আমরা", "সবাই"]);
+        assert_eq!(state_amra.honorific_tier, HonorificRegister::Neutral);
+    }
+
+    #[test]
+    fn test_anvaya_clause_boundary_isolation() {
+        // Sentence 1 ends with punctuation, next sentence shouldn't inherit earlier sentence's honorific subject
+        let state = AnvayaAgreementEngine::extract_state(&["আপনি", "কেমন", "আছেন?", "খবর", "কি"]);
+        assert_eq!(state.honorific_tier, HonorificRegister::Neutral);
+
+        // Third person familiar pronoun 'ওরা'
+        let state_ora = AnvayaAgreementEngine::extract_state(&["ওরা", "এখন"]);
+        assert_eq!(state_ora.honorific_tier, HonorificRegister::Familiar);
     }
 }
