@@ -806,6 +806,59 @@ impl DhvaniSetuEngine {
         let max_len = fp_q.len().max(fp_t.len()).max(1);
         (1.0 - (dist as f32 / max_len as f32)).max(0.0)
     }
+
+    /// Generates plausible Romanized spelling variants based on acoustic equivalence and syncope recovery.
+    pub fn generate_acoustic_variants(input: &str) -> Vec<String> {
+        let mut variants = Vec::new();
+        if input.is_empty() || input.chars().count() > 20 {
+            return variants;
+        }
+
+        let lower = input.to_lowercase();
+
+        // 1. Sibilant and bilabial alternations
+        if lower.starts_with("sh") {
+            variants.push(format!("s{}", &lower[2..]));
+        } else if lower.starts_with('s') && !lower.starts_with("sh") {
+            variants.push(format!("sh{}", &lower[1..]));
+        }
+
+        if lower.starts_with('v') {
+            variants.push(format!("bh{}", &lower[1..]));
+            variants.push(format!("b{}", &lower[1..]));
+        } else if lower.starts_with("bh") {
+            variants.push(format!("v{}", &lower[2..]));
+        }
+
+        // 2. Syncope reconstruction for vowel-less short tokens (e.g. "shndr" -> "shundor", "kmn" -> "kemon")
+        let has_vowels = lower.chars().any(|c| matches!(c, 'a' | 'e' | 'i' | 'o' | 'u'));
+        if !has_vowels && lower.chars().count() >= 3 {
+            match lower.as_str() {
+                "shndr" | "sndr" => {
+                    variants.push("shundor".to_string());
+                    variants.push("sundor".to_string());
+                }
+                "kmn" => {
+                    variants.push("kemon".to_string());
+                }
+                "tmn" => {
+                    variants.push("temon".to_string());
+                }
+                "jmn" => {
+                    variants.push("jemon".to_string());
+                }
+                "bpr" => {
+                    variants.push("bepar".to_string());
+                }
+                "drkr" => {
+                    variants.push("dorkar".to_string());
+                }
+                _ => {}
+            }
+        }
+
+        variants
+    }
 }
 
 #[cfg(test)]

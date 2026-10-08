@@ -1063,6 +1063,22 @@ impl PhoneticSuggestion {
                 }
             }
 
+            // 10b. Project "ধ্বনি-সেতু" (Dhvani-Setu) — Phonological Acoustic Recovery
+            if self.config.enable_banglish_shorthand {
+                for ac_variant in super::fuzzy::DhvaniSetuEngine::generate_acoustic_variants(middle) {
+                    let ac_phonetic = self.convert_phonetic(&ac_variant);
+                    if self.database.is_exact_dictionary_word(&ac_phonetic) {
+                        add_cand(
+                            ac_phonetic,
+                            CandidateSource::FuzzySoundLaw,
+                            3100,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
+                    }
+                }
+            }
+
             if middle.contains('-') && middle.len() >= 3 && !middle.split('-').all(|p| p.len() <= 1)
             {
                 let unhyphenated = middle.replace('-', "");
