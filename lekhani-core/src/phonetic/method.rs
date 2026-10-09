@@ -23,6 +23,8 @@ pub struct PhoneticMethod {
     pub use_dictionary: bool,
     pub include_english: bool,
     pub last_committed_word: Option<String>,
+    pub last_committed_prev_word: Option<String>,
+    pub last_commit_time: Option<std::time::Instant>,
     pub recent_context: Vec<String>,
     pub stats: Arc<Mutex<UserStats>>,
     pub is_prediction_mode: bool,
@@ -42,6 +44,8 @@ impl PhoneticMethod {
             use_dictionary: true,
             include_english: true,
             last_committed_word: None,
+            last_committed_prev_word: None,
+            last_commit_time: None,
             recent_context: Vec::with_capacity(8),
             stats: Arc::new(Mutex::new(UserStats::new())),
             is_prediction_mode: false,
@@ -82,6 +86,7 @@ impl PhoneticMethod {
     }
 
     pub fn process_key(&mut self, key: u16, _modifier: u8) -> bool {
+        self.last_commit_time = None;
         if self.is_prediction_mode {
             self.is_prediction_mode = false;
             self.current_candidates.clear();
@@ -113,6 +118,22 @@ impl PhoneticMethod {
             }
             true
         } else {
+            // Check if user is immediately backspacing after an accidental commit (undo within 2.0s)
+            if let (Some(committed), Some(commit_time)) = (&self.last_committed_word, self.last_commit_time) {
+                if commit_time.elapsed().as_secs_f32() <= 2.0 {
+                    let prev = self.last_committed_prev_word.clone();
+                    if let Ok(mut l) = self.suggestion_engine.database.learner.write() {
+                        l.penalize_mistake(prev.as_deref(), committed);
+                    }
+                    self.last_committed_word = None;
+                    self.last_committed_prev_word = None;
+                    self.last_commit_time = None;
+                    if !self.recent_context.is_empty() {
+                        self.recent_context.pop();
+                    }
+                    self.suggestion_engine.clear_cache();
+                }
+            }
             false
         }
     }
@@ -200,6 +221,7 @@ impl PhoneticMethod {
                 self.suggestion_engine.clear_cache();
             }
             let prev_word = self.last_committed_word.clone();
+            self.last_committed_prev_word = prev_word.clone();
             self.suggestion_engine
                 .observe_committed(prev_word.as_deref(), committed);
             if let Ok(mut stats) = self.stats.lock() {
@@ -210,6 +232,7 @@ impl PhoneticMethod {
                 self.recent_context.remove(0);
             }
             self.last_committed_word = Some(committed.clone());
+            self.last_commit_time = Some(std::time::Instant::now());
         }
         self.reset();
         text
@@ -231,6 +254,8 @@ impl PhoneticMethod {
 
     pub fn clear_context(&mut self) {
         self.last_committed_word = None;
+        self.last_committed_prev_word = None;
+        self.last_commit_time = None;
         self.recent_context.clear();
         self.reset();
     }

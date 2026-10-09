@@ -116,11 +116,11 @@ impl Default for RankWeights {
             is_in_dict: 2200.0,
             normalized_freq: 2080.0,
             is_high_freq: 2000.0,
-            lm_score: 5000.0,
-            is_exact_phonetic: 3500.0,
+            lm_score: 4500.0,
+            is_exact_phonetic: 6000.0,
             phonetic_similarity: 200.0,
             length_penalty: 400.0,
-            source_weight: 4200.0,
+            source_weight: 3200.0,
             clitic_alignment: 3500.0,
             intent_modifier_boost: 4500.0,
             user_bigram_prob: 3000.0,
@@ -504,8 +504,8 @@ mod tests {
             ..Default::default()
         };
         let score = weights.compute_score(&features);
-        // 2200 + 3500 + 0.8 * 5000 = 9700
-        assert_eq!(score, 9700);
+        // 2200 + 6000 + 0.8 * 4500 = 11800
+        assert_eq!(score, 11800);
     }
 
     #[test]
