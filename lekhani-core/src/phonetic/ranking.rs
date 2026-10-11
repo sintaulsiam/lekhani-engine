@@ -483,6 +483,7 @@ pub fn is_colloquial_verbal_form(text: &str) -> bool {
         "সে",
         "মু", "ম্নে",
         "তেসি", "তেসো", "তেসে", "তেসেন",
+        "তাসি", "তাসো", "তাসে", "তাসেন",
     ];
     COLLOQUIAL_ENDINGS.iter().any(|&e| text.ends_with(e))
 }
