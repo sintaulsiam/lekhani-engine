@@ -31,6 +31,8 @@ pub struct AutonomousLearner {
     #[serde(default)]
     pub input_error_counts: HashMap<String, u32>,
     #[serde(default)]
+    pub last_decay_timestamp: u64,
+    #[serde(default)]
     pub rank_weights: RankWeights,
     #[serde(skip)]
     pub dirty: bool,
@@ -48,7 +50,7 @@ impl Default for AutonomousLearner {
 
 impl AutonomousLearner {
     pub const BINARY_MAGIC: &'static [u8; 4] = b"LLRN";
-    pub const BINARY_VERSION: u32 = 3;
+    pub const BINARY_VERSION: u32 = 4;
 
     pub fn new() -> Self {
         Self {
@@ -62,6 +64,7 @@ impl AutonomousLearner {
             candidate_selection_counts: HashMap::new(),
             input_error_map: HashMap::new(),
             input_error_counts: HashMap::new(),
+            last_decay_timestamp: 0,
             rank_weights: RankWeights::default(),
             dirty: false,
         }
@@ -427,7 +430,11 @@ impl AutonomousLearner {
         *count += 1;
         self.dirty = true;
 
-        if *count >= self.auto_learn_threshold && !trie.contains_exact(&word) {
+        if *count >= self.auto_learn_threshold
+            && !trie.contains_exact(&word)
+            && is_valid_bengali_orthography(&word)
+            && !is_probable_spelling_mistake(&word, trie)
+        {
             self.learned_words.insert(word.clone());
             self.dirty = true;
             newly_learned.push(word);
@@ -438,6 +445,67 @@ impl AutonomousLearner {
         }
 
         newly_learned
+    }
+
+    /// Apply recency decay to prevent stale vocabulary and outdated candidate overrides
+    /// from remaining permanently pinned in memory.
+    pub fn apply_recency_decay(&mut self, factor: f32) {
+        let f = factor.clamp(0.1, 0.99);
+
+        // 1. Decay candidate selection counts & prune zero counts
+        self.candidate_selection_counts.retain(|_, count| {
+            *count = ((*count as f32) * f).round() as u32;
+            *count >= 1
+        });
+
+        // 2. Prune candidate_memory if backing count dropped below 1
+        self.candidate_memory.retain(|buf, cand| {
+            let key = format!("{}\t{}", buf, cand);
+            self.candidate_selection_counts.contains_key(&key)
+        });
+
+        // 3. Decay input error counts
+        self.input_error_counts.retain(|_, count| {
+            *count = ((*count as f32) * f).round() as u32;
+            *count >= 1
+        });
+
+        // 4. Prune input_error_map if backing count dropped below 1
+        self.input_error_map.retain(|raw, cand| {
+            let key = format!("{}\t{}", raw, cand);
+            self.input_error_counts.contains_key(&key)
+        });
+
+        // 5. Decay observed word frequencies
+        self.observed_counts.retain(|word, count| {
+            *count = ((*count as f32) * f).round() as u32;
+            *count >= 1 || self.learned_words.contains(word) || self.custom_user_words.contains(word)
+        });
+
+        // 6. Decay bigram frequencies
+        self.user_bigrams.retain(|_, count| {
+            *count = ((*count as f32) * f).round() as u32;
+            *count >= 1
+        });
+
+        self.dirty = true;
+    }
+
+    /// Check elapsed time and apply recency decay if at least 24 hours (86,400s) have passed
+    pub fn decay_if_needed(&mut self, current_epoch_seconds: u64) {
+        if self.last_decay_timestamp == 0 {
+            self.last_decay_timestamp = current_epoch_seconds;
+            return;
+        }
+        if current_epoch_seconds > self.last_decay_timestamp {
+            let elapsed = current_epoch_seconds - self.last_decay_timestamp;
+            let days = elapsed / 86_400;
+            if days >= 1 {
+                let factor = (0.85f32).powf((days as f32) / 30.0);
+                self.apply_recency_decay(factor);
+                self.last_decay_timestamp = current_epoch_seconds;
+            }
+        }
     }
 
     /// Pre-trained high-frequency conversational word pairs and idioms for instant warm-start
@@ -639,6 +707,39 @@ impl AutonomousLearner {
                             learner.dirty = false;
                             return learner;
                         }
+                    } else if version == 3 {
+                        #[derive(Deserialize)]
+                        struct AutonomousLearnerV3 {
+                            observed_counts: HashMap<String, u32>,
+                            learned_words: HashSet<String>,
+                            custom_user_words: HashSet<String>,
+                            auto_learn_threshold: u32,
+                            user_bigrams: HashMap<String, u32>,
+                            last_committed_word: Option<String>,
+                            candidate_memory: HashMap<String, String>,
+                            candidate_selection_counts: HashMap<String, u32>,
+                            input_error_map: HashMap<String, String>,
+                            input_error_counts: HashMap<String, u32>,
+                            rank_weights: RankWeights,
+                        }
+                        if let Ok(old) = bincode::deserialize::<AutonomousLearnerV3>(&bytes[8..]) {
+                            let mut learner = Self::new();
+                            learner.observed_counts = old.observed_counts;
+                            learner.learned_words = old.learned_words;
+                            learner.custom_user_words = old.custom_user_words;
+                            learner.auto_learn_threshold = old.auto_learn_threshold;
+                            learner.user_bigrams = old.user_bigrams;
+                            learner.last_committed_word = old.last_committed_word;
+                            learner.candidate_memory = old.candidate_memory;
+                            learner.candidate_selection_counts = old.candidate_selection_counts;
+                            learner.input_error_map = old.input_error_map;
+                            learner.input_error_counts = old.input_error_counts;
+                            learner.rank_weights = old.rank_weights;
+                            learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
+                            learner.input_error_map.retain(|k, _| k.chars().count() > 2);
+                            learner.dirty = true;
+                            return learner;
+                        }
                     } else if version == 2 {
                         #[derive(Deserialize)]
                         struct AutonomousLearnerV2 {
@@ -782,6 +883,102 @@ pub const PRETRAINED_CONVERSATIONAL_BIGRAMS: &[(&str, &str, u32)] = &[
     ("কাজ", "করছি", 16),
     ("কাজ", "শেষ", 18),
 ];
+
+/// Validate Bengali orthographical legality:
+/// - No orphaned dependent vowel signs (kars) at start of word
+/// - No consecutive dependent vowel signs
+/// - No orphaned Hasanta at word start, no consecutive Hasanta (্্), and no Hasanta directly followed by Kar
+/// - No Chandra-bindu (ঁ), Anusvara (ং), Visarga (ঃ) at word start or repeated consecutive
+#[inline]
+pub fn is_valid_bengali_orthography(word: &str) -> bool {
+    if word.is_empty() {
+        return false;
+    }
+    let chars: Vec<char> = word.chars().collect();
+    if chars.is_empty() {
+        return false;
+    }
+
+    let is_kar = |c: char| matches!(c, 'া' | 'ি' | 'ী' | 'ু' | 'ূ' | 'ৃ' | 'ে' | 'ৈ' | 'ো' | 'ৌ');
+    let is_modifier = |c: char| matches!(c, 'ঁ' | 'ং' | 'ঃ');
+
+    // First char cannot be a Kar, Hasanta, or modifier
+    if is_kar(chars[0]) || chars[0] == '্' || is_modifier(chars[0]) {
+        return false;
+    }
+
+    for i in 0..chars.len() {
+        let c = chars[i];
+        if i + 1 < chars.len() {
+            let next = chars[i + 1];
+            // Consecutive Kars
+            if is_kar(c) && is_kar(next) {
+                return false;
+            }
+            // Consecutive Hasanta
+            if c == '্' && next == '্' {
+                return false;
+            }
+            // Hasanta followed directly by Kar without intervening consonant
+            if c == '্' && is_kar(next) {
+                return false;
+            }
+            // Consecutive modifiers
+            if is_modifier(c) && is_modifier(next) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// Sound-law typo proximity filter:
+/// Checks if an unrecognized candidate is an edit-distance-1 permutation of a high-frequency
+/// dictionary word differing by common Bengali orthographic confusion pairs (ি/ী, ু/ূ, শ/স/ষ, ন/ণ, র/ড়/ঢ়, ত/ৎ, জ/য).
+/// If so, marks it as a probable spelling mistake (e.g. পরিক্ষা -> পরীক্ষা, মুহুর্ত -> মুহূর্ত)
+/// to prevent polluting the learned dictionary.
+pub fn is_probable_spelling_mistake(word: &str, trie: &PrefixTrie) -> bool {
+    if trie.get_frequency(word) >= 5000 {
+        return false;
+    }
+
+    const CONFUSION_PAIRS: &[(char, &[char])] = &[
+        ('ি', &['ী']),
+        ('ী', &['ি']),
+        ('ু', &['ূ']),
+        ('ূ', &['ু']),
+        ('শ', &['স', 'ষ']),
+        ('স', &['শ', 'ষ']),
+        ('ষ', &['শ', 'স']),
+        ('ন', &['ণ']),
+        ('ণ', &['ন']),
+        ('র', &['ড়', 'ঢ়']),
+        ('ড়', &['র', 'ঢ়']),
+        ('ঢ়', &['ড়', 'র']),
+        ('ত', &['ৎ']),
+        ('ৎ', &['ত']),
+        ('জ', &['য']),
+        ('য', &['জ']),
+    ];
+
+    let chars: Vec<char> = word.chars().collect();
+    for i in 0..chars.len() {
+        let ch = chars[i];
+        for &(target, replacements) in CONFUSION_PAIRS {
+            if ch == target {
+                for &rep in replacements {
+                    let mut candidate = chars.clone();
+                    candidate[i] = rep;
+                    let candidate_str: String = candidate.into_iter().collect();
+                    if trie.get_frequency(&candidate_str) >= 3000 {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
 
 #[cfg(test)]
 mod tests {
@@ -1029,5 +1226,48 @@ mod tests {
         adapted.rank_weights.lm_score = 7500.0; // user has already adapted
         adapted.load_pretrained_rank_weights(&weights_path);
         assert_eq!(adapted.rank_weights.lm_score, 7500.0, "Must not overwrite adapted weights");
+    }
+
+    #[test]
+    fn test_learner_hygiene_and_decay() {
+        let mut trie = PrefixTrie::new();
+        trie.insert_weighted("পরীক্ষা".to_string(), 9000);
+        trie.insert_weighted("মুহূর্ত".to_string(), 8500);
+
+        // 1. Orthographical legality
+        assert!(is_valid_bengali_orthography("কুয়েট"));
+        assert!(is_valid_bengali_orthography("পরীক্ষা"));
+        assert!(!is_valid_bengali_orthography("াভাত")); // orphan Kar at start
+        assert!(!is_valid_bengali_orthography("ভাাাত")); // consecutive Kars
+        assert!(!is_valid_bengali_orthography("্ভাত")); // orphan Hasanta at start
+
+        // 2. Typo proximity check
+        assert!(is_probable_spelling_mistake("পরিক্ষা", &trie));
+        assert!(is_probable_spelling_mistake("মুহুর্ত", &trie));
+        assert!(!is_probable_spelling_mistake("কুয়েট", &trie));
+
+        // 3. observe_and_learn rejection of typos vs acceptance of new genuine words
+        let mut learner = AutonomousLearner::new();
+        learner.auto_learn_threshold = 2;
+
+        // Typos should never be learned into learned_words
+        for _ in 0..5 {
+            learner.observe_and_learn("পরিক্ষা", &trie);
+        }
+        assert!(!learner.learned_words.contains("পরিক্ষা"), "Typo must not be learned");
+
+        // Genuinely new vocabulary should be learned
+        for _ in 0..2 {
+            learner.observe_and_learn("কুয়েট", &trie);
+        }
+        assert!(learner.learned_words.contains("কুয়েট"), "Valid new word must be learned");
+
+        // 4. Recency decay
+        learner.record_candidate_selection_direct("Kothay", "কোথায়");
+        assert_eq!(learner.candidate_memory.get("kothay"), Some(&"কোথায়".to_string()));
+
+        // Apply decay with low factor (simulating 60 days without use)
+        learner.apply_recency_decay(0.0); // complete decay of zero-frequency entries
+        assert_eq!(learner.candidate_memory.get("kothay"), None, "Decayed entry must be pruned");
     }
 }
