@@ -75,8 +75,8 @@ impl AnvayaAgreementEngine {
         let mut confidence = 0.0f32;
         let mut subject_offset = None;
 
-        // Inspect up to last 8 tokens within current clause
-        let take = context.len().min(8);
+        // Inspect up to last 16 tokens within current clause
+        let take = context.len().min(16);
         let start = context.len() - take;
         let slice = &context[start..];
 
@@ -561,5 +561,22 @@ mod tests {
         // Third person familiar pronoun 'ওরা'
         let state_ora = AnvayaAgreementEngine::extract_state(&["ওরা", "এখন"]);
         assert_eq!(state_ora.honorific_tier, HonorificRegister::Familiar);
+    }
+
+    #[test]
+    fn test_anvaya_long_distance_sov() {
+        // Long-distance formal agreement over 7+ words
+        let ctx_formal = &["আপনি", "কাল", "সকালে", "অফিসে", "আসার", "সময়", "সাবধানে"];
+        let state_formal = AnvayaAgreementEngine::extract_state(ctx_formal);
+        assert_eq!(state_formal.honorific_tier, HonorificRegister::FormalHonorific);
+        assert!(AnvayaAgreementEngine::compute_agreement_score(&state_formal, "আসবেন") > 2.0);
+        assert!(AnvayaAgreementEngine::compute_agreement_score(&state_formal, "আসবে") < -2.0);
+
+        // Long-distance intimate agreement
+        let ctx_intimate = &["তুই", "কাল", "সকালে", "অফিসে", "আসার", "সময়", "সাবধানে"];
+        let state_intimate = AnvayaAgreementEngine::extract_state(ctx_intimate);
+        assert_eq!(state_intimate.honorific_tier, HonorificRegister::Intimate);
+        assert!(AnvayaAgreementEngine::compute_agreement_score(&state_intimate, "আসবি") > 2.0);
+        assert!(AnvayaAgreementEngine::compute_agreement_score(&state_intimate, "আসবেন") < -2.0);
     }
 }

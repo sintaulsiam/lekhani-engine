@@ -263,8 +263,19 @@ impl ContextScorer {
         right_word: Option<&str>,
         candidates: &mut [String],
     ) {
+        let _ = self.rank_candidates_in_place_bidirectional_with_scores(context, right_word, candidates);
+    }
+
+    /// Bi-directional zero-allocation candidate ranking returning scores array.
+    pub fn rank_candidates_in_place_bidirectional_with_scores(
+        &self,
+        context: &[&str],
+        right_word: Option<&str>,
+        candidates: &mut [String],
+    ) -> [f32; 32] {
+        let mut scores = [0.0; 32];
         if candidates.len() <= 1 {
-            return;
+            return scores;
         }
 
         let clean_context = truncate_at_sentence_boundary(context);
@@ -304,9 +315,11 @@ impl ContextScorer {
 
         let anvaya_state = crate::anvaya::AnvayaAgreementEngine::extract_state(clean_context);
 
+        // Track initial primary candidate before reranking
+        let initial_primary = candidates.first().cloned();
+
         // Stack-allocated array for zero-allocation scoring (up to 32 candidates)
         let len = candidates.len().min(32);
-        let mut scores = [0.0; 32];
         for i in 0..len {
             let cand = &candidates[i];
             let lm_score = if prev1.is_some() {
@@ -338,6 +351,8 @@ impl ContextScorer {
             scores[i] = lm_score + personal_boost + grammar_boost + anvaya_boost + register_boost + right_boost + semantic_boost - position_penalty;
         }
 
+        let initial_primary_score = scores[0];
+
         // Simple insertion sort to sort `candidates` and `scores` in tandem.
         // For N <= 32 this is extremely fast and entirely stack-based.
         for i in 1..len {
@@ -348,6 +363,28 @@ impl ContextScorer {
                 j -= 1;
             }
         }
+
+        // Homophone Uncertainty Deadband:
+        // If the original primary candidate (from rule-based parser or exact match) was displaced
+        // by a phonetic homophone, but the score difference is within the uncertainty deadband (< 0.75),
+        // do not override the typist's explicit intent.
+        const HOMOPHONE_UNCERTAINTY_DELTA: f32 = 0.75;
+        if let Some(ref primary) = initial_primary {
+            if len >= 2 && &candidates[0] != primary {
+                let winner = &candidates[0];
+                let winner_score = scores[0];
+                if are_bengali_homophones(winner, primary)
+                    && (winner_score - initial_primary_score) < HOMOPHONE_UNCERTAINTY_DELTA
+                {
+                    if let Some(pos) = candidates[..len].iter().position(|c| c == primary) {
+                        candidates.swap(0, pos);
+                        scores.swap(0, pos);
+                    }
+                }
+            }
+        }
+
+        scores
     }
 
     /// Compute context score boost for homophone pairs
@@ -662,6 +699,55 @@ pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str
     boost
 }
 
+/// Zero-allocation phonetic homophone comparison using canonical Bengali soundex codes.
+#[inline]
+pub fn are_bengali_homophones(w1: &str, w2: &str) -> bool {
+    let mut s1 = [0u8; 32];
+    let mut s2 = [0u8; 32];
+    let len1 = encode_bengali_soundex(w1, &mut s1);
+    let len2 = encode_bengali_soundex(w2, &mut s2);
+    len1 > 0 && len1 == len2 && s1[..len1] == s2[..len2]
+}
+
+#[inline]
+fn encode_bengali_soundex(word: &str, buf: &mut [u8; 32]) -> usize {
+    let mut idx = 0;
+    let mut last = 0u8;
+    for ch in word.chars() {
+        let code = match ch {
+            'শ' | 'ষ' | 'স' => b'S',
+            'ন' | 'ণ' | 'ং' | 'ঙ' | 'ঁ' | 'ঞ' => b'N',
+            'ি' | 'ী' | 'ই' | 'ঈ' => b'I',
+            'ু' | 'ূ' | 'উ' | 'ঊ' => b'U',
+            'া' | 'আ' => b'A',
+            'ে' | 'এ' => b'E',
+            'ো' | 'ও' | 'অ' => b'O',
+            'ৈ' | 'ঐ' => b'Y',
+            'ৌ' | 'ঔ' => b'W',
+            'র' | 'ড়' | 'ঢ়' | 'ঋ' | 'ৃ' => b'R',
+            'ত' | 'ৎ' | 'ট' => b'T',
+            'থ' | 'ঠ' => b't',
+            'দ' | 'ড' => b'D',
+            'ধ' | 'ঢ' => b'd',
+            'ক' | 'খ' => b'K',
+            'গ' | 'ঘ' => b'G',
+            'চ' | 'ছ' => b'C',
+            'প' | 'ফ' => b'P',
+            'ব' | 'ভ' => b'B',
+            'জ' | 'য' | 'য়' | 'ঝ' => b'J',
+            'হ' => b'H',
+            '্' => continue,
+            _ => continue,
+        };
+        if code != last && idx < 32 {
+            buf[idx] = code;
+            idx += 1;
+            last = code;
+        }
+    }
+    idx
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -770,5 +856,23 @@ mod tests {
         // In formal context, "করবেন" should clearly dominate
         let ranked_formal = scorer.rank_candidates(&["জনাব", "আপনি", "কাজটা"], &candidates);
         assert_eq!(ranked_formal[0], "করবেন");
+    }
+
+    #[test]
+    fn test_homophone_uncertainty_deadband() {
+        assert!(are_bengali_homophones("পরা", "পড়া"));
+        assert!(are_bengali_homophones("কী", "কি"));
+        assert!(!are_bengali_homophones("ভাত", "কাল"));
+
+        let scorer = ContextScorer::new();
+        // With neutral context "একটি", when initial primary is "পরা", deadband keeps "পরা" #0
+        let mut cands = vec!["পরা".to_string(), "পড়া".to_string()];
+        scorer.rank_candidates_in_place_bidirectional(&["একটি"], None, &mut cands);
+        assert_eq!(cands[0], "পরা", "Neutral context should preserve literal primary 'পরা'");
+
+        // With explicit reading context "বই", "পড়া" overrides "পরা"
+        let mut book_cands = vec!["পরা".to_string(), "পড়া".to_string()];
+        scorer.rank_candidates_in_place_bidirectional(&["বই"], None, &mut book_cands);
+        assert_eq!(book_cands[0], "পড়া", "Explicit context 'বই' must override to 'পড়া'");
     }
 }
