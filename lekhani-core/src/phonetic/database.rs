@@ -538,6 +538,12 @@ impl PhoneticDatabase {
         self.overrides.lookup(input)
     }
 
+    /// Fast zero-copy prefix search on supervised phonetic overrides
+    #[inline]
+    pub fn lookup_override_prefix(&self, prefix: &str, max_key_len: usize, limit: usize) -> Vec<(&str, OverrideEntry<'_>)> {
+        self.overrides.lookup_prefix(prefix, max_key_len, limit)
+    }
+
     /// Load database from a directory containing dictionary.json, suffix.json, autocorrect.json
     pub fn load_from_dir<P: AsRef<Path>>(
         &mut self,

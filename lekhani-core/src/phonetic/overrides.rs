@@ -54,6 +54,11 @@ impl<'a> OverrideEntry<'a> {
     }
 
     #[inline]
+    pub fn iter(&self) -> std::slice::Iter<'_, (&'a str, f32)> {
+        self.as_slice().iter()
+    }
+
+    #[inline]
     pub fn first(&self) -> Option<(&'a str, f32)> {
         if self.len > 0 {
             Some(self.items[0])
@@ -300,6 +305,74 @@ impl ZeroCopyOverrides {
             }
         }
         None
+    }
+
+    /// Fast zero-copy prefix search on sorted keys in binary overrides table.
+    pub fn lookup_prefix<'a>(&'a self, prefix: &str, max_key_len: usize, limit: usize) -> Vec<(&'a str, OverrideEntry<'a>)> {
+        if self.key_count == 0 || limit == 0 {
+            return Vec::new();
+        }
+        let data = self.buffer.as_ref();
+        let strings = &data[self.strings_offset..self.strings_offset + self.strings_len];
+
+        let mut low = 0;
+        let mut high = self.key_count;
+
+        while low < high {
+            let mid = (low + high) / 2;
+            let pos = self.keys_offset + mid * Self::KEY_RECORD_LEN;
+            let k_off = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
+            let k_len = u16::from_le_bytes(data[pos + 4..pos + 6].try_into().unwrap()) as usize;
+            let key_str = unsafe {
+                std::str::from_utf8_unchecked(&strings[k_off..k_off + k_len])
+            };
+            if key_str < prefix {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+
+        let mut results = Vec::with_capacity(limit);
+        for idx in low..self.key_count {
+            if results.len() >= limit {
+                break;
+            }
+            let pos = self.keys_offset + idx * Self::KEY_RECORD_LEN;
+            let k_len = u16::from_le_bytes(data[pos + 4..pos + 6].try_into().unwrap()) as usize;
+            if max_key_len > 0 && k_len > max_key_len {
+                continue;
+            }
+            let k_off = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
+            let key_str = unsafe {
+                std::str::from_utf8_unchecked(&strings[k_off..k_off + k_len])
+            };
+            if !key_str.starts_with(prefix) {
+                break;
+            }
+            if key_str == prefix {
+                continue;
+            }
+            let cand_start = u32::from_le_bytes(data[pos + 6..pos + 10].try_into().unwrap()) as usize;
+            let cand_count = u16::from_le_bytes(data[pos + 10..pos + 12].try_into().unwrap()) as usize;
+
+            let mut entry = OverrideEntry::new();
+            for i in 0..cand_count.min(4) {
+                let c_idx = cand_start + i;
+                if c_idx >= self.cand_count { break; }
+                let c_pos = self.cands_offset + c_idx * Self::CAND_RECORD_LEN;
+                let b_off = u32::from_le_bytes(data[c_pos..c_pos + 4].try_into().unwrap()) as usize;
+                let b_len = u16::from_le_bytes(data[c_pos + 4..c_pos + 6].try_into().unwrap()) as usize;
+                let conf = f32::from_le_bytes(data[c_pos + 6..c_pos + 10].try_into().unwrap());
+
+                let bengali_str = unsafe {
+                    std::str::from_utf8_unchecked(&strings[b_off..b_off + b_len])
+                };
+                entry.push(bengali_str, conf);
+            }
+            results.push((key_str, entry));
+        }
+        results
     }
 
     pub fn compile(map: &std::collections::HashMap<String, Vec<(String, f32)>>) -> Vec<u8> {
