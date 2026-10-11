@@ -132,6 +132,11 @@ impl AutonomousLearner {
         }
         self.candidate_memory
             .insert(clean_buf.to_string(), clean_cand.to_string());
+        let lower = clean_buf.to_ascii_lowercase();
+        if lower != clean_buf {
+            self.candidate_memory
+                .insert(lower, clean_cand.to_string());
+        }
         self.dirty = true;
         if self.candidate_memory.len() > 2200 {
             self.prune_if_needed();
@@ -173,6 +178,20 @@ impl AutonomousLearner {
             if self.candidate_memory.len() > 2200 {
                 self.prune_if_needed();
             }
+        }
+    }
+
+    /// Explicitly record personal error pattern directly bypassing frequency threshold
+    pub fn record_input_error_direct(&mut self, raw_input: &str, candidate: &str) {
+        let clean_raw = raw_input.trim().to_lowercase();
+        let clean_cand = candidate.trim();
+        if clean_raw.is_empty() || clean_cand.is_empty() || clean_raw == clean_cand || clean_cand.is_ascii() {
+            return;
+        }
+        self.input_error_map.insert(clean_raw, clean_cand.to_string());
+        self.dirty = true;
+        if self.input_error_map.len() > 2200 {
+            self.prune_if_needed();
         }
     }
 
@@ -300,6 +319,17 @@ impl AutonomousLearner {
                     self.dirty = true;
                 }
             }
+        }
+        // Also remove direct 1-shot candidate_memory entries matching this mistakenly committed candidate
+        let direct_keys: Vec<String> = self
+            .candidate_memory
+            .iter()
+            .filter(|(_, v)| v.as_str() == clean_curr)
+            .map(|(k, _)| k.clone())
+            .collect();
+        for k in direct_keys {
+            self.candidate_memory.remove(&k);
+            self.dirty = true;
         }
 
         if self.last_committed_word.as_deref() == Some(clean_curr) {
