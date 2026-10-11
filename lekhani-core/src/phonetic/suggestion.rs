@@ -1196,15 +1196,22 @@ impl PhoneticSuggestion {
                 || raw_candidates.iter().any(|c| {
                     c.source != CandidateSource::SegmentedLattice
                         && !c.text.contains(' ')
-                        && self.database.trie.contains_exact(&c.text)
-                });
+                        && (self.database.trie.contains_exact(&c.text)
+                            || self.database.is_exact_dictionary_word(&c.text)
+                            || c.source == CandidateSource::Loanword
+                            || c.source == CandidateSource::Autocorrect
+                            || c.source == CandidateSource::PhoneticOverride)
+                })
+                || preferred_loanword.is_some()
+                || PhoneticDatabase::get_bilingual_loanword(middle).is_some()
+                || self.database.get_autocorrect_raw(middle).is_some();
             let segmented = super::segmenter::segment_concatenated_token(
                 middle,
                 &self.database,
                 |s| self.convert_phonetic(s),
             );
             for seg in segmented {
-                let boost = if has_exact_single_word { 3000 } else { 12000 };
+                let boost = if has_exact_single_word { 2000 } else { 6000 };
                 add_cand(
                     seg.text,
                     CandidateSource::SegmentedLattice,
@@ -1462,9 +1469,9 @@ impl PhoneticSuggestion {
             }
             if cand.source == CandidateSource::SegmentedLattice {
                 let boost = if has_exact_single_word || has_dominant_homophone || preferred_loanword.is_some() {
-                    cand.initial_boost.min(3000)
+                    cand.initial_boost.min(2500)
                 } else {
-                    cand.initial_boost + 2000
+                    cand.initial_boost
                 };
                 scored_candidates.push((cand.text.clone(), boost, RankFeatures::default()));
                 continue;

@@ -27,6 +27,19 @@ pub fn segment_concatenated_token(
         return Vec::new();
     }
 
+    // Do not split if the input is already a code token, a known loanword, an autocorrect entry, or an exact dictionary word
+    if super::code_shield::is_code_token(input)
+        || PhoneticDatabase::get_bilingual_loanword(&lower).is_some()
+        || database.get_autocorrect_raw(&lower).is_some()
+    {
+        return Vec::new();
+    }
+
+    let whole_conv = convert_fn(&lower);
+    if !whole_conv.is_empty() && database.is_exact_dictionary_word(&whole_conv) {
+        return Vec::new();
+    }
+
     const VALID_SHORT_WORDS: &[&str] = &[
         "am", "ba", "ei", "ek", "ha", "ja", "je", "ke", "ki", "ma", "na", "oi", "se", "ta",
     ];
@@ -133,5 +146,10 @@ mod tests {
         // Verify non-ASCII input safely returns empty without slicing panics
         let res_unicode = segment_concatenated_token("বাংলাশব্দযোজক", &db, convert);
         assert!(res_unicode.is_empty());
+
+        // Verify known bilingual loanwords and exact matches do not get segmented
+        assert!(segment_concatenated_token("download", &db, convert).is_empty());
+        assert!(segment_concatenated_token("password", &db, convert).is_empty());
+        assert!(segment_concatenated_token("online", &db, convert).is_empty());
     }
 }
