@@ -1413,6 +1413,14 @@ impl PhoneticSuggestion {
             FORMAL_DISCOURSE_HEADS.contains(&w.trim_matches('।'))
         });
 
+        const CASUAL_DISCOURSE_HEADS: &[&str] = &[
+            "রে", "মামা", "ব্রো", "দোস্ত", "কিরে", "নাকি", "আরে", "ভাই", "vai", "bro", "boss", "বস",
+        ];
+        let is_casual_register_context = context.iter().any(|&w| {
+            let clean = w.trim_matches(|c: char| c.is_ascii_punctuation() || c == '।' || c == ',');
+            CASUAL_DISCOURSE_HEADS.contains(&clean)
+        });
+
         // neural_alpha: adaptive blending weight based on N-gram LM confidence and context.
         // Computed once here so it can be used both in ranking and as a feature.
         let ngram_top_log = prev.map(|p| self.ai_context.lm().score_candidate(prev_prev, None, p));
@@ -1453,6 +1461,7 @@ impl PhoneticSuggestion {
             neural_alpha,
             is_sentence_initial,
             is_formal_register_context,
+            is_casual_register_context,
         };
 
         let has_exact_single_word = is_primary_in_dict

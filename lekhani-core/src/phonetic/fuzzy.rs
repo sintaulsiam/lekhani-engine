@@ -263,7 +263,26 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("ddh", &["dhZ", "dhy", "dd", "dh"]),
     ("tth", &["thZ", "thy", "tt"]),
     ("tt", &["tZ", "ty", "t``", "t"]),
-    // 8. Chandrabindu Nasalization Equivalences (চাঁদ, হাঁস, দাঁত, বাঁশ, পাঁচ)
+    // 8. Chandrabindu Nasalization Equivalences (চাঁদ, হাঁস, দাঁত, বাঁশ, পাঁচ, ফোঁটা, গাঁজা, রাঁধা, কুঁড়ে)
+    ("chad", &["c^ad", "ch^ad", "chad"]),
+    ("cad", &["c^ad", "cad"]),
+    ("bash", &["b^ash", "bash"]),
+    ("badh", &["b^adh", "badh"]),
+    ("kad", &["k^ad", "kad"]),
+    ("kat", &["k^at", "k^aT", "kat"]),
+    ("fot", &["f^ot", "f^oT", "fot"]),
+    ("fash", &["f^ash", "fash"]),
+    ("fad", &["f^ad", "fad"]),
+    ("gaz", &["g^az", "gaz"]),
+    ("gath", &["g^ath", "gath"]),
+    ("hach", &["h^ach", "hach"]),
+    ("hat", &["h^at", "h^aT", "hat"]),
+    ("hash", &["h^ash", "hash"]),
+    ("pac", &["p^ac", "p^ach", "pac"]),
+    ("pach", &["p^ach", "p^ac", "pach"]),
+    ("radh", &["r^adh", "radh"]),
+    ("jhap", &["jh^ap", "jhap"]),
+    ("tara", &["t^ara", "tara"]),
     ("ad", &["a^d", "ad"]),
     ("as", &["a^s", "a^sh", "as"]),
     ("ash", &["a^sh", "a^s", "ash"]),
@@ -277,14 +296,21 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("an", &["a^n", "an"]),
     ("ha", &["h^a", "ha"]),
     ("ca", &["c^a", "ca"]),
-    ("cha", &["ch^a", "cha"]),
+    ("cha", &["c^a", "ch^a", "cha"]),
     ("da", &["d^a", "da"]),
     ("ba", &["b^a", "ba"]),
     ("pa", &["p^a", "pa"]),
     ("fa", &["f^a", "fa"]),
+    ("fo", &["f^o", "fo"]),
     ("pha", &["ph^a", "pha"]),
+    ("pho", &["ph^o", "fo"]),
     ("ga", &["g^a", "ga"]),
     ("ka", &["k^a", "ka"]),
+    ("ku", &["k^u", "ku"]),
+    ("hu", &["h^u", "hu"]),
+    ("ra", &["r^a", "ra"]),
+    ("ta", &["t^a", "ta"]),
+    ("Ta", &["T^a", "Ta"]),
     // 9. Casual Banglish & Conversational Sound Laws
     ("aso", &["acho", "asen"]),
     ("aco", &["acho"]),
@@ -950,5 +976,17 @@ mod tests {
             DhvaniSetuEngine::acoustic_fingerprint("juddho"),
             DhvaniSetuEngine::acoustic_fingerprint("zuddho")
         );
+    }
+
+    #[test]
+    fn test_soft_chandra_bindu_expansion() {
+        let chad_variants = generate_phonetic_variants("chad");
+        assert!(chad_variants.contains(&"c^ad".to_string()) || chad_variants.contains(&"ch^ad".to_string()));
+
+        let bash_variants = generate_phonetic_variants("bash");
+        assert!(bash_variants.contains(&"b^ash".to_string()));
+
+        let fota_variants = generate_phonetic_variants("fota");
+        assert!(fota_variants.contains(&"f^ota".to_string()) || fota_variants.contains(&"f^oTa".to_string()));
     }
 }

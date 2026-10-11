@@ -240,6 +240,8 @@ pub struct CandidateContext<'a> {
     pub is_sentence_initial: bool,
     /// True if current context head matches a formal register phrase
     pub is_formal_register_context: bool,
+    /// True if context contains casual discourse markers (রে, মামা, ব্রো, দোস্ত, ইত্যাদি)
+    pub is_casual_register_context: bool,
 }
 
 impl<'a> CandidateContext<'a> {
@@ -428,8 +430,8 @@ pub fn extract_candidate_features(
     }
 
     // 7f. Colloquial verbal form detection
-    if cand.source == CandidateSource::MorphologicalInflection && is_colloquial_verbal_form(&cand.text) {
-        f.is_colloquial = 1.0;
+    if is_colloquial_verbal_form(&cand.text) {
+        f.is_colloquial = if ctx.is_casual_register_context { 2.0 } else { 1.0 };
     }
 
     // 7g. Sentence-initial
@@ -470,12 +472,17 @@ fn count_suffix_depth(text: &str) -> usize {
 
 /// Returns true if the word ends with a recognizable colloquial Bengali verbal suffix.
 #[inline]
-fn is_colloquial_verbal_form(text: &str) -> bool {
+pub fn is_colloquial_verbal_form(text: &str) -> bool {
     const COLLOQUIAL_ENDINGS: &[&str] = &[
         "চ্ছিলাম", "চ্ছিলে", "চ্ছিল",
         "চ্ছি", "চ্ছে",
         "ছিলাম", "ছিলে", "ছিল",
         "বো", "বে", "বেন",
+        // Informal SMS / Dialectal inflections
+        "সি", "সিলাম", "সিলে", "সিলো", "সেন",
+        "সে",
+        "মু", "ম্নে",
+        "তেসি", "তেসো", "তেসে", "তেসেন",
     ];
     COLLOQUIAL_ENDINGS.iter().any(|&e| text.ends_with(e))
 }
@@ -552,6 +559,7 @@ mod tests {
             neural_alpha: 0.35,
             is_sentence_initial: true,
             is_formal_register_context: false,
+            is_casual_register_context: false,
         }
     }
 
@@ -596,6 +604,7 @@ mod tests {
             user_bigram_boost: 0, is_user_favored: false, is_user_learned: false,
             context_lm_score: None, gru_log_prob: None, neural_alpha: 0.1,
             is_sentence_initial: true, is_formal_register_context: false,
+            is_casual_register_context: false,
         };
         let cand = CandidateHypothesis {
             text: "ঢাকা".to_string(),
