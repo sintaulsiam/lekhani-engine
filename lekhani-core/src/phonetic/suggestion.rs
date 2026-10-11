@@ -95,17 +95,19 @@ pub struct PhoneticSuggestion {
 }
 
 fn probe_neural_predictor() -> Option<Arc<lekhani_neural::NeuralContextPredictor>> {
-    let candidate_dirs = [
-        "data/dictionaries",
-        "../data/dictionaries",
-        "../../data/dictionaries",
-        "/mnt/data/lekhani-android/data/dictionaries",
-        "/usr/local/share/lekhani/dictionaries",
-        "/usr/share/lekhani/dictionaries",
-    ];
+    let mut candidate_dirs: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(env_dir) = std::env::var("LEKHANI_MODELS_DIR") {
+        candidate_dirs.push(std::path::PathBuf::from(env_dir));
+    }
+    candidate_dirs.extend([
+        std::path::PathBuf::from("data/dictionaries"),
+        std::path::PathBuf::from("../data/dictionaries"),
+        std::path::PathBuf::from("../../data/dictionaries"),
+        std::path::PathBuf::from("/usr/local/share/lekhani/dictionaries"),
+        std::path::PathBuf::from("/usr/share/lekhani/dictionaries"),
+    ]);
 
-    for dir_str in &candidate_dirs {
-        let dir = std::path::Path::new(dir_str);
+    for dir in &candidate_dirs {
         let p_model = dir.join("bengali_gru_v2.bin");
         let p_vocab = dir.join("bengali_vocab_v2.json");
         if p_model.exists() && p_vocab.exists() {
@@ -1839,12 +1841,30 @@ impl PhoneticSuggestion {
         previous_word: Option<&str>,
         committed_word: &str,
     ) -> Vec<String> {
-        if let Some(prev) = previous_word {
-            if let Ok(mut l) = self.database.learner.write() {
+        self.record_commit_feedback(previous_word, committed_word, None)
+    }
+
+    /// Record full commit feedback with a single write lock acquisition
+    pub fn record_commit_feedback(
+        &mut self,
+        previous_word: Option<&str>,
+        committed_word: &str,
+        selection_override: Option<(&str, Option<RankFeatures>, Option<RankFeatures>)>,
+    ) -> Vec<String> {
+        if let Ok(mut l) = self.database.learner.write() {
+            if let Some((buffer, chosen_f, rejected_f)) = selection_override {
+                l.record_candidate_selection_direct(buffer, committed_word);
+                if let (Some(chosen), Some(rejected)) = (chosen_f, rejected_f) {
+                    l.update_rank_weights(&chosen, &rejected);
+                }
+            }
+            if let Some(prev) = previous_word {
                 l.observe_committed_pair(prev, committed_word);
             }
+            l.observe_and_learn(committed_word, &self.database.trie)
+        } else {
+            Vec::new()
         }
-        self.database.observe_committed_word(committed_word)
     }
 
     /// Predict next probable Bengali words for zero-preedit state using the statistical language model

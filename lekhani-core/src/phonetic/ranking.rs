@@ -189,12 +189,55 @@ use super::suggestion::{CandidateHypothesis, CandidateSource};
 use unicode_segmentation::UnicodeSegmentation;
 
 /// Grapheme-cluster-aware Levenshtein edit distance to preserve Bengali conjuncts.
+/// Stack-allocated (zero heap allocations on the hot path) for tokens up to 32 graphemes.
 pub fn grapheme_edit_distance(a: &str, b: &str) -> usize {
-    let a_g: Vec<&str> = a.graphemes(true).collect();
-    let b_g: Vec<&str> = b.graphemes(true).collect();
-    let (la, lb) = (a_g.len(), b_g.len());
+    if a == b {
+        return 0;
+    }
+    const STACK_LIMIT: usize = 32;
+
+    let mut a_stack = [""; STACK_LIMIT];
+    let mut la = 0;
+    for g in a.graphemes(true) {
+        if la < STACK_LIMIT {
+            a_stack[la] = g;
+        }
+        la += 1;
+    }
+
+    let mut b_stack = [""; STACK_LIMIT];
+    let mut lb = 0;
+    for g in b.graphemes(true) {
+        if lb < STACK_LIMIT {
+            b_stack[lb] = g;
+        }
+        lb += 1;
+    }
+
     if la == 0 { return lb; }
     if lb == 0 { return la; }
+
+    // Fast path: stack allocation for typical words <= 32 graphemes (zero heap allocation)
+    if la <= STACK_LIMIT && lb <= STACK_LIMIT {
+        let mut prev = [0usize; STACK_LIMIT + 1];
+        let mut curr = [0usize; STACK_LIMIT + 1];
+        for (idx, p) in prev[..=lb].iter_mut().enumerate() {
+            *p = idx;
+        }
+        for (i, &ga) in a_stack[..la].iter().enumerate() {
+            curr[0] = i + 1;
+            for (j, &gb) in b_stack[..lb].iter().enumerate() {
+                let cost = if ga == gb { 0 } else { 1 };
+                curr[j + 1] = (prev[j + 1] + 1).min(curr[j] + 1).min(prev[j] + cost);
+            }
+            prev[..=lb].copy_from_slice(&curr[..=lb]);
+        }
+        return prev[lb];
+    }
+
+    // Fallback for unusually long phrases (> 32 graphemes)
+    let a_g: Vec<&str> = a.graphemes(true).collect();
+    let b_g: Vec<&str> = b.graphemes(true).collect();
     let mut prev: Vec<usize> = (0..=lb).collect();
     let mut curr: Vec<usize> = vec![0; lb + 1];
     for (i, &ga) in a_g.iter().enumerate() {

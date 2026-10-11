@@ -367,7 +367,7 @@ pub fn evaluate_retro_correction(surrounding_context: &str) -> Option<RetroCorre
                     original_word: token.to_string(),
                     replacement_word: repl.to_string(),
                     reason: "শ্রদ্ধাবাচক সর্বনামের সাথে ক্রিয়ার সঙ্গতি".to_string(),
-                    chip_label: format!("🪄 {}", repl),
+                    chip_label: repl.to_string(),
                     chars_to_backspace,
                     text_to_commit,
                 });
@@ -412,7 +412,7 @@ pub fn evaluate_retro_correction(surrounding_context: &str) -> Option<RetroCorre
                     original_word: token.to_string(),
                     replacement_word: repl.to_string(),
                     reason: "ঘনিষ্ঠ সর্বনামের সাথে ক্রিয়ার সঙ্গতি".to_string(),
-                    chip_label: format!("🪄 {}", repl),
+                    chip_label: repl.to_string(),
                     chars_to_backspace,
                     text_to_commit,
                 });
@@ -454,7 +454,7 @@ pub fn evaluate_retro_correction(surrounding_context: &str) -> Option<RetroCorre
                     original_word: "পরা".to_string(),
                     replacement_word: "পড়া".to_string(),
                     reason: "বই পড়ার সাথে সঙ্গতিপূর্ণ বানান".to_string(),
-                    chip_label: "🪄 পড়া".to_string(),
+                    chip_label: "পড়া".to_string(),
                     chars_to_backspace,
                     text_to_commit,
                 });
@@ -488,7 +488,7 @@ pub fn evaluate_retro_correction(surrounding_context: &str) -> Option<RetroCorre
                     original_word: "পড়া".to_string(),
                     replacement_word: "পরা".to_string(),
                     reason: "পোশাক পরার সাথে সঙ্গতিপূর্ণ বানান".to_string(),
-                    chip_label: "🪄 পরা".to_string(),
+                    chip_label: "পরা".to_string(),
                     chars_to_backspace,
                     text_to_commit,
                 });
@@ -735,7 +735,7 @@ mod tests {
         let c1 = corr1.unwrap();
         assert_eq!(c1.original_word, "আছো");
         assert_eq!(c1.replacement_word, "আছেন");
-        assert_eq!(c1.chip_label, "🪄 আছেন");
+        assert_eq!(c1.chip_label, "আছেন");
 
         // 2. Intimate mismatch: তুই কোথায় যাচ্ছো -> যাচ্ছিস
         let corr2 = session.get_retro_correction("তুই কোথায় যাচ্ছো");

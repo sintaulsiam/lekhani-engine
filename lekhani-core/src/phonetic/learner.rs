@@ -77,9 +77,23 @@ impl AutonomousLearner {
         if clean_prev.is_empty() || clean_curr.is_empty() || clean_prev == clean_curr {
             return;
         }
-        let key = format!("{}\t{}", clean_prev, clean_curr);
-        let count = self.user_bigrams.entry(key).or_insert(0);
-        *count = (*count + 1).min(1000);
+        let total_len = clean_prev.len() + 1 + clean_curr.len();
+        if total_len <= 256 {
+            let mut buf = [0u8; 256];
+            buf[..clean_prev.len()].copy_from_slice(clean_prev.as_bytes());
+            buf[clean_prev.len()] = b'\t';
+            buf[clean_prev.len() + 1..total_len].copy_from_slice(clean_curr.as_bytes());
+            let key_str = unsafe { std::str::from_utf8_unchecked(&buf[..total_len]) };
+            if let Some(count) = self.user_bigrams.get_mut(key_str) {
+                *count = (*count + 1).min(1000);
+            } else {
+                self.user_bigrams.insert(key_str.to_string(), 1);
+            }
+        } else {
+            let key = format!("{}\t{}", clean_prev, clean_curr);
+            let count = self.user_bigrams.entry(key).or_insert(0);
+            *count = (*count + 1).min(1000);
+        }
         self.last_committed_word = Some(clean_curr.to_string());
         self.dirty = true;
         if self.user_bigrams.len() > 8500 {

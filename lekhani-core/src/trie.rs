@@ -199,12 +199,12 @@ impl PrefixTrie {
             Err(idx) => idx,
         };
 
-        let mut matched: Vec<(&'a str, u32)> = Vec::with_capacity(limit * 4);
+        let mut matched: Vec<(&'a str, u32)> = Vec::with_capacity((limit * 3).max(8));
         for entry in &self.entries[start_idx..] {
             let word = self.word_at(entry);
             if word.starts_with(prefix) {
                 matched.push((word, entry.freq));
-                if matched.len() >= limit * 8 {
+                if matched.len() >= (limit * 4).max(16) {
                     break;
                 }
             } else {

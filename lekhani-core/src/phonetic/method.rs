@@ -7,6 +7,7 @@ use super::ranking::RankFeatures;
 use super::suggestion::{AiProfile, PhoneticSuggestion};
 use crate::keycodes::*;
 
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::ngram::UserStats;
@@ -25,7 +26,7 @@ pub struct PhoneticMethod {
     pub last_committed_word: Option<String>,
     pub last_committed_prev_word: Option<String>,
     pub last_commit_time: Option<std::time::Instant>,
-    pub recent_context: Vec<String>,
+    pub recent_context: VecDeque<String>,
     pub stats: Arc<Mutex<UserStats>>,
     pub is_prediction_mode: bool,
     pub is_prediction_navigated: bool,
@@ -46,7 +47,7 @@ impl PhoneticMethod {
             last_committed_word: None,
             last_committed_prev_word: None,
             last_commit_time: None,
-            recent_context: Vec::with_capacity(8),
+            recent_context: VecDeque::with_capacity(8),
             stats: Arc::new(Mutex::new(UserStats::new())),
             is_prediction_mode: false,
             is_prediction_navigated: false,
@@ -129,7 +130,7 @@ impl PhoneticMethod {
                     self.last_committed_prev_word = None;
                     self.last_commit_time = None;
                     if !self.recent_context.is_empty() {
-                        self.recent_context.pop();
+                        self.recent_context.pop_back();
                     }
                     self.suggestion_engine.clear_cache();
                 }
@@ -207,29 +208,27 @@ impl PhoneticMethod {
         let text = self.current_candidates.get(index).cloned();
         if let Some(ref committed) = text {
             let typed_len = self.buffer.len();
-            if index != self.default_selected_index && !self.buffer.is_empty() && !self.is_prediction_mode {
+            let is_override = index != self.default_selected_index && !self.buffer.is_empty() && !self.is_prediction_mode;
+            let override_data = if is_override {
                 self.candidate_memory
                     .insert(self.buffer.clone(), committed.clone());
                 let chosen_f = self.current_candidate_features.get(index).copied();
                 let rejected_f = self.current_candidate_features.get(self.default_selected_index).copied();
-                if let Ok(mut l) = self.suggestion_engine.database.learner.write() {
-                    l.record_candidate_selection_direct(&self.buffer, committed);
-                    if let (Some(ref chosen), Some(ref rejected)) = (chosen_f, rejected_f) {
-                        l.update_rank_weights(chosen, rejected);
-                    }
-                }
                 self.suggestion_engine.clear_cache();
-            }
+                Some((self.buffer.as_str(), chosen_f, rejected_f))
+            } else {
+                None
+            };
             let prev_word = self.last_committed_word.clone();
             self.last_committed_prev_word = prev_word.clone();
             self.suggestion_engine
-                .observe_committed(prev_word.as_deref(), committed);
+                .record_commit_feedback(prev_word.as_deref(), committed, override_data);
             if let Ok(mut stats) = self.stats.lock() {
                 stats.record_commit(typed_len, committed);
             }
-            self.recent_context.push(committed.clone());
+            self.recent_context.push_back(committed.clone());
             if self.recent_context.len() > 6 {
-                self.recent_context.remove(0);
+                self.recent_context.pop_front();
             }
             self.last_committed_word = Some(committed.clone());
             self.last_commit_time = Some(std::time::Instant::now());
@@ -466,7 +465,7 @@ mod tests {
     #[test]
     fn test_ai_off_disables_predictions() {
         let mut method = PhoneticMethod::new();
-        method.recent_context.push("আমি".to_string());
+        method.recent_context.push_back("আমি".to_string());
         method.suggestion_engine.config.ai_profile = AiProfile::Off;
 
         // Must return false and leave candidates empty
