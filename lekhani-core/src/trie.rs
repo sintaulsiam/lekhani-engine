@@ -332,10 +332,28 @@ impl PrefixTrie {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Invalid UTF-8 in trie buffer: {}", e)))?;
 
         let mut entries = Vec::with_capacity(entry_count);
+        let make_parse_err = |i: usize, field: &str| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Entry {} {field} slice length mismatch", i),
+            )
+        };
         for i in 0..entry_count {
-            let offset = u32::from_le_bytes(data[cursor..cursor + 4].try_into().unwrap());
-            let len = u16::from_le_bytes(data[cursor + 4..cursor + 6].try_into().unwrap());
-            let freq = u32::from_le_bytes(data[cursor + 6..cursor + 10].try_into().unwrap());
+            let offset = u32::from_le_bytes(
+                data[cursor..cursor + 4]
+                    .try_into()
+                    .map_err(|_| make_parse_err(i, "offset"))?,
+            );
+            let len = u16::from_le_bytes(
+                data[cursor + 4..cursor + 6]
+                    .try_into()
+                    .map_err(|_| make_parse_err(i, "len"))?,
+            );
+            let freq = u32::from_le_bytes(
+                data[cursor + 6..cursor + 10]
+                    .try_into()
+                    .map_err(|_| make_parse_err(i, "freq"))?,
+            );
 
             let start = offset as usize;
             let end = start.checked_add(len as usize).ok_or_else(|| {

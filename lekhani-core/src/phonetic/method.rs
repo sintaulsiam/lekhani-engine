@@ -256,6 +256,7 @@ impl PhoneticMethod {
         self.last_committed_prev_word = None;
         self.last_commit_time = None;
         self.recent_context.clear();
+        self.recent_context.shrink_to_fit();
         self.reset();
     }
 
