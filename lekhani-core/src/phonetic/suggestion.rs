@@ -84,6 +84,7 @@ pub struct PhoneticSuggestion {
     pub ai_predictor: lekhani_ai::NextWordPredictor,
     pub ai_decoder: lekhani_ai::BeamSearchDecoder,
     pub config: PhoneticSuggestionConfig,
+    pub neural_predictor: Option<Arc<lekhani_neural::NeuralContextPredictor>>,
     /// Generation number mirroring database.generation. When they diverge the
     /// local cache is stale and must be cleared before the next lookup.
     cache_generation: u64,
@@ -91,6 +92,36 @@ pub struct PhoneticSuggestion {
     last_computed_features: Vec<RankFeatures>,
     /// Candidates computed for the most recently ranked candidates
     last_computed_candidates: Vec<String>,
+}
+
+fn probe_neural_predictor() -> Option<Arc<lekhani_neural::NeuralContextPredictor>> {
+    let candidate_dirs = [
+        "data/dictionaries",
+        "../data/dictionaries",
+        "../../data/dictionaries",
+        "/mnt/data/lekhani-android/data/dictionaries",
+        "/usr/local/share/lekhani/dictionaries",
+        "/usr/share/lekhani/dictionaries",
+    ];
+
+    for dir_str in &candidate_dirs {
+        let dir = std::path::Path::new(dir_str);
+        let p_model = dir.join("bengali_gru_v2.bin");
+        let p_vocab = dir.join("bengali_vocab_v2.json");
+        if p_model.exists() && p_vocab.exists() {
+            if let (Ok(model), Ok(vocab)) = (
+                lekhani_neural::MicroGruModel::load_binary(&p_model),
+                lekhani_neural::BpeVocabulary::load_json(&p_vocab),
+            ) {
+                if model.vocab_size() == vocab.len() {
+                    if let Ok(pred) = lekhani_neural::NeuralContextPredictor::try_new(Arc::new(model), Arc::new(vocab)) {
+                        return Some(Arc::new(pred));
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 impl std::fmt::Debug for PhoneticSuggestion {
@@ -192,10 +223,21 @@ impl PhoneticSuggestion {
             ai_predictor: lekhani_ai::NextWordPredictor::with_language_model(lm.clone()),
             ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
+            neural_predictor: probe_neural_predictor(),
             cache_generation: 0,
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
         }
+    }
+
+    pub fn set_neural_predictor(&mut self, predictor: Arc<lekhani_neural::NeuralContextPredictor>) {
+        self.neural_predictor = Some(predictor);
+        self.cache.clear();
+    }
+
+    pub fn with_neural_predictor(mut self, predictor: Arc<lekhani_neural::NeuralContextPredictor>) -> Self {
+        self.neural_predictor = Some(predictor);
+        self
     }
 
     /// Check if a layout JSON structure contains valid phonetic patterns
@@ -230,6 +272,7 @@ impl PhoneticSuggestion {
             ai_predictor: lekhani_ai::NextWordPredictor::with_language_model(lm.clone()),
             ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
+            neural_predictor: probe_neural_predictor(),
             cache_generation: 0,
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
@@ -1433,6 +1476,18 @@ impl PhoneticSuggestion {
         } else {
             0.0
         };
+
+        // Predict semantic candidates once for the given context using neural model
+        let neural_predictions = if let Some(ref np) = self.neural_predictor {
+            if !context.is_empty() && self.config.ai_profile == AiProfile::Balanced {
+                let joined = context.join(" ");
+                np.predict_candidates(&joined, 16)
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
         // ─────────────────────────────────────────────────────────────────────
 
         let candidate_ctx = CandidateContext {
@@ -1549,12 +1604,22 @@ impl PhoneticSuggestion {
                 .as_ref()
                 .is_some_and(|l| l.learned_words.contains(&cand.text));
 
+            let cand_gru_log_prob = if !neural_predictions.is_empty() {
+                neural_predictions
+                    .iter()
+                    .find(|nc| nc.word == cand.text)
+                    .map(|nc| nc.log_prob)
+            } else {
+                None
+            };
+
             let per_cand_ctx = CandidateContext {
                 lm_score,
                 user_bigram_boost,
                 is_user_favored,
                 is_user_learned,
                 context_lm_score,
+                gru_log_prob: cand_gru_log_prob,
                 ..candidate_ctx
             };
 
