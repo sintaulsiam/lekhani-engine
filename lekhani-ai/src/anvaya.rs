@@ -269,6 +269,18 @@ impl AnvayaAgreementEngine {
         VerbConjugationTier::Neutral
     }
 
+    /// Checks whether `candidate` represents an honorific register shift relative to `typed`.
+    /// Returns `true` if both words have distinct, non-neutral verb conjugation tiers
+    /// (e.g. `আসো` (Familiar) -> `আছেন` (Formal), or `করবি` (Intimate) -> `করবেন` (Formal)).
+    #[inline]
+    pub fn is_honorific_shift(typed: &str, candidate: &str) -> bool {
+        let typed_tier = Self::classify_verb_tier(typed);
+        let cand_tier = Self::classify_verb_tier(candidate);
+        typed_tier != VerbConjugationTier::Neutral
+            && cand_tier != VerbConjugationTier::Neutral
+            && typed_tier != cand_tier
+    }
+
     /// Computes the log-probability bonus or penalty for a candidate based on Anvaya agreement.
     /// Returns score in range [-4.5, +4.0].
     #[inline]
@@ -578,5 +590,22 @@ mod tests {
         assert_eq!(state_intimate.honorific_tier, HonorificRegister::Intimate);
         assert!(AnvayaAgreementEngine::compute_agreement_score(&state_intimate, "আসবি") > 2.0);
         assert!(AnvayaAgreementEngine::compute_agreement_score(&state_intimate, "আসবেন") < -2.0);
+    }
+
+    #[test]
+    fn test_anvaya_is_honorific_shift() {
+        // Familiar -> Formal is a shift
+        assert!(AnvayaAgreementEngine::is_honorific_shift("আসো", "আছেন"));
+        assert!(AnvayaAgreementEngine::is_honorific_shift("আছো", "আছেন"));
+        // Intimate -> Formal is a shift
+        assert!(AnvayaAgreementEngine::is_honorific_shift("করবি", "করবেন"));
+        // Intimate -> Familiar is a shift
+        assert!(AnvayaAgreementEngine::is_honorific_shift("আছিস", "আছো"));
+        // Same tier is NOT an honorific shift
+        assert!(!AnvayaAgreementEngine::is_honorific_shift("আছেন", "করবেন"));
+        assert!(!AnvayaAgreementEngine::is_honorific_shift("আছো", "করছো"));
+        // Non-verb words are NOT honorific shifts
+        assert!(!AnvayaAgreementEngine::is_honorific_shift("বংলা", "বাংলা"));
+        assert!(!AnvayaAgreementEngine::is_honorific_shift("মানুষ", "মানুষটি"));
     }
 }
