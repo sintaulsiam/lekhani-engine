@@ -758,22 +758,62 @@ impl PhoneticSuggestion {
             }
         });
         if let Some((bn_loan, en_loan)) = loan_opt {
-            add_cand(
-                bn_loan.to_string(),
-                CandidateSource::Loanword,
-                6500,
-                &mut raw_candidates,
-                &mut seen,
-            );
-            preferred_loanword = Some(bn_loan.to_string());
-            if include_english {
+            let is_tech_collocation = if let Some(&last_ctx) = context.last() {
+                let last_lower = last_ctx.to_lowercase();
+                let middle_lower = middle.to_lowercase();
+                matches!(
+                    (last_lower.as_str(), middle_lower.as_str()),
+                    ("link", "share")
+                        | ("file", "download")
+                        | ("api", "call")
+                        | ("server", "restart")
+                        | ("git", "push")
+                        | ("git", "pull")
+                        | ("git", "commit")
+                        | ("git", "merge")
+                        | ("code", "review")
+                        | ("pull", "request")
+                        | ("bug", "fix")
+                        | ("task", "complete")
+                )
+            } else {
+                false
+            };
+
+            if is_tech_collocation {
                 add_cand(
                     en_loan.to_string(),
                     CandidateSource::Loanword,
-                    -1500,
+                    9500,
                     &mut raw_candidates,
                     &mut seen,
                 );
+                add_cand(
+                    bn_loan.to_string(),
+                    CandidateSource::Loanword,
+                    7000,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+                preferred_loanword = Some(en_loan.to_string());
+            } else {
+                add_cand(
+                    bn_loan.to_string(),
+                    CandidateSource::Loanword,
+                    6500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+                preferred_loanword = Some(bn_loan.to_string());
+                if include_english {
+                    add_cand(
+                        en_loan.to_string(),
+                        CandidateSource::Loanword,
+                        -1500,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
             }
         } else {
             // Suffix decomposition on loanwords (e.g. "computere" -> "কম্পিউটার" + "ে" -> "কম্পিউটারে", "fileti" -> "ফাইলটি")
@@ -875,6 +915,21 @@ impl PhoneticSuggestion {
                     }
                 }
             }
+        }
+
+        // 4b. Code-Switching Contextual Verb & State Agreement
+        if let Some(&last_ctx) = context.last() {
+            let last_lower = last_ctx.to_lowercase();
+            if matches!(last_lower.as_str(), "post" | "login") && middle.eq_ignore_ascii_case("koro") {
+                add_cand("করো".to_string(), CandidateSource::ExactDictionary, 9200, &mut raw_candidates, &mut seen);
+            } else if last_lower == "wifi" && middle.eq_ignore_ascii_case("on") {
+                add_cand("অন".to_string(), CandidateSource::ExactDictionary, 9200, &mut raw_candidates, &mut seen);
+            } else if last_lower == "bluetooth" && middle.eq_ignore_ascii_case("off") {
+                add_cand("অফ".to_string(), CandidateSource::ExactDictionary, 9200, &mut raw_candidates, &mut seen);
+            }
+        }
+        if middle.eq_ignore_ascii_case("pathaw") {
+            add_cand("পাঠাও".to_string(), CandidateSource::PhoneticOverride, 8800, &mut raw_candidates, &mut seen);
         }
 
         // 5. Special literal matches on middle portion (e.g. (:smile:), (=12+5))
