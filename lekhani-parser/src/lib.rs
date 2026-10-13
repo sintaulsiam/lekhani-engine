@@ -81,6 +81,10 @@ pub fn has_explicit_avro_intent(input: &str) -> bool {
             // Double-dot or double-comma hasanta operators
             b'.' if i + 1 < len && bytes[i + 1] == b'.' => return true,
             b',' if i + 1 < len && bytes[i + 1] == b',' => return true,
+            // Invariant Avro vowel digraph: 'rri' -> ঋ / ৃ (e.g. rritu -> ঋতু, krrishi -> কৃষি)
+            b'r' | b'R' if i + 2 < len
+                && (bytes[i + 1] == b'r' || bytes[i + 1] == b'R')
+                && (bytes[i + 2] == b'i' || bytes[i + 2] == b'I') => return true,
             // Lowercase ASCII characters prove the token is not an all-caps acronym or shout-typing
             b'a'..=b'z' => {
                 has_lower = true;
@@ -118,6 +122,8 @@ mod tests {
         assert!(has_explicit_avro_intent("k,,k"));
         assert!(has_explicit_avro_intent("k..k"));
         assert!(has_explicit_avro_intent("$500"));
+        assert!(has_explicit_avro_intent("rritu"));
+        assert!(has_explicit_avro_intent("krrishi"));
 
         // Standard lowercase phonetic words without operators must NOT trigger
         assert!(!has_explicit_avro_intent("kaccha"));
