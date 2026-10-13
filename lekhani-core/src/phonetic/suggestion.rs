@@ -55,6 +55,7 @@ pub struct PhoneticSuggestionConfig {
     pub enable_phrase_prediction: bool,
     pub enable_dynamic_macros: bool,
     pub auto_dari: bool,
+    pub enable_bilingual_clitic: bool,
 }
 
 impl Default for PhoneticSuggestionConfig {
@@ -71,6 +72,7 @@ impl Default for PhoneticSuggestionConfig {
             enable_phrase_prediction: true,
             enable_dynamic_macros: true,
             auto_dari: true,
+            enable_bilingual_clitic: false,
         }
     }
 }
@@ -951,16 +953,18 @@ impl PhoneticSuggestion {
                 add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
             }
         }
-        if let Some((hyphen_primary, hyphen_cands)) = crate::bilingual::resolve_bilingual_hyphen_clitic(middle) {
-            add_cand(hyphen_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
-            for c in hyphen_cands {
-                add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+        if self.config.enable_bilingual_clitic {
+            if let Some((hyphen_primary, hyphen_cands)) = crate::bilingual::resolve_bilingual_hyphen_clitic(middle) {
+                add_cand(hyphen_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
+                for c in hyphen_cands {
+                    add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+                }
             }
-        }
-        if let Some((unhyphen_primary, unhyphen_cands)) = crate::bilingual::resolve_unhyphenated_bilingual_clitic(middle) {
-            add_cand(unhyphen_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
-            for c in unhyphen_cands {
-                add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+            if let Some((unhyphen_primary, unhyphen_cands)) = crate::bilingual::resolve_unhyphenated_bilingual_clitic(middle) {
+                add_cand(unhyphen_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
+                for c in unhyphen_cands {
+                    add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+                }
             }
         }
 

@@ -6,6 +6,20 @@
 //! - Unhyphenated bilingual clitics (e.g. "WhatsAppe" -> "WhatsApp-এ", "filegulo" -> "file-গুলো")
 //! - Technical acronym detection ("API", "RAM", "JSON", "UI", "CCA")
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static BILINGUAL_CLITIC_ENABLED: AtomicBool = AtomicBool::new(false);
+
+/// Enable or disable bilingual clitic resolution globally (default: false)
+pub fn set_bilingual_clitic_enabled(enabled: bool) {
+    BILINGUAL_CLITIC_ENABLED.store(enabled, Ordering::Relaxed);
+}
+
+/// Returns true if bilingual clitic resolution is currently enabled
+pub fn is_bilingual_clitic_enabled() -> bool {
+    BILINGUAL_CLITIC_ENABLED.load(Ordering::Relaxed)
+}
+
 pub const COMMON_TECH_ACRONYMS: &[&str] = &[
     "RAM", "ROM", "CPU", "GPU", "SSD", "HDD", "USB", "LAN", "LED", "LCD",
     "URL", "URI", "API", "SDK", "SQL", "CSS", "HTML", "JSON", "XML", "PDF",
@@ -290,6 +304,10 @@ pub fn resolve_bilingual_hyphen_clitic(input: &str) -> Option<(String, Vec<Strin
         return None;
     }
 
+    if lekhani_parser::has_explicit_avro_intent(base) {
+        return None;
+    }
+
     let lower_suffix = suffix.to_lowercase();
     let b_clitic = match lower_suffix.as_str() {
         "e" => "-এ",
@@ -333,9 +351,15 @@ pub fn resolve_unhyphenated_bilingual_clitic(input: &str) -> Option<(String, Vec
                 continue;
             }
 
+            if lekhani_parser::has_explicit_avro_intent(base) {
+                continue;
+            }
+
             // Capitalized or multi-case bases are strongly indicative of a Latin token (e.g. "Meetinger", "WhatsAppe", "iPhone-er")
-            let has_uppercase = base.chars().any(|c| c.is_ascii_uppercase());
-            if has_uppercase || is_static_short_english_word(base) {
+            let has_valid_latin_title = base.len() >= 3
+                && base.chars().next().is_some_and(|c| c.is_ascii_uppercase());
+            let is_all_caps = base.len() >= 2 && base.chars().all(|c| c.is_ascii_uppercase());
+            if has_valid_latin_title || is_all_caps || is_static_short_english_word(base) {
                 let primary = format!("{}{}", base, b_clitic);
                 let mut candidates = vec![primary.clone(), input.to_string()];
                 if b_clitic.starts_with('-') {

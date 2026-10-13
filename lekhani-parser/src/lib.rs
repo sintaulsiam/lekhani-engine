@@ -119,7 +119,13 @@ mod tests {
         assert!(has_explicit_avro_intent("k..k"));
         assert!(has_explicit_avro_intent("$500"));
 
+        // Standard lowercase phonetic words without operators must NOT trigger
+        assert!(!has_explicit_avro_intent("kaccha"));
+        assert!(!has_explicit_avro_intent("porikkhay"));
+        assert!(!has_explicit_avro_intent("shikkha"));
+
         // Mid-word Avro uppercase distinctions
+        assert!(has_explicit_avro_intent("kZackZacani"));
         assert!(has_explicit_avro_intent("paR"));
         assert!(has_explicit_avro_intent("poR"));
         assert!(has_explicit_avro_intent("kOno"));
