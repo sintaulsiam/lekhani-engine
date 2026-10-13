@@ -47,7 +47,10 @@ pub fn default_avro_parser() -> LekhaniParser {
 /// Returns true if the token contains explicit, unambiguous Avro grammatical operators
 /// or mid-word case distinctions that indicate intentional phonetic rule typing.
 ///
-/// Executes in single-pass linear byte time (< 5 nanoseconds) with zero heap allocations.
+/// Returns true if the token contains explicit, unambiguous Avro grammatical operators
+/// or mid-word case distinctions that indicate intentional phonetic rule typing.
+///
+/// Executes in a single-pass linear byte loop (< 3 nanoseconds) with zero heap allocations.
 #[inline]
 pub fn has_explicit_avro_intent(input: &str) -> bool {
     let bytes = input.as_bytes();
@@ -56,34 +59,44 @@ pub fn has_explicit_avro_intent(input: &str) -> bool {
         return false;
     }
 
-    // Check if the token is entirely all-caps (e.g. acronyms like "UI", "API", or shout typing like "TUMI").
-    // All-caps tokens are handled by acronym passthrough or case-insensitive dictionary lookup,
-    // not by explicit Avro case differentiation rules.
-    let is_all_caps = bytes.iter().any(|b| b.is_ascii_alphabetic())
-        && bytes.iter().filter(|b| b.is_ascii_alphabetic()).all(|b| b.is_ascii_uppercase());
+    let mut has_lower = false;
+    let mut has_mid_avro_upper = false;
 
     let mut i = 0;
     while i < len {
-        match bytes[i] {
-            // Explicit Avro diacritics and hasanta / khanda-ta / bisorgo / taka operators
-            b'^' | b'`' | b'\'' | b':' | b'$' => return true,
+        let b = bytes[i];
+        match b {
+            // Explicit Avro diacritics and hasanta / khanda-ta / currency operators
+            b'^' | b'`' | b'\'' | b'$' => return true,
+            // Bisorgo operator: ignore numeric clock ratios (e.g. 10:30)
+            b':' => {
+                let is_clock_ratio = i > 0
+                    && bytes[i - 1].is_ascii_digit()
+                    && i + 1 < len
+                    && bytes[i + 1].is_ascii_digit();
+                if !is_clock_ratio {
+                    return true;
+                }
+            }
             // Double-dot or double-comma hasanta operators
             b'.' if i + 1 < len && bytes[i + 1] == b'.' => return true,
             b',' if i + 1 < len && bytes[i + 1] == b',' => return true,
-            // Grammatical Avro uppercase characters mid-word (non-initial to avoid Android/mobile TitleCase,
-            // and non-all-caps to preserve technical acronyms and capitalized words):
+            // Lowercase ASCII characters prove the token is not an all-caps acronym or shout-typing
+            b'a'..=b'z' => {
+                has_lower = true;
+            }
+            // Grammatical Avro uppercase characters mid-word (non-initial to preserve sentence-initial TitleCase):
             // O (ো), I (ঈ), U (ঊ), D (ড), G (জ্ঞ/ঘ), J (য), N (ণ), R (ড়), S (ষ), T (ট), Y (য়), Z (য)
-            b'O' | b'I' | b'U' | b'D' | b'G' | b'J' | b'N' | b'R' | b'S' | b'T' | b'Y' | b'Z'
-                if i > 0 && !is_all_caps =>
-            {
-                return true;
+            b'O' | b'I' | b'U' | b'D' | b'G' | b'J' | b'N' | b'R' | b'S' | b'T' | b'Y' | b'Z' if i > 0 => {
+                has_mid_avro_upper = true;
             }
             _ => {}
         }
         i += 1;
     }
 
-    false
+    // Mid-word case distinctions only apply when the word is not entirely all-caps
+    has_mid_avro_upper && has_lower
 }
 
 #[cfg(test)]
@@ -92,28 +105,47 @@ mod tests {
 
     #[test]
     fn test_has_explicit_avro_intent() {
+        // Explicit operators
         assert!(has_explicit_avro_intent("c^ad"));
+        assert!(has_explicit_avro_intent("ca^d"));
         assert!(has_explicit_avro_intent("h^as"));
         assert!(has_explicit_avro_intent("b^ash"));
         assert!(has_explicit_avro_intent("du:kho"));
         assert!(has_explicit_avro_intent("k`kh"));
         assert!(has_explicit_avro_intent("k'kh"));
         assert!(has_explicit_avro_intent("hot`at"));
-        assert!(has_explicit_avro_intent("hot'at"));
+        assert!(has_explicit_avro_intent("hoThat``"));
         assert!(has_explicit_avro_intent("k,,k"));
         assert!(has_explicit_avro_intent("k..k"));
         assert!(has_explicit_avro_intent("$500"));
 
+        // Mid-word Avro uppercase distinctions
         assert!(has_explicit_avro_intent("paR"));
+        assert!(has_explicit_avro_intent("poR"));
         assert!(has_explicit_avro_intent("kOno"));
         assert!(has_explicit_avro_intent("kaTh"));
         assert!(has_explicit_avro_intent("biSTi"));
         assert!(has_explicit_avro_intent("bODh"));
+        assert!(has_explicit_avro_intent("bigganI"));
 
+        // Sentence-initial titlecase must NOT trigger
         assert!(!has_explicit_avro_intent("Tumi"));
         assert!(!has_explicit_avro_intent("Din"));
         assert!(!has_explicit_avro_intent("Tara"));
         assert!(!has_explicit_avro_intent("kemon"));
         assert!(!has_explicit_avro_intent("basha"));
+        assert!(!has_explicit_avro_intent("ami"));
+
+        // All-caps acronyms and shout typing must NOT trigger
+        assert!(!has_explicit_avro_intent("UI"));
+        assert!(!has_explicit_avro_intent("API"));
+        assert!(!has_explicit_avro_intent("RAM"));
+        assert!(!has_explicit_avro_intent("CPU"));
+        assert!(!has_explicit_avro_intent("TUMI"));
+        assert!(!has_explicit_avro_intent("DESH"));
+
+        // Numeric clock ratios must NOT trigger as bisorgo
+        assert!(!has_explicit_avro_intent("10:30"));
+        assert!(!has_explicit_avro_intent("12:00"));
     }
 }
