@@ -39,3 +39,9 @@ impl Default for WasmAvroParser {
 pub fn parse_avro(input: &str) -> String {
     default_avro_parser().convert(input)
 }
+
+/// Check if the phonetic input contains explicit, unambiguous Avro grammatical operators or mid-word casing.
+#[wasm_bindgen]
+pub fn has_explicit_avro_intent(input: &str) -> bool {
+    crate::has_explicit_avro_intent(input)
+}

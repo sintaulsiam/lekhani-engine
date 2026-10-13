@@ -1354,6 +1354,8 @@ impl PhoneticSuggestion {
         }
 
         // 15. Global Multi-Factor Probabilistic Scoring & Ranker
+        let has_explicit_intent = lekhani_parser::has_explicit_avro_intent(middle)
+            || lekhani_parser::has_explicit_avro_intent(term);
         let has_backtick = middle.contains('`') || term.contains('`');
         let has_explicit_casing = middle.chars().any(|c| c.is_ascii_uppercase() && c != 'K');
         let has_explicit_rri_digraph = middle.contains("rri") || term.contains("rri");
@@ -1549,6 +1551,7 @@ impl PhoneticSuggestion {
             middle,
             term,
             has_dominant_homophone,
+            has_explicit_intent,
             has_explicit_casing,
             has_backtick,
             has_explicit_rri_digraph,
@@ -1685,6 +1688,17 @@ impl PhoneticSuggestion {
         // Sort candidates by descending total score
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
 
+        // When explicit Avro syntax/casing is detected, ensure the direct transliteration
+        // candidate (phonetic) is locked at Slot 0 and protected against LM demotion.
+        if has_explicit_intent {
+            if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == &phonetic) {
+                if pos > 0 {
+                    let direct = scored_candidates.remove(pos);
+                    scored_candidates.insert(0, direct);
+                }
+            }
+        }
+
         // Phase 1: Context-Gated Bidirectional LM Re-sort Pass
         //
         // If we have preceding context AND there are ≥2 dictionary candidates competing
@@ -1695,11 +1709,9 @@ impl PhoneticSuggestion {
         // This re-sort is zero-allocation (in-place) and runs only when it can make
         // a meaningful difference: ≥2 non-trivial candidates with context available.
         //
-        // Examples disambiguated by this pass:
-        //   "পরা" vs "পড়া"  — after "শার্ট" → "পরা" promoted to Slot 0
-        //   "কর"  vs "কড়"  — after "নখ"   → "নখ কড়া" promoted
-        //   "বলা" vs "বলআ" — context prunes non-words automatically
+        // Note: Explicit Avro intent completely bypasses this pass to preserve deterministic user intent.
         if self.config.ai_profile != AiProfile::Off
+            && !has_explicit_intent
             && !context.is_empty()
             && scored_candidates.len() >= 2
         {

@@ -26,6 +26,7 @@ pub use morpheme::{
     RupmulTier, SuffixCategory,
 };
 pub use ngram::UserStats;
+pub use lekhani_parser::{default_avro_parser, has_explicit_avro_intent, CompiledLayout, LekhaniParser};
 pub use phonetic::{AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion, PhoneticSuggestionConfig};
 pub use session::{ActiveLayoutType, InputSession};
 pub use snippets::SnippetManager;

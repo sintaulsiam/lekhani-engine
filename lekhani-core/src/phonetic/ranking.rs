@@ -258,6 +258,7 @@ pub struct CandidateContext<'a> {
     pub middle: &'a str,
     pub term: &'a str,
     pub has_dominant_homophone: bool,
+    pub has_explicit_intent: bool,
     pub has_explicit_casing: bool,
     pub has_backtick: bool,
     pub has_explicit_rri_digraph: bool,
@@ -354,7 +355,9 @@ pub fn extract_candidate_features(
                 || cand.source == CandidateSource::PhoneticOverride;
             f.is_exact_phonetic = if is_dict_equiv { 1.0 } else { 0.43 };
 
-            if ctx.has_backtick {
+            if ctx.has_explicit_intent {
+                f.intent_modifier_boost = 3.5;
+            } else if ctx.has_backtick {
                 f.intent_modifier_boost = 1.11;
             } else if ctx.has_explicit_casing || ctx.has_explicit_rri_digraph {
                 f.intent_modifier_boost = 0.78;
@@ -378,7 +381,9 @@ pub fn extract_candidate_features(
             {
                 f.intent_modifier_boost -= 0.78;
             }
-            if cand.source == CandidateSource::FuzzySoundLaw {
+            if ctx.has_explicit_intent {
+                f.intent_modifier_boost -= 3.5;
+            } else if cand.source == CandidateSource::FuzzySoundLaw {
                 if ctx.has_backtick {
                     f.intent_modifier_boost -= 0.89;
                 } else if ctx.has_explicit_casing {
@@ -584,6 +589,7 @@ mod tests {
             middle: phonetic,
             term: phonetic,
             has_dominant_homophone: false,
+            has_explicit_intent: false,
             has_explicit_casing: false,
             has_backtick: false,
             has_explicit_rri_digraph: false,
@@ -628,6 +634,30 @@ mod tests {
     }
 
     #[test]
+    fn test_explicit_avro_intent_feature_boost() {
+        let targets = Vec::new();
+        let mut ctx = make_ctx("paR", "পড়", &targets);
+        ctx.has_explicit_intent = true;
+
+        let direct_cand = CandidateHypothesis {
+            text: "পড়".to_string(),
+            source: CandidateSource::DirectTransliteration,
+            initial_boost: 0,
+        };
+        let fuzzy_cand = CandidateHypothesis {
+            text: "পর".to_string(),
+            source: CandidateSource::FuzzySoundLaw,
+            initial_boost: 0,
+        };
+
+        let f_direct = extract_candidate_features(&direct_cand, true, 500, true, &ctx, false);
+        let f_fuzzy = extract_candidate_features(&fuzzy_cand, true, 5000, true, &ctx, false);
+
+        assert_eq!(f_direct.intent_modifier_boost, 3.5);
+        assert!(f_fuzzy.intent_modifier_boost <= -3.5);
+    }
+
+    #[test]
     fn test_grapheme_edit_distance_bengali_conjuncts() {
         assert_eq!(grapheme_edit_distance("ক্ষ", "ক"), 1);
         assert_eq!(grapheme_edit_distance("পড়া", "পরা"), 1);
@@ -641,7 +671,7 @@ mod tests {
         let targets = Vec::new();
         let ctx = CandidateContext {
             phonetic: "dhaka", primary: "ঢাকা", middle: "dhaka", term: "dhaka",
-            has_dominant_homophone: false, has_explicit_casing: false, has_backtick: false,
+            has_dominant_homophone: false, has_explicit_intent: false, has_explicit_casing: false, has_backtick: false,
             has_explicit_rri_digraph: false, is_atomic_syllable: false, is_primary_in_dict: true,
             is_short_token: false, has_clitic_o_candidate: false, has_clitic_i_candidate: false,
             clitic_o_targets: &targets, clitic_i_targets: &targets, lm_score: None,
