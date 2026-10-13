@@ -710,7 +710,6 @@ impl PhoneticSuggestion {
 
         // 3d. Project "অন্বয়" (Anvaya) — Dynamic Concordant Verb Synthesis
         let anvaya_state = lekhani_ai::AnvayaAgreementEngine::extract_state(context);
-        let mut preferred_anvaya = None;
         if anvaya_state.honorific_tier != lekhani_ai::HonorificRegister::Neutral {
             if let Some(concordant_verb) =
                 lekhani_ai::AnvayaAgreementEngine::synthesize_concordant_verb(
@@ -725,7 +724,6 @@ impl PhoneticSuggestion {
                     &mut raw_candidates,
                     &mut seen,
                 );
-                preferred_anvaya = Some(concordant_verb.to_string());
             }
         }
 
@@ -922,8 +920,6 @@ impl PhoneticSuggestion {
             } else {
                 None
             }
-        } else if let Some(ref anv_pref) = preferred_anvaya {
-            Some(anv_pref.clone())
         } else if let Some(ref ov_pref) = preferred_override {
             Some(ov_pref.clone())
         } else if let Some(ref loan_pref) = preferred_loanword {
