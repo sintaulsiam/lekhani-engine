@@ -1,0 +1,1785 @@
+{
+  "total": 210,
+  "cases": [
+    {
+      "context": [
+        "আমি",
+        "বই"
+      ],
+      "input": "pora",
+      "expected": "পড়া",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "নতুন",
+        "জামা"
+      ],
+      "input": "pora",
+      "expected": "পরা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "চা"
+      ],
+      "input": "khabo",
+      "expected": "খাব",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "সেখানে"
+      ],
+      "input": "jabo",
+      "expected": "যাব",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "ভালো"
+      ],
+      "input": "achi",
+      "expected": "আছি",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "কাজে"
+      ],
+      "input": "khata",
+      "expected": "খাটা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "বিছানা"
+      ],
+      "input": "pata",
+      "expected": "পাতা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "গাছের"
+      ],
+      "input": "pata",
+      "expected": "পাতা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "হাত"
+      ],
+      "input": "dhoya",
+      "expected": "ধোয়া",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "আগুন ও"
+      ],
+      "input": "dhowa",
+      "expected": "ধোঁয়া",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "গান"
+      ],
+      "input": "shona",
+      "expected": "শোনা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "খাঁটি"
+      ],
+      "input": "shona",
+      "expected": "সোনা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "বাগান"
+      ],
+      "input": "ghera",
+      "expected": "ঘেরা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "মাথা"
+      ],
+      "input": "ghora",
+      "expected": "ঘোরা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "চোখ"
+      ],
+      "input": "tana",
+      "expected": "টানা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "সুর"
+      ],
+      "input": "tana",
+      "expected": "টানা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "পথ"
+      ],
+      "input": "chola",
+      "expected": "চলা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "কথা"
+      ],
+      "input": "bola",
+      "expected": "বলা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "ঘর"
+      ],
+      "input": "chara",
+      "expected": "ছাড়া",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "তুমি"
+      ],
+      "input": "chara",
+      "expected": "ছাড়া",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "দাম"
+      ],
+      "input": "kom",
+      "expected": "কম",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "কাজ"
+      ],
+      "input": "kom",
+      "expected": "কম",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "নদী"
+      ],
+      "input": "par",
+      "expected": "পাড়",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "পরীক্ষা"
+      ],
+      "input": "pas",
+      "expected": "পাস",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "মাটি"
+      ],
+      "input": "khura",
+      "expected": "খোঁড়া",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "পা"
+      ],
+      "input": "khora",
+      "expected": "খোঁড়া",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "পানি"
+      ],
+      "input": "dhala",
+      "expected": "ঢালা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "গাছ"
+      ],
+      "input": "dala",
+      "expected": "ডালা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "দিন"
+      ],
+      "input": "rat",
+      "expected": "রাত",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "চাঁদের"
+      ],
+      "input": "alo",
+      "expected": "আলো",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "বৃষ্টি"
+      ],
+      "input": "porche",
+      "expected": "পড়ছে",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "জামা"
+      ],
+      "input": "porche",
+      "expected": "পরছে",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "চিঠি"
+      ],
+      "input": "lekha",
+      "expected": "লেখা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "ছবি"
+      ],
+      "input": "aka",
+      "expected": "আঁকা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "বই"
+      ],
+      "input": "kene",
+      "expected": "কেনা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "পণ্য"
+      ],
+      "input": "kena",
+      "expected": "কেনা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "ভাত"
+      ],
+      "input": "randha",
+      "expected": "রাঁধা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "বাচ্চা"
+      ],
+      "input": "kanda",
+      "expected": "কাঁদা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "বৃষ্টির"
+      ],
+      "input": "shuru",
+      "expected": "শুরু",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "কাজের"
+      ],
+      "input": "shesh",
+      "expected": "শেষ",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "সবার"
+      ],
+      "input": "age",
+      "expected": "আগে",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "তার"
+      ],
+      "input": "pore",
+      "expected": "পরে",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "বাবার"
+      ],
+      "input": "kotha",
+      "expected": "কথা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "মায়ের"
+      ],
+      "input": "ador",
+      "expected": "আদর",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "দেশের"
+      ],
+      "input": "unnoyon",
+      "expected": "উন্নয়ন",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "জাতির"
+      ],
+      "input": "itihas",
+      "expected": "ইতিহাস",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "সত্য"
+      ],
+      "input": "shundor",
+      "expected": "সুন্দর",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "জীবন"
+      ],
+      "input": "shongram",
+      "expected": "সংগ্রাম",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "স্বাধীন"
+      ],
+      "input": "bangladesh",
+      "expected": "বাংলাদেশ",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "সোনার"
+      ],
+      "input": "bangla",
+      "expected": "বাংলা",
+      "category": "formal_literary",
+      "subcat": "homophone"
+    },
+    {
+      "context": [
+        "আপনি"
+      ],
+      "input": "achen",
+      "expected": "আছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "আপনি",
+        "কেমন"
+      ],
+      "input": "achen",
+      "expected": "আছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "আপনি",
+        "কখন"
+      ],
+      "input": "ashben",
+      "expected": "আসবেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "আপনি",
+        "কি"
+      ],
+      "input": "bolchen",
+      "expected": "বলছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "আপনি",
+        "কথা"
+      ],
+      "input": "shunchen",
+      "expected": "শুনছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "আপনি",
+        "বই"
+      ],
+      "input": "porchen",
+      "expected": "পড়ছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "আপনি",
+        "ভাত"
+      ],
+      "input": "kheyechen",
+      "expected": "খেয়েছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "আপনি",
+        "চা"
+      ],
+      "input": "khaben",
+      "expected": "খাবেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "আপনি",
+        "সেখানে"
+      ],
+      "input": "jaben",
+      "expected": "যাবেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "আপনি",
+        "কাজ"
+      ],
+      "input": "korchen",
+      "expected": "করছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি"
+      ],
+      "input": "ashchen",
+      "expected": "আসছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি",
+        "কথা"
+      ],
+      "input": "bolchen",
+      "expected": "বলছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি",
+        "ভাত"
+      ],
+      "input": "kheyechen",
+      "expected": "খেয়েছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি",
+        "বই"
+      ],
+      "input": "porchen",
+      "expected": "পড়ছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি",
+        "সেখানে"
+      ],
+      "input": "giyechen",
+      "expected": "গিয়েছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি",
+        "চিঠি"
+      ],
+      "input": "likhechen",
+      "expected": "লিখেছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি",
+        "আদেশ"
+      ],
+      "input": "diyechen",
+      "expected": "দিয়েছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি",
+        "উপদেশ"
+      ],
+      "input": "diyechen",
+      "expected": "দিয়েছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি",
+        "সাহায্য"
+      ],
+      "input": "korechen",
+      "expected": "করেছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তিনি",
+        "রাগ"
+      ],
+      "input": "korechen",
+      "expected": "করেছেন",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "কেমন"
+      ],
+      "input": "acho",
+      "expected": "আছো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "কখন"
+      ],
+      "input": "ashbe",
+      "expected": "আসবে",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "কি"
+      ],
+      "input": "bolcho",
+      "expected": "বলছো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "ভাত"
+      ],
+      "input": "kheyecho",
+      "expected": "খেয়েছো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "চা"
+      ],
+      "input": "khabe",
+      "expected": "খাবে",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "বই"
+      ],
+      "input": "porcho",
+      "expected": "পড়ছো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "গান"
+      ],
+      "input": "shuncho",
+      "expected": "শুনছো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "সেখানে"
+      ],
+      "input": "jabe",
+      "expected": "যাবে",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "কাজ"
+      ],
+      "input": "koro",
+      "expected": "করো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "ঘরে"
+      ],
+      "input": "jao",
+      "expected": "যাও",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "চিঠি"
+      ],
+      "input": "likhecho",
+      "expected": "লিখেছো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "খেলা"
+      ],
+      "input": "korcho",
+      "expected": "করছো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "ছবি"
+      ],
+      "input": "dekhcho",
+      "expected": "দেখছো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "কথা"
+      ],
+      "input": "bolo",
+      "expected": "বলো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুমি",
+        "সত্য"
+      ],
+      "input": "bolo",
+      "expected": "বলো",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "কেমন"
+      ],
+      "input": "achis",
+      "expected": "আছিস",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "কখন"
+      ],
+      "input": "ashbi",
+      "expected": "আসবি",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "কি"
+      ],
+      "input": "korchis",
+      "expected": "করছিস",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "ভাত"
+      ],
+      "input": "khabi",
+      "expected": "খাবি",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "চা"
+      ],
+      "input": "khabi",
+      "expected": "খাবি",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "বই"
+      ],
+      "input": "porchis",
+      "expected": "পড়ছিস",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "গান"
+      ],
+      "input": "shunchis",
+      "expected": "শুনছিস",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "সেখানে"
+      ],
+      "input": "jabi",
+      "expected": "যাবি",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "কাজ"
+      ],
+      "input": "kor",
+      "expected": "কর",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "ঘরে"
+      ],
+      "input": "ja",
+      "expected": "যা",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "কথা"
+      ],
+      "input": "bol",
+      "expected": "বল",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "চিঠি"
+      ],
+      "input": "lekh",
+      "expected": "লেখ",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "ছবি"
+      ],
+      "input": "dekh",
+      "expected": "দেখ",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "খেলা"
+      ],
+      "input": "kor",
+      "expected": "কর",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [
+        "তুই",
+        "দৌড়"
+      ],
+      "input": "de",
+      "expected": "দে",
+      "category": "honorific_agreement",
+      "subcat": "anvaya"
+    },
+    {
+      "context": [],
+      "input": "kmn",
+      "expected": "কেমন",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "amr",
+      "expected": "আমার",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "tmr",
+      "expected": "তোমার",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "apnr",
+      "expected": "আপনার",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "ekhn",
+      "expected": "এখন",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "kno",
+      "expected": "কেন",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "drkr",
+      "expected": "দরকার",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "bndhu",
+      "expected": "বন্ধু",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "khbr",
+      "expected": "খবর",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "hbe",
+      "expected": "হবে",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "thk",
+      "expected": "ঠিক",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "shob",
+      "expected": "সব",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "kisu",
+      "expected": "কিছু",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "bujhsi",
+      "expected": "বুঝেছি",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "gesilam",
+      "expected": "গেছিলাম",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "kortesi",
+      "expected": "করছি",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "kormu",
+      "expected": "করব",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "jamu",
+      "expected": "যাব",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "khamu",
+      "expected": "খাব",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "khaiba",
+      "expected": "খাবা",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "korba",
+      "expected": "করবা",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "jaina",
+      "expected": "যাই না",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "parina",
+      "expected": "পারি না",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "hobena",
+      "expected": "হবে না",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "lagbena",
+      "expected": "লাগবে না",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "shundor",
+      "expected": "সুন্দর",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "sundor",
+      "expected": "সুন্দর",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "thikase",
+      "expected": "ঠিক আছে",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "accha",
+      "expected": "আচ্ছা",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "ashole",
+      "expected": "আসলে",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "kamda",
+      "expected": "কামটা",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "hunchos",
+      "expected": "হুনছস",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "amago",
+      "expected": "আমাগো",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "aib",
+      "expected": "আইব",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "thaikka",
+      "expected": "থাইক্কা",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "kita",
+      "expected": "কিতা",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "korray",
+      "expected": "কররায়",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "jaibay",
+      "expected": "যাইবায়",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "oigel",
+      "expected": "অইগেল",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "jaitasen",
+      "expected": "যাইতাছেন",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "hoilei",
+      "expected": "হইলেই",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "danraya",
+      "expected": "দাঁড়ায়া",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "koilam",
+      "expected": "কইলাম",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "jaio",
+      "expected": "যাইও",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "bolsi",
+      "expected": "বলছি",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "shunsi",
+      "expected": "শুনেছি",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "dekhsi",
+      "expected": "দেখেছি",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "janina",
+      "expected": "জানি না",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "thakuk",
+      "expected": "থাকুক",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [],
+      "input": "bolteci",
+      "expected": "বলছি",
+      "category": "colloquial_chat_slang",
+      "subcat": "dialect_chat"
+    },
+    {
+      "context": [
+        "facebook"
+      ],
+      "input": "e",
+      "expected": "এ",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "link"
+      ],
+      "input": "share",
+      "expected": "share",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "file"
+      ],
+      "input": "download",
+      "expected": "download",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "api"
+      ],
+      "input": "call",
+      "expected": "call",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "post"
+      ],
+      "input": "koro",
+      "expected": "করো",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "server"
+      ],
+      "input": "restart",
+      "expected": "restart",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "git"
+      ],
+      "input": "push",
+      "expected": "push",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "code"
+      ],
+      "input": "review",
+      "expected": "review",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "pull"
+      ],
+      "input": "request",
+      "expected": "request",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "bug"
+      ],
+      "input": "fix",
+      "expected": "fix",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "app"
+      ],
+      "input": "update",
+      "expected": "আপডেট",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "login"
+      ],
+      "input": "koro",
+      "expected": "করো",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "password"
+      ],
+      "input": "dao",
+      "expected": "দাও",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "email"
+      ],
+      "input": "pathaw",
+      "expected": "পাঠাও",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "meeting"
+      ],
+      "input": "ache",
+      "expected": "আছে",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "project"
+      ],
+      "input": "kaj",
+      "expected": "কাজ",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "task"
+      ],
+      "input": "complete",
+      "expected": "complete",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "video"
+      ],
+      "input": "call",
+      "expected": "কল",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "audio"
+      ],
+      "input": "message",
+      "expected": "মেসেজ",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "screen"
+      ],
+      "input": "share",
+      "expected": "শেয়ার",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "online"
+      ],
+      "input": "clas",
+      "expected": "ক্লাস",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "google"
+      ],
+      "input": "search",
+      "expected": "সার্চ",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "youtube"
+      ],
+      "input": "video",
+      "expected": "ভিডিও",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "wifi"
+      ],
+      "input": "on",
+      "expected": "অন",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "bluetooth"
+      ],
+      "input": "off",
+      "expected": "অফ",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "battery"
+      ],
+      "input": "charge",
+      "expected": "চার্জ",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "camera"
+      ],
+      "input": "click",
+      "expected": "ক্লিক",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "photo"
+      ],
+      "input": "edit",
+      "expected": "এডিট",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "group"
+      ],
+      "input": "chat",
+      "expected": "চ্যাট",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [
+        "status"
+      ],
+      "input": "update",
+      "expected": "আপডেট",
+      "category": "code_mixed_banglish",
+      "subcat": "code_switch"
+    },
+    {
+      "context": [],
+      "input": "ammi",
+      "expected": "আমি",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "tomi",
+      "expected": "তুমি",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "bhlao",
+      "expected": "ভালো",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "kemn",
+      "expected": "কেমন",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "shnodor",
+      "expected": "সুন্দর",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "bnagla",
+      "expected": "বাংলা",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "bngladesh",
+      "expected": "বাংলাদেশ",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "khbor",
+      "expected": "খবর",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "dohhkho",
+      "expected": "দুঃখ",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "shroif",
+      "expected": "শরীফ",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "dhonobad",
+      "expected": "ধন্যবাদ",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "shanti",
+      "expected": "শান্তি",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "prnam",
+      "expected": "প্রণাম",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "proti",
+      "expected": "প্রতি",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "shomoy",
+      "expected": "সময়",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "kothay",
+      "expected": "কোথায়",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "jnte",
+      "expected": "জানতে",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "dekte",
+      "expected": "দেখতে",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "bolte",
+      "expected": "বলতে",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "shnte",
+      "expected": "শুনতে",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "krote",
+      "expected": "করতে",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "jtee",
+      "expected": "যেতে",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "ashitee",
+      "expected": "আসতে",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "bujlam",
+      "expected": "বুঝলাম",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "shotti",
+      "expected": "সত্যি",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "mitha",
+      "expected": "মিথ্যা",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "sotto",
+      "expected": "সত্য",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "sojjho",
+      "expected": "সহ্য",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "dhrojo",
+      "expected": "ধৈর্য",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    },
+    {
+      "context": [],
+      "input": "bhroso",
+      "expected": "ভরসা",
+      "category": "typo_and_fatfinger",
+      "subcat": "spatial_typo"
+    }
+  ]
+}
