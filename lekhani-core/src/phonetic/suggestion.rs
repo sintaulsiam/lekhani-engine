@@ -944,6 +944,26 @@ impl PhoneticSuggestion {
             );
         }
 
+        // 5b. Bilingual Digit-Units, Hyphenated Clitics & Unhyphenated Clitics
+        if let Some((digit_primary, digit_cands)) = crate::bilingual::resolve_digit_unit_candidates(middle) {
+            add_cand(digit_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
+            for c in digit_cands {
+                add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+            }
+        }
+        if let Some((hyphen_primary, hyphen_cands)) = crate::bilingual::resolve_bilingual_hyphen_clitic(middle) {
+            add_cand(hyphen_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
+            for c in hyphen_cands {
+                add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+            }
+        }
+        if let Some((unhyphen_primary, unhyphen_cands)) = crate::bilingual::resolve_unhyphenated_bilingual_clitic(middle) {
+            add_cand(unhyphen_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
+            for c in unhyphen_cands {
+                add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+            }
+        }
+
         // 6. Autocorrect / Common Overrides / Loanwords / Verbal Decomposition / Elongation Collapse
         let resolve_ac = |raw: &str| -> String {
             if raw.chars().any(|c| c.is_bengali()) {

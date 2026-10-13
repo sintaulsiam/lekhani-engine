@@ -1,5 +1,6 @@
 //! Lekhani Core Typing Engine
 
+pub mod bilingual;
 pub mod chars;
 pub mod conjuncts;
 pub mod converter;
@@ -13,6 +14,8 @@ pub mod phonetic;
 pub mod session;
 pub mod snippets;
 pub mod trie;
+
+pub use bilingual::*;
 
 pub use chars::*;
 pub use conjuncts::{ConjunctCatalog, ConjunctInfo};
