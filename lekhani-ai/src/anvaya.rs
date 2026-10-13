@@ -81,6 +81,16 @@ impl AnvayaAgreementEngine {
         let slice = &context[start..];
 
         for (idx, &token) in slice.iter().enumerate().rev() {
+            // If an earlier token has sentence boundary punctuation, do not cross into previous sentence
+            if idx < slice.len() - 1
+                && (token.contains('।')
+                    || token.contains('?')
+                    || token.contains('!')
+                    || token.contains('\n'))
+            {
+                break;
+            }
+
             let clean = token.trim_matches(|c: char| {
                 c.is_ascii_punctuation()
                     || c == '।'
@@ -103,7 +113,7 @@ impl AnvayaAgreementEngine {
                 || clean.ends_with("িতেছিলেন")
                 || clean.ends_with("িয়া")
                 || clean.ends_with("িবার")
-                || clean == " হইল"
+                || clean == "হইল"
                 || clean == "তাহাকে"
                 || clean == "তাহারা"
             {
@@ -195,16 +205,6 @@ impl AnvayaAgreementEngine {
                 subject_offset = Some(idx);
                 break;
             }
-
-            // If an earlier token has sentence boundary punctuation, do not cross into previous sentence
-            if idx < slice.len() - 1
-                && (token.contains('।')
-                    || token.contains('?')
-                    || token.contains('!')
-                    || token.contains('\n'))
-            {
-                break;
-            }
         }
 
         AnvayaState {
@@ -254,12 +254,14 @@ impl AnvayaAgreementEngine {
             return VerbConjugationTier::Intimate;
         }
 
-        // 3. Familiar Verb Markers: -ছো, -ো, -বে, -লে, -তে (e.g. আছো, করছো, করবে, বললে, করতে)
+        // 3. Familiar Verb Markers: -ছো, -ো, -বে, -তেছো, -ছিলে (e.g. আছো, করছো, করবে, করতেছো, করছিলে)
+        // Note: We deliberately exclude -তে and -লে here because -তে is primarily the non-finite
+        // infinitive marker (খেতে, যেতে, করতে) or locative case suffix (বাড়িতে, রাতে), and -লে is
+        // the non-finite conditional participle (আসলে, করলে). Classifying them as Familiar would
+        // wrongfully penalize infinitives and locative nouns under Formal (আপনি) or Intimate (তুই) contexts.
         if clean.ends_with("ছো")
             || clean.ends_with('ো')
             || clean.ends_with("বে")
-            || clean.ends_with("লে")
-            || clean.ends_with("তে")
             || clean.ends_with("তেছো")
             || clean.ends_with("ছিলে")
         {
@@ -607,5 +609,19 @@ mod tests {
         // Non-verb words are NOT honorific shifts
         assert!(!AnvayaAgreementEngine::is_honorific_shift("বংলা", "বাংলা"));
         assert!(!AnvayaAgreementEngine::is_honorific_shift("মানুষ", "মানুষটি"));
+    }
+
+    #[test]
+    fn test_anvaya_infinitive_and_locative_neutrality() {
+        let state_apni = AnvayaAgreementEngine::extract_state(&["আপনি", "ভাত"]);
+        // Infinitives (-তে) like খেতে, যেতে, করতে and locatives like বাড়িতে must NOT be penalized under Formal
+        assert_eq!(AnvayaAgreementEngine::classify_verb_tier("খেতে"), VerbConjugationTier::Neutral);
+        assert_eq!(AnvayaAgreementEngine::classify_verb_tier("বাড়িতে"), VerbConjugationTier::Neutral);
+        assert_eq!(AnvayaAgreementEngine::compute_agreement_score(&state_apni, "খেতে"), 0.0);
+        assert_eq!(AnvayaAgreementEngine::compute_agreement_score(&state_apni, "বাড়িতে"), 0.0);
+
+        // Sadhu word 'হইল' must correctly trigger Sadhu register
+        let state_sadhu = AnvayaAgreementEngine::extract_state(&["তাহা", "হইল"]);
+        assert_eq!(state_sadhu.stylistic_tier, StylisticRegister::Sadhu);
     }
 }

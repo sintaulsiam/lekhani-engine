@@ -38,17 +38,19 @@ impl BeamSearchDecoder {
     /// Decode a sequence of token candidate lists into the globally optimal sentence path
     /// using a zero-allocation parent-pointer arena across beam layers.
     pub fn decode(&self, sequence_candidates: &[Vec<String>]) -> Vec<String> {
-        if sequence_candidates.is_empty() {
+        let non_empty_candidates: Vec<&Vec<String>> = sequence_candidates
+            .iter()
+            .filter(|c| !c.is_empty())
+            .collect();
+
+        if non_empty_candidates.is_empty() {
             return Vec::new();
         }
 
-        let mut layers: Vec<Vec<BeamNode<'_>>> = Vec::with_capacity(sequence_candidates.len());
+        let mut layers: Vec<Vec<BeamNode<'_>>> = Vec::with_capacity(non_empty_candidates.len());
 
         // Initialize layer 0 with first token options
-        if let Some(first_cands) = sequence_candidates.first() {
-            if first_cands.is_empty() {
-                return Vec::new();
-            }
+        if let Some(first_cands) = non_empty_candidates.first() {
             let mut layer0: Vec<BeamNode<'_>> = Vec::with_capacity(self.beam_width);
             for (cand_idx, cand) in first_cands.iter().take(self.beam_width).enumerate() {
                 let score = self.lm.score_candidate(None, None, cand);
@@ -64,11 +66,8 @@ impl BeamSearchDecoder {
         }
 
         // Iterate through remaining tokens
-        for t in 1..sequence_candidates.len() {
-            let token_cands = &sequence_candidates[t];
-            if token_cands.is_empty() {
-                continue;
-            }
+        for t in 1..non_empty_candidates.len() {
+            let token_cands = non_empty_candidates[t];
 
             let prev_layer = &layers[t - 1];
             let mut next_layer: Vec<BeamNode<'_>> =
@@ -146,5 +145,23 @@ mod tests {
 
         let decoded = decoder.decode(&token_options);
         assert_eq!(decoded, vec!["আমি", "শার্ট", "পরা"]);
+    }
+
+    #[test]
+    fn test_beam_search_with_empty_candidate_lists() {
+        let decoder = BeamSearchDecoder::new();
+
+        let token_options = vec![
+            vec!["আমি".to_string()],
+            vec![], // Empty middle token list
+            vec!["ভাত".to_string(), "ভাতো".to_string()],
+        ];
+
+        let decoded = decoder.decode(&token_options);
+        assert_eq!(decoded, vec!["আমি", "ভাত"]);
+
+        // Completely empty or all-empty candidate lists
+        assert!(decoder.decode(&[]).is_empty());
+        assert!(decoder.decode(&[vec![], vec![]]).is_empty());
     }
 }
