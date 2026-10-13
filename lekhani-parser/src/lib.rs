@@ -6,6 +6,7 @@
 
 pub mod compiler;
 pub mod engine;
+pub mod pipeline;
 pub mod rule;
 pub mod tables;
 pub mod trie;
@@ -15,6 +16,7 @@ pub mod wasm;
 
 pub use compiler::CompiledLayout;
 pub use engine::LekhaniParser;
+pub use pipeline::TransliterationPipeline;
 pub use rule::{ConditionScope, MatchType, Pattern, PatternRule, RuleCondition};
 
 use std::sync::{Arc, OnceLock};

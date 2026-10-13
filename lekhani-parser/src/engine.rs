@@ -17,43 +17,25 @@ impl LekhaniParser {
 
     /// Convert input string into Unicode Bengali, writing directly into `output`.
     /// Zero heap allocations on the hot path.
+    #[inline]
     pub fn convert_into(&self, input: &str, output: &mut String) {
-        if input.is_empty() {
-            return;
-        }
-
-        // Handle Latin Chandra Bindu pre-normalization: e.g. "c^ad" -> "ca^d"
-        let norm_storage: String;
-        let effective_input = if input.as_bytes().contains(&b'^') {
-            norm_storage = normalize_chandra_latin(input);
-            norm_storage.as_str()
-        } else {
-            input
-        };
-
-        let has_combining = if effective_input.is_ascii() {
-            self.convert_ascii_into(effective_input, output)
-        } else {
-            self.convert_mixed_into(effective_input, output)
-        };
-
-        // Post-process to ensure canonical Unicode Combining Class sequence
-        if has_combining {
-            canonicalize_combining_marks(output);
-        }
+        crate::pipeline::TransliterationPipeline::new(self).process(input, output);
     }
 
     /// Convert input string using pure raw grammar rules without extra diacritic reordering.
     /// Exactly matches the raw Avro grammar specification.
+    #[inline]
     pub fn convert_raw_into(&self, input: &str, output: &mut String) {
-        if input.is_empty() {
-            return;
-        }
+        crate::pipeline::TransliterationPipeline::new(self).process_raw(input, output);
+    }
 
+    /// Low-level grammar transliteration choosing fast-path ASCII or mixed parser.
+    #[inline]
+    pub(crate) fn transliterate_grammar(&self, input: &str, output: &mut String) -> bool {
         if input.is_ascii() {
-            self.convert_ascii_into(input, output);
+            self.convert_ascii_into(input, output)
         } else {
-            self.convert_mixed_into(input, output);
+            self.convert_mixed_into(input, output)
         }
     }
 
@@ -218,7 +200,7 @@ impl LekhaniParser {
 }
 
 /// Normalizes Latin caret (^) placement: e.g. "c^ad" -> "ca^d"
-fn normalize_chandra_latin(text: &str) -> String {
+pub(crate) fn normalize_chandra_latin(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     let mut out = String::with_capacity(text.len());
     let mut i = 0;
@@ -253,7 +235,7 @@ fn is_latin_vowel(c: char) -> bool {
 }
 
 /// Canonicalize Bengali Unicode combining sequences (Nukta composition & Chandra Bindu ordering)
-fn canonicalize_combining_marks(text: &mut String) {
+pub(crate) fn canonicalize_combining_marks(text: &mut String) {
     if text.contains('\u{09BC}') {
         let replaced = text
             .replace("\u{09AF}\u{09BC}", "য়")

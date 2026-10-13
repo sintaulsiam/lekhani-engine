@@ -17,7 +17,7 @@ pub use anvaya::{AnvayaAgreementEngine, AnvayaState, HonorificRegister, VerbConj
 pub use beam::BeamSearchDecoder;
 pub use context::{truncate_at_sentence_boundary, ContextScorer, PersonalScoreOverlay};
 pub use embeddings::WordEmbeddings;
-pub use lm::LanguageModel;
+pub use lm::{LanguageModel, StringInterner};
 pub use prediction::NextWordPredictor;
 pub use trainer::{
     train_files_streaming, CorpusTrainer, TrainedLanguageModelData, TrainingConfig,

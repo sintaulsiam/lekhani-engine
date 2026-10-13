@@ -1031,6 +1031,52 @@ pub const TRIGRAM_TRANSITIONS: &[((&str, &str, &str), f32)] = &[
     (("ছবি", "তুলতে", "পছন্দ"), -0.05),
 ];
 
+/// Flyweight Factory for shared string representations across unigrams, bigrams, and trigrams.
+/// Guarantees that identical Bengali tokens share a single heap allocation (`Arc<str>`).
+#[derive(Default, Debug, Clone)]
+pub struct StringInterner {
+    pool: hashbrown::HashSet<Arc<str>>,
+}
+
+impl StringInterner {
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            pool: hashbrown::HashSet::new(),
+        }
+    }
+
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            pool: hashbrown::HashSet::with_capacity(capacity),
+        }
+    }
+
+    /// Retrieve an interned `Arc<str>` for `s`, creating and caching it if not already present.
+    #[inline]
+    pub fn intern(&mut self, s: &str) -> Arc<str> {
+        if let Some(existing) = self.pool.get(s) {
+            existing.clone()
+        } else {
+            let arc: Arc<str> = Arc::from(s);
+            self.pool.insert(arc.clone());
+            arc
+        }
+    }
+
+    /// Number of unique interned strings in the pool.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.pool.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.pool.is_empty()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct LanguageModel {
     inner: Arc<LanguageModelInner>,
@@ -1172,17 +1218,18 @@ impl LanguageModel {
 
 impl LanguageModelInner {
     pub fn from_static_tables() -> Self {
+        let mut interner = StringInterner::with_capacity(UNIGRAM_LOG_PROBS.len() + BIGRAM_TRANSITIONS.len() * 2);
         let mut unigrams = HashMap::with_capacity(UNIGRAM_LOG_PROBS.len() + 100);
         for &(w, p) in UNIGRAM_LOG_PROBS {
-            unigrams.insert(Arc::from(w), p);
+            unigrams.insert(interner.intern(w), p);
         }
 
         let mut bigrams = HashMap::with_capacity(BIGRAM_TRANSITIONS.len() + 100);
         let mut next_word_map: HashMap<Arc<str>, Vec<(Arc<str>, f32)>> = HashMap::new();
 
         for &((w1, w2), p) in BIGRAM_TRANSITIONS {
-            let a1: Arc<str> = Arc::from(w1);
-            let a2: Arc<str> = Arc::from(w2);
+            let a1: Arc<str> = interner.intern(w1);
+            let a2: Arc<str> = interner.intern(w2);
             bigrams.insert((a1.clone(), a2.clone()), p);
             let entry = next_word_map.entry(a1).or_default();
             if let Some(pos) = entry.iter().position(|(cand, _)| cand.as_ref() == w2) {
@@ -1202,9 +1249,9 @@ impl LanguageModelInner {
         let mut next_trigram_map: TrigramFollowers = HashMap::new();
 
         for &((w1, w2, w3), p) in TRIGRAM_TRANSITIONS {
-            let a1: Arc<str> = Arc::from(w1);
-            let a2: Arc<str> = Arc::from(w2);
-            let a3: Arc<str> = Arc::from(w3);
+            let a1: Arc<str> = interner.intern(w1);
+            let a2: Arc<str> = interner.intern(w2);
+            let a3: Arc<str> = interner.intern(w3);
             trigrams.insert((a1.clone(), a2.clone(), a3.clone()), p);
             let tri_entry = next_trigram_map.entry((a1, a2)).or_default();
             if let Some(pos) = tri_entry.iter().position(|(cand, _)| cand.as_ref() == w3) {
@@ -1287,16 +1334,8 @@ impl LanguageModelInner {
 
     pub fn load_trained_data(&mut self, data: &crate::trainer::TrainedLanguageModelData) {
         self.zero_copy = None;
-        let mut string_pool: hashbrown::HashSet<Arc<str>> = hashbrown::HashSet::with_capacity(data.unigrams.len() + 500);
-        let mut intern = |s: &str| -> Arc<str> {
-            if let Some(existing) = string_pool.get(s) {
-                existing.clone()
-            } else {
-                let arc: Arc<str> = Arc::from(s);
-                string_pool.insert(arc.clone());
-                arc
-            }
-        };
+        let mut interner = StringInterner::with_capacity(data.unigrams.len() + 500);
+        let mut intern = |s: &str| -> Arc<str> { interner.intern(s) };
 
         const MAX_WORD_CONTINUATIONS: usize = 6;
         const MAX_TRIGRAM_CONTINUATIONS: usize = 4;
