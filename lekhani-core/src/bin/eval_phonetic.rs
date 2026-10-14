@@ -353,6 +353,7 @@ fn compute_raw_avro_top1(cases: &[(String, String)]) -> f64 {
     (hits as f64 / cases.len().max(1) as f64) * 100.0
 }
 
+#[allow(clippy::too_many_arguments)]
 fn evaluate_persona(
     split_name: &str,
     persona_name: &str,

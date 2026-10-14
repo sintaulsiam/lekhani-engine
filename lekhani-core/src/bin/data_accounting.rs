@@ -141,7 +141,7 @@ pub fn analyze_split(name: &str, path: &Path) -> SplitAccounting {
 
         let bn_char_count = bn_raw.chars().count();
         let lat_char_count = lat_raw.chars().count();
-        let bn_byte_count = bn_raw.as_bytes().len();
+        let bn_byte_count = bn_raw.len();
 
         if lat_char_count > 24 {
             ac.roman_char_len_gt_24 += 1;

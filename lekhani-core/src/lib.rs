@@ -14,6 +14,7 @@ pub mod personas;
 pub mod phonetic;
 pub mod session;
 pub mod snippets;
+pub mod tokenization;
 pub mod trie;
 
 pub use bilingual::*;
