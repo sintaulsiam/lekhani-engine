@@ -1,15 +1,20 @@
 //! Lekhani Multi-Persona Transliteration Evaluation Harness & Regression Gate
 //!
-//! Evaluates the phonetic transliteration engine across 5 standardized personas:
+//! Evaluates the phonetic transliteration engine across 6 standardized personas:
 //! 1. natural: Raw human-annotated romanizations from held-out Dakshina test set
 //! 2. lazy: Lowercase, no Shift distinctions, chat digraph folds (aa->a, ee->i, w->o)
 //! 3. vowel_drop_p30: Non-initial vowels dropped with probability p = 0.30
 //! 4. vowel_drop_p60: Non-initial vowels dropped with probability p = 0.60
-//! 5. avro_strict: Canonical Avro forward-mapped sanity check ceiling
+//! 5. vowel_drop_p90: Non-initial vowels dropped with probability p = 0.90
+//! 6. avro_strict: Canonical Avro forward-mapped sanity check ceiling
 //!
-//! Computes Top-1/Top-3/Top-5 accuracy, bootstrap 95% confidence intervals,
-//! KSPC (Keystrokes Per Character), OOV rate, seen/unseen splits, length breakdowns,
-//! and latency percentiles (p50, p95, p99).
+//! Computes:
+//! - Top-1/Top-3/Top-5 accuracy
+//! - Cluster bootstrap 95% confidence intervals (clustered by target word)
+//! - Dual scoring: "any attested" vs "most frequent attested" vs "exact row"
+//! - True candidate reachability vs "Not in Top-5"
+//! - KSPC (Keystrokes Per Character): effective typing vs conditional on hits
+//! - Latency percentiles (p50, p95, p99)
 
 use hashbrown::{HashMap, HashSet};
 use lekhani_core::chars::canonicalize;
@@ -26,6 +31,7 @@ use std::time::Instant;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunMeta {
     pub git_sha: String,
+    pub dirty_tree: bool,
     pub seed: u64,
     pub split: String,
     pub canonical: String,
@@ -46,8 +52,16 @@ pub struct LengthMetrics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccuracyBreakdown {
+    pub exact_row: f64,
+    pub any_attested: f64,
+    pub most_frequent_attested: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KspcMetrics {
-    pub mean: f64,
+    pub effective: f64,
+    pub conditional_hits: f64,
     pub accept_at_rank: [f64; 3],
 }
 
@@ -62,11 +76,13 @@ pub struct LatencyMetrics {
 pub struct PersonaMetrics {
     pub n: usize,
     pub top1: f64,
-    pub top1_ci95: [f64; 2],
+    pub top1_ci95_cluster: [f64; 2],
     pub top3: f64,
     pub top5: f64,
     pub mrr: f64,
-    pub oov_rate: f64,
+    pub not_in_top5: f64,
+    pub unreachable: f64,
+    pub scoring: AccuracyBreakdown,
     pub by_seen: HashMap<String, SplitMetrics>,
     pub by_length: HashMap<String, LengthMetrics>,
     pub kspc: KspcMetrics,
@@ -88,10 +104,16 @@ pub struct MultiPersonaReport {
     pub worst_cases: Vec<WorstCaseItem>,
 }
 
-/// Compute 1000-iteration bootstrap 95% confidence interval
-fn compute_bootstrap_ci95(hits: &[bool], seed: u64) -> [f64; 2] {
-    let n = hits.len();
-    if n == 0 {
+pub struct DakshinaGoldIndex {
+    pub roman_to_attested: HashMap<String, HashSet<String>>,
+    pub roman_to_most_frequent: HashMap<String, String>,
+}
+
+/// Compute 1000-iteration cluster bootstrap 95% confidence interval
+/// Resamples clusters (target Bengali words) with replacement to account for correlation
+fn compute_cluster_bootstrap_ci95(clusters: &[Vec<bool>], seed: u64) -> [f64; 2] {
+    let num_clusters = clusters.len();
+    if num_clusters == 0 {
         return [0.0, 0.0];
     }
     let mut rng = SimpleRng::new(seed);
@@ -99,17 +121,24 @@ fn compute_bootstrap_ci95(hits: &[bool], seed: u64) -> [f64; 2] {
     let mut sampled_accs = Vec::with_capacity(iterations);
 
     for _ in 0..iterations {
-        let mut count = 0;
-        for _ in 0..n {
-            let idx = (rng.next_u64() as usize) % n;
-            if hits[idx] {
-                count += 1;
+        let mut total_hits = 0;
+        let mut total_rows = 0;
+        for _ in 0..num_clusters {
+            let idx = (rng.next_u64() as usize) % num_clusters;
+            let cluster = &clusters[idx];
+            total_rows += cluster.len();
+            for &hit in cluster {
+                if hit {
+                    total_hits += 1;
+                }
             }
         }
-        sampled_accs.push(count as f64 / n as f64 * 100.0);
+        if total_rows > 0 {
+            sampled_accs.push(total_hits as f64 / total_rows as f64 * 100.0);
+        }
     }
 
-    sampled_accs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sampled_accs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let low_idx = (iterations as f64 * 0.025) as usize;
     let high_idx = (iterations as f64 * 0.975) as usize;
     [
@@ -126,6 +155,23 @@ fn get_git_sha() -> String {
         .and_then(|out| String::from_utf8(out.stdout).ok())
         .map(|s| s.trim().chars().take(8).collect())
         .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn is_tree_dirty() -> bool {
+    std::process::Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .map(|s| {
+            // Ignore untracked diagnostic tools
+            let relevant_lines = s
+                .lines()
+                .filter(|line| !line.contains("diagnose_ablation") && !line.contains("failures_100"))
+                .count();
+            relevant_lines > 0
+        })
+        .unwrap_or(false)
 }
 
 fn setup_engine() -> PhoneticSuggestion {
@@ -159,7 +205,14 @@ fn setup_engine() -> PhoneticSuggestion {
     sugg
 }
 
-fn load_test_pairs() -> Vec<(String, String)> {
+#[derive(Clone)]
+struct RawTestRow {
+    bn_target: String,
+    latin: String,
+    count: usize,
+}
+
+fn load_test_data() -> (Vec<RawTestRow>, DakshinaGoldIndex) {
     let test_candidates = [
         PathBuf::from("/home/smsiam/.gemini/antigravity-ide/brain/6e8f5951-b148-4374-87c2-2e54e03df641/scratch/dakshina/dakshina_dataset_v1.0/bn/lexicons/bn.translit.sampled.test.tsv"),
         PathBuf::from("data/eval/bn.translit.sampled.test.tsv"),
@@ -173,7 +226,9 @@ fn load_test_pairs() -> Vec<(String, String)> {
 
     let file = File::open(&test_path).expect("Failed to open test.tsv");
     let reader = BufReader::new(file);
-    let mut pairs = Vec::with_capacity(10000);
+    let mut rows = Vec::with_capacity(10000);
+
+    let mut roman_counts: HashMap<String, HashMap<String, usize>> = HashMap::new();
 
     for line in reader.lines() {
         if let Ok(l) = line {
@@ -181,14 +236,55 @@ fn load_test_pairs() -> Vec<(String, String)> {
             if parts.len() >= 2 {
                 let bn_target = canonicalize(parts[0].trim());
                 let latin = parts[1].trim().to_string();
+                let count: usize = if parts.len() >= 3 {
+                    parts[2].trim().parse().unwrap_or(1)
+                } else {
+                    1
+                };
                 if !bn_target.is_empty() && !latin.is_empty() {
-                    pairs.push((bn_target, latin));
+                    rows.push(RawTestRow {
+                        bn_target: bn_target.clone(),
+                        latin: latin.clone(),
+                        count,
+                    });
+
+                    roman_counts
+                        .entry(latin)
+                        .or_default()
+                        .entry(bn_target)
+                        .and_modify(|c| *c += count)
+                        .or_insert(count);
                 }
             }
         }
     }
 
-    pairs
+    let mut roman_to_attested = HashMap::new();
+    let mut roman_to_most_frequent = HashMap::new();
+
+    for (roman, bn_map) in roman_counts {
+        let mut attested_set = HashSet::new();
+        let mut max_count = 0;
+        let mut best_bn = String::new();
+
+        for (bn, count) in bn_map {
+            if count > max_count {
+                max_count = count;
+                best_bn = bn.clone();
+            }
+            attested_set.insert(bn);
+        }
+        roman_to_attested.insert(roman.clone(), attested_set);
+        roman_to_most_frequent.insert(roman, best_bn);
+    }
+
+    (
+        rows,
+        DakshinaGoldIndex {
+            roman_to_attested,
+            roman_to_most_frequent,
+        },
+    )
 }
 
 fn load_dict_words() -> HashSet<String> {
@@ -215,8 +311,8 @@ fn load_dict_words() -> HashSet<String> {
                             }
                         }
                     }
-                    break;
                 }
+                break;
             }
         }
     }
@@ -225,22 +321,27 @@ fn load_dict_words() -> HashSet<String> {
 
 fn evaluate_persona(
     persona_name: &str,
-    cases: &[(String, String)], // (input_keystrokes, expected_bn)
+    cases: &[(String, String)], // (input_keystrokes, target_bn)
     sugg: &mut PhoneticSuggestion,
     dict_words: &HashSet<String>,
+    gold_index: Option<&DakshinaGoldIndex>,
     seed: u64,
     worst_cases_out: &mut Vec<WorstCaseItem>,
 ) -> PersonaMetrics {
     let empty_memory = HashMap::new();
     let n = cases.len();
-    let mut top1_hits = Vec::with_capacity(n);
-    let mut top3_hits = 0;
-    let mut top5_hits = 0;
+    let mut exact_hits = Vec::with_capacity(n);
+    let mut any_attested_hits = 0usize;
+    let mut most_freq_hits = 0usize;
+    let mut top3_hits = 0usize;
+    let mut top5_hits = 0usize;
     let mut mrr_sum = 0.0;
-    let mut oov_count = 0;
+    let mut unreachable_count = 0usize;
 
     let mut latencies_us = Vec::with_capacity(n);
-    let mut total_keystrokes = 0usize;
+    let mut total_keystrokes_eff = 0usize;
+    let mut hits_keystrokes = 0usize;
+    let mut hits_target_chars = 0usize;
     let mut total_target_chars = 0usize;
     let mut rank_counts = [0usize; 3];
 
@@ -284,9 +385,10 @@ fn evaluate_persona(
         latencies_us.push(elapsed_us);
 
         let candidates: Vec<String> = raw_candidates.iter().map(|s| canonicalize(s)).collect();
+        let top_cand = candidates.first().cloned().unwrap_or_default();
 
         let mut rank = None;
-        for (i, cand) in candidates.iter().enumerate() {
+        for (i, cand) in candidates.iter().take(5).enumerate() {
             if cand == target_bn {
                 rank = Some(i);
                 break;
@@ -294,13 +396,34 @@ fn evaluate_persona(
         }
 
         let is_top1 = rank == Some(0);
-        top1_hits.push(is_top1);
+        exact_hits.push(is_top1);
+
+        // Dual scoring
+        if let Some(idx) = gold_index {
+            if idx.roman_to_attested.get(input).map_or(false, |set| set.contains(&top_cand)) {
+                any_attested_hits += 1;
+            }
+            if idx.roman_to_most_frequent.get(input).map_or(false, |m| m == &top_cand) {
+                most_freq_hits += 1;
+            }
+        } else {
+            if is_top1 {
+                any_attested_hits += 1;
+                most_freq_hits += 1;
+            }
+        }
 
         if is_top1 {
             if is_seen { seen_top1 += 1; } else { unseen_top1 += 1; }
             if input_len <= 3 { len_1_3_top1 += 1; }
             else if input_len <= 6 { len_4_6_top1 += 1; }
             else { len_7_plus_top1 += 1; }
+        }
+
+        // True reachability: was target in the candidate list at all?
+        let in_full_candidates = candidates.iter().any(|c| c == target_bn);
+        if !in_full_candidates {
+            unreachable_count += 1;
         }
 
         if let Some(r) = rank {
@@ -316,17 +439,18 @@ fn evaluate_persona(
             }
             mrr_sum += 1.0 / (r as f64 + 1.0);
 
-            // KSPC keystroke cost
+            // KSPC: selection cost (1 for space or tap, 2 for rank 3/4)
             let selection_cost = match r {
-                0 => 1, // Space
-                1 | 2 => 1, // Candidate tap
-                _ => 2, // Scroll & tap
+                0 => 1,
+                1 | 2 => 1,
+                _ => 2,
             };
-            total_keystrokes += input_len + selection_cost;
+            total_keystrokes_eff += input_len + selection_cost;
+            hits_keystrokes += input_len + selection_cost;
+            hits_target_chars += target_len;
         } else {
-            oov_count += 1;
-            // Penalty: backspace whole word + re-type target + space
-            total_keystrokes += input_len + target_len + 1;
+            // Miss penalty: backspace whole word + re-type target + space
+            total_keystrokes_eff += input_len + target_len + 1;
 
             if worst_cases_out.len() < 50 {
                 worst_cases_out.push(WorstCaseItem {
@@ -339,18 +463,32 @@ fn evaluate_persona(
         }
     }
 
-    latencies_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    latencies_us.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let p50 = latencies_us[latencies_us.len() * 50 / 100];
     let p95 = latencies_us[latencies_us.len() * 95 / 100];
     let p99 = latencies_us[latencies_us.len() * 99 / 100];
 
-    let top1_pct = (top1_hits.iter().filter(|&&h| h).count() as f64 / n as f64) * 100.0;
-    let top1_ci95 = compute_bootstrap_ci95(&top1_hits, seed);
+    let top1_pct = (exact_hits.iter().filter(|&&h| h).count() as f64 / n as f64) * 100.0;
+
+    // Cluster bootstrap by target Bengali word
+    let mut target_clusters: HashMap<&str, Vec<bool>> = HashMap::new();
+    for ((_, target_bn), &hit) in cases.iter().zip(exact_hits.iter()) {
+        target_clusters.entry(target_bn.as_str()).or_default().push(hit);
+    }
+    let clusters: Vec<Vec<bool>> = target_clusters.into_values().collect();
+    let top1_ci95_cluster = compute_cluster_bootstrap_ci95(&clusters, seed);
+
     let top3_pct = (top3_hits as f64 / n as f64) * 100.0;
     let top5_pct = (top5_hits as f64 / n as f64) * 100.0;
     let mrr = mrr_sum / n as f64;
-    let oov_rate = (oov_count as f64 / n as f64) * 100.0;
-    let mean_kspc = total_keystrokes as f64 / total_target_chars.max(1) as f64;
+    let not_in_top5 = 100.0 - top5_pct;
+    let unreachable = (unreachable_count as f64 / n as f64) * 100.0;
+
+    let effective_kspc = total_keystrokes_eff as f64 / total_target_chars.max(1) as f64;
+    let conditional_kspc = hits_keystrokes as f64 / hits_target_chars.max(1) as f64;
+
+    let any_attested_pct = (any_attested_hits as f64 / n as f64) * 100.0;
+    let most_freq_pct = (most_freq_hits as f64 / n as f64) * 100.0;
 
     let mut by_seen = HashMap::new();
     by_seen.insert(
@@ -393,23 +531,37 @@ fn evaluate_persona(
         },
     );
 
+    let rank_total = rank_counts[0] + rank_counts[1] + rank_counts[2];
+    let accept_at_rank = if rank_total > 0 {
+        [
+            rank_counts[0] as f64 / rank_total as f64,
+            rank_counts[1] as f64 / rank_total as f64,
+            rank_counts[2] as f64 / rank_total as f64,
+        ]
+    } else {
+        [0.0, 0.0, 0.0]
+    };
+
     PersonaMetrics {
         n,
         top1: (top1_pct * 100.0).round() / 100.0,
-        top1_ci95,
+        top1_ci95_cluster,
         top3: (top3_pct * 100.0).round() / 100.0,
         top5: (top5_pct * 100.0).round() / 100.0,
         mrr: (mrr * 10000.0).round() / 10000.0,
-        oov_rate: (oov_rate * 100.0).round() / 100.0,
+        not_in_top5: (not_in_top5 * 100.0).round() / 100.0,
+        unreachable: (unreachable * 100.0).round() / 100.0,
+        scoring: AccuracyBreakdown {
+            exact_row: (top1_pct * 100.0).round() / 100.0,
+            any_attested: (any_attested_pct * 100.0).round() / 100.0,
+            most_frequent_attested: (most_freq_pct * 100.0).round() / 100.0,
+        },
         by_seen,
         by_length,
         kspc: KspcMetrics {
-            mean: (mean_kspc * 1000.0).round() / 1000.0,
-            accept_at_rank: [
-                (rank_counts[0] as f64 / n as f64 * 100.0).round() / 100.0,
-                (rank_counts[1] as f64 / n as f64 * 100.0).round() / 100.0,
-                (rank_counts[2] as f64 / n as f64 * 100.0).round() / 100.0,
-            ],
+            effective: (effective_kspc * 100.0).round() / 100.0,
+            conditional_hits: (conditional_kspc * 100.0).round() / 100.0,
+            accept_at_rank,
         },
         latency_us: LatencyMetrics {
             p50: (p50 * 10.0).round() / 10.0,
@@ -420,26 +572,42 @@ fn evaluate_persona(
 }
 
 fn main() {
-    println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║       🎯 Lekhani Multi-Persona Transliteration Evaluation        ║");
-    println!("╚══════════════════════════════════════════════════════════════════╝");
+    println!("══════════════════════════════════════════════════════════════════════════════════════════════════");
+    println!("  🚀 Lekhani Multi-Persona Transliteration Evaluation Harness & Regression Gate");
+    println!("══════════════════════════════════════════════════════════════════════════════════════════════════\n");
 
-    let seed: u64 = 42;
     let git_sha = get_git_sha();
-    println!("Git SHA: {} | Seed: {}", git_sha, seed);
+    let dirty_tree = is_tree_dirty();
+    let seed = 42u64;
 
-    let raw_pairs = load_test_pairs();
-    println!("Loaded {} held-out test pairs from Dakshina.", raw_pairs.len());
-
-    let dict_words = load_dict_words();
-    println!("Loaded {} canonical words from dictionary.json.", dict_words.len());
+    println!("Environment Metadata:");
+    println!("  ➔ Git Commit SHA : {}", git_sha);
+    println!("  ➔ Dirty Tree     : {}", dirty_tree);
+    println!("  ➔ Random Seed    : {}", seed);
+    println!("  ➔ Target NFC     : standard decomposed nuktas (U+09BC) + atomic Khanda Ta (U+09CE)");
+    println!("  ➔ Cluster Boot   : clustered by target Bengali word (1,000 iterations)\n");
 
     let mut sugg = setup_engine();
+    let (raw_rows, gold_index) = load_test_data();
+    let dict_words = load_dict_words();
+
+    let raw_pairs: Vec<(String, String)> = raw_rows
+        .into_iter()
+        .map(|r| (r.bn_target, r.latin))
+        .collect();
+
+    println!(
+        "Loaded {} test pairs across {} unique targets from held-out Dakshina test.tsv.",
+        raw_pairs.len(),
+        raw_pairs.iter().map(|(bn, _)| bn).collect::<HashSet<_>>().len()
+    );
+    println!("Loaded {} canonical dictionary entries.\n", dict_words.len());
+
     let mut report_personas = HashMap::new();
     let mut all_worst_cases = Vec::new();
 
-    // 1. Natural Persona (Raw human romanization)
-    println!("\n▶️  Evaluating Persona: [Natural]...");
+    // 1. Natural Persona (Raw human-typed transliterations)
+    println!("▶️  Evaluating Persona: [Natural]...");
     let natural_cases: Vec<(String, String)> = raw_pairs
         .iter()
         .map(|(bn, latin)| (transform_natural(latin), bn.clone()))
@@ -449,12 +617,13 @@ fn main() {
         &natural_cases,
         &mut sugg,
         &dict_words,
+        Some(&gold_index),
         seed + 1,
         &mut all_worst_cases,
     );
     report_personas.insert("natural".to_string(), natural_metrics);
 
-    // 2. Lazy Persona (Lowercase, collapsed Shift, chat folds)
+    // 2. Lazy Persona (Lowercase, collapsed double vowels, chat folds)
     println!("▶️  Evaluating Persona: [Lazy]...");
     let lazy_cases: Vec<(String, String)> = raw_pairs
         .iter()
@@ -465,6 +634,7 @@ fn main() {
         &lazy_cases,
         &mut sugg,
         &dict_words,
+        Some(&gold_index),
         seed + 2,
         &mut all_worst_cases,
     );
@@ -482,6 +652,7 @@ fn main() {
         &vdrop_p30_cases,
         &mut sugg,
         &dict_words,
+        None,
         seed + 3,
         &mut all_worst_cases,
     );
@@ -499,12 +670,31 @@ fn main() {
         &vdrop_p60_cases,
         &mut sugg,
         &dict_words,
+        None,
         seed + 4,
         &mut all_worst_cases,
     );
     report_personas.insert("vowel_drop_p60".to_string(), vdrop_p60_metrics);
 
-    // 5. Avro-Strict Persona (Canonical forward-mapped ceiling)
+    // 5. Vowel-Dropped Persona (p = 0.90)
+    println!("▶️  Evaluating Persona: [Vowel-Dropped p=0.90]...");
+    let mut rng_p90 = SimpleRng::new(seed + 90);
+    let vdrop_p90_cases: Vec<(String, String)> = raw_pairs
+        .iter()
+        .map(|(bn, latin)| (transform_vowel_drop(latin, 0.90, &mut rng_p90), bn.clone()))
+        .collect();
+    let vdrop_p90_metrics = evaluate_persona(
+        "vowel_drop_p90",
+        &vdrop_p90_cases,
+        &mut sugg,
+        &dict_words,
+        None,
+        seed + 5,
+        &mut all_worst_cases,
+    );
+    report_personas.insert("vowel_drop_p90".to_string(), vdrop_p90_metrics);
+
+    // 6. Avro-Strict Persona (Canonical forward-mapped ceiling)
     println!("▶️  Evaluating Persona: [Avro-Strict]...");
     let avro_cases: Vec<(String, String)> = raw_pairs
         .iter()
@@ -515,35 +705,54 @@ fn main() {
         &avro_cases,
         &mut sugg,
         &dict_words,
-        seed + 5,
+        None,
+        seed + 6,
         &mut all_worst_cases,
     );
     report_personas.insert("avro_strict".to_string(), avro_metrics);
 
     // Display Summary Table
     println!("\n📊 Multi-Persona Evaluation Summary:");
-    println!("─────────────────────────────────────────────────────────────────────────────────────────────");
+    println!("───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
     println!(
-        "{:<18} {:>7} {:>16} {:>10} {:>8} {:>8} {:>8} {:>12}",
-        "Persona", "N", "Top-1 (95% CI)", "Top-3", "MRR", "OOV %", "KSPC", "Latency p95"
+        "{:<17} {:>6} {:>15} {:>10} {:>10} {:>8} {:>9} {:>9} {:>13} {:>11}",
+        "Persona", "N", "Top-1 (Exact)", "Any Attest", "Top-3", "MRR", "NotInTop5", "Unreach%", "KSPC (Eff/Hit)", "Lat p95"
     );
-    println!("─────────────────────────────────────────────────────────────────────────────────────────────");
+    println!("───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
 
-    let persona_order = ["natural", "lazy", "vowel_drop_p30", "vowel_drop_p60", "avro_strict"];
+    let persona_order = [
+        "natural",
+        "lazy",
+        "vowel_drop_p30",
+        "vowel_drop_p60",
+        "vowel_drop_p90",
+        "avro_strict",
+    ];
     for name in &persona_order {
         if let Some(m) = report_personas.get(*name) {
-            let ci_str = format!("{:.1}% [{:.1}-{:.1}]", m.top1, m.top1_ci95[0], m.top1_ci95[1]);
+            let ci_str = format!("{:.1}% [{:.1}-{:.1}]", m.top1, m.top1_ci95_cluster[0], m.top1_ci95_cluster[1]);
+            let kspc_str = format!("{:.2} / {:.2}", m.kspc.effective, m.kspc.conditional_hits);
             println!(
-                "{:<18} {:>7} {:>16} {:>9.1}% {:>8.4} {:>7.1}% {:>8.2} {:>10.0}µs",
-                name, m.n, ci_str, m.top3, m.mrr, m.oov_rate, m.kspc.mean, m.latency_us.p95
+                "{:<17} {:>6} {:>15} {:>9.1}% {:>9.1}% {:>8.4} {:>8.1}% {:>8.1}% {:>13} {:>9.0}µs",
+                name,
+                m.n,
+                ci_str,
+                m.scoring.any_attested,
+                m.top3,
+                m.mrr,
+                m.not_in_top5,
+                m.unreachable,
+                kspc_str,
+                m.latency_us.p95
             );
         }
     }
-    println!("─────────────────────────────────────────────────────────────────────────────────────────────");
+    println!("───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
 
     let report = MultiPersonaReport {
         run: RunMeta {
             git_sha,
+            dirty_tree,
             seed,
             split: "test".to_string(),
             canonical: "nfc+khanda".to_string(),
@@ -556,6 +765,6 @@ fn main() {
     let baseline_path = Path::new("data/eval/baseline.json");
     if let Ok(json) = serde_json::to_string_pretty(&report) {
         let _ = std::fs::write(baseline_path, json);
-        println!("\n💾 Saved multi-persona baseline report to {:?}", baseline_path);
+        println!("\n💾 Saved updated multi-persona baseline report to {:?}", baseline_path);
     }
 }

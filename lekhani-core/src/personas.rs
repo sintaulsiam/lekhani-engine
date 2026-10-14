@@ -119,13 +119,9 @@ fn cons_to_avro(c: char) -> Option<&'static str> {
         'র' => Some("r"),
         'ল' => Some("l"),
         'শ' => Some("sh"),
-        'ষ' => Some("S"),
+        'ষ' => Some("Sh"),
         'স' => Some("s"),
         'হ' => Some("h"),
-        'ৎ' => Some("t``"),
-        'ং' => Some("ng"),
-        'ঃ' => Some(":"),
-        'ঁ' => Some("^"),
         _ => None,
     }
 }
@@ -154,7 +150,7 @@ pub fn transform_avro_strict(bn_word: &str) -> String {
                     continue;
                 }
                 'য' => {
-                    out.push('y');
+                    out.push('Y');
                     i += 2;
                     continue;
                 }
@@ -162,7 +158,16 @@ pub fn transform_avro_strict(bn_word: &str) -> String {
             }
         }
 
-        // 2. Independent Vowels
+        // 2. Modifiers (Terminal diacritics - never take inherent vowels)
+        match c {
+            'ং' => { out.push_str("ng"); i += 1; continue; }
+            'ঃ' => { out.push(':'); i += 1; continue; }
+            'ঁ' => { out.push('^'); i += 1; continue; }
+            'ৎ' => { out.push_str("t``"); i += 1; continue; }
+            _ => {}
+        }
+
+        // 3. Independent Vowels
         match c {
             'অ' => { out.push('o'); i += 1; continue; }
             'আ' => { out.push('a'); i += 1; continue; }
@@ -178,7 +183,7 @@ pub fn transform_avro_strict(bn_word: &str) -> String {
             _ => {}
         }
 
-        // 3. Dependent Vowel Signs (Kars)
+        // 4. Dependent Vowel Signs (Kars)
         match c {
             'া' => { out.push('a'); i += 1; continue; }
             'ি' => { out.push('i'); i += 1; continue; }
@@ -188,12 +193,22 @@ pub fn transform_avro_strict(bn_word: &str) -> String {
             'ৃ' => { out.push_str("rri"); i += 1; continue; }
             'ে' => { out.push('e'); i += 1; continue; }
             'ৈ' => { out.push_str("oi"); i += 1; continue; }
-            'ো' => { out.push('o'); i += 1; continue; }
+            'ো' => { out.push('O'); i += 1; continue; }
             'ৌ' => { out.push_str("ou"); i += 1; continue; }
             _ => {}
         }
 
-        // 4. Special Conjuncts & Pholas
+        // 5. Special Conjuncts, Pholas, & Reph
+        // 5a. Reph: র + ্ + Consonant -> "rr" + consonant
+        if c == 'র' && i + 2 < chars.len() && chars[i + 1] == '্' {
+            let next_c = chars[i + 2];
+            if next_c != '্' && next_c != 'র' && next_c != 'য' {
+                out.push_str("rr");
+                i += 2;
+                continue;
+            }
+        }
+
         if i + 2 < chars.len() && chars[i + 1] == '্' {
             let next_c = chars[i + 2];
             // ক + ্ + ষ -> kkh
@@ -248,7 +263,7 @@ pub fn transform_avro_strict(bn_word: &str) -> String {
             }
         }
 
-        // 5. Consonants
+        // 6. Consonants
         if let Some(cs) = cons_to_avro(c) {
             out.push_str(cs);
             // Check if next char needs inherent vowel 'o'
@@ -266,7 +281,7 @@ pub fn transform_avro_strict(bn_word: &str) -> String {
             continue;
         }
 
-        // 6. Virama (Hasanta)
+        // 7. Virama (Hasanta)
         if c == '্' {
             i += 1;
             continue;
