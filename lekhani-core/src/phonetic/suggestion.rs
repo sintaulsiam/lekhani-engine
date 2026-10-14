@@ -56,6 +56,7 @@ pub struct PhoneticSuggestionConfig {
     pub enable_dynamic_macros: bool,
     pub auto_dari: bool,
     pub enable_bilingual_clitic: bool,
+    pub strict_avro_mode: bool,
 }
 
 impl Default for PhoneticSuggestionConfig {
@@ -73,6 +74,7 @@ impl Default for PhoneticSuggestionConfig {
             enable_dynamic_macros: true,
             auto_dari: true,
             enable_bilingual_clitic: false,
+            strict_avro_mode: false,
         }
     }
 }
@@ -304,6 +306,10 @@ impl PhoneticSuggestion {
         self.cache.clear();
     }
 
+    pub fn get_config(&self) -> PhoneticSuggestionConfig {
+        self.config
+    }
+
     /// Clear cached candidate suggestions
     pub fn clear_cache(&mut self) {
         self.cache.clear();
@@ -518,7 +524,8 @@ impl PhoneticSuggestion {
             | ((self.config.enable_word_segmentation as u32) << 1)
             | ((self.config.enable_colloquial_dialects as u32) << 2)
             | ((self.config.enable_banglish_shorthand as u32) << 3)
-            | ((self.config.enable_dynamic_macros as u32) << 4);
+            | ((self.config.enable_dynamic_macros as u32) << 4)
+            | ((self.config.strict_avro_mode as u32) << 5);
 
         let cache_key = if context.is_empty() {
             format!("{}:{}:{}:{}", term, include_english, use_dictionary, cfg_mask)
@@ -1712,9 +1719,9 @@ impl PhoneticSuggestion {
         // Sort candidates by descending total score
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
 
-        // When explicit Avro syntax/casing is detected, ensure the direct transliteration
-        // candidate (phonetic) is locked at Slot 0 and protected against LM demotion.
-        if has_explicit_intent {
+        // When explicit Avro syntax/casing is detected or strict_avro_mode is active,
+        // ensure the direct transliteration candidate (phonetic) is locked at Slot 0 and protected against LM demotion.
+        if has_explicit_intent || self.config.strict_avro_mode {
             if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == &phonetic) {
                 if pos > 0 {
                     let direct = scored_candidates.remove(pos);
@@ -1736,6 +1743,7 @@ impl PhoneticSuggestion {
         // Note: Explicit Avro intent completely bypasses this pass to preserve deterministic user intent.
         if self.config.ai_profile != AiProfile::Off
             && !has_explicit_intent
+            && !self.config.strict_avro_mode
             && !context.is_empty()
             && scored_candidates.len() >= 2
         {
@@ -3244,5 +3252,36 @@ mod tests {
 
         // 4. Object with non-array patterns
         assert!(!sugg.set_layout(&serde_json::json!({"patterns": 123})));
+    }
+
+    #[test]
+    fn test_strict_avro_mode_toggle() {
+        let mut sugg = PhoneticSuggestion::new();
+        let layout_candidates = [
+            std::path::Path::new("../../data/layouts/avrophonetic.json"),
+            std::path::Path::new("data/layouts/avrophonetic.json"),
+            std::path::Path::new("../data/layouts/avrophonetic.json"),
+        ];
+        for p in layout_candidates {
+            if p.exists() {
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    if let Ok(json) = serde_json::from_str(&content) {
+                        sugg.set_layout(&json);
+                        break;
+                    }
+                }
+            }
+        }
+        let empty_memory = HashMap::new();
+
+        // 1. Default (strict_avro_mode = false): smart adaptive ranking promotes dictionary word 'চেষ্টা' over naive 'ছেস্তা'
+        assert!(!sugg.config.strict_avro_mode);
+        let (cands_adaptive, _) = sugg.suggest("chesta", true, true, &empty_memory);
+        assert_eq!(cands_adaptive[0], "চেষ্টা");
+
+        // 2. Strict Avro Mode enabled: locks direct naive transliteration 'ছেস্তা' at Slot 0
+        sugg.config.strict_avro_mode = true;
+        let (cands_strict, _) = sugg.suggest("chesta", true, true, &empty_memory);
+        assert_eq!(cands_strict[0], "ছেস্তা");
     }
 }

@@ -135,6 +135,16 @@ impl InputSession {
         self.phonetic.suggestion_engine.update_config(config);
     }
 
+    pub fn set_strict_avro_mode(&mut self, enabled: bool) {
+        let mut cfg = self.phonetic.suggestion_engine.get_config();
+        cfg.strict_avro_mode = enabled;
+        self.phonetic.suggestion_engine.update_config(cfg);
+    }
+
+    pub fn is_strict_avro_mode(&self) -> bool {
+        self.phonetic.suggestion_engine.get_config().strict_avro_mode
+    }
+
     pub fn update_fixed_config(
         &mut self,
         auto_vowel: bool,
