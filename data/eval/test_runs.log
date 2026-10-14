@@ -1,0 +1,3 @@
+# Lekhani Test Set Evaluation Log (Ground Rule 2)
+# Format: <ISO-8601 Timestamp> | <Git SHA> | <Configuration / Description>
+2026-10-14T19:17:04Z | SHA: 5166d5c3 | Step 1 re-baseline on real engine configuration; dictionary.json only (SHA256: 8a51b4d98bcbe147771751c60fa1d2919a84b0b910232bdcf863617ecc88fbdb); rule engine baseline

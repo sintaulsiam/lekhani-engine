@@ -1,14 +1,16 @@
 //! Lekhani Multi-Persona Transliteration Evaluation Harness & Regression Gate
 //!
 //! Evaluates the phonetic transliteration engine across 6 standardized personas:
-//! 1. natural: Raw human-annotated romanizations from held-out Dakshina test set
+//! 1. natural: Raw human-annotated romanizations from held-out Dakshina splits
 //! 2. lazy: Lowercase, no Shift distinctions, chat digraph folds (aa->a, ee->i, w->o)
 //! 3. vowel_drop_p30: Non-initial vowels dropped with probability p = 0.30
 //! 4. vowel_drop_p60: Non-initial vowels dropped with probability p = 0.60
 //! 5. vowel_drop_p90: Non-initial vowels dropped with probability p = 0.90
 //! 6. avro_strict: Canonical Avro forward-mapped sanity check ceiling
 //!
+//! Evaluates both DEV and TEST splits using strictly dictionary.json (zero Wikipedia unigrams).
 //! Computes:
+//! - Raw Avro-only Top-1 baseline (parser only, no lexicon/ranking)
 //! - Top-1/Top-3/Top-5 accuracy
 //! - Cluster bootstrap 95% confidence intervals (clustered by target word)
 //! - Dual scoring: "any attested" vs "most frequent attested" vs "exact row"
@@ -18,6 +20,7 @@
 
 use hashbrown::{HashMap, HashSet};
 use lekhani_core::chars::canonicalize;
+use lekhani_core::fs::file_sha256_hex;
 use lekhani_core::personas::{
     transform_avro_strict, transform_lazy, transform_natural, transform_vowel_drop, SimpleRng,
 };
@@ -33,8 +36,9 @@ pub struct RunMeta {
     pub git_sha: String,
     pub dirty_tree: bool,
     pub seed: u64,
-    pub split: String,
     pub canonical: String,
+    pub dictionary_file: String,
+    pub dictionary_hash: String,
     pub timestamp: String,
 }
 
@@ -91,6 +95,7 @@ pub struct PersonaMetrics {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorstCaseItem {
+    pub split: String,
     pub persona: String,
     pub input: String,
     pub expected: String,
@@ -98,8 +103,19 @@ pub struct WorstCaseItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SplitReport {
+    pub n: usize,
+    pub unique_targets: usize,
+    pub raw_avro_top1: f64,
+    pub personas: HashMap<String, PersonaMetrics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultiPersonaReport {
     pub run: RunMeta,
+    pub raw_avro_top1: HashMap<String, f64>,
+    pub dev: SplitReport,
+    pub test: SplitReport,
     pub personas: HashMap<String, PersonaMetrics>,
     pub worst_cases: Vec<WorstCaseItem>,
 }
@@ -164,13 +180,12 @@ fn is_tree_dirty() -> bool {
         .ok()
         .and_then(|out| String::from_utf8(out.stdout).ok())
         .map(|s| {
-            // Ignore untracked diagnostic tools
             let relevant_lines = s
                 .lines()
                 .filter(|line| {
-                    !line.contains("diagnose_ablation")
-                        && !line.contains("failures_100")
-                        && !line.contains("baseline.json")
+                    !line.contains("baseline.json")
+                        && !line.contains("data/eval/reports")
+                        && !line.contains("data/eval/test_runs.log")
                 })
                 .count();
             relevant_lines > 0
@@ -178,7 +193,7 @@ fn is_tree_dirty() -> bool {
         .unwrap_or(false)
 }
 
-fn setup_engine() -> PhoneticSuggestion {
+fn setup_engine(dict_filename: &str) -> (PhoneticSuggestion, PathBuf, String) {
     let mut sugg = PhoneticSuggestion::new();
     let layout_candidates = [
         PathBuf::from("data/layouts/avrophonetic.json"),
@@ -195,43 +210,56 @@ fn setup_engine() -> PhoneticSuggestion {
             }
         }
     }
-    let dict_candidates = [
+
+    let dict_dir_candidates = [
         PathBuf::from("data/dictionaries"),
         PathBuf::from("../data/dictionaries"),
         PathBuf::from("../../data/dictionaries"),
     ];
-    for p in &dict_candidates {
-        if p.exists() {
-            let _ = sugg.database.load_from_dir(p);
-            break;
-        }
-    }
-    sugg
+    let dict_dir = dict_dir_candidates
+        .iter()
+        .find(|p| p.join(dict_filename).exists())
+        .cloned()
+        .expect("Directory containing dictionary file not found!");
+
+    let dict_full_path = dict_dir.join(dict_filename);
+    let dict_hash = file_sha256_hex(&dict_full_path)
+        .expect("Failed to compute SHA-256 hash of dictionary.json");
+
+    sugg.database
+        .load_from_dir_with_dict(&dict_dir, dict_filename)
+        .expect("Failed to load database with dictionary");
+
+    (sugg, dict_full_path, dict_hash)
 }
 
 #[derive(Clone)]
-struct RawTestRow {
+struct RawRow {
     bn_target: String,
     latin: String,
     _count: usize,
 }
 
-fn load_test_data() -> (Vec<RawTestRow>, DakshinaGoldIndex) {
-    let test_candidates = [
-        PathBuf::from("/home/smsiam/.gemini/antigravity-ide/brain/6e8f5951-b148-4374-87c2-2e54e03df641/scratch/dakshina/dakshina_dataset_v1.0/bn/lexicons/bn.translit.sampled.test.tsv"),
-        PathBuf::from("data/eval/bn.translit.sampled.test.tsv"),
-        PathBuf::from("../data/eval/bn.translit.sampled.test.tsv"),
+fn load_split_data(split_name: &str) -> (Vec<RawRow>, DakshinaGoldIndex, PathBuf) {
+    let filename = format!("bn.translit.sampled.{}.tsv", split_name);
+    let candidates = [
+        PathBuf::from(format!("data/eval/{}", filename)),
+        PathBuf::from(format!("../data/eval/{}", filename)),
+        PathBuf::from(format!("../../data/eval/{}", filename)),
+        PathBuf::from(format!(
+            "/home/smsiam/.gemini/antigravity-ide/brain/6e8f5951-b148-4374-87c2-2e54e03df641/scratch/dakshina/dakshina_dataset_v1.0/bn/lexicons/{}",
+            filename
+        )),
     ];
-    let test_path = test_candidates
+    let path = candidates
         .iter()
         .find(|p| p.exists())
         .cloned()
-        .expect("Held-out Dakshina test.tsv not found!");
+        .unwrap_or_else(|| panic!("Dakshina {} file not found!", filename));
 
-    let file = File::open(&test_path).expect("Failed to open test.tsv");
+    let file = File::open(&path).unwrap_or_else(|_| panic!("Failed to open {:?}", path));
     let reader = BufReader::new(file);
     let mut rows = Vec::with_capacity(10000);
-
     let mut roman_counts: HashMap<String, HashMap<String, usize>> = HashMap::new();
 
     for l in reader.lines().map_while(Result::ok) {
@@ -245,7 +273,7 @@ fn load_test_data() -> (Vec<RawTestRow>, DakshinaGoldIndex) {
                 1
             };
             if !bn_target.is_empty() && !latin.is_empty() {
-                rows.push(RawTestRow {
+                rows.push(RawRow {
                     bn_target: bn_target.clone(),
                     latin: latin.clone(),
                     _count: count,
@@ -286,44 +314,47 @@ fn load_test_data() -> (Vec<RawTestRow>, DakshinaGoldIndex) {
             roman_to_attested,
             roman_to_most_frequent,
         },
+        path,
     )
 }
 
-fn load_dict_words() -> HashSet<String> {
-    let dict_candidates = [
-        PathBuf::from("data/dictionaries/dictionary.json"),
-        PathBuf::from("../data/dictionaries/dictionary.json"),
-    ];
+fn load_dict_words(dict_path: &Path) -> HashSet<String> {
     let mut set = HashSet::new();
-    for p in &dict_candidates {
-        if p.exists() {
-            if let Ok(file) = File::open(p) {
-                let reader = BufReader::new(file);
-                if let Ok(map) =
-                    serde_json::from_reader::<_, HashMap<String, serde_json::Value>>(reader)
-                {
-                    for val in map.values() {
-                        if let Some(list) = val.as_array() {
-                            for item in list {
-                                if let Some(s) = item.as_str() {
-                                    set.insert(canonicalize(s));
-                                } else if let Some(arr) = item.as_array() {
-                                    if let Some(s) = arr.first().and_then(|v| v.as_str()) {
-                                        set.insert(canonicalize(s));
-                                    }
-                                }
+    if let Ok(file) = File::open(dict_path) {
+        let reader = BufReader::new(file);
+        if let Ok(map) = serde_json::from_reader::<_, HashMap<String, serde_json::Value>>(reader) {
+            for val in map.values() {
+                if let Some(list) = val.as_array() {
+                    for item in list {
+                        if let Some(s) = item.as_str() {
+                            set.insert(canonicalize(s));
+                        } else if let Some(arr) = item.as_array() {
+                            if let Some(s) = arr.first().and_then(|v| v.as_str()) {
+                                set.insert(canonicalize(s));
                             }
                         }
                     }
                 }
-                break;
             }
         }
     }
     set
 }
 
+fn compute_raw_avro_top1(cases: &[(String, String)]) -> f64 {
+    let raw_parser = lekhani_parser::default_avro_parser();
+    let mut hits = 0usize;
+    for (bn_target, latin) in cases {
+        let conv = canonicalize(&raw_parser.convert(latin));
+        if &conv == bn_target {
+            hits += 1;
+        }
+    }
+    (hits as f64 / cases.len().max(1) as f64) * 100.0
+}
+
 fn evaluate_persona(
+    split_name: &str,
     persona_name: &str,
     cases: &[(String, String)], // (input_keystrokes, target_bn)
     sugg: &mut PhoneticSuggestion,
@@ -474,6 +505,7 @@ fn evaluate_persona(
 
             if worst_cases_out.len() < 50 {
                 worst_cases_out.push(WorstCaseItem {
+                    split: split_name.to_string(),
                     persona: persona_name.to_string(),
                     input: input.clone(),
                     expected: target_bn.clone(),
@@ -594,160 +626,148 @@ fn evaluate_persona(
     }
 }
 
-fn main() {
-    println!("══════════════════════════════════════════════════════════════════════════════════════════════════");
-    println!("  🚀 Lekhani Multi-Persona Transliteration Evaluation Harness & Regression Gate");
-    println!("══════════════════════════════════════════════════════════════════════════════════════════════════\n");
-
-    let git_sha = get_git_sha();
-    let dirty_tree = is_tree_dirty();
-    let seed = 42u64;
-
-    println!("Environment Metadata:");
-    println!("  ➔ Git Commit SHA : {}", git_sha);
-    println!("  ➔ Dirty Tree     : {}", dirty_tree);
-    println!("  ➔ Random Seed    : {}", seed);
-    println!(
-        "  ➔ Target NFC     : standard decomposed nuktas (U+09BC) + atomic Khanda Ta (U+09CE)"
-    );
-    println!("  ➔ Cluster Boot   : clustered by target Bengali word (1,000 iterations)\n");
-
-    let mut sugg = setup_engine();
-    let (raw_rows, gold_index) = load_test_data();
-    let dict_words = load_dict_words();
-
-    let raw_pairs: Vec<(String, String)> = raw_rows
-        .into_iter()
-        .map(|r| (r.bn_target, r.latin))
-        .collect();
-
-    println!(
-        "Loaded {} test pairs across {} unique targets from held-out Dakshina test.tsv.",
-        raw_pairs.len(),
-        raw_pairs
-            .iter()
-            .map(|(bn, _)| bn)
-            .collect::<HashSet<_>>()
-            .len()
-    );
-    println!(
-        "Loaded {} canonical dictionary entries.\n",
-        dict_words.len()
-    );
-
+fn evaluate_split(
+    split_name: &str,
+    raw_pairs: &[(String, String)],
+    gold_index: &DakshinaGoldIndex,
+    dict_words: &HashSet<String>,
+    sugg: &mut PhoneticSuggestion,
+    seed: u64,
+    worst_cases_out: &mut Vec<WorstCaseItem>,
+) -> SplitReport {
+    let raw_avro_top1 = compute_raw_avro_top1(raw_pairs);
     let mut report_personas = HashMap::new();
-    let mut all_worst_cases = Vec::new();
 
-    // 1. Natural Persona (Raw human-typed transliterations)
-    println!("▶️  Evaluating Persona: [Natural]...");
+    // 1. Natural
+    println!("  ▶️  Evaluating [{}] - [Natural]...", split_name);
     let natural_cases: Vec<(String, String)> = raw_pairs
         .iter()
         .map(|(bn, latin)| (transform_natural(latin), bn.clone()))
         .collect();
     let natural_metrics = evaluate_persona(
+        split_name,
         "natural",
         &natural_cases,
-        &mut sugg,
-        &dict_words,
-        Some(&gold_index),
+        sugg,
+        dict_words,
+        Some(gold_index),
         seed + 1,
-        &mut all_worst_cases,
+        worst_cases_out,
     );
     report_personas.insert("natural".to_string(), natural_metrics);
 
-    // 2. Lazy Persona (Lowercase, collapsed double vowels, chat folds)
-    println!("▶️  Evaluating Persona: [Lazy]...");
+    // 2. Lazy
+    println!("  ▶️  Evaluating [{}] - [Lazy]...", split_name);
     let lazy_cases: Vec<(String, String)> = raw_pairs
         .iter()
         .map(|(bn, latin)| (transform_lazy(latin), bn.clone()))
         .collect();
     let lazy_metrics = evaluate_persona(
+        split_name,
         "lazy",
         &lazy_cases,
-        &mut sugg,
-        &dict_words,
-        Some(&gold_index),
+        sugg,
+        dict_words,
+        Some(gold_index),
         seed + 2,
-        &mut all_worst_cases,
+        worst_cases_out,
     );
     report_personas.insert("lazy".to_string(), lazy_metrics);
 
-    // 3. Vowel-Dropped Persona (p = 0.30)
-    println!("▶️  Evaluating Persona: [Vowel-Dropped p=0.30]...");
+    // 3. Vowel-Dropped p=0.30
+    println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.30]...", split_name);
     let mut rng_p30 = SimpleRng::new(seed + 30);
     let vdrop_p30_cases: Vec<(String, String)> = raw_pairs
         .iter()
         .map(|(bn, latin)| (transform_vowel_drop(latin, 0.30, &mut rng_p30), bn.clone()))
         .collect();
     let vdrop_p30_metrics = evaluate_persona(
+        split_name,
         "vowel_drop_p30",
         &vdrop_p30_cases,
-        &mut sugg,
-        &dict_words,
+        sugg,
+        dict_words,
         None,
         seed + 3,
-        &mut all_worst_cases,
+        worst_cases_out,
     );
     report_personas.insert("vowel_drop_p30".to_string(), vdrop_p30_metrics);
 
-    // 4. Vowel-Dropped Persona (p = 0.60)
-    println!("▶️  Evaluating Persona: [Vowel-Dropped p=0.60]...");
+    // 4. Vowel-Dropped p=0.60
+    println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.60]...", split_name);
     let mut rng_p60 = SimpleRng::new(seed + 60);
     let vdrop_p60_cases: Vec<(String, String)> = raw_pairs
         .iter()
         .map(|(bn, latin)| (transform_vowel_drop(latin, 0.60, &mut rng_p60), bn.clone()))
         .collect();
     let vdrop_p60_metrics = evaluate_persona(
+        split_name,
         "vowel_drop_p60",
         &vdrop_p60_cases,
-        &mut sugg,
-        &dict_words,
+        sugg,
+        dict_words,
         None,
         seed + 4,
-        &mut all_worst_cases,
+        worst_cases_out,
     );
     report_personas.insert("vowel_drop_p60".to_string(), vdrop_p60_metrics);
 
-    // 5. Vowel-Dropped Persona (p = 0.90)
-    println!("▶️  Evaluating Persona: [Vowel-Dropped p=0.90]...");
+    // 5. Vowel-Dropped p=0.90
+    println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.90]...", split_name);
     let mut rng_p90 = SimpleRng::new(seed + 90);
     let vdrop_p90_cases: Vec<(String, String)> = raw_pairs
         .iter()
         .map(|(bn, latin)| (transform_vowel_drop(latin, 0.90, &mut rng_p90), bn.clone()))
         .collect();
     let vdrop_p90_metrics = evaluate_persona(
+        split_name,
         "vowel_drop_p90",
         &vdrop_p90_cases,
-        &mut sugg,
-        &dict_words,
+        sugg,
+        dict_words,
         None,
         seed + 5,
-        &mut all_worst_cases,
+        worst_cases_out,
     );
     report_personas.insert("vowel_drop_p90".to_string(), vdrop_p90_metrics);
 
-    // 6. Avro-Strict Persona (Canonical forward-mapped ceiling)
-    println!("▶️  Evaluating Persona: [Avro-Strict]...");
+    // 6. Avro-Strict
+    println!("  ▶️  Evaluating [{}] - [Avro-Strict]...", split_name);
     let avro_cases: Vec<(String, String)> = raw_pairs
         .iter()
         .map(|(bn, _)| (transform_avro_strict(bn), bn.clone()))
         .collect();
     let avro_metrics = evaluate_persona(
+        split_name,
         "avro_strict",
         &avro_cases,
-        &mut sugg,
-        &dict_words,
+        sugg,
+        dict_words,
         None,
         seed + 6,
-        &mut all_worst_cases,
+        worst_cases_out,
     );
     report_personas.insert("avro_strict".to_string(), avro_metrics);
 
-    // Display Summary Table
-    println!("\n📊 Multi-Persona Evaluation Summary:");
+    let unique_targets = raw_pairs
+        .iter()
+        .map(|(bn, _)| bn)
+        .collect::<HashSet<_>>()
+        .len();
+
+    SplitReport {
+        n: raw_pairs.len(),
+        unique_targets,
+        raw_avro_top1: (raw_avro_top1 * 100.0).round() / 100.0,
+        personas: report_personas,
+    }
+}
+
+fn print_split_table(title: &str, report: &SplitReport) {
+    println!("\n📊 {} (N = {}, Unique Targets = {}, Raw Avro Top-1 = {:.2}%):", title, report.n, report.unique_targets, report.raw_avro_top1);
     println!("───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
     println!(
-        "{:<17} {:>6} {:>15} {:>10} {:>10} {:>8} {:>9} {:>9} {:>13} {:>11}",
+        "{:<17} {:>6} {:>17} {:>10} {:>10} {:>8} {:>9} {:>9} {:>13} {:>11}",
         "Persona",
         "N",
         "Top-1 (Exact)",
@@ -770,14 +790,14 @@ fn main() {
         "avro_strict",
     ];
     for name in &persona_order {
-        if let Some(m) = report_personas.get(*name) {
+        if let Some(m) = report.personas.get(*name) {
             let ci_str = format!(
                 "{:.1}% [{:.1}-{:.1}]",
                 m.top1, m.top1_ci95_cluster[0], m.top1_ci95_cluster[1]
             );
             let kspc_str = format!("{:.2} / {:.2}", m.kspc.effective, m.kspc.conditional_hits);
             println!(
-                "{:<17} {:>6} {:>15} {:>9.1}% {:>9.1}% {:>8.4} {:>8.1}% {:>8.1}% {:>13} {:>9.0}µs",
+                "{:<17} {:>6} {:>17} {:>9.1}% {:>9.1}% {:>8.4} {:>8.1}% {:>8.1}% {:>13} {:>9.0}µs",
                 name,
                 m.n,
                 ci_str,
@@ -792,17 +812,72 @@ fn main() {
         }
     }
     println!("───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
+}
+
+fn main() {
+    println!("══════════════════════════════════════════════════════════════════════════════════════════════════");
+    println!("  🚀 Lekhani Multi-Persona Transliteration Evaluation Harness & Regression Gate");
+    println!("══════════════════════════════════════════════════════════════════════════════════════════════════\n");
+
+    let dict_filename = "dictionary.json";
+    let (mut sugg, dict_path, dict_hash) = setup_engine(dict_filename);
+
+    let git_sha = get_git_sha();
+    let dirty_tree = is_tree_dirty();
+    let seed = 42u64;
+
+    println!("Environment Metadata:");
+    println!("  ➔ Git Commit SHA : {}", git_sha);
+    println!("  ➔ Dirty Tree     : {}", dirty_tree);
+    println!("  ➔ Dictionary File: {}", dict_path.display());
+    println!("  ➔ Dictionary SHA : {}", dict_hash);
+    println!("  ➔ Random Seed    : {}", seed);
+    println!(
+        "  ➔ Target NFC     : standard decomposed nuktas (U+09BC) + atomic Khanda Ta (U+09CE)"
+    );
+    println!("  ➔ Cluster Boot   : clustered by target Bengali word (1,000 iterations)\n");
+
+    let dict_words = load_dict_words(&dict_path);
+    println!("Loaded {} canonical dictionary entries from {}.\n", dict_words.len(), dict_filename);
+
+    let mut all_worst_cases = Vec::new();
+
+    // ── DEV SPLIT EVALUATION ──────────────────────────────────────────────
+    println!("▶️  Loading and Evaluating Held-Out DEV split...");
+    let (dev_rows, dev_gold, dev_path) = load_split_data("dev");
+    let dev_pairs: Vec<(String, String)> = dev_rows.into_iter().map(|r| (r.bn_target, r.latin)).collect();
+    println!("Loaded {} dev pairs from {:?}", dev_pairs.len(), dev_path);
+    let dev_report = evaluate_split("dev", &dev_pairs, &dev_gold, &dict_words, &mut sugg, seed, &mut all_worst_cases);
+
+    // ── TEST SPLIT EVALUATION ─────────────────────────────────────────────
+    println!("\n▶️  Loading and Evaluating Held-Out TEST split...");
+    let (test_rows, test_gold, test_path) = load_split_data("test");
+    let test_pairs: Vec<(String, String)> = test_rows.into_iter().map(|r| (r.bn_target, r.latin)).collect();
+    println!("Loaded {} test pairs from {:?}", test_pairs.len(), test_path);
+    let test_report = evaluate_split("test", &test_pairs, &test_gold, &dict_words, &mut sugg, seed + 100, &mut all_worst_cases);
+
+    // ── SUMMARY TABLES ───────────────────────────────────────────────────
+    print_split_table("DEV SET EVALUATION SUMMARY", &dev_report);
+    print_split_table("TEST SET EVALUATION SUMMARY", &test_report);
+
+    let mut raw_avro_top1 = HashMap::new();
+    raw_avro_top1.insert("dev".to_string(), dev_report.raw_avro_top1);
+    raw_avro_top1.insert("test".to_string(), test_report.raw_avro_top1);
 
     let report = MultiPersonaReport {
         run: RunMeta {
             git_sha,
             dirty_tree,
             seed,
-            split: "test".to_string(),
             canonical: "nfc+khanda".to_string(),
+            dictionary_file: dict_path.display().to_string(),
+            dictionary_hash: dict_hash.clone(),
             timestamp: chrono::Utc::now().to_rfc3339(),
         },
-        personas: report_personas,
+        raw_avro_top1,
+        dev: dev_report,
+        test: test_report.clone(),
+        personas: test_report.personas, // Alias for backward compatibility
         worst_cases: all_worst_cases,
     };
 

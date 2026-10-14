@@ -184,7 +184,11 @@ fn test_dakshina_baseline_gate_against_json() {
         std::fs::read_to_string(&baseline_path).expect("Failed to read baseline.json");
     let baseline_json: serde_json::Value = serde_json::from_str(&baseline_str).expect("Valid JSON");
 
-    let natural = &baseline_json["personas"]["natural"];
+    let natural = if baseline_json.get("test").is_some() {
+        &baseline_json["test"]["personas"]["natural"]
+    } else {
+        &baseline_json["personas"]["natural"]
+    };
     let min_top1 = natural["top1_ci95_cluster"][0]
         .as_f64()
         .expect("ci lower bound");

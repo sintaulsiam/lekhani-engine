@@ -329,6 +329,14 @@ impl PhoneticSuggestion {
         &self.last_computed_candidates
     }
 
+    pub fn dictionary_path(&self) -> Option<&std::path::Path> {
+        self.database.dictionary_path.as_deref()
+    }
+
+    pub fn dictionary_hash(&self) -> Option<&str> {
+        self.database.dictionary_hash.as_deref()
+    }
+
     /// Transliterate directly using Avro phonetic rules
     pub fn convert_phonetic(&self, text: &str) -> String {
         if text.is_empty() {

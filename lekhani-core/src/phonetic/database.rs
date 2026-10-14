@@ -21,6 +21,10 @@ pub struct PhoneticDatabase {
     emojis: Arc<EmojiMap>,
     snippets: Arc<SnippetManager>,
     pub learner: Arc<RwLock<AutonomousLearner>>,
+    /// Path to the loaded dictionary file (e.g. "dictionary.json")
+    pub dictionary_path: Option<std::path::PathBuf>,
+    /// SHA-256 hash of the loaded dictionary file
+    pub dictionary_hash: Option<String>,
     /// Monotonically increasing generation counter.
     /// Bumped on any mutation that can change candidate output
     /// (dictionary load, autocorrect reload). Lets per-session suggestion
@@ -548,6 +552,8 @@ impl PhoneticDatabase {
             emojis: Arc::new(EmojiMap::new()),
             snippets: Arc::new(SnippetManager::new()),
             learner: Arc::new(RwLock::new(AutonomousLearner::new())),
+            dictionary_path: None,
+            dictionary_hash: None,
             generation: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -632,80 +638,38 @@ impl PhoneticDatabase {
         self.overrides.lookup_prefix(prefix, max_key_len, limit)
     }
 
-    /// Load database from a directory containing dictionary.json, suffix.json, autocorrect.json
-    pub fn load_from_dir<P: AsRef<Path>>(
+    /// Load database from a directory containing the specified dictionary (defaulting strictly to dictionary.json)
+    pub fn load_from_dir_with_dict<P: AsRef<Path>>(
         &mut self,
         dir: P,
+        dict_filename: &str,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let dir = dir.as_ref();
+        let dict_path = dir.join(dict_filename);
 
-        // 1. Ultra-Fast Binary Dictionary with User Cache Fallback
-        let user_cache_bin = std::env::var("XDG_CACHE_HOME")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| {
-                std::env::var("HOME")
-                    .map(|h| std::path::PathBuf::from(h).join(".cache"))
-                    .unwrap_or_else(|_| std::env::temp_dir())
-            })
-            .join("lekhani")
-            .join("dictionary.bin");
+        if dict_path.exists() {
+            let content = std::fs::read_to_string(&dict_path)?;
+            let hash = crate::fs::compute_sha256_hex(content.as_bytes());
+            self.dictionary_path = Some(dict_path.clone());
+            self.dictionary_hash = Some(hash);
 
-        let mut loaded = false;
-        let dict_bin_path = dir.join("dictionary.bin");
-        let dict_path = dir.join("dictionary.json");
-
-        let bin_candidates = [&dict_bin_path, &user_cache_bin];
-        for cand in bin_candidates {
-            if cand.exists() {
-                if dict_path.exists() {
-                    if let (Ok(m_cand), Ok(m_json)) = (
-                        cand.metadata().and_then(|m| m.modified()),
-                        dict_path.metadata().and_then(|m| m.modified()),
-                    ) {
-                        if m_cand < m_json {
-                            continue; // Cache is older than source json
+            if let Ok(raw_map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&content)
+            {
+                let mut words = Vec::with_capacity(160000);
+                for val in raw_map.values() {
+                    if let Some(list) = val.as_array() {
+                        for item in list {
+                            if let Some(s) = item.as_str() {
+                                words.push(crate::chars::canonicalize(s));
+                            } else if let Some(arr) = item.as_array() {
+                                if let Some(s) = arr.first().and_then(|v| v.as_str()) {
+                                    words.push(crate::chars::canonicalize(s));
+                                }
+                            }
                         }
                     }
                 }
-                if let Ok(bytes) = std::fs::read(cand) {
-                    if bytes.starts_with(b"LDI3") {
-                        if let Ok(bin_trie) = PrefixTrie::from_binary(&bytes) {
-                            Arc::make_mut(&mut self.trie).merge(&bin_trie);
-                            loaded = true;
-                            break;
-                        }
-                    } else if let Ok(content) = std::str::from_utf8(&bytes) {
-                        let words: Vec<String> = content
-                            .lines()
-                            .map(|s| s.trim().to_string())
-                            .filter(|s| !s.is_empty())
-                            .collect();
-                        Arc::make_mut(&mut self.trie).insert_bulk(words);
-                        let _ = self.trie.save_binary(cand);
-                        loaded = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if !loaded && dict_path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&dict_path) {
-                if let Ok(raw_map) = serde_json::from_str::<HashMap<String, Vec<String>>>(&content)
-                {
-                    let mut words = Vec::with_capacity(160000);
-                    for (_k, v_list) in raw_map {
-                        words.extend(v_list);
-                    }
-                    Arc::make_mut(&mut self.trie).insert_bulk(words);
-                    // Attempt saving adjacent to dictionary.json; if write fails (e.g. read-only system dir), save to user cache
-                    if self.trie.save_binary(&dict_bin_path).is_err() {
-                        if let Some(parent) = user_cache_bin.parent() {
-                            let _ = std::fs::create_dir_all(parent);
-                        }
-                        let _ = self.trie.save_binary(&user_cache_bin);
-                    }
-                }
+                Arc::make_mut(&mut self.trie).insert_bulk(words);
             }
         }
 
@@ -766,6 +730,14 @@ impl PhoneticDatabase {
         // Signal any cached suggestion engines to invalidate
         self.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
+    }
+
+    /// Load database from a directory (defaults strictly to "dictionary.json")
+    pub fn load_from_dir<P: AsRef<Path>>(
+        &mut self,
+        dir: P,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.load_from_dir_with_dict(dir, "dictionary.json")
     }
 
     /// Load user-specific autocorrect file
