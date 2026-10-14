@@ -328,7 +328,9 @@ pub fn resolve_bilingual_hyphen_clitic(input: &str) -> Option<(String, Vec<Strin
     };
 
     let primary = format!("{}{}", base, b_clitic);
-    let mut candidates = vec![primary.clone(), input.to_string()];
+    let mut candidates = Vec::with_capacity(4);
+    candidates.push(primary.clone());
+    candidates.push(input.to_string());
     if let Some(stripped) = b_clitic.strip_prefix('-') {
         candidates.push(format!("{}{}", base, stripped));
     }
@@ -361,7 +363,9 @@ pub fn resolve_unhyphenated_bilingual_clitic(input: &str) -> Option<(String, Vec
             let is_all_caps = base.len() >= 2 && base.chars().all(|c| c.is_ascii_uppercase());
             if has_valid_latin_title || is_all_caps || is_static_short_english_word(base) {
                 let primary = format!("{}{}", base, b_clitic);
-                let mut candidates = vec![primary.clone(), input.to_string()];
+                let mut candidates = Vec::with_capacity(4);
+                candidates.push(primary.clone());
+                candidates.push(input.to_string());
                 if let Some(stripped) = b_clitic.strip_prefix('-') {
                     candidates.push(format!("{}{}", base, stripped));
                 }
