@@ -132,16 +132,43 @@ fn main() {
     let mut seen_total = 0;
     let mut unseen_total = 0;
 
+    let mut len_seen_total = [0usize; 3];
+    let mut len_seen_top1 = [0usize; 3];
+    let mut len_unseen_total = [0usize; 3];
+    let mut len_unseen_top1 = [0usize; 3];
+
     for (bn_target, latin) in &test_pairs {
         let is_seen = dict_words.contains(bn_target);
         if is_seen { seen_total += 1; } else { unseen_total += 1; }
+
+        // Track length-stratified Seen vs Unseen
+        let lat_len = latin.chars().count();
+        let bucket_idx = if lat_len <= 3 {
+            0
+        } else if lat_len <= 6 {
+            1
+        } else {
+            2
+        };
+
+        if is_seen {
+            len_seen_total[bucket_idx] += 1;
+        } else {
+            len_unseen_total[bucket_idx] += 1;
+        }
 
         // A. Full Engine
         let (cands_full, _) = sugg_full.suggest(latin, true, true, &empty_memory);
         let cands_full_canon: Vec<String> = cands_full.iter().map(|s| canonicalize(s)).collect();
         if cands_full_canon.first() == Some(bn_target) {
             full_top1 += 1;
-            if is_seen { full_seen_top1 += 1; } else { full_unseen_top1 += 1; }
+            if is_seen {
+                full_seen_top1 += 1;
+                len_seen_top1[bucket_idx] += 1;
+            } else {
+                full_unseen_top1 += 1;
+                len_unseen_top1[bucket_idx] += 1;
+            }
         }
         if cands_full_canon.iter().take(3).any(|c| c == bn_target) {
             full_top3 += 1;
@@ -218,23 +245,44 @@ fn main() {
     );
     println!("──────────────────────────────────────────────────────────────────────");
     println!(
-        "Seen vs Unseen in Full Engine: Seen Top-1 = {:.2}% ({}/{}) | Unseen Top-1 = {:.2}% ({}/{})\n",
+        "Overall Seen vs Unseen: Seen Top-1 = {:.2}% ({}/{}) | Unseen Top-1 = {:.2}% ({}/{})\n",
         full_seen_top1 as f64 / seen_total as f64 * 100.0,
         full_seen_top1, seen_total,
         full_unseen_top1 as f64 / unseen_total as f64 * 100.0,
         full_unseen_top1, unseen_total
     );
 
+    println!("📊 Stratified Seen vs Unseen Top-1 by Latin Character Length:");
+    println!("──────────────────────────────────────────────────────────────────────");
+    println!("{:<14} {:<24} {:<24}", "Length Bucket", "Seen Words Top-1", "Unseen Words Top-1");
+    println!("──────────────────────────────────────────────────────────────────────");
+    let bucket_names = ["1-3 chars", "4-6 chars", "7+ chars"];
+    for i in 0..3 {
+        let s_acc = if len_seen_total[i] > 0 { len_seen_top1[i] as f64 / len_seen_total[i] as f64 * 100.0 } else { 0.0 };
+        let u_acc = if len_unseen_total[i] > 0 { len_unseen_top1[i] as f64 / len_unseen_total[i] as f64 * 100.0 } else { 0.0 };
+        println!(
+            "{:<14} {:>6.2}% ({:>4}/{:<4})      {:>6.2}% ({:>4}/{:<4})",
+            bucket_names[i],
+            s_acc, len_seen_top1[i], len_seen_total[i],
+            u_acc, len_unseen_top1[i], len_unseen_total[i]
+        );
+    }
+    println!("──────────────────────────────────────────────────────────────────────\n");
+
     // ────────────────────────────────────────────────────────────────
-    // PART 2: Trace 20 Seen-Word Failures
+    // PART 2: Trace 20 Seen-Word Failures (Across 20 DISTINCT Targets)
     // ────────────────────────────────────────────────────────────────
     println!("══════════════════════════════════════════════════════════════════");
-    println!("   🔍 PART 2: TRACE OF 20 SEEN-WORD FAILURES (Target IS in Dict)");
+    println!("   🔍 PART 2: TRACE OF 20 SEEN-WORD FAILURES (20 DISTINCT Targets)");
     println!("══════════════════════════════════════════════════════════════════");
 
+    let mut traced_distinct_targets = HashSet::new();
     let mut traced = 0;
     for (bn_target, latin) in &test_pairs {
         if !dict_words.contains(bn_target) {
+            continue;
+        }
+        if traced_distinct_targets.contains(bn_target) {
             continue;
         }
         let (cands, _) = sugg_full.suggest(latin, true, true, &empty_memory);
@@ -243,10 +291,11 @@ fn main() {
             continue; // Not a failure
         }
 
+        traced_distinct_targets.insert(bn_target.clone());
         let rank = cands_canon.iter().position(|c| c == bn_target);
         traced += 1;
         println!(
-            "Case #{:02}: Input: {:<16} Target: {:<12} (Seen: YES)",
+            "Case #{:02}: Input: {:<16} Target: {:<14} (Seen: YES)",
             traced, latin, bn_target
         );
         match rank {
@@ -332,27 +381,57 @@ fn main() {
         in_dictionary: bool,
     }
 
-    let mut failures = Vec::with_capacity(100);
+    let mut failures_by_target: HashMap<String, Vec<FailureCase>> = HashMap::new();
+    let mut item_id = 0;
     for (bn_target, latin) in &test_pairs {
         let (cands, _) = sugg_full.suggest(latin, true, true, &empty_memory);
         let cands_canon: Vec<String> = cands.iter().map(|s| canonicalize(s)).collect();
         if cands_canon.first() != Some(bn_target) {
+            item_id += 1;
             let rank = cands_canon.iter().position(|c| c == bn_target);
-            failures.push(FailureCase {
-                id: failures.len() + 1,
-                input: latin.clone(),
-                target: bn_target.clone(),
-                candidates: cands_canon.into_iter().take(5).collect(),
-                target_rank: rank,
-                in_dictionary: dict_words.contains(bn_target),
-            });
-            if failures.len() >= 100 {
-                break;
+            failures_by_target
+                .entry(bn_target.clone())
+                .or_default()
+                .push(FailureCase {
+                    id: item_id,
+                    input: latin.clone(),
+                    target: bn_target.clone(),
+                    candidates: cands_canon.into_iter().take(5).collect(),
+                    target_rank: rank,
+                    in_dictionary: dict_words.contains(bn_target),
+                });
+        }
+    }
+
+    let mut distinct_failed_targets: Vec<String> = failures_by_target.keys().cloned().collect();
+    distinct_failed_targets.sort(); // Lexicographical sort to cover the entire alphabet
+    let num_distinct = distinct_failed_targets.len();
+    println!("Found failures across {} distinct target Bengali words.", num_distinct);
+
+    // Uniformly sample 100 distinct target words across the sorted vocabulary
+    let sample_size = 100.min(num_distinct);
+    let step = num_distinct as f64 / sample_size as f64;
+    let mut sampled_failures = Vec::with_capacity(sample_size);
+
+    for i in 0..sample_size {
+        let target_idx = (i as f64 * step) as usize;
+        let target_word = &distinct_failed_targets[target_idx];
+        if let Some(cases) = failures_by_target.get(target_word) {
+            if let Some(case) = cases.first() {
+                let mut c = FailureCase {
+                    id: i + 1,
+                    input: case.input.clone(),
+                    target: case.target.clone(),
+                    candidates: case.candidates.clone(),
+                    target_rank: case.target_rank,
+                    in_dictionary: case.in_dictionary,
+                };
+                sampled_failures.push(c);
             }
         }
     }
 
-    let json_out = serde_json::to_string_pretty(&failures).expect("Serialize failures");
-    std::fs::write("data/eval/failures_100.json", json_out).expect("Write failures_100.json");
-    println!("\n✅ Dumped 100 Natural persona failures to data/eval/failures_100.json for hand audit.");
+    let json_out = serde_json::to_string_pretty(&sampled_failures).expect("Serialize failures");
+    std::fs::write("data/eval/failures_100_stratified.json", json_out).expect("Write failures_100_stratified.json");
+    println!("✅ Dumped {} Natural persona failures across {} DISTINCT targets to data/eval/failures_100_stratified.json for hand audit.", sampled_failures.len(), sample_size);
 }

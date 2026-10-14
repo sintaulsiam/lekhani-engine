@@ -1,0 +1,1230 @@
+[
+  {
+    "id": 1,
+    "input": "anri",
+    "target": "অঁরি",
+    "candidates": [
+      "আনরই",
+      "আংরই",
+      "অ্যানরই",
+      "আন্রি",
+      "আনেই"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 2,
+    "input": "anchale",
+    "target": "অঞ্চলে",
+    "candidates": [
+      "আঞ্ছালে",
+      "আবছালে",
+      "anchale"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 3,
+    "input": "ananumodita",
+    "target": "অননুমোদিত",
+    "candidates": [
+      "আনানুমদিতা",
+      "ananumodita"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 4,
+    "input": "abasaner",
+    "target": "অবসানের",
+    "candidates": [
+      "আবাসনের",
+      "আবাসানের",
+      "abasaner"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 5,
+    "input": "olimpikey",
+    "target": "অলিম্পিকে",
+    "candidates": [
+      "অলিম্পিকেয়",
+      "অলিম্পিকেই",
+      "olimpikey"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 6,
+    "input": "alener",
+    "target": "অ্যালেনের",
+    "candidates": [
+      "আলেমের",
+      "আলেনের",
+      "alener"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 7,
+    "input": "aakil",
+    "target": "আকিল",
+    "candidates": [
+      "আঁকিল",
+      "আকিল",
+      "আকিলিস",
+      "আকিলের",
+      "আঁকিলি"
+    ],
+    "target_rank": 1,
+    "in_dictionary": false
+  },
+  {
+    "id": 8,
+    "input": "andamaner",
+    "target": "আন্দামানে",
+    "candidates": [
+      "আন্দামানের",
+      "andamaner"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 9,
+    "input": "arja",
+    "target": "আর্য",
+    "candidates": [
+      "আর্যা",
+      "আরজা",
+      "arja"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 10,
+    "input": "eu",
+    "target": "ইইউ",
+    "candidates": [
+      "ইউ",
+      "এউ",
+      "ইউএন",
+      "ইউএফও",
+      "এঊ"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 11,
+    "input": "epz",
+    "target": "ইপিজেড",
+    "candidates": [
+      "এপয়",
+      "এপয",
+      "এফয",
+      "এপজ",
+      "এপঝ"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 12,
+    "input": "ooeenslet",
+    "target": "উইন্সলেট",
+    "candidates": [
+      "উঈন্সলেত",
+      "ooeenslet"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 13,
+    "input": "upanibeshbad",
+    "target": "উপনিবেশবাদ",
+    "candidates": [
+      "উপানিবেশবাদ",
+      "upanibeshbad"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 14,
+    "input": "ekkhando",
+    "target": "একখণ্ড",
+    "candidates": [
+      "এক্ষান্দ",
+      "ekkhando"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 15,
+    "input": "averest",
+    "target": "এভারেস্ট",
+    "candidates": [
+      "আভেরেস্ত",
+      "averest"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 16,
+    "input": "oikanteek",
+    "target": "ঐকান্তিক",
+    "candidates": [
+      "অইকান্তীক",
+      "oikanteek"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 17,
+    "input": "kanthadan",
+    "target": "কণ্ঠদান",
+    "candidates": [
+      "কান্থাদান",
+      "kanthadan"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 18,
+    "input": "kameo",
+    "target": "কমেও",
+    "candidates": [
+      "কামেও",
+      "খামেও",
+      "kameo"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 19,
+    "input": "kalkarkhanar",
+    "target": "কলকারখানার",
+    "candidates": [
+      "কালকারখানার",
+      "কাল্কারখানার",
+      "কালিয়ারখানার",
+      "kalkarkhanar"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 20,
+    "input": "kaaraabhog",
+    "target": "কারাভোগ",
+    "candidates": [
+      "কাআরাআভগ",
+      "kaaraabhog"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 21,
+    "input": "kundur",
+    "target": "কুণ্ডুর",
+    "candidates": [
+      "কুন্ডুর",
+      "কুণ্ডুর",
+      "কুন্দুর",
+      "kundur"
+    ],
+    "target_rank": 1,
+    "in_dictionary": false
+  },
+  {
+    "id": 22,
+    "input": "kaushalgotobhabe",
+    "target": "কৌশলগতভাবে",
+    "candidates": [
+      "কাউশাল্গতভাবে",
+      "kaushalgotobhabe"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 23,
+    "input": "khunna",
+    "target": "ক্ষুণ্ণ",
+    "candidates": [
+      "খুন্না",
+      "khunna"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 24,
+    "input": "ganabidhwangsi",
+    "target": "গণবিধ্বংসী",
+    "candidates": [
+      "গানাবিধ্বাংছি",
+      "গানাবিধ্বাংেছি",
+      "গানাবিধ্বাংসি",
+      "ganabidhwangsi"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 25,
+    "input": "gajipurer",
+    "target": "গাজীপুরের",
+    "candidates": [
+      "গাজিপুরের",
+      "গাজীপুরের",
+      "গাজিপুররের",
+      "গাজিপুরেরর",
+      "গাজীপুররের"
+    ],
+    "target_rank": 1,
+    "in_dictionary": false
+  },
+  {
+    "id": 26,
+    "input": "gomati",
+    "target": "গোমতি",
+    "candidates": [
+      "ঘামাতই",
+      "গুমাটি",
+      "গামাটি",
+      "ঘামাটি",
+      "ঘুমাটি"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 27,
+    "input": "granthasamuher",
+    "target": "গ্রন্থসমূহের",
+    "candidates": [
+      "গ্রান্থাসামুহের",
+      "granthasamuher"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 28,
+    "input": "ghoorni",
+    "target": "ঘূর্ণি",
+    "candidates": [
+      "ঘুরনি",
+      "ঘুরনই",
+      "ঘূর্ণই",
+      "ghoorni"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 29,
+    "input": "chalaman",
+    "target": "চলমান",
+    "candidates": [
+      "ছালামান",
+      "chalaman"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 30,
+    "input": "cheetroroop",
+    "target": "চিত্ররূপ",
+    "candidates": [
+      "ছীত্ররুপ",
+      "cheetroroop"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 31,
+    "input": "chateeng",
+    "target": "চ্যাটিং",
+    "candidates": [
+      "ছাতীং",
+      "chateeng"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 32,
+    "input": "janoika",
+    "target": "জনৈক",
+    "candidates": [
+      "জানইকা",
+      "janoika"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 33,
+    "input": "janaley",
+    "target": "জানালে",
+    "candidates": [
+      "জানালেয়",
+      "যানালেয়",
+      "জানালেই",
+      "জাঙ্গালেয়",
+      "জাঙ্গালেই"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 34,
+    "input": "jore",
+    "target": "জ্বরে",
+    "candidates": [
+      "জোরে",
+      "জরে",
+      "ঝরে",
+      "ঝড়ে",
+      "যারে"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 35,
+    "input": "toor",
+    "target": "টুর",
+    "candidates": [
+      "তুর",
+      "তোর",
+      "টুর",
+      "তূর",
+      "থুর"
+    ],
+    "target_rank": 2,
+    "in_dictionary": true
+  },
+  {
+    "id": 36,
+    "input": "daakotaa",
+    "target": "ডাকোটা",
+    "candidates": [
+      "দাআকতাআ",
+      "daakotaa"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 37,
+    "input": "danes",
+    "target": "ডেনিস",
+    "candidates": [
+      "দানেশ",
+      "দানেশমন্দ",
+      "দানেশমন্দি",
+      "দানেশমন্দী",
+      "দানেস"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 38,
+    "input": "tarun",
+    "target": "তরুণ",
+    "candidates": [
+      "তারুণ",
+      "তারুণ্য",
+      "তারুণ্যের",
+      "তারুন",
+      "তারুণ্যসুলভ"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 39,
+    "input": "tinmase",
+    "target": "তিনমাসে",
+    "candidates": [
+      "তিন্মাছে",
+      "তিন্মােছে",
+      "তিন্মাসে",
+      "tinmase"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 40,
+    "input": "thakto",
+    "target": "থাকত",
+    "candidates": [
+      "থাকতো",
+      "ঠাকতো",
+      "থাক্ত",
+      "thakto"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 41,
+    "input": "dastidaarer",
+    "target": "দস্তিদারের",
+    "candidates": [
+      "দাস্তিদাআরের",
+      "dastidaarer"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 42,
+    "input": "durgata",
+    "target": "দুর্গত",
+    "candidates": [
+      "দুর্গাটা",
+      "দূর্গাটা",
+      "দুরগাতা",
+      "durgata"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 43,
+    "input": "dehomone",
+    "target": "দেহমন",
+    "candidates": [
+      "দেহমনে",
+      "dehomone"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 44,
+    "input": "deeper",
+    "target": "দ্বীপের",
+    "candidates": [
+      "ডিপের",
+      "দীপের",
+      "দ্বীপের",
+      "ডীপের",
+      "দিপের"
+    ],
+    "target_rank": 2,
+    "in_dictionary": false
+  },
+  {
+    "id": 45,
+    "input": "dharabahikata",
+    "target": "ধারাবাহিকতা",
+    "candidates": [
+      "ধারাবাহিকাতা",
+      "dharabahikata"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 46,
+    "input": "nabanirbachito",
+    "target": "নবনির্বাচিত",
+    "candidates": [
+      "নাবানিরবাছিত",
+      "nabanirbachito"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 47,
+    "input": "nani",
+    "target": "নানী",
+    "candidates": [
+      "নানি",
+      "নানী",
+      "নানই",
+      "নাঙই",
+      "নানীর"
+    ],
+    "target_rank": 1,
+    "in_dictionary": true
+  },
+  {
+    "id": 48,
+    "input": "niraananda",
+    "target": "নিরানন্দ",
+    "candidates": [
+      "নিরাআনান্দা",
+      "niraananda"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 49,
+    "input": "nature",
+    "target": "নেচার",
+    "candidates": [
+      "নাথুরে",
+      "নাতুরে",
+      "🌳",
+      "nature"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 50,
+    "input": "patel",
+    "target": "পটেল",
+    "candidates": [
+      "প্যাটেল",
+      "প্যাটেলকে",
+      "প্যাটেলের",
+      "পাতেল",
+      "patel"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 51,
+    "input": "parishodhita",
+    "target": "পরিশোধিত",
+    "candidates": [
+      "পারিশধিতা",
+      "parishodhita"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 52,
+    "input": "paikari",
+    "target": "পাইকারী",
+    "candidates": [
+      "পাইকারি",
+      "পাইকারী",
+      "পাইকারই",
+      "পাইকাররই",
+      "paikari"
+    ],
+    "target_rank": 1,
+    "in_dictionary": false
+  },
+  {
+    "id": 53,
+    "input": "pala",
+    "target": "পাল",
+    "candidates": [
+      "পালা",
+      "ফালা",
+      "ফালাক",
+      "ফালায়",
+      "পালাইছে"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 54,
+    "input": "pooroheet",
+    "target": "পুরোহিত",
+    "candidates": [
+      "পুরহীত",
+      "pooroheet"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 55,
+    "input": "prakalpa",
+    "target": "প্রকল্প",
+    "candidates": [
+      "প্রাকাল্পা",
+      "prakalpa"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 56,
+    "input": "prajanmake",
+    "target": "প্রজন্মকে",
+    "candidates": [
+      "প্রাজান্মাকে",
+      "prajanmake"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 57,
+    "input": "probeshey",
+    "target": "প্রবেশে",
+    "candidates": [
+      "প্রবেশেয়",
+      "প্রবেছেয়",
+      "প্রবেশেই",
+      "probeshey"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 58,
+    "input": "prachurjata",
+    "target": "প্রাচুর্যতা",
+    "candidates": [
+      "প্রাছুরজাতা",
+      "prachurjata"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 59,
+    "input": "falasa",
+    "target": "ফলস",
+    "candidates": [
+      "ফালাসা",
+      "ফালসা",
+      "falasa"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 60,
+    "input": "fookor",
+    "target": "ফুকোর",
+    "candidates": [
+      "ফুকর",
+      "ফুকোর",
+      "ফুকার",
+      "ফুকরা",
+      "ফুঁকর"
+    ],
+    "target_rank": 1,
+    "in_dictionary": false
+  },
+  {
+    "id": 61,
+    "input": "badan",
+    "target": "বদন",
+    "candidates": [
+      "বাধান",
+      "বাধানো",
+      "বাদানুবাদ",
+      "বাধানিষেধ",
+      "বাদান"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 62,
+    "input": "balteow",
+    "target": "বলতেও",
+    "candidates": [
+      "বালতেওও",
+      "বালতেও",
+      "ভালতেও",
+      "balteow"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 63,
+    "input": "bag",
+    "target": "বাগ",
+    "candidates": [
+      "ব্যাগ",
+      "বাগ",
+      "ভাগ",
+      "বাঘ",
+      "বাঘা"
+    ],
+    "target_rank": 1,
+    "in_dictionary": true
+  },
+  {
+    "id": 64,
+    "input": "before",
+    "target": "বিফোর",
+    "candidates": [
+      "বেপারে",
+      "বাফরে",
+      "বেফরে",
+      "before"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 65,
+    "input": "beershrestho",
+    "target": "বীরশ্রেষ্ঠ",
+    "candidates": [
+      "বীরশ্রেষ্ঠও",
+      "বীরশ্রেস্থ",
+      "beershrestho"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 66,
+    "input": "bojhaan",
+    "target": "বোঝান",
+    "candidates": [
+      "বঝাআন",
+      "bojhaan"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 67,
+    "input": "bang",
+    "target": "ব্যাঙ",
+    "candidates": [
+      "বাং",
+      "বান",
+      "ভান",
+      "বাণ",
+      "ওয়াং"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 68,
+    "input": "blackmaeel",
+    "target": "ব্ল্যাকমেইল",
+    "candidates": [
+      "ব্লাচকমাঈল",
+      "blackmaeel"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 69,
+    "input": "bhaasaari",
+    "target": "ভাষারই",
+    "candidates": [
+      "ভাআসাআরি",
+      "bhaasaari"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 70,
+    "input": "maukoddoma",
+    "target": "মকদ্দমা",
+    "candidates": [
+      "মাউকদ্দমা",
+      "মুকদ্দমা",
+      "maukoddoma"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 71,
+    "input": "motamotkey",
+    "target": "মতামতকে",
+    "candidates": [
+      "মতামতকেয়",
+      "মথামতকেয়",
+      "মোতামতকেয়",
+      "মুতামতকেয়",
+      "মাতামতকেয়"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 72,
+    "input": "masjidgulor",
+    "target": "মসজিদগুলোর",
+    "candidates": [
+      "মাসজিদ্গুলর",
+      "masjidgulor"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 73,
+    "input": "madrasey",
+    "target": "মাদ্রাজে",
+    "candidates": [
+      "মাদ্রাসেয়",
+      "মাদারসেয়",
+      "madrasey"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 74,
+    "input": "maarbo",
+    "target": "মারবো",
+    "candidates": [
+      "মার্ভ",
+      "মারব",
+      "মারবে",
+      "মারবো",
+      "মারবেন"
+    ],
+    "target_rank": 3,
+    "in_dictionary": true
+  },
+  {
+    "id": 75,
+    "input": "metar",
+    "target": "মিটার",
+    "candidates": [
+      "মেতার",
+      "মেটার",
+      "মেটর",
+      "মেতারর",
+      "মেটারর"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 76,
+    "input": "musalamana",
+    "target": "মুসলমান",
+    "candidates": [
+      "মুসালামানা",
+      "musalamana"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 77,
+    "input": "meental",
+    "target": "মেন্টাল",
+    "candidates": [
+      "মীন্তাল",
+      "meental"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 78,
+    "input": "jatheshthho",
+    "target": "যথেষ্ট",
+    "candidates": [
+      "জাথেশ্তহহ",
+      "jatheshthho"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 79,
+    "input": "jaunatake",
+    "target": "যৌনতাকে",
+    "candidates": [
+      "জাউনাতাকে",
+      "jaunatake"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 80,
+    "input": "rasid",
+    "target": "রসিদ",
+    "candidates": [
+      "রাশিদ",
+      "রাশিদা",
+      "রাশিদুন",
+      "রাসিদ",
+      "rasid"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 81,
+    "input": "refarm",
+    "target": "রিফর্ম",
+    "candidates": [
+      "রেফার",
+      "রেফারম",
+      "refarm"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 82,
+    "input": "romero",
+    "target": "রোমেরো",
+    "candidates": [
+      "রমের",
+      "রোমের",
+      "রামের",
+      "রুমের",
+      "রোমেরো"
+    ],
+    "target_rank": 4,
+    "in_dictionary": false
+  },
+  {
+    "id": 83,
+    "input": "liste",
+    "target": "লিস্টে",
+    "candidates": [
+      "লিখতে",
+      "লিস্টে",
+      "লিষ্টে",
+      "লিস্টের",
+      "লিসয়তে"
+    ],
+    "target_rank": 1,
+    "in_dictionary": false
+  },
+  {
+    "id": 84,
+    "input": "shahure",
+    "target": "শহুরে",
+    "candidates": [
+      "শাহুরে",
+      "সাহুরে",
+      "শাহুররে",
+      "সাহুররে",
+      "shahure"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 85,
+    "input": "sikhalen",
+    "target": "শিখালেন",
+    "candidates": [
+      "সিকালেন",
+      "শিখালেন",
+      "শিকালেন",
+      "সিখালেন",
+      "sikhalen"
+    ],
+    "target_rank": 1,
+    "in_dictionary": false
+  },
+  {
+    "id": 86,
+    "input": "sekhaten",
+    "target": "শেখাতেন",
+    "candidates": [
+      "সেখাতেন",
+      "শেখাতেন",
+      "সেকাতেন",
+      "sekhaten"
+    ],
+    "target_rank": 1,
+    "in_dictionary": true
+  },
+  {
+    "id": 87,
+    "input": "sanbadmadhyamgulo",
+    "target": "সংবাদমাধ্যমগুলো",
+    "candidates": [
+      "সানবাদ্মাধ্যামগুল",
+      "sanbadmadhyamgulo"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 88,
+    "input": "sachetanata",
+    "target": "সচেতনতা",
+    "candidates": [
+      "সাছেতানাতা",
+      "sachetanata"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 89,
+    "input": "samaajkormi",
+    "target": "সমাজকর্মী",
+    "candidates": [
+      "সামাআজকরমি",
+      "samaajkormi"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 90,
+    "input": "sahakarir",
+    "target": "সহকারীর",
+    "candidates": [
+      "সাহাকারির",
+      "sahakarir"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 91,
+    "input": "safalyao",
+    "target": "সাফল্যও",
+    "candidates": [
+      "সাফাল্যাও",
+      "safalyao"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 92,
+    "input": "shaalthaa",
+    "target": "সালথা",
+    "candidates": [
+      "শাআলথাআ",
+      "shaalthaa"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 93,
+    "input": "seemfoni",
+    "target": "সিম্ফোনি",
+    "candidates": [
+      "সিম্ফনি",
+      "সিম্ফনিতে",
+      "সীম্ফনি",
+      "seemfoni"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 94,
+    "input": "soorta",
+    "target": "সুরটা",
+    "candidates": [
+      "সুরতা",
+      "সুরটা",
+      "সুরটাই",
+      "সূরটা",
+      "ছুরটা"
+    ],
+    "target_rank": 1,
+    "in_dictionary": false
+  },
+  {
+    "id": 95,
+    "input": "salimer",
+    "target": "সেলিমের",
+    "candidates": [
+      "সালিমের",
+      "সালিমেরর",
+      "salimer"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 96,
+    "input": "shtationery",
+    "target": "স্টেশনারি",
+    "candidates": [
+      "শ্তাতিওনের‍্য",
+      "shtationery"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 97,
+    "input": "swalpata",
+    "target": "স্বল্পতা",
+    "candidates": [
+      "স্বাল্পাতা",
+      "swalpata"
+    ],
+    "target_rank": null,
+    "in_dictionary": true
+  },
+  {
+    "id": 98,
+    "input": "harinke",
+    "target": "হরিণকে",
+    "candidates": [
+      "হারিণকে",
+      "হারিঙ্কে",
+      "harinke"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 99,
+    "input": "harmoneeka",
+    "target": "হারমোনিকা",
+    "candidates": [
+      "হারমনীকা",
+      "harmoneeka"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  },
+  {
+    "id": 100,
+    "input": "hellyte",
+    "target": "হিলিতে",
+    "candidates": [
+      "হেলতে",
+      "হেলয়তে",
+      "হেল্ল্যতে",
+      "hellyte"
+    ],
+    "target_rank": null,
+    "in_dictionary": false
+  }
+]
