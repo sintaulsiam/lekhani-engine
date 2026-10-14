@@ -106,6 +106,17 @@ pub struct GateResult {
     pub p95_latency_us: f64,
 }
 
+pub fn check_dictionary_hash(actual: &str, expected: &str) -> Result<(), String> {
+    if actual.trim().eq_ignore_ascii_case(expected.trim()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "GATE FAILURE: Dictionary SHA-256 mismatch!\n  Expected: {}\n  Actual:   {}",
+            expected, actual
+        ))
+    }
+}
+
 pub fn check_baseline_gate(
     actual: &GateResult,
     min_top1_threshold: f64,
@@ -155,6 +166,18 @@ fn test_regression_gate_fails_on_deliberate_degradation() {
     assert!(res_lat
         .unwrap_err()
         .contains("p95 latency 2200.0 µs exceeded"));
+}
+
+#[test]
+fn test_regression_gate_fails_on_tampered_dictionary_hash() {
+    let original = "8a51b4d98bcbe147771751c60fa1d2919a84b0b910232bdcf863617ecc88fbdb";
+    let tampered = "8a51b4d98bcbe147771751c60fa1d2919a84b0b910232bdcf863617ecc88fbdc"; // tampered last byte
+    let res = check_dictionary_hash(tampered, original);
+    assert!(
+        res.is_err(),
+        "Gate must fail when dictionary SHA-256 differs"
+    );
+    assert!(res.unwrap_err().contains("Dictionary SHA-256 mismatch"));
 }
 
 #[test]
@@ -242,6 +265,17 @@ fn test_dakshina_baseline_gate_against_json() {
             let _ = sugg.database.load_from_dir(p);
             break;
         }
+    }
+
+    // 1. Verify Dictionary SHA-256 Hash against baseline.json
+    if let Some(expected_hash) = baseline_json.get("run").and_then(|r| r.get("dictionary_hash")).and_then(|h| h.as_str()) {
+        let actual_hash = sugg.database.dictionary_hash.as_deref().unwrap_or("");
+        let hash_check = check_dictionary_hash(actual_hash, expected_hash);
+        assert!(
+            hash_check.is_ok(),
+            "Dakshina CI dictionary hash gate failed: {:?}",
+            hash_check.err()
+        );
     }
 
     let empty_mem = HashMap::new();
