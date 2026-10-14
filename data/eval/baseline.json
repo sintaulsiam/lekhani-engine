@@ -1,53 +1,742 @@
 {
-  "timestamp": "2026-10-07T09:31:15.865444140+00:00",
-  "total_cases": 253,
-  "top1_accuracy": 100.0,
-  "top3_accuracy": 100.0,
-  "eval_duration_ms": 74.41996900000001,
-  "avg_latency_us": 294.14624505928856,
-  "categories": {
-    "formal": {
-      "total": 50,
-      "top1_correct": 50,
-      "top3_correct": 50,
-      "top1_accuracy": 100.0,
-      "top3_accuracy": 100.0
+  "run": {
+    "git_sha": "1aa5fcf1",
+    "seed": 42,
+    "split": "test",
+    "canonical": "nfc+khanda",
+    "timestamp": "2026-10-14T17:45:21.845851182+00:00"
+  },
+  "personas": {
+    "avro_strict": {
+      "n": 9228,
+      "top1": 77.44,
+      "top1_ci95": [
+        76.55,
+        78.29
+      ],
+      "top3": 87.72,
+      "top5": 88.39,
+      "mrr": 0.8268,
+      "oov_rate": 11.34,
+      "by_seen": {
+        "seen": {
+          "n": 4246,
+          "top1": 79.27461139896373,
+          "top3": 88.81300047103156
+        },
+        "unseen": {
+          "n": 4982,
+          "top1": 75.87314331593737,
+          "top3": 86.79245283018868
+        }
+      },
+      "by_length": {
+        "1-3": {
+          "n": 285,
+          "top1": 80.7017543859649
+        },
+        "7+": {
+          "n": 5938,
+          "top1": 75.73256988885146
+        },
+        "4-6": {
+          "n": 3005,
+          "top1": 80.4991680532446
+        }
+      },
+      "kspc": {
+        "mean": 1.404,
+        "accept_at_rank": [
+          0.77,
+          0.1,
+          0.01
+        ]
+      },
+      "latency_us": {
+        "p50": 0.0,
+        "p95": 780.0,
+        "p99": 1328.0
+      }
     },
-    "texting_slang": {
-      "total": 45,
-      "top1_correct": 45,
-      "top3_correct": 45,
-      "top1_accuracy": 100.0,
-      "top3_accuracy": 100.0
+    "lazy": {
+      "n": 9228,
+      "top1": 32.47,
+      "top1_ci95": [
+        31.56,
+        33.42
+      ],
+      "top3": 39.93,
+      "top5": 40.64,
+      "mrr": 0.3618,
+      "oov_rate": 59.12,
+      "by_seen": {
+        "seen": {
+          "n": 4246,
+          "top1": 31.37070183702308,
+          "top3": 38.20065944418276
+        },
+        "unseen": {
+          "n": 4982,
+          "top1": 33.40024086712164,
+          "top3": 41.40907266158169
+        }
+      },
+      "by_length": {
+        "1-3": {
+          "n": 181,
+          "top1": 35.91160220994475
+        },
+        "7+": {
+          "n": 6038,
+          "top1": 30.407419675389203
+        },
+        "4-6": {
+          "n": 3009,
+          "top1": 36.390827517447654
+        }
+      },
+      "kspc": {
+        "mean": 1.895,
+        "accept_at_rank": [
+          0.32,
+          0.06,
+          0.01
+        ]
+      },
+      "latency_us": {
+        "p50": 400.0,
+        "p95": 1474.0,
+        "p99": 2221.0
+      }
     },
-    "proper_noun": {
-      "total": 25,
-      "top1_correct": 25,
-      "top3_correct": 25,
-      "top1_accuracy": 100.0,
-      "top3_accuracy": 100.0
+    "natural": {
+      "n": 9228,
+      "top1": 30.83,
+      "top1_ci95": [
+        29.94,
+        31.74
+      ],
+      "top3": 37.66,
+      "top5": 38.24,
+      "mrr": 0.3421,
+      "oov_rate": 61.54,
+      "by_seen": {
+        "seen": {
+          "n": 4246,
+          "top1": 29.6514366462553,
+          "top3": 35.56288271314178
+        },
+        "unseen": {
+          "n": 4982,
+          "top1": 31.83460457647531,
+          "top3": 39.44199116820554
+        }
+      },
+      "by_length": {
+        "1-3": {
+          "n": 151,
+          "top1": 33.11258278145696
+        },
+        "7+": {
+          "n": 6357,
+          "top1": 28.818625137643544
+        },
+        "4-6": {
+          "n": 2720,
+          "top1": 35.404411764705884
+        }
+      },
+      "kspc": {
+        "mean": 1.95,
+        "accept_at_rank": [
+          0.31,
+          0.06,
+          0.01
+        ]
+      },
+      "latency_us": {
+        "p50": 494.0,
+        "p95": 1517.0,
+        "p99": 2207.0
+      }
     },
-    "colloquial": {
-      "total": 50,
-      "top1_correct": 50,
-      "top3_correct": 50,
-      "top1_accuracy": 100.0,
-      "top3_accuracy": 100.0
+    "vowel_drop_p30": {
+      "n": 9228,
+      "top1": 16.98,
+      "top1_ci95": [
+        16.23,
+        17.71
+      ],
+      "top3": 21.14,
+      "top5": 21.91,
+      "mrr": 0.1911,
+      "oov_rate": 77.88,
+      "by_seen": {
+        "seen": {
+          "n": 4246,
+          "top1": 18.46443711728686,
+          "top3": 22.821479039095617
+        },
+        "unseen": {
+          "n": 4982,
+          "top1": 15.716579686872741,
+          "top3": 19.710959454034523
+        }
+      },
+      "by_length": {
+        "1-3": {
+          "n": 428,
+          "top1": 12.616822429906541
+        },
+        "7+": {
+          "n": 5110,
+          "top1": 15.79256360078278
+        },
+        "4-6": {
+          "n": 3690,
+          "top1": 19.132791327913278
+        }
+      },
+      "kspc": {
+        "mean": 1.979,
+        "accept_at_rank": [
+          0.17,
+          0.03,
+          0.01
+        ]
+      },
+      "latency_us": {
+        "p50": 385.0,
+        "p95": 1294.0,
+        "p99": 1955.0
+      }
     },
-    "loanword": {
-      "total": 30,
-      "top1_correct": 30,
-      "top3_correct": 30,
-      "top1_accuracy": 100.0,
-      "top3_accuracy": 100.0
-    },
-    "verbal_conjugation": {
-      "total": 53,
-      "top1_correct": 53,
-      "top3_correct": 53,
-      "top1_accuracy": 100.0,
-      "top3_accuracy": 100.0
+    "vowel_drop_p60": {
+      "n": 9228,
+      "top1": 7.96,
+      "top1_ci95": [
+        7.4,
+        8.5
+      ],
+      "top3": 10.47,
+      "top5": 11.11,
+      "mrr": 0.093,
+      "oov_rate": 88.68,
+      "by_seen": {
+        "seen": {
+          "n": 4246,
+          "top1": 10.103626943005182,
+          "top3": 13.165332077249175
+        },
+        "unseen": {
+          "n": 4982,
+          "top1": 6.142111601766359,
+          "top3": 8.169409875551988
+        }
+      },
+      "by_length": {
+        "1-3": {
+          "n": 920,
+          "top1": 5.6521739130434785
+        },
+        "7+": {
+          "n": 3590,
+          "top1": 7.103064066852367
+        },
+        "4-6": {
+          "n": 4718,
+          "top1": 9.07164052564646
+        }
+      },
+      "kspc": {
+        "mean": 1.944,
+        "accept_at_rank": [
+          0.08,
+          0.02,
+          0.01
+        ]
+      },
+      "latency_us": {
+        "p50": 285.0,
+        "p95": 1031.0,
+        "p99": 1517.0
+      }
     }
   },
-  "top_disagreements": []
+  "worst_cases": [
+    {
+      "persona": "natural",
+      "input": "anri",
+      "expected": "অঁরি",
+      "got": [
+        "আনরই",
+        "আংরই",
+        "অ্যানরই"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aunry",
+      "expected": "অঁরি",
+      "got": [
+        "অন্রয়",
+        "আউন্র্য",
+        "aunry"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "onry",
+      "expected": "অঁরি",
+      "got": [
+        "অন্ররয়",
+        "অন্রয়",
+        "অন্রররয়"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ori",
+      "expected": "অঁরি",
+      "got": [
+        "অরি",
+        "আরি",
+        "উরি"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "angsagrohonkari",
+      "expected": "অংশগ্রহনকারী",
+      "got": [
+        "আংসাগ্রহঙ্কারি",
+        "angsagrohonkari"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "angshogrohonkari",
+      "expected": "অংশগ্রহনকারী",
+      "got": [
+        "আংশগ্রহঙ্কারি",
+        "angshogrohonkari"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "angsogrohonkari",
+      "expected": "অংশগ্রহনকারী",
+      "got": [
+        "আংসগ্রহঙ্কারি",
+        "angsogrohonkari"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "anshograhankari",
+      "expected": "অংশগ্রহনকারী",
+      "got": [
+        "আনশগ্রাহাঙ্কারি",
+        "anshograhankari"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ongsagrohonkari",
+      "expected": "অংশগ্রহনকারী",
+      "got": [
+        "অংসাগ্রহঙ্কারি",
+        "ongsagrohonkari"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ongshogrohonkari",
+      "expected": "অংশগ্রহনকারী",
+      "got": [
+        "অংশগ্রহঙ্কারি",
+        "ongshogrohonkari"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ongsogrohonkari",
+      "expected": "অংশগ্রহনকারী",
+      "got": [
+        "অংসগ্রহঙ্কারি",
+        "ongsogrohonkari"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akkharguli",
+      "expected": "অক্ষরগুলি",
+      "got": [
+        "অক্ষারগুলি",
+        "আখ্যারগুলি",
+        "অক্ষাররগুলি"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akkhargulo",
+      "expected": "অক্ষরগুলো",
+      "got": [
+        "আকছারগুলো",
+        "আখাররগুলো",
+        "অক্ষারগুলো"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akkharti",
+      "expected": "অক্ষরটি",
+      "got": [
+        "অক্ষারটি",
+        "আখ্যারটি",
+        "অক্ষাররটি"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aksarti",
+      "expected": "অক্ষরটি",
+      "got": [
+        "অক্ষারটি",
+        "আকছারটি",
+        "আকচারটি"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akkhare",
+      "expected": "অক্ষরে",
+      "got": [
+        "আখ্যারে",
+        "অক্ষারে",
+        "অক্ষাররে"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akkharey",
+      "expected": "অক্ষরে",
+      "got": [
+        "অক্ষারেয়",
+        "আখ্যারেয়",
+        "অক্ষারেই"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akkhorey",
+      "expected": "অক্ষরে",
+      "got": [
+        "অক্ষরেয়",
+        "অক্সরেয়",
+        "অক্ষরেই"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akkharer",
+      "expected": "অক্ষরের",
+      "got": [
+        "অক্ষারের",
+        "আখ্যারের",
+        "অক্ষাররের"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aksaforda",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "আক্সাফরদা",
+        "aksaforda"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aksapharda",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "আক্সাফারদা",
+        "aksapharda"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aksaphoorda",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "আক্সাফুরদা",
+        "aksaphoorda"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aksaphorda",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "আক্সাফরদা",
+        "aksaphorda"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akshaphorda",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "আকশাফরদা",
+        "akshaphorda"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aqsaphorda",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "আকসাফরদা",
+        "aqsaphorda"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "axfard",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "আক্সফারদ",
+        "axfard"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "oksford",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "অক্সফরদ",
+        "oksford"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ooxfoord",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "উক্সফুরদ",
+        "ooxfoord"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "oxphord",
+      "expected": "অক্সফোর্ড",
+      "got": [
+        "অক্সফরদ",
+        "oxphord"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "okshforder",
+      "expected": "অক্সফোর্ডের",
+      "got": [
+        "অকশফরদের",
+        "কশফরদের",
+        "okshforder"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "okshphorder",
+      "expected": "অক্সফোর্ডের",
+      "got": [
+        "অকশফরদের",
+        "কশফরদের",
+        "okshphorder"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akhanda",
+      "expected": "অখণ্ড",
+      "got": [
+        "আখান্দ",
+        "আখান্দা",
+        "খান্দা"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akhando",
+      "expected": "অখণ্ড",
+      "got": [
+        "আখান্দ",
+        "আখান্দও",
+        "akhando"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "okhondo",
+      "expected": "অখণ্ড",
+      "got": [
+        "অখন্ড",
+        "আখন্দ",
+        "আখন্দও"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akhandota",
+      "expected": "অখন্ডতা",
+      "got": [
+        "আখান্দটা",
+        "আখান্দতা",
+        "akhandota"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "akhandotaa",
+      "expected": "অখন্ডতা",
+      "got": [
+        "আখান্দতাআ",
+        "akhandotaa"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aukhandota",
+      "expected": "অখন্ডতা",
+      "got": [
+        "আউখান্দতা",
+        "aukhandota"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aukhondota",
+      "expected": "অখন্ডতা",
+      "got": [
+        "আউখন্দতা",
+        "aukhondota"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "agranthita",
+      "expected": "অগ্রন্থিত",
+      "got": [
+        "আগ্রান্থিতা",
+        "agranthita"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "agranthito",
+      "expected": "অগ্রন্থিত",
+      "got": [
+        "আগ্রান্থিত",
+        "agranthito"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "agronthita",
+      "expected": "অগ্রন্থিত",
+      "got": [
+        "আগ্রন্থিতা",
+        "agronthita"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ajaanta",
+      "expected": "অজন্তা",
+      "got": [
+        "আজানটা",
+        "উজানটা",
+        "আযানটা"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ajanta",
+      "expected": "অজন্তা",
+      "got": [
+        "আজানটা",
+        "আযানটা",
+        "উজানটা"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "aujanta",
+      "expected": "অজন্তা",
+      "got": [
+        "উজানটা",
+        "আউজান্তা",
+        "aujanta"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "awejonta",
+      "expected": "অজন্তা",
+      "got": [
+        "আওেজন্তা",
+        "awejonta"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ojanta",
+      "expected": "অজন্তা",
+      "got": [
+        "ওজনটা",
+        "উজানটা",
+        "আজানটা"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ajantar",
+      "expected": "অজন্তার",
+      "got": [
+        "আজানটার",
+        "আযানটার",
+        "উজানটার"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "awejontar",
+      "expected": "অজন্তার",
+      "got": [
+        "আওেজন্তার",
+        "awejontar"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "ojanteyei",
+      "expected": "অজান্তেই",
+      "got": [
+        "অজান্তেয়েই",
+        "অজান্তেইয়েই",
+        "ojanteyei"
+      ]
+    },
+    {
+      "persona": "natural",
+      "input": "anchal",
+      "expected": "অঞ্চল",
+      "got": [
+        "আঞ্ছাল",
+        "anchal"
+      ]
+    }
+  ]
 }

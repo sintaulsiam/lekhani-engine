@@ -10,6 +10,7 @@ pub mod fs;
 pub mod keycodes;
 pub mod morpheme;
 pub mod ngram;
+pub mod personas;
 pub mod phonetic;
 pub mod session;
 pub mod snippets;

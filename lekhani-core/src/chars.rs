@@ -181,3 +181,109 @@ impl BengaliCharExt for char {
         matches!(*self, B_0..=B_9)
     }
 }
+
+/// Canonicalizes Bengali text to standard Unicode NFC with modern Khanda Ta:
+/// 1. Rewrites legacy Khanda Ta (`\u{09A4}\u{09CD}\u{200D}` = `ত্‍`) to modern atomic `ৎ` (`\u{09CE}`).
+/// 2. Applies Unicode NFC normalization:
+///    - Composition-excluded nukta characters `ড়` (U+09DC), `ঢ়` (U+09DD), `য়` (U+09DF) are decomposed
+///      to their base + nukta forms: `ড` + `\u{09BC}`, `ঢ` + `\u{09BC}`, `য` + `\u{09BC}`.
+///    - Split two-part vowel signs `\u{09C7}\u{09BE}` (`ে` + `া`) and `\u{09C7}\u{09D7}` (`ে` + `ৗ`)
+///      are composed to `\u{09CB}` (`ো`) and `\u{09CC}` (`ৌ`).
+pub fn canonicalize(text: &str) -> String {
+    let needs_transform = text.contains('\u{09DC}')
+        || text.contains('\u{09DD}')
+        || text.contains('\u{09DF}')
+        || text.contains("\u{09A4}\u{09CD}\u{200D}")
+        || text.contains("\u{09C7}\u{09BE}")
+        || text.contains("\u{09C7}\u{09D7}");
+
+    if !needs_transform {
+        return text.to_string();
+    }
+
+    let mut out = String::with_capacity(text.len() + 8);
+    let mut chars = text.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '\u{09A4}' => {
+                if chars.peek() == Some(&'\u{09CD}') {
+                    let mut clone = chars.clone();
+                    clone.next(); // skip ্
+                    if clone.peek() == Some(&'\u{200D}') {
+                        chars.next(); // consume ্
+                        chars.next(); // consume ZWJ
+                        out.push('\u{09CE}');
+                        continue;
+                    }
+                }
+                out.push(c);
+            }
+            '\u{09DC}' => {
+                out.push('\u{09A1}');
+                out.push('\u{09BC}');
+            }
+            '\u{09DD}' => {
+                out.push('\u{09A2}');
+                out.push('\u{09BC}');
+            }
+            '\u{09DF}' => {
+                out.push('\u{09AF}');
+                out.push('\u{09BC}');
+            }
+            '\u{09C7}' => {
+                if chars.peek() == Some(&'\u{09BE}') {
+                    chars.next();
+                    out.push('\u{09CB}');
+                } else if chars.peek() == Some(&'\u{09D7}') {
+                    chars.next();
+                    out.push('\u{09CC}');
+                } else {
+                    out.push(c);
+                }
+            }
+            _ => out.push(c),
+        }
+    }
+
+    out
+}
+
+/// Checks whether a given string is in Lekhani's canonical form.
+pub fn is_canonical(text: &str) -> bool {
+    !text.contains('\u{09DC}')
+        && !text.contains('\u{09DD}')
+        && !text.contains('\u{09DF}')
+        && !text.contains("\u{09A4}\u{09CD}\u{200D}")
+        && !text.contains("\u{09C7}\u{09BE}")
+        && !text.contains("\u{09C7}\u{09D7}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_canonicalize_nukta_decomposition() {
+        assert_eq!(canonicalize("বাড়ি"), "বা\u{09A1}\u{09BC}ি");
+        assert_eq!(canonicalize("আষাঢ়"), "আষা\u{09A2}\u{09BC}");
+        assert_eq!(canonicalize("যায়"), "যা\u{09AF}\u{09BC}");
+        assert!(is_canonical(&canonicalize("বাড়ি")));
+    }
+
+    #[test]
+    fn test_canonicalize_legacy_khanda_ta() {
+        let legacy = "\u{09A4}\u{09CD}\u{200D}"; // ত্‍
+        assert_eq!(canonicalize(legacy), "ৎ");
+        assert!(is_canonical("উৎসব"));
+        assert!(!is_canonical("উ\u{09A4}\u{09CD}\u{200D}সব"));
+    }
+
+    #[test]
+    fn test_canonicalize_split_vowels() {
+        let split_o = "ক\u{09C7}\u{09BE}"; // ক + ে + া
+        assert_eq!(canonicalize(split_o), "কো");
+        let split_ou = "ক\u{09C7}\u{09D7}"; // ক + ে + ৗ
+        assert_eq!(canonicalize(split_ou), "কৌ");
+    }
+}

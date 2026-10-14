@@ -120,6 +120,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("dekhbo", &[("দেখব", 1.0), ("দেখবো", 0.95)]),
         ("parbo", &[("পারব", 1.0), ("পারবো", 0.95)]),
         ("thakbo", &[("থাকব", 1.0), ("থাকবো", 0.95)]),
+        ("thake", &[("থাকে", 1.0)]),
+        ("thako", &[("থাকো", 1.0)]),
+        ("thaki", &[("থাকি", 1.0)]),
+        ("thaken", &[("থাকেন", 1.0)]),
         ("likhbo", &[("লিখব", 1.0), ("লিখবো", 0.95)]),
         ("shunbo", &[("শুনব", 1.0), ("শুনবো", 0.95)]),
         ("holo", &[("হলো", 1.0), ("হল", 0.90)]),
@@ -238,16 +242,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut merged_overrides: HashMap<String, Vec<(String, f32)>> = HashMap::new();
     for &(key, cands) in golden_entries {
-        let cand_vec = cands.iter().map(|&(s, c)| (s.to_string(), c)).collect();
+        let cand_vec = cands
+            .iter()
+            .map(|&(s, c)| (lekhani_core::chars::canonicalize(s), c))
+            .collect();
         merged_overrides.insert(key.to_string(), cand_vec);
     }
     println!("🌟 Initialized {} golden curated entries.", merged_overrides.len());
 
-    // 3. Read Dakshina TSVs
+    // 3. Read Dakshina TSVs (Strictly train split only — dev is for tuning, test is held out)
     let tsv_paths = [
         PathBuf::from("/home/smsiam/.gemini/antigravity-ide/brain/6e8f5951-b148-4374-87c2-2e54e03df641/scratch/dakshina/dakshina_dataset_v1.0/bn/lexicons/bn.translit.sampled.train.tsv"),
-        PathBuf::from("/home/smsiam/.gemini/antigravity-ide/brain/6e8f5951-b148-4374-87c2-2e54e03df641/scratch/dakshina/dakshina_dataset_v1.0/bn/lexicons/bn.translit.sampled.dev.tsv"),
-        PathBuf::from("/home/smsiam/.gemini/antigravity-ide/brain/6e8f5951-b148-4374-87c2-2e54e03df641/scratch/dakshina/dakshina_dataset_v1.0/bn/lexicons/bn.translit.sampled.test.tsv"),
     ];
 
     let mut latin_to_bn_counts: HashMap<String, HashMap<String, usize>> = HashMap::new();
@@ -267,14 +272,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if parts.len() != 3 {
                 continue;
             }
-            let bn = parts[0].trim();
+            let bn_raw = parts[0].trim();
+            let bn = lekhani_core::chars::canonicalize(bn_raw);
             let latin = parts[1].trim().to_ascii_lowercase();
             let cnt: usize = match parts[2].trim().parse() {
                 Ok(c) => c,
                 Err(_) => continue,
             };
 
-            if !is_valid_latin(&latin) || !is_valid_bengali(bn) {
+            if !is_valid_latin(&latin) || !is_valid_bengali(&bn) {
                 continue;
             }
 
