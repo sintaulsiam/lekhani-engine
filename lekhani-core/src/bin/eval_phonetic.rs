@@ -167,7 +167,11 @@ fn is_tree_dirty() -> bool {
             // Ignore untracked diagnostic tools
             let relevant_lines = s
                 .lines()
-                .filter(|line| !line.contains("diagnose_ablation") && !line.contains("failures_100"))
+                .filter(|line| {
+                    !line.contains("diagnose_ablation")
+                        && !line.contains("failures_100")
+                        && !line.contains("baseline.json")
+                })
                 .count();
             relevant_lines > 0
         })
