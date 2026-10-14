@@ -3,4 +3,6 @@
 2026-10-14T19:17:04Z | SHA: 5166d5c3 | Step 1 re-baseline on real engine configuration; dictionary.json only (SHA256: 8a51b4d98bcbe147771751c60fa1d2919a84b0b910232bdcf863617ecc88fbdb); rule engine baseline
 2026-10-14T19:22:15Z | SHA: 61b565f | Step 1 full test split confirmation (N=9228); 6 personas evaluated
 2026-10-14T19:45:26Z | SHA: 61b565f | Step 2 gate verification: test_dakshina_baseline_gate_against_json with dictionary hash verification
+2026-10-14T19:48:10Z | SHA: 61b565f | Step 2 release gate test_dakshina_baseline_gate_against_json full test split run (N=9228)
+2026-10-14T19:55:00Z | SHA: 3129ff1 | Step 2 post-commit gate check test_dakshina_baseline_gate_against_json
 

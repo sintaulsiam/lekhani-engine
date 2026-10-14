@@ -61,7 +61,7 @@ Because Bengali characters in UTF-8 are 3 bytes each (e.g. `ক` = 3 bytes), `bn
 | | **Dropped (`> 24` bytes)** | **2,125 (23.0%)** | **10.24** | **11.01** | **82.59%** | **Systematically harder (82.59% conjuncts)** |
 | | Full Split (Filters OFF) | 9,228 (100.0%) | 6.88 | 8.00 | 46.34% | Authentic full test set |
 
-**Conclusion**: The dropped rows were systematically harder (average character length: 10.53 vs. 5.85; conjunct rate: 86.83% vs. 36.75%). Truncating them would deprive the Step 3 tokenization and Step 4 alignment models of complex conjunct patterns.
+**Conclusion**: The dropped partition was systematically harder: average Bengali character length was nearly double (10.53 vs. 5.85), and conjunct density was 86.83% vs. 36.75%. While the kept split contained 24,390 conjunct rows (66,368 × 36.75%), the dropped split contained 24,464 conjunct rows (28,178 × 86.83%). Thus, roughly half (50.1%) of all conjunct rows in the training data were dropped, severely underrepresenting longer conjunct-heavy words in the training distribution.
 
 ---
 

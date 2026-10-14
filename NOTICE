@@ -7,7 +7,9 @@ Portions of the phonetic evaluation and alignment benchmark assets in `data/eval
 - **License**: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
 - **License URL**: https://creativecommons.org/licenses/by-sa/4.0/
 - **Copyright**: © 2020 Google LLC
-- **ShareAlike Notice**: Any models, transition alignments, or lexicons derived directly from the Dakshina dataset must be licensed under CC BY-SA 4.0 or a compatible license upon distribution.
+- **Upstream Verbatim License Clause** (from `https://raw.githubusercontent.com/google-research-datasets/dakshina/master/README.md`):
+  > "The dataset is licensed under [CC BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/). Any third party content or data is provided 'As Is' without any warranty, express or implied."
+- **ShareAlike Notice**: Under CC BY-SA 4.0, if you remix, transform, or build upon the material, you must distribute your contributions under the same license as the original. If models, transition alignments, or lexicons derived directly from the Dakshina dataset are distributed, they inherit CC BY-SA 4.0. Legal review is required prior to shipping any derived binary weights.
 - **Citation**:
   Brian Roark, Lawrence Wolf-Sonkin, Christo Kirov, Ying Sheng, Narsheel Ranjan, Sanjeev Satheesh, Mark Elliot, Yuval Novotny, Dirk Padfield.
   "Processing South Asian Languages Written in the Latin Script: the Dakshina Dataset."
@@ -18,6 +20,11 @@ Portions of the phonetic evaluation and alignment benchmark assets in `data/eval
 
 Root word lists in `data/dictionaries/` are derived from the OpenBangla Keyboard and Avro Phonetic community dictionaries.
 - **Software License (OpenBangla)**: GNU General Public License v3.0 or later (GPL-3.0-or-later)
+- **Software License URL**: https://opensource.org/licenses/GPL-3.0
+- **Upstream Verbatim License Clause** (from `https://raw.githubusercontent.com/OpenBangla/OpenBangla-Keyboard/master/README.adoc`):
+  > "This project is licensed under https://opensource.org/licenses/GPL-3.0[GPL 3 Licence]."
 - **Original Lexicon License (Avro Phonetic / OmicronLab)**: Mozilla Public License 1.1 (MPL 1.1) / GNU LGPL 2.1 / GNU GPL 2.0 tri-license
 - **Copyright**: © OmicronLab (Mehdi Hasan Khan) / OpenBangla Community (Muhammad Mominul Huque and contributors)
+- **License Boundary Notice**: If dictionary data under GPL is bundled or distributed within client binaries (e.g. Android APK / dynamic library), GPL terms may apply to the distributed bundle. Legal qualification is required prior to release.
+
 
