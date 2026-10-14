@@ -78,7 +78,10 @@ impl<'a> Index<usize> for OverrideEntry<'a> {
         if index < self.len {
             &self.items[index]
         } else {
-            panic!("OverrideEntry index out of bounds: {} >= {}", index, self.len);
+            panic!(
+                "OverrideEntry index out of bounds: {} >= {}",
+                index, self.len
+            );
         }
     }
 }
@@ -173,7 +176,10 @@ impl ZeroCopyOverrides {
     pub const CAND_RECORD_LEN: usize = 12;
 
     pub fn from_static(bytes: &'static [u8]) -> Result<Self, &'static str> {
-        if bytes.len() >= 8 && &bytes[0..4] == Self::MAGIC && u32::from_le_bytes(bytes[4..8].try_into().unwrap_or([0; 4])) == 1 {
+        if bytes.len() >= 8
+            && &bytes[0..4] == Self::MAGIC
+            && u32::from_le_bytes(bytes[4..8].try_into().unwrap_or([0; 4])) == 1
+        {
             // Backward compatibility with legacy POVR v1
             let map = parse_legacy_v1(bytes).ok_or("Failed to parse legacy v1 POVR")?;
             return Ok(Self::from_map(&map));
@@ -182,7 +188,10 @@ impl ZeroCopyOverrides {
     }
 
     pub fn from_bytes(bytes: Arc<[u8]>) -> Result<Self, &'static str> {
-        if bytes.len() >= 8 && &bytes[0..4] == Self::MAGIC && u32::from_le_bytes(bytes[4..8].try_into().unwrap_or([0; 4])) == 1 {
+        if bytes.len() >= 8
+            && &bytes[0..4] == Self::MAGIC
+            && u32::from_le_bytes(bytes[4..8].try_into().unwrap_or([0; 4])) == 1
+        {
             let map = parse_legacy_v1(&bytes).ok_or("Failed to parse legacy v1 POVR")?;
             return Ok(Self::from_map(&map));
         }
@@ -191,14 +200,18 @@ impl ZeroCopyOverrides {
 
     pub fn from_map(map: &std::collections::HashMap<String, Vec<(String, f32)>>) -> Self {
         let compiled = Self::compile_to_bytes(map.iter().map(|(k, v)| (k.as_str(), v.as_slice())));
-        Self::parse_buffer(OverrideBuffer::Shared(Arc::from(compiled.into_boxed_slice())))
-            .unwrap_or_default()
+        Self::parse_buffer(OverrideBuffer::Shared(Arc::from(
+            compiled.into_boxed_slice(),
+        )))
+        .unwrap_or_default()
     }
 
     pub fn from_hashbrown_map(map: &hashbrown::HashMap<String, Vec<(String, f32)>>) -> Self {
         let compiled = Self::compile_to_bytes(map.iter().map(|(k, v)| (k.as_str(), v.as_slice())));
-        Self::parse_buffer(OverrideBuffer::Shared(Arc::from(compiled.into_boxed_slice())))
-            .unwrap_or_default()
+        Self::parse_buffer(OverrideBuffer::Shared(Arc::from(
+            compiled.into_boxed_slice(),
+        )))
+        .unwrap_or_default()
     }
 
     fn parse_buffer(buffer: OverrideBuffer) -> Result<Self, &'static str> {
@@ -223,8 +236,12 @@ impl ZeroCopyOverrides {
         let strings_offset = u32::from_le_bytes(data[24..28].try_into().unwrap()) as usize;
         let strings_len = u32::from_le_bytes(data[28..32].try_into().unwrap()) as usize;
 
-        let keys_total = key_count.checked_mul(Self::KEY_RECORD_LEN).ok_or("Overflow keys len")?;
-        let cands_total = cand_count.checked_mul(Self::CAND_RECORD_LEN).ok_or("Overflow cands len")?;
+        let keys_total = key_count
+            .checked_mul(Self::KEY_RECORD_LEN)
+            .ok_or("Overflow keys len")?;
+        let cands_total = cand_count
+            .checked_mul(Self::CAND_RECORD_LEN)
+            .ok_or("Overflow cands len")?;
 
         if keys_offset + keys_total > data.len() {
             return Err("Keys table out of bounds");
@@ -277,25 +294,31 @@ impl ZeroCopyOverrides {
             let k_off = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
             let k_len = u16::from_le_bytes(data[pos + 4..pos + 6].try_into().unwrap()) as usize;
 
-            let key_str = unsafe {
-                std::str::from_utf8_unchecked(&strings[k_off..k_off + k_len])
-            };
+            let key_str = unsafe { std::str::from_utf8_unchecked(&strings[k_off..k_off + k_len]) };
 
             match key_str.cmp(query) {
                 Ordering::Less => low = mid + 1,
                 Ordering::Greater => high = mid,
                 Ordering::Equal => {
-                    let cand_start = u32::from_le_bytes(data[pos + 6..pos + 10].try_into().unwrap()) as usize;
-                    let cand_count = u16::from_le_bytes(data[pos + 10..pos + 12].try_into().unwrap()) as usize;
+                    let cand_start =
+                        u32::from_le_bytes(data[pos + 6..pos + 10].try_into().unwrap()) as usize;
+                    let cand_count =
+                        u16::from_le_bytes(data[pos + 10..pos + 12].try_into().unwrap()) as usize;
 
                     let mut entry = OverrideEntry::new();
                     for i in 0..cand_count.min(MAX_OVERRIDE_CANDIDATES) {
                         let c_idx = cand_start + i;
-                        if c_idx >= self.cand_count { break; }
+                        if c_idx >= self.cand_count {
+                            break;
+                        }
                         let c_pos = self.cands_offset + c_idx * Self::CAND_RECORD_LEN;
-                        let b_off = u32::from_le_bytes(data[c_pos..c_pos + 4].try_into().unwrap()) as usize;
-                        let b_len = u16::from_le_bytes(data[c_pos + 4..c_pos + 6].try_into().unwrap()) as usize;
-                        let conf = f32::from_le_bytes(data[c_pos + 6..c_pos + 10].try_into().unwrap());
+                        let b_off =
+                            u32::from_le_bytes(data[c_pos..c_pos + 4].try_into().unwrap()) as usize;
+                        let b_len =
+                            u16::from_le_bytes(data[c_pos + 4..c_pos + 6].try_into().unwrap())
+                                as usize;
+                        let conf =
+                            f32::from_le_bytes(data[c_pos + 6..c_pos + 10].try_into().unwrap());
 
                         let bengali_str = unsafe {
                             std::str::from_utf8_unchecked(&strings[b_off..b_off + b_len])
@@ -310,7 +333,12 @@ impl ZeroCopyOverrides {
     }
 
     /// Fast zero-copy prefix search on sorted keys in binary overrides table.
-    pub fn lookup_prefix<'a>(&'a self, prefix: &str, max_key_len: usize, limit: usize) -> Vec<(&'a str, OverrideEntry<'a>)> {
+    pub fn lookup_prefix<'a>(
+        &'a self,
+        prefix: &str,
+        max_key_len: usize,
+        limit: usize,
+    ) -> Vec<(&'a str, OverrideEntry<'a>)> {
         if self.key_count == 0 || limit == 0 {
             return Vec::new();
         }
@@ -325,9 +353,7 @@ impl ZeroCopyOverrides {
             let pos = self.keys_offset + mid * Self::KEY_RECORD_LEN;
             let k_off = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
             let k_len = u16::from_le_bytes(data[pos + 4..pos + 6].try_into().unwrap()) as usize;
-            let key_str = unsafe {
-                std::str::from_utf8_unchecked(&strings[k_off..k_off + k_len])
-            };
+            let key_str = unsafe { std::str::from_utf8_unchecked(&strings[k_off..k_off + k_len]) };
             if key_str < prefix {
                 low = mid + 1;
             } else {
@@ -346,30 +372,32 @@ impl ZeroCopyOverrides {
                 continue;
             }
             let k_off = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
-            let key_str = unsafe {
-                std::str::from_utf8_unchecked(&strings[k_off..k_off + k_len])
-            };
+            let key_str = unsafe { std::str::from_utf8_unchecked(&strings[k_off..k_off + k_len]) };
             if !key_str.starts_with(prefix) {
                 break;
             }
             if key_str == prefix {
                 continue;
             }
-            let cand_start = u32::from_le_bytes(data[pos + 6..pos + 10].try_into().unwrap()) as usize;
-            let cand_count = u16::from_le_bytes(data[pos + 10..pos + 12].try_into().unwrap()) as usize;
+            let cand_start =
+                u32::from_le_bytes(data[pos + 6..pos + 10].try_into().unwrap()) as usize;
+            let cand_count =
+                u16::from_le_bytes(data[pos + 10..pos + 12].try_into().unwrap()) as usize;
 
             let mut entry = OverrideEntry::new();
             for i in 0..cand_count.min(MAX_OVERRIDE_CANDIDATES) {
                 let c_idx = cand_start + i;
-                if c_idx >= self.cand_count { break; }
+                if c_idx >= self.cand_count {
+                    break;
+                }
                 let c_pos = self.cands_offset + c_idx * Self::CAND_RECORD_LEN;
                 let b_off = u32::from_le_bytes(data[c_pos..c_pos + 4].try_into().unwrap()) as usize;
-                let b_len = u16::from_le_bytes(data[c_pos + 4..c_pos + 6].try_into().unwrap()) as usize;
+                let b_len =
+                    u16::from_le_bytes(data[c_pos + 4..c_pos + 6].try_into().unwrap()) as usize;
                 let conf = f32::from_le_bytes(data[c_pos + 6..c_pos + 10].try_into().unwrap());
 
-                let bengali_str = unsafe {
-                    std::str::from_utf8_unchecked(&strings[b_off..b_off + b_len])
-                };
+                let bengali_str =
+                    unsafe { std::str::from_utf8_unchecked(&strings[b_off..b_off + b_len]) };
                 entry.push(bengali_str, conf);
             }
             results.push((key_str, entry));
@@ -464,28 +492,45 @@ fn parse_legacy_v1(bytes: &[u8]) -> Option<HashMap<String, Vec<(String, f32)>>> 
     let mut map = HashMap::with_capacity(count);
 
     for _ in 0..count {
-        if cursor + 2 > bytes.len() { break; }
-        let latin_len = u16::from_le_bytes(bytes[cursor..cursor+2].try_into().ok()?) as usize;
+        if cursor + 2 > bytes.len() {
+            break;
+        }
+        let latin_len = u16::from_le_bytes(bytes[cursor..cursor + 2].try_into().ok()?) as usize;
         cursor += 2;
-        if cursor + latin_len > bytes.len() { break; }
-        let latin = std::str::from_utf8(&bytes[cursor..cursor+latin_len]).ok()?.to_string();
+        if cursor + latin_len > bytes.len() {
+            break;
+        }
+        let latin = std::str::from_utf8(&bytes[cursor..cursor + latin_len])
+            .ok()?
+            .to_string();
         cursor += latin_len;
 
-        if cursor + 2 > bytes.len() { break; }
-        let cand_count = u16::from_le_bytes(bytes[cursor..cursor+2].try_into().ok()?) as usize;
+        if cursor + 2 > bytes.len() {
+            break;
+        }
+        let cand_count = u16::from_le_bytes(bytes[cursor..cursor + 2].try_into().ok()?) as usize;
         cursor += 2;
 
         let mut cands = Vec::with_capacity(cand_count);
         for _ in 0..cand_count {
-            if cursor + 2 > bytes.len() { break; }
-            let bengali_len = u16::from_le_bytes(bytes[cursor..cursor+2].try_into().ok()?) as usize;
+            if cursor + 2 > bytes.len() {
+                break;
+            }
+            let bengali_len =
+                u16::from_le_bytes(bytes[cursor..cursor + 2].try_into().ok()?) as usize;
             cursor += 2;
-            if cursor + bengali_len > bytes.len() { break; }
-            let bengali = std::str::from_utf8(&bytes[cursor..cursor+bengali_len]).ok()?.to_string();
+            if cursor + bengali_len > bytes.len() {
+                break;
+            }
+            let bengali = std::str::from_utf8(&bytes[cursor..cursor + bengali_len])
+                .ok()?
+                .to_string();
             cursor += bengali_len;
 
-            if cursor + 4 > bytes.len() { break; }
-            let conf = f32::from_le_bytes(bytes[cursor..cursor+4].try_into().ok()?);
+            if cursor + 4 > bytes.len() {
+                break;
+            }
+            let conf = f32::from_le_bytes(bytes[cursor..cursor + 4].try_into().ok()?);
             cursor += 4;
             cands.push((bengali, conf));
         }

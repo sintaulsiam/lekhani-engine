@@ -52,7 +52,11 @@ impl TrainedLanguageModelData {
             self.unigrams.entry(w.clone()).or_insert(*p);
         }
 
-        let mut existing_bi: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
+        let mut existing_bi: hashbrown::HashSet<(&str, &str)> = self
+            .bigrams
+            .iter()
+            .map(|(w1, w2, _)| (w1.as_str(), w2.as_str()))
+            .collect();
         let mut new_bi = Vec::new();
         for (w1, w2, p) in &other.bigrams {
             if existing_bi.insert((w1.as_str(), w2.as_str())) {
@@ -62,7 +66,11 @@ impl TrainedLanguageModelData {
         drop(existing_bi);
         self.bigrams.extend(new_bi);
 
-        let mut existing_tri: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
+        let mut existing_tri: hashbrown::HashSet<(&str, &str, &str)> = self
+            .trigrams
+            .iter()
+            .map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str()))
+            .collect();
         let mut new_tri = Vec::new();
         for (w1, w2, w3, p) in &other.trigrams {
             if existing_tri.insert((w1.as_str(), w2.as_str(), w3.as_str())) {
@@ -72,7 +80,11 @@ impl TrainedLanguageModelData {
         drop(existing_tri);
         self.trigrams.extend(new_tri);
 
-        let mut existing_four: hashbrown::HashSet<(&str, &str, &str, &str)> = self.fourgrams.iter().map(|(w1, w2, w3, w4, _)| (w1.as_str(), w2.as_str(), w3.as_str(), w4.as_str())).collect();
+        let mut existing_four: hashbrown::HashSet<(&str, &str, &str, &str)> = self
+            .fourgrams
+            .iter()
+            .map(|(w1, w2, w3, w4, _)| (w1.as_str(), w2.as_str(), w3.as_str(), w4.as_str()))
+            .collect();
         let mut new_four = Vec::new();
         for (w1, w2, w3, w4, p) in &other.fourgrams {
             if existing_four.insert((w1.as_str(), w2.as_str(), w3.as_str(), w4.as_str())) {
@@ -94,8 +106,9 @@ impl TrainedLanguageModelData {
 
         self.bigrams
             .retain(|(w1, w2, _)| !is_junk_token(w1) && !is_junk_token(w2));
-        self.trigrams
-            .retain(|(w1, w2, w3, _)| !is_junk_token(w1) && !is_junk_token(w2) && !is_junk_token(w3));
+        self.trigrams.retain(|(w1, w2, w3, _)| {
+            !is_junk_token(w1) && !is_junk_token(w2) && !is_junk_token(w3)
+        });
         self.fourgrams.retain(|(w1, w2, w3, w4, _)| {
             !is_junk_token(w1) && !is_junk_token(w2) && !is_junk_token(w3) && !is_junk_token(w4)
         });
@@ -103,14 +116,12 @@ impl TrainedLanguageModelData {
         removed_unigrams
     }
 
-
     /// Load trained model data from a JSON file
     pub fn load_from_json<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
         let content = std::fs::read_to_string(path)?;
         serde_json::from_str(&content)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
-
 
     /// Serialize language model data into compact quantized binary format (LLM3)
     pub fn to_binary_llm3(&self) -> Vec<u8> {
@@ -120,13 +131,20 @@ impl TrainedLanguageModelData {
         let fourgrams = self.fourgrams.clone();
 
         let has_bengali = self.unigrams.is_empty()
-            || self.unigrams.keys().any(|k| k.chars().any(crate::trainer::chars::is_bengali_char));
+            || self
+                .unigrams
+                .keys()
+                .any(|k| k.chars().any(crate::trainer::chars::is_bengali_char));
         if has_bengali {
             for &(w, p) in crate::lm::UNIGRAM_LOG_PROBS {
                 unigrams.entry(w.to_string()).or_insert(p);
             }
 
-            let bigram_set: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
+            let bigram_set: hashbrown::HashSet<(&str, &str)> = self
+                .bigrams
+                .iter()
+                .map(|(w1, w2, _)| (w1.as_str(), w2.as_str()))
+                .collect();
             for &((w1, w2), p) in crate::lm::BIGRAM_TRANSITIONS {
                 if !bigram_set.contains(&(w1, w2)) {
                     bigrams.push((w1.to_string(), w2.to_string(), p));
@@ -134,7 +152,11 @@ impl TrainedLanguageModelData {
             }
             drop(bigram_set);
 
-            let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
+            let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self
+                .trigrams
+                .iter()
+                .map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str()))
+                .collect();
             for &((w1, w2, w3), p) in crate::lm::TRIGRAM_TRANSITIONS {
                 if !trigram_set.contains(&(w1, w2, w3)) {
                     trigrams.push((w1.to_string(), w2.to_string(), w3.to_string(), p));
@@ -190,7 +212,8 @@ impl TrainedLanguageModelData {
             let id_b1 = vocab_map[b1.as_str()];
             let id_a2 = vocab_map[a2.as_str()];
             let id_b2 = vocab_map[b2.as_str()];
-            id_a1.cmp(&id_b1)
+            id_a1
+                .cmp(&id_b1)
                 .then_with(|| p2.partial_cmp(p1).unwrap_or(std::cmp::Ordering::Equal))
                 .then_with(|| id_a2.cmp(&id_b2))
         });
@@ -204,7 +227,8 @@ impl TrainedLanguageModelData {
             let id_b2 = vocab_map[b2.as_str()];
             let id_a3 = vocab_map[a3.as_str()];
             let id_b3 = vocab_map[b3.as_str()];
-            id_a1.cmp(&id_b1)
+            id_a1
+                .cmp(&id_b1)
                 .then_with(|| id_a2.cmp(&id_b2))
                 .then_with(|| p2.partial_cmp(p1).unwrap_or(std::cmp::Ordering::Equal))
                 .then_with(|| id_a3.cmp(&id_b3))
@@ -221,7 +245,8 @@ impl TrainedLanguageModelData {
             let id_b3 = vocab_map[b3.as_str()];
             let id_a4 = vocab_map[a4.as_str()];
             let id_b4 = vocab_map[b4.as_str()];
-            id_a1.cmp(&id_b1)
+            id_a1
+                .cmp(&id_b1)
                 .then_with(|| id_a2.cmp(&id_b2))
                 .then_with(|| id_a3.cmp(&id_b3))
                 .then_with(|| p2.partial_cmp(p1).unwrap_or(std::cmp::Ordering::Equal))
@@ -310,13 +335,20 @@ impl TrainedLanguageModelData {
         let mut trigrams = self.trigrams.clone();
 
         let has_bengali = self.unigrams.is_empty()
-            || self.unigrams.keys().any(|k| k.chars().any(crate::trainer::chars::is_bengali_char));
+            || self
+                .unigrams
+                .keys()
+                .any(|k| k.chars().any(crate::trainer::chars::is_bengali_char));
         if has_bengali {
             for &(w, p) in crate::lm::UNIGRAM_LOG_PROBS {
                 unigrams.entry(w.to_string()).or_insert(p);
             }
 
-            let bigram_set: hashbrown::HashSet<(&str, &str)> = self.bigrams.iter().map(|(w1, w2, _)| (w1.as_str(), w2.as_str())).collect();
+            let bigram_set: hashbrown::HashSet<(&str, &str)> = self
+                .bigrams
+                .iter()
+                .map(|(w1, w2, _)| (w1.as_str(), w2.as_str()))
+                .collect();
             for &((w1, w2), p) in crate::lm::BIGRAM_TRANSITIONS {
                 if !bigram_set.contains(&(w1, w2)) {
                     bigrams.push((w1.to_string(), w2.to_string(), p));
@@ -324,7 +356,11 @@ impl TrainedLanguageModelData {
             }
             drop(bigram_set);
 
-            let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self.trigrams.iter().map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str())).collect();
+            let trigram_set: hashbrown::HashSet<(&str, &str, &str)> = self
+                .trigrams
+                .iter()
+                .map(|(w1, w2, w3, _)| (w1.as_str(), w2.as_str(), w3.as_str()))
+                .collect();
             for &((w1, w2, w3), p) in crate::lm::TRIGRAM_TRANSITIONS {
                 if !trigram_set.contains(&(w1, w2, w3)) {
                     trigrams.push((w1.to_string(), w2.to_string(), w3.to_string(), p));
@@ -375,7 +411,8 @@ impl TrainedLanguageModelData {
             let id_b1 = vocab_map[b1.as_str()];
             let id_a2 = vocab_map[a2.as_str()];
             let id_b2 = vocab_map[b2.as_str()];
-            id_a1.cmp(&id_b1)
+            id_a1
+                .cmp(&id_b1)
                 .then_with(|| p2.partial_cmp(p1).unwrap_or(std::cmp::Ordering::Equal))
                 .then_with(|| id_a2.cmp(&id_b2))
         });
@@ -390,7 +427,8 @@ impl TrainedLanguageModelData {
             let id_b2 = vocab_map[b2.as_str()];
             let id_a3 = vocab_map[a3.as_str()];
             let id_b3 = vocab_map[b3.as_str()];
-            id_a1.cmp(&id_b1)
+            id_a1
+                .cmp(&id_b1)
                 .then_with(|| id_a2.cmp(&id_b2))
                 .then_with(|| p2.partial_cmp(p1).unwrap_or(std::cmp::Ordering::Equal))
                 .then_with(|| id_a3.cmp(&id_b3))
@@ -549,15 +587,27 @@ impl TrainedLanguageModelData {
 
         // Unigrams cursor
         let unigrams_start = cursor;
-        cursor += if is_v3 { unigram_count * 5 } else { unigram_count * 8 };
+        cursor += if is_v3 {
+            unigram_count * 5
+        } else {
+            unigram_count * 8
+        };
 
         // Bigrams cursor
         let bigrams_start = cursor;
-        cursor += if is_v3 { bigram_count * 9 } else { bigram_count * 12 };
+        cursor += if is_v3 {
+            bigram_count * 9
+        } else {
+            bigram_count * 12
+        };
 
         // Trigrams cursor
         let trigrams_start = cursor;
-        cursor += if is_v3 { trigram_count * 13 } else { trigram_count * 16 };
+        cursor += if is_v3 {
+            trigram_count * 13
+        } else {
+            trigram_count * 16
+        };
 
         // Fourgrams cursor
         let fourgrams_start = cursor;
@@ -600,8 +650,10 @@ impl TrainedLanguageModelData {
         let mut bigrams = Vec::with_capacity(bigram_count);
         let mut b_cursor = bigrams_start;
         for _ in 0..bigram_count {
-            let w1_id = u32::from_le_bytes(data[b_cursor..b_cursor + 4].try_into().unwrap()) as usize;
-            let w2_id = u32::from_le_bytes(data[b_cursor + 4..b_cursor + 8].try_into().unwrap()) as usize;
+            let w1_id =
+                u32::from_le_bytes(data[b_cursor..b_cursor + 4].try_into().unwrap()) as usize;
+            let w2_id =
+                u32::from_le_bytes(data[b_cursor + 4..b_cursor + 8].try_into().unwrap()) as usize;
             let prob = if is_v3 {
                 dequantize_log_prob(data[b_cursor + 8])
             } else {
@@ -617,16 +669,24 @@ impl TrainedLanguageModelData {
         let mut trigrams = Vec::with_capacity(trigram_count);
         let mut t_cursor = trigrams_start;
         for _ in 0..trigram_count {
-            let w1_id = u32::from_le_bytes(data[t_cursor..t_cursor + 4].try_into().unwrap()) as usize;
-            let w2_id = u32::from_le_bytes(data[t_cursor + 4..t_cursor + 8].try_into().unwrap()) as usize;
-            let w3_id = u32::from_le_bytes(data[t_cursor + 8..t_cursor + 12].try_into().unwrap()) as usize;
+            let w1_id =
+                u32::from_le_bytes(data[t_cursor..t_cursor + 4].try_into().unwrap()) as usize;
+            let w2_id =
+                u32::from_le_bytes(data[t_cursor + 4..t_cursor + 8].try_into().unwrap()) as usize;
+            let w3_id =
+                u32::from_le_bytes(data[t_cursor + 8..t_cursor + 12].try_into().unwrap()) as usize;
             let prob = if is_v3 {
                 dequantize_log_prob(data[t_cursor + 12])
             } else {
                 f32::from_le_bytes(data[t_cursor + 12..t_cursor + 16].try_into().unwrap())
             };
             if w1_id < words.len() && w2_id < words.len() && w3_id < words.len() {
-                trigrams.push((words[w1_id].clone(), words[w2_id].clone(), words[w3_id].clone(), prob));
+                trigrams.push((
+                    words[w1_id].clone(),
+                    words[w2_id].clone(),
+                    words[w3_id].clone(),
+                    prob,
+                ));
             }
             t_cursor += if is_v3 { 13 } else { 16 };
         }
@@ -636,12 +696,22 @@ impl TrainedLanguageModelData {
         if is_v3 && fourgram_count > 0 {
             let mut f_cursor = fourgrams_start;
             for _ in 0..fourgram_count {
-                let w1_id = u32::from_le_bytes(data[f_cursor..f_cursor + 4].try_into().unwrap()) as usize;
-                let w2_id = u32::from_le_bytes(data[f_cursor + 4..f_cursor + 8].try_into().unwrap()) as usize;
-                let w3_id = u32::from_le_bytes(data[f_cursor + 8..f_cursor + 12].try_into().unwrap()) as usize;
-                let w4_id = u32::from_le_bytes(data[f_cursor + 12..f_cursor + 16].try_into().unwrap()) as usize;
+                let w1_id =
+                    u32::from_le_bytes(data[f_cursor..f_cursor + 4].try_into().unwrap()) as usize;
+                let w2_id = u32::from_le_bytes(data[f_cursor + 4..f_cursor + 8].try_into().unwrap())
+                    as usize;
+                let w3_id =
+                    u32::from_le_bytes(data[f_cursor + 8..f_cursor + 12].try_into().unwrap())
+                        as usize;
+                let w4_id =
+                    u32::from_le_bytes(data[f_cursor + 12..f_cursor + 16].try_into().unwrap())
+                        as usize;
                 let prob = dequantize_log_prob(data[f_cursor + 16]);
-                if w1_id < words.len() && w2_id < words.len() && w3_id < words.len() && w4_id < words.len() {
+                if w1_id < words.len()
+                    && w2_id < words.len()
+                    && w3_id < words.len()
+                    && w4_id < words.len()
+                {
                     fourgrams.push((
                         words[w1_id].clone(),
                         words[w2_id].clone(),
@@ -672,8 +742,12 @@ impl TrainedLanguageModelData {
 
 use rayon::prelude::*;
 
-fn default_min_fourgram_freq() -> usize { 8 }
-fn default_max_fourgrams() -> usize { 30_000 }
+fn default_min_fourgram_freq() -> usize {
+    8
+}
+fn default_max_fourgrams() -> usize {
+    30_000
+}
 
 /// Configuration options for N-gram pruning and model capacity
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1183,10 +1257,20 @@ pub fn train_files_streaming<P: AsRef<Path>>(
                 let (batch_bi, batch_tri) = batch
                     .par_chunks(2_500)
                     .fold(
-                        || (HashMap::<u64, u32>::new(), HashMap::<(u32, u32, u32), u32>::new()),
+                        || {
+                            (
+                                HashMap::<u64, u32>::new(),
+                                HashMap::<(u32, u32, u32), u32>::new(),
+                            )
+                        },
                         |(mut local_bi, mut local_tri), chunk| {
                             for line in chunk {
-                                process_line_ngrams(line, &vocab_lookup, &mut local_bi, &mut local_tri);
+                                process_line_ngrams(
+                                    line,
+                                    &vocab_lookup,
+                                    &mut local_bi,
+                                    &mut local_tri,
+                                );
                             }
                             (local_bi, local_tri)
                         },
@@ -1227,7 +1311,12 @@ pub fn train_files_streaming<P: AsRef<Path>>(
             let (batch_bi, batch_tri) = batch
                 .par_chunks(2_500)
                 .fold(
-                    || (HashMap::<u64, u32>::new(), HashMap::<(u32, u32, u32), u32>::new()),
+                    || {
+                        (
+                            HashMap::<u64, u32>::new(),
+                            HashMap::<(u32, u32, u32), u32>::new(),
+                        )
+                    },
                     |(mut local_bi, mut local_tri), chunk| {
                         for line in chunk {
                             process_line_ngrams(line, &vocab_lookup, &mut local_bi, &mut local_tri);
@@ -1310,7 +1399,11 @@ pub fn train_files_streaming<P: AsRef<Path>>(
     let mut trigrams = Vec::with_capacity(trigram_vec.len());
     for ((w1_id, w2_id, w3_id), count) in trigram_vec {
         let bi_key = ((w1_id as u64) << 32) | (w2_id as u64);
-        let bi_count = compiled_bigram_counts.get(&bi_key).copied().unwrap_or(1).max(1) as f32;
+        let bi_count = compiled_bigram_counts
+            .get(&bi_key)
+            .copied()
+            .unwrap_or(1)
+            .max(1) as f32;
         let prob = (count as f32) / bi_count;
         let w1 = &vocab_list[w1_id as usize];
         let w2 = &vocab_list[w2_id as usize];
@@ -1431,9 +1524,28 @@ pub fn is_junk_token(w: &str) -> bool {
 
     let lower = trimmed.to_lowercase();
     const JUNK_SUBSTRINGS: &[&str] = &[
-        "&lt;", "&gt;", "&amp;", "&quot;", "http", "www.", ".com", ".org", ".php", "quot", "nbsp",
-        "href", "cite", "ইউআরএল", "আর্কাইভের", "আর্কাইভ", "ওয়েব্যাক", "আইএসবিএন",
-        "অবস্থাকার্যকর", "অবস্থাঅকার্যকর", "সংগ্রহেরতারিখ", "অনূদিতশিরোনাম",
+        "&lt;",
+        "&gt;",
+        "&amp;",
+        "&quot;",
+        "http",
+        "www.",
+        ".com",
+        ".org",
+        ".php",
+        "quot",
+        "nbsp",
+        "href",
+        "cite",
+        "ইউআরএল",
+        "আর্কাইভের",
+        "আর্কাইভ",
+        "ওয়েব্যাক",
+        "আইএসবিএন",
+        "অবস্থাকার্যকর",
+        "অবস্থাঅকার্যকর",
+        "সংগ্রহেরতারিখ",
+        "অনূদিতশিরোনাম",
     ];
 
     for junk in JUNK_SUBSTRINGS {
@@ -1587,7 +1699,8 @@ mod tests {
         assert!(loaded.bigrams.len() >= compiled.bigrams.len());
         assert!(loaded.trigrams.len() >= compiled.trigrams.len());
 
-        let zc = crate::zero_copy::ZeroCopyLanguageModel::from_slice(bytes.leak()).expect("Failed to parse zero-copy LLM2");
+        let zc = crate::zero_copy::ZeroCopyLanguageModel::from_slice(bytes.leak())
+            .expect("Failed to parse zero-copy LLM2");
         assert_eq!(zc.unigram_count(), loaded.unigrams.len());
         assert_eq!(zc.bigram_count(), loaded.bigrams.len());
         assert_eq!(zc.trigram_count(), loaded.trigrams.len());
@@ -1649,13 +1762,15 @@ mod tests {
         assert!(!bytes.is_empty());
         assert_eq!(&bytes[0..4], b"LLM3");
 
-        let loaded = TrainedLanguageModelData::from_binary(&bytes).expect("Failed to load LLM3 binary");
+        let loaded =
+            TrainedLanguageModelData::from_binary(&bytes).expect("Failed to load LLM3 binary");
         assert_eq!(loaded.total_words, compiled.total_words);
         assert!(loaded.unigrams.len() >= compiled.unigrams.len());
         assert!(loaded.bigrams.len() >= compiled.bigrams.len());
         assert!(loaded.trigrams.len() >= compiled.trigrams.len());
 
-        let zc = crate::zero_copy::ZeroCopyLanguageModel::from_slice(bytes.leak()).expect("Failed to parse zero-copy LLM3");
+        let zc = crate::zero_copy::ZeroCopyLanguageModel::from_slice(bytes.leak())
+            .expect("Failed to parse zero-copy LLM3");
         assert_eq!(zc.unigram_count(), loaded.unigrams.len());
         assert_eq!(zc.bigram_count(), loaded.bigrams.len());
         assert_eq!(zc.trigram_count(), loaded.trigrams.len());
@@ -1671,9 +1786,17 @@ mod tests {
         // Train text containing decomposed nuktas (ড + ় -> ড়) and (অ + া -> আ)
         let decomposed_text = "ব\u{09a1}\u{09bc} গাছ। \u{0985}\u{09be}মি আসছি।";
         trainer.train_text(decomposed_text);
-        assert!(trainer.unigram_counts.contains_key("বড়"), "Must be canonicalized to atomic U+09DC ড়");
-        assert!(trainer.unigram_counts.contains_key("আমি"), "Must be canonicalized to atomic U+0986 আ");
-        assert!(!trainer.unigram_counts.contains_key("ব\u{09a1}\u{09bc}"), "Decomposed token must not exist in LM vocab");
+        assert!(
+            trainer.unigram_counts.contains_key("বড়"),
+            "Must be canonicalized to atomic U+09DC ড়"
+        );
+        assert!(
+            trainer.unigram_counts.contains_key("আমি"),
+            "Must be canonicalized to atomic U+0986 আ"
+        );
+        assert!(
+            !trainer.unigram_counts.contains_key("ব\u{09a1}\u{09bc}"),
+            "Decomposed token must not exist in LM vocab"
+        );
     }
 }
-

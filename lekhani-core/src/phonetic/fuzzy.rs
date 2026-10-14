@@ -824,8 +824,14 @@ impl DhvaniSetuEngine {
 
         // Syncope-resilient consonant skeleton check:
         // strip internal vowels ('A', 'I', 'U') and compare skeleton
-        let skel_q: String = fp_q.chars().filter(|&c| c != 'A' && c != 'I' && c != 'U').collect();
-        let skel_t: String = fp_t.chars().filter(|&c| c != 'A' && c != 'I' && c != 'U').collect();
+        let skel_q: String = fp_q
+            .chars()
+            .filter(|&c| c != 'A' && c != 'I' && c != 'U')
+            .collect();
+        let skel_t: String = fp_t
+            .chars()
+            .filter(|&c| c != 'A' && c != 'I' && c != 'U')
+            .collect();
 
         if !skel_q.is_empty() && skel_q == skel_t {
             return 0.92;
@@ -860,7 +866,9 @@ impl DhvaniSetuEngine {
         }
 
         // 2. Syncope reconstruction for vowel-less short tokens (e.g. "shndr" -> "shundor", "kmn" -> "kemon")
-        let has_vowels = lower.chars().any(|c| matches!(c, 'a' | 'e' | 'i' | 'o' | 'u'));
+        let has_vowels = lower
+            .chars()
+            .any(|c| matches!(c, 'a' | 'e' | 'i' | 'o' | 'u'));
         if !has_vowels && lower.chars().count() >= 3 {
             match lower.as_str() {
                 "shndr" | "sndr" => {
@@ -984,12 +992,18 @@ mod tests {
     #[test]
     fn test_soft_chandra_bindu_expansion() {
         let chad_variants = generate_phonetic_variants("chad");
-        assert!(chad_variants.contains(&"c^ad".to_string()) || chad_variants.contains(&"ch^ad".to_string()));
+        assert!(
+            chad_variants.contains(&"c^ad".to_string())
+                || chad_variants.contains(&"ch^ad".to_string())
+        );
 
         let bash_variants = generate_phonetic_variants("bash");
         assert!(bash_variants.contains(&"b^ash".to_string()));
 
         let fota_variants = generate_phonetic_variants("fota");
-        assert!(fota_variants.contains(&"f^ota".to_string()) || fota_variants.contains(&"f^oTa".to_string()));
+        assert!(
+            fota_variants.contains(&"f^ota".to_string())
+                || fota_variants.contains(&"f^oTa".to_string())
+        );
     }
 }

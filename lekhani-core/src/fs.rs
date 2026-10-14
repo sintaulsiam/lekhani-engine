@@ -17,10 +17,7 @@ pub fn atomic_write_secure<P: AsRef<Path>>(path: P, data: &[u8]) -> Result<(), s
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     std::fs::create_dir_all(parent)?;
 
-    let file_stem = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("file");
+    let file_stem = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
     let pid = std::process::id();
     let count = COUNTER.fetch_add(1, Ordering::Relaxed);
     let tmp_path = parent.join(format!(".{}.tmp.{}.{}", file_stem, pid, count));

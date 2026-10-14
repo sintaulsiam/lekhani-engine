@@ -328,8 +328,12 @@ impl PrefixTrie {
         let mut cursor = 16;
 
         let buffer_bytes = &data[cursor + entries_bytes..cursor + entries_bytes + buffer_len];
-        let buffer_str = std::str::from_utf8(buffer_bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Invalid UTF-8 in trie buffer: {}", e)))?;
+        let buffer_str = std::str::from_utf8(buffer_bytes).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid UTF-8 in trie buffer: {}", e),
+            )
+        })?;
 
         let mut entries = Vec::with_capacity(entry_count);
         let make_parse_err = |i: usize, field: &str| {
@@ -357,12 +361,18 @@ impl PrefixTrie {
 
             let start = offset as usize;
             let end = start.checked_add(len as usize).ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Entry {} offset overflow", i))
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Entry {} offset overflow", i),
+                )
             })?;
             if end > buffer_len {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("Entry {} extends past buffer bounds ({} > {})", i, end, buffer_len),
+                    format!(
+                        "Entry {} extends past buffer bounds ({} > {})",
+                        i, end, buffer_len
+                    ),
                 ));
             }
             if !buffer_str.is_char_boundary(start) || !buffer_str.is_char_boundary(end) {
@@ -472,7 +482,9 @@ mod tests {
         buf.extend_from_slice(b"test");
 
         let res = PrefixTrie::from_binary(&buf);
-        assert!(res.is_err(), "PrefixTrie must reject entry extending past buffer bounds");
+        assert!(
+            res.is_err(),
+            "PrefixTrie must reject entry extending past buffer bounds"
+        );
     }
 }
-

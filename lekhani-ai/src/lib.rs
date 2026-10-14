@@ -19,9 +19,7 @@ pub use context::{truncate_at_sentence_boundary, ContextScorer, PersonalScoreOve
 pub use embeddings::WordEmbeddings;
 pub use lm::{LanguageModel, StringInterner};
 pub use prediction::NextWordPredictor;
-pub use trainer::{
-    train_files_streaming, CorpusTrainer, TrainedLanguageModelData, TrainingConfig,
-};
+pub use trainer::{train_files_streaming, CorpusTrainer, TrainedLanguageModelData, TrainingConfig};
 pub use zero_copy::ZeroCopyLanguageModel;
 
 #[cfg(test)]

@@ -50,7 +50,6 @@ fn test_complex_conjuncts() {
     assert_eq!(parser.convert("NgkSh"), "ঙ্ক্ষ");
     assert_eq!(parser.convert("ShTh"), "ষ্ঠ");
     assert_eq!(parser.convert("cch"), "চ্ছ");
-
 }
 
 #[test]
@@ -92,4 +91,3 @@ fn test_backtick_conjunct_breaker_and_zwnj() {
     assert_eq!(parser.convert("k`k"), "কক");
     assert_eq!(parser.convert("p`p"), "পপ");
 }
-

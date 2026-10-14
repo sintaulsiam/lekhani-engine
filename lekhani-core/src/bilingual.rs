@@ -21,14 +21,12 @@ pub fn is_bilingual_clitic_enabled() -> bool {
 }
 
 pub const COMMON_TECH_ACRONYMS: &[&str] = &[
-    "RAM", "ROM", "CPU", "GPU", "SSD", "HDD", "USB", "LAN", "LED", "LCD",
-    "URL", "URI", "API", "SDK", "SQL", "CSS", "HTML", "JSON", "XML", "PDF",
-    "APK", "JPG", "PNG", "MP3", "MP4", "OTP", "NFC", "GPS", "VPN", "DNS",
-    "SSH", "FTP", "MAC", "IP", "OS", "PC", "TV", "AI", "UI", "UX", "ID",
-    "SMS", "CCA", "SIM", "PIN", "CVV", "ATM", "POS", "QR", "FAQ", "DDR",
-    "PCI", "SATA", "NVME", "WIFI", "RFC", "HTTP", "HTTPS", "REST",
-    "CLI", "GUI", "IDE", "AAB", "JNI", "FFI", "ABI", "NDK",
-    "SOC", "DSP", "ISP", "CER", "WER", "LLM", "AGI", "ASR", "TTS", "NLP",
+    "RAM", "ROM", "CPU", "GPU", "SSD", "HDD", "USB", "LAN", "LED", "LCD", "URL", "URI", "API",
+    "SDK", "SQL", "CSS", "HTML", "JSON", "XML", "PDF", "APK", "JPG", "PNG", "MP3", "MP4", "OTP",
+    "NFC", "GPS", "VPN", "DNS", "SSH", "FTP", "MAC", "IP", "OS", "PC", "TV", "AI", "UI", "UX",
+    "ID", "SMS", "CCA", "SIM", "PIN", "CVV", "ATM", "POS", "QR", "FAQ", "DDR", "PCI", "SATA",
+    "NVME", "WIFI", "RFC", "HTTP", "HTTPS", "REST", "CLI", "GUI", "IDE", "AAB", "JNI", "FFI",
+    "ABI", "NDK", "SOC", "DSP", "ISP", "CER", "WER", "LLM", "AGI", "ASR", "TTS", "NLP",
 ];
 
 pub fn is_common_tech_acronym(token: &str) -> bool {
@@ -196,20 +194,12 @@ pub fn resolve_digit_unit_candidates(input: &str) -> Option<(String, Vec<String>
         }
         "mb" => {
             let p = format!("{} এমবি", b_digits);
-            let cands = vec![
-                p.clone(),
-                format!("{}MB", digits),
-                input.to_string(),
-            ];
+            let cands = vec![p.clone(), format!("{}MB", digits), input.to_string()];
             (p, cands)
         }
         "gb" => {
             let p = format!("{} জিবি", b_digits);
-            let cands = vec![
-                p.clone(),
-                format!("{}GB", digits),
-                input.to_string(),
-            ];
+            let cands = vec![p.clone(), format!("{}GB", digits), input.to_string()];
             (p, cands)
         }
         // English ordinals to Bengali ordinals
@@ -299,7 +289,9 @@ pub fn resolve_bilingual_hyphen_clitic(input: &str) -> Option<(String, Vec<Strin
 
     if base.is_empty()
         || suffix.is_empty()
-        || !base.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        || !base
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
     {
         return None;
     }
@@ -358,8 +350,8 @@ pub fn resolve_unhyphenated_bilingual_clitic(input: &str) -> Option<(String, Vec
             }
 
             // Capitalized or multi-case bases are strongly indicative of a Latin token (e.g. "Meetinger", "WhatsAppe", "iPhone-er")
-            let has_valid_latin_title = base.len() >= 3
-                && base.chars().next().is_some_and(|c| c.is_ascii_uppercase());
+            let has_valid_latin_title =
+                base.len() >= 3 && base.chars().next().is_some_and(|c| c.is_ascii_uppercase());
             let is_all_caps = base.len() >= 2 && base.chars().all(|c| c.is_ascii_uppercase());
             if has_valid_latin_title || is_all_caps || is_static_short_english_word(base) {
                 let primary = format!("{}{}", base, b_clitic);

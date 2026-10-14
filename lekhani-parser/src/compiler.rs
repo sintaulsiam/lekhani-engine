@@ -1,8 +1,8 @@
 //! Layout JSON Compiler for Phonetic Parser
 
-use serde_json::Value;
 use super::rule::{ConditionScope, MatchType, Pattern, PatternRule, RuleCondition};
 use super::trie::PatternTrie;
+use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub struct CompiledLayout {

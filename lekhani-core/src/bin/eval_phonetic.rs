@@ -213,7 +213,7 @@ fn setup_engine() -> PhoneticSuggestion {
 struct RawTestRow {
     bn_target: String,
     latin: String,
-    count: usize,
+    _count: usize,
 }
 
 fn load_test_data() -> (Vec<RawTestRow>, DakshinaGoldIndex) {
@@ -234,31 +234,29 @@ fn load_test_data() -> (Vec<RawTestRow>, DakshinaGoldIndex) {
 
     let mut roman_counts: HashMap<String, HashMap<String, usize>> = HashMap::new();
 
-    for line in reader.lines() {
-        if let Ok(l) = line {
-            let parts: Vec<&str> = l.split('\t').collect();
-            if parts.len() >= 2 {
-                let bn_target = canonicalize(parts[0].trim());
-                let latin = parts[1].trim().to_string();
-                let count: usize = if parts.len() >= 3 {
-                    parts[2].trim().parse().unwrap_or(1)
-                } else {
-                    1
-                };
-                if !bn_target.is_empty() && !latin.is_empty() {
-                    rows.push(RawTestRow {
-                        bn_target: bn_target.clone(),
-                        latin: latin.clone(),
-                        count,
-                    });
+    for l in reader.lines().map_while(Result::ok) {
+        let parts: Vec<&str> = l.split('\t').collect();
+        if parts.len() >= 2 {
+            let bn_target = canonicalize(parts[0].trim());
+            let latin = parts[1].trim().to_string();
+            let count: usize = if parts.len() >= 3 {
+                parts[2].trim().parse().unwrap_or(1)
+            } else {
+                1
+            };
+            if !bn_target.is_empty() && !latin.is_empty() {
+                rows.push(RawTestRow {
+                    bn_target: bn_target.clone(),
+                    latin: latin.clone(),
+                    _count: count,
+                });
 
-                    roman_counts
-                        .entry(latin)
-                        .or_default()
-                        .entry(bn_target)
-                        .and_modify(|c| *c += count)
-                        .or_insert(count);
-                }
+                roman_counts
+                    .entry(latin)
+                    .or_default()
+                    .entry(bn_target)
+                    .and_modify(|c| *c += count)
+                    .or_insert(count);
             }
         }
     }
@@ -301,7 +299,9 @@ fn load_dict_words() -> HashSet<String> {
         if p.exists() {
             if let Ok(file) = File::open(p) {
                 let reader = BufReader::new(file);
-                if let Ok(map) = serde_json::from_reader::<_, HashMap<String, serde_json::Value>>(reader) {
+                if let Ok(map) =
+                    serde_json::from_reader::<_, HashMap<String, serde_json::Value>>(reader)
+                {
                     for val in map.values() {
                         if let Some(list) = val.as_array() {
                             for item in list {
@@ -404,10 +404,14 @@ fn evaluate_persona(
 
         // Dual scoring
         if let Some(idx) = gold_index {
-            if idx.roman_to_attested.get(input).map_or(false, |set| set.contains(&top_cand)) {
+            if idx
+                .roman_to_attested
+                .get(input)
+                .is_some_and(|set| set.contains(&top_cand))
+            {
                 any_attested_hits += 1;
             }
-            if idx.roman_to_most_frequent.get(input).map_or(false, |m| m == &top_cand) {
+            if idx.roman_to_most_frequent.get(input) == Some(&top_cand) {
                 most_freq_hits += 1;
             }
         } else {
@@ -418,10 +422,18 @@ fn evaluate_persona(
         }
 
         if is_top1 {
-            if is_seen { seen_top1 += 1; } else { unseen_top1 += 1; }
-            if input_len <= 3 { len_1_3_top1 += 1; }
-            else if input_len <= 6 { len_4_6_top1 += 1; }
-            else { len_7_plus_top1 += 1; }
+            if is_seen {
+                seen_top1 += 1;
+            } else {
+                unseen_top1 += 1;
+            }
+            if input_len <= 3 {
+                len_1_3_top1 += 1;
+            } else if input_len <= 6 {
+                len_4_6_top1 += 1;
+            } else {
+                len_7_plus_top1 += 1;
+            }
         }
 
         // True reachability: was target in the candidate list at all?
@@ -433,7 +445,11 @@ fn evaluate_persona(
         if let Some(r) = rank {
             if r < 3 {
                 top3_hits += 1;
-                if is_seen { seen_top3 += 1; } else { unseen_top3 += 1; }
+                if is_seen {
+                    seen_top3 += 1;
+                } else {
+                    unseen_top3 += 1;
+                }
             }
             if r < 5 {
                 top5_hits += 1;
@@ -477,7 +493,10 @@ fn evaluate_persona(
     // Cluster bootstrap by target Bengali word
     let mut target_clusters: HashMap<&str, Vec<bool>> = HashMap::new();
     for ((_, target_bn), &hit) in cases.iter().zip(exact_hits.iter()) {
-        target_clusters.entry(target_bn.as_str()).or_default().push(hit);
+        target_clusters
+            .entry(target_bn.as_str())
+            .or_default()
+            .push(hit);
     }
     let clusters: Vec<Vec<bool>> = target_clusters.into_values().collect();
     let top1_ci95_cluster = compute_cluster_bootstrap_ci95(&clusters, seed);
@@ -588,7 +607,9 @@ fn main() {
     println!("  ➔ Git Commit SHA : {}", git_sha);
     println!("  ➔ Dirty Tree     : {}", dirty_tree);
     println!("  ➔ Random Seed    : {}", seed);
-    println!("  ➔ Target NFC     : standard decomposed nuktas (U+09BC) + atomic Khanda Ta (U+09CE)");
+    println!(
+        "  ➔ Target NFC     : standard decomposed nuktas (U+09BC) + atomic Khanda Ta (U+09CE)"
+    );
     println!("  ➔ Cluster Boot   : clustered by target Bengali word (1,000 iterations)\n");
 
     let mut sugg = setup_engine();
@@ -603,9 +624,16 @@ fn main() {
     println!(
         "Loaded {} test pairs across {} unique targets from held-out Dakshina test.tsv.",
         raw_pairs.len(),
-        raw_pairs.iter().map(|(bn, _)| bn).collect::<HashSet<_>>().len()
+        raw_pairs
+            .iter()
+            .map(|(bn, _)| bn)
+            .collect::<HashSet<_>>()
+            .len()
     );
-    println!("Loaded {} canonical dictionary entries.\n", dict_words.len());
+    println!(
+        "Loaded {} canonical dictionary entries.\n",
+        dict_words.len()
+    );
 
     let mut report_personas = HashMap::new();
     let mut all_worst_cases = Vec::new();
@@ -720,7 +748,16 @@ fn main() {
     println!("───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
     println!(
         "{:<17} {:>6} {:>15} {:>10} {:>10} {:>8} {:>9} {:>9} {:>13} {:>11}",
-        "Persona", "N", "Top-1 (Exact)", "Any Attest", "Top-3", "MRR", "NotInTop5", "Unreach%", "KSPC (Eff/Hit)", "Lat p95"
+        "Persona",
+        "N",
+        "Top-1 (Exact)",
+        "Any Attest",
+        "Top-3",
+        "MRR",
+        "NotInTop5",
+        "Unreach%",
+        "KSPC (Eff/Hit)",
+        "Lat p95"
     );
     println!("───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
 
@@ -734,7 +771,10 @@ fn main() {
     ];
     for name in &persona_order {
         if let Some(m) = report_personas.get(*name) {
-            let ci_str = format!("{:.1}% [{:.1}-{:.1}]", m.top1, m.top1_ci95_cluster[0], m.top1_ci95_cluster[1]);
+            let ci_str = format!(
+                "{:.1}% [{:.1}-{:.1}]",
+                m.top1, m.top1_ci95_cluster[0], m.top1_ci95_cluster[1]
+            );
             let kspc_str = format!("{:.2} / {:.2}", m.kspc.effective, m.kspc.conditional_hits);
             println!(
                 "{:<17} {:>6} {:>15} {:>9.1}% {:>9.1}% {:>8.4} {:>8.1}% {:>8.1}% {:>13} {:>9.0}µs",
@@ -769,6 +809,9 @@ fn main() {
     let baseline_path = Path::new("data/eval/baseline.json");
     if let Ok(json) = serde_json::to_string_pretty(&report) {
         let _ = std::fs::write(baseline_path, json);
-        println!("\n💾 Saved updated multi-persona baseline report to {:?}", baseline_path);
+        println!(
+            "\n💾 Saved updated multi-persona baseline report to {:?}",
+            baseline_path
+        );
     }
 }

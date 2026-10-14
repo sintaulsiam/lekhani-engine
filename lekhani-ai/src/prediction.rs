@@ -67,7 +67,10 @@ pub const BENGALI_FORMAL_PHRASES: &[(&[&str], &[&str])] = &[
     (&["ফলস্বরূপ"], &["এই", "তিনি", "সরকার"]),
     (&["পরিণতিতে"], &["এই", "তিনি"]),
     // ── Government / Politics ─────────────────────────────────────────────
-    (&["সরকার"], &["কর্তৃক", "পক্ষ থেকে", "ঘোষণা", "জানিয়েছে", "সিদ্ধান্ত"]),
+    (
+        &["সরকার"],
+        &["কর্তৃক", "পক্ষ থেকে", "ঘোষণা", "জানিয়েছে", "সিদ্ধান্ত"],
+    ),
     (&["সরকারি"], &["সিদ্ধান্ত", "নির্দেশ", "প্রতিষ্ঠান", "কর্মকর্তা"]),
     (&["মন্ত্রণালয়"], &["সূত্রে", "জানিয়েছে", "থেকে", "কর্তৃক"]),
     (&["মন্ত্রী"], &["বলেন", "জানান", "সভাপতিত্বে", "কর্তৃক"]),
@@ -280,12 +283,14 @@ impl NextWordPredictor {
             }
         }
 
-
         let pool_size = (limit * 3).max(12);
         let mut raw_candidates: Vec<String> = Vec::with_capacity(pool_size);
 
         let (prev2, prev1) = if context.len() >= 2 {
-            (Some(context[context.len() - 2]), Some(context[context.len() - 1]))
+            (
+                Some(context[context.len() - 2]),
+                Some(context[context.len() - 1]),
+            )
         } else {
             (None, Some(context[context.len() - 1]))
         };
@@ -317,15 +322,22 @@ impl NextWordPredictor {
             })
             .collect();
 
-        scored_candidates.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        scored_candidates
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Fill remaining slots with high-frequency contextual fallbacks
         if idiom_matches.len() + scored_candidates.len() < limit {
             let fallbacks = [
-                "হবে", "আছে", "করব", "যাব", "ভালো",
-                "চাই", "কথা", "দেখা", "ছিল", "করছি",
+                "হবে",
+                "আছে",
+                "করব",
+                "যাব",
+                "ভালো",
+                "চাই",
+                "কথা",
+                "দেখা",
+                "ছিল",
+                "করছি",
             ];
             for fb in fallbacks {
                 if idiom_matches.len() + scored_candidates.len() >= limit {

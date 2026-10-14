@@ -53,7 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "    • Initial: {} unigrams, {} bigrams, {} trigrams, {} fourgrams",
-        initial_unigrams, initial_bigrams, initial_trigrams, model.fourgram_count()
+        initial_unigrams,
+        initial_bigrams,
+        initial_trigrams,
+        model.fourgram_count()
     );
 
     // 1. Sanitize: Prune junk tokens
@@ -92,7 +95,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 4. Export binary
-    println!("[*] Exporting sanitized model to: {}", output_path.display());
+    println!(
+        "[*] Exporting sanitized model to: {}",
+        output_path.display()
+    );
     let binary_bytes = model.to_binary_llm3();
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -431,7 +437,15 @@ fn inject_conversational_ngrams(model: &mut TrainedLanguageModelData) {
     }
     model.fourgrams = four_map
         .into_iter()
-        .map(|((w1, w2, w3, w4), p)| (w1.to_string(), w2.to_string(), w3.to_string(), w4.to_string(), p))
+        .map(|((w1, w2, w3, w4), p)| {
+            (
+                w1.to_string(),
+                w2.to_string(),
+                w3.to_string(),
+                w4.to_string(),
+                p,
+            )
+        })
         .collect();
 }
 
@@ -453,7 +467,9 @@ fn replenish_from_dictionary(
                         if !trimmed.is_empty()
                             && !is_junk_token(trimmed)
                             && !model.unigrams.contains_key(trimmed)
-                            && trimmed.chars().all(lekhani_ai::trainer::chars::is_bengali_char)
+                            && trimmed
+                                .chars()
+                                .all(lekhani_ai::trainer::chars::is_bengali_char)
                             && trimmed.chars().count() >= 2
                             && trimmed.chars().count() <= 12
                         {
@@ -486,6 +502,9 @@ fn replenish_from_dictionary(
         added += 1;
     }
 
-    println!("    • Added {} verified authentic words from dictionary", added);
+    println!(
+        "    • Added {} verified authentic words from dictionary",
+        added
+    );
     Ok(())
 }

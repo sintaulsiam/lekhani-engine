@@ -69,7 +69,8 @@ fn test_real_world_chat_diagnostic_scenarios() {
     );
 
     // 5. [কোনো] + "shomossha" -> "সমস্যা"
-    let (cands5, _) = sugg.suggest_with_context("shomossha", Some("কোনো"), true, true, &empty_memory);
+    let (cands5, _) =
+        sugg.suggest_with_context("shomossha", Some("কোনো"), true, true, &empty_memory);
     assert_eq!(
         cands5.first(),
         Some(&"সমস্যা".to_string()),

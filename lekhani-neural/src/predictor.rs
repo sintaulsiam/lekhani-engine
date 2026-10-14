@@ -4,10 +4,10 @@
 //! Blends neural semantic candidates with Tier 1 N-gram candidates with an
 //! adaptive weighting factor.
 
+use crate::model::{GruScratchpad, MicroGruModel};
+use crate::vocab::BpeVocabulary;
 use std::cell::RefCell;
 use std::sync::Arc;
-use crate::model::{MicroGruModel, GruScratchpad};
-use crate::vocab::BpeVocabulary;
 
 thread_local! {
     static LOCAL_SCRATCHPAD: RefCell<Option<GruScratchpad>> = const { RefCell::new(None) };
@@ -104,10 +104,18 @@ impl NeuralContextPredictor {
         let top_tokens = LOCAL_SCRATCHPAD.with(|cell| {
             let mut pad_opt = cell.borrow_mut();
             let pad = pad_opt.get_or_insert_with(|| {
-                GruScratchpad::new(self.vocab.len(), self.model.embedding_dim, self.model.hidden_dim)
+                GruScratchpad::new(
+                    self.vocab.len(),
+                    self.model.embedding_dim,
+                    self.model.hidden_dim,
+                )
             });
             if pad.logits.len() != self.vocab.len() {
-                *pad = GruScratchpad::new(self.vocab.len(), self.model.embedding_dim, self.model.hidden_dim);
+                *pad = GruScratchpad::new(
+                    self.vocab.len(),
+                    self.model.embedding_dim,
+                    self.model.hidden_dim,
+                );
             }
             self.model.predict_top_k(window, top_k * 2, pad)
         });
@@ -153,11 +161,20 @@ impl NeuralContextPredictor {
     ) -> Vec<String> {
         let alpha = alpha.clamp(0.0, 1.0);
         let mut scores: std::collections::HashMap<&str, f32> =
-            std::collections::HashMap::with_capacity(ngram_candidates.len() + neural_candidates.len());
-        let mut seen = std::collections::HashSet::with_capacity(ngram_candidates.len() + neural_candidates.len());
-        let mut ordered_candidates = Vec::with_capacity(ngram_candidates.len() + neural_candidates.len());
+            std::collections::HashMap::with_capacity(
+                ngram_candidates.len() + neural_candidates.len(),
+            );
+        let mut seen = std::collections::HashSet::with_capacity(
+            ngram_candidates.len() + neural_candidates.len(),
+        );
+        let mut ordered_candidates =
+            Vec::with_capacity(ngram_candidates.len() + neural_candidates.len());
 
-        let min_neural = neural_candidates.iter().map(|c| c.log_prob).fold(0.0f32, |m, v| m.min(v)) - 2.0;
+        let min_neural = neural_candidates
+            .iter()
+            .map(|c| c.log_prob)
+            .fold(0.0f32, |m, v| m.min(v))
+            - 2.0;
 
         for (rank, ng) in ngram_candidates.iter().enumerate() {
             let ng_score = -0.3 * (rank as f32);
@@ -207,8 +224,14 @@ mod tests {
 
         let ngrams = vec!["যাব".to_string(), "খাব".to_string()];
         let neurals = vec![
-            NeuralCandidate { word: "আসব".into(), log_prob: -0.2 },
-            NeuralCandidate { word: "যাব".into(), log_prob: -0.8 },
+            NeuralCandidate {
+                word: "আসব".into(),
+                log_prob: -0.2,
+            },
+            NeuralCandidate {
+                word: "যাব".into(),
+                log_prob: -0.8,
+            },
         ];
 
         // Active typing: N-gram dominant (alpha = 0.2)
@@ -239,7 +262,11 @@ mod tests {
 
         // N-gram uncertain → balanced
         let alpha = compute_neural_alpha(-2.5, true, 4);
-        assert!((0.4..=0.6).contains(&alpha), "Expected balanced alpha, got {}", alpha);
+        assert!(
+            (0.4..=0.6).contains(&alpha),
+            "Expected balanced alpha, got {}",
+            alpha
+        );
     }
 
     #[test]
@@ -248,6 +275,8 @@ mod tests {
         let mismatched_model = Arc::new(MicroGruModel::new(2048, 16, 16));
         let res = NeuralContextPredictor::try_new(mismatched_model, vocab);
         assert!(res.is_err());
-        assert!(res.unwrap_err().contains("vocab_size (2048) does not match"));
+        assert!(res
+            .unwrap_err()
+            .contains("vocab_size (2048) does not match"));
     }
 }

@@ -16,6 +16,5 @@ pub use database::PhoneticDatabase;
 pub use learner::AutonomousLearner;
 pub use method::PhoneticMethod;
 pub use overrides::{OverrideCandidate, OverrideEntry, ZeroCopyOverrides};
-pub use ranking::{CandidateContext, RankFeatures, RankWeights, extract_candidate_features};
+pub use ranking::{extract_candidate_features, CandidateContext, RankFeatures, RankWeights};
 pub use suggestion::{PhoneticSuggestion, PhoneticSuggestionConfig};
-

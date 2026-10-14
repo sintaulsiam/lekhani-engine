@@ -1,6 +1,6 @@
 use crate::emojis::EmojiMap;
-use crate::phonetic::AutonomousLearner;
 use crate::phonetic::overrides::{OverrideEntry, ZeroCopyOverrides};
+use crate::phonetic::AutonomousLearner;
 use crate::snippets::SnippetManager;
 use crate::trie::PrefixTrie;
 use hashbrown::HashMap;
@@ -409,9 +409,11 @@ pub const BANGLISH_SHORTHAND: &[(&str, &str)] = &[
     ("korba", "করবা"),
 ];
 
-const EMBEDDED_AUTOCORRECT_JSON: &[u8] = include_bytes!("../../../data/dictionaries/autocorrect.json");
+const EMBEDDED_AUTOCORRECT_JSON: &[u8] =
+    include_bytes!("../../../data/dictionaries/autocorrect.json");
 const EMBEDDED_SUFFIX_JSON: &[u8] = include_bytes!("../../../data/dictionaries/suffix.json");
-const EMBEDDED_OVERRIDES_BIN: &[u8] = include_bytes!("../../../data/dictionaries/phonetic_overrides.bin");
+const EMBEDDED_OVERRIDES_BIN: &[u8] =
+    include_bytes!("../../../data/dictionaries/phonetic_overrides.bin");
 
 pub fn parse_binary_overrides(bytes: &[u8]) -> Option<PhoneticOverrideMap> {
     if bytes.len() < 12 || &bytes[0..4] != b"POVR" {
@@ -426,28 +428,45 @@ pub fn parse_binary_overrides(bytes: &[u8]) -> Option<PhoneticOverrideMap> {
     let mut map = HashMap::with_capacity(count);
 
     for _ in 0..count {
-        if cursor + 2 > bytes.len() { break; }
-        let latin_len = u16::from_le_bytes(bytes[cursor..cursor+2].try_into().ok()?) as usize;
+        if cursor + 2 > bytes.len() {
+            break;
+        }
+        let latin_len = u16::from_le_bytes(bytes[cursor..cursor + 2].try_into().ok()?) as usize;
         cursor += 2;
-        if cursor + latin_len > bytes.len() { break; }
-        let latin = std::str::from_utf8(&bytes[cursor..cursor+latin_len]).ok()?.to_string();
+        if cursor + latin_len > bytes.len() {
+            break;
+        }
+        let latin = std::str::from_utf8(&bytes[cursor..cursor + latin_len])
+            .ok()?
+            .to_string();
         cursor += latin_len;
 
-        if cursor + 2 > bytes.len() { break; }
-        let cand_count = u16::from_le_bytes(bytes[cursor..cursor+2].try_into().ok()?) as usize;
+        if cursor + 2 > bytes.len() {
+            break;
+        }
+        let cand_count = u16::from_le_bytes(bytes[cursor..cursor + 2].try_into().ok()?) as usize;
         cursor += 2;
 
         let mut cands = Vec::with_capacity(cand_count);
         for _ in 0..cand_count {
-            if cursor + 2 > bytes.len() { break; }
-            let bengali_len = u16::from_le_bytes(bytes[cursor..cursor+2].try_into().ok()?) as usize;
+            if cursor + 2 > bytes.len() {
+                break;
+            }
+            let bengali_len =
+                u16::from_le_bytes(bytes[cursor..cursor + 2].try_into().ok()?) as usize;
             cursor += 2;
-            if cursor + bengali_len > bytes.len() { break; }
-            let bengali = std::str::from_utf8(&bytes[cursor..cursor+bengali_len]).ok()?.to_string();
+            if cursor + bengali_len > bytes.len() {
+                break;
+            }
+            let bengali = std::str::from_utf8(&bytes[cursor..cursor + bengali_len])
+                .ok()?
+                .to_string();
             cursor += bengali_len;
 
-            if cursor + 4 > bytes.len() { break; }
-            let conf = f32::from_le_bytes(bytes[cursor..cursor+4].try_into().ok()?);
+            if cursor + 4 > bytes.len() {
+                break;
+            }
+            let conf = f32::from_le_bytes(bytes[cursor..cursor + 4].try_into().ok()?);
             cursor += 4;
             cands.push((bengali, conf));
         }
@@ -464,7 +483,8 @@ fn get_static_suffix() -> Arc<HashMap<String, String>> {
             for &(k, v) in CORE_SUFFIXES {
                 suffix.insert(k.to_string(), v.to_string());
             }
-            if let Ok(map) = serde_json::from_slice::<HashMap<String, String>>(EMBEDDED_SUFFIX_JSON) {
+            if let Ok(map) = serde_json::from_slice::<HashMap<String, String>>(EMBEDDED_SUFFIX_JSON)
+            {
                 suffix.extend(map);
             }
             Arc::new(suffix)
@@ -480,7 +500,9 @@ fn get_static_autocorrect() -> Arc<HashMap<String, String>> {
             for &(k, v) in CORE_AUTOCORRECT {
                 autocorrect.insert(k.to_string(), v.to_string());
             }
-            if let Ok(map) = serde_json::from_slice::<HashMap<String, String>>(EMBEDDED_AUTOCORRECT_JSON) {
+            if let Ok(map) =
+                serde_json::from_slice::<HashMap<String, String>>(EMBEDDED_AUTOCORRECT_JSON)
+            {
                 autocorrect.extend(map.into_iter().filter(|(k, v)| k != v));
             }
             Arc::new(autocorrect)
@@ -504,9 +526,7 @@ fn get_static_shorthand() -> Arc<HashMap<String, String>> {
 fn get_static_overrides() -> ZeroCopyOverrides {
     static STATIC_OVERRIDES: OnceLock<ZeroCopyOverrides> = OnceLock::new();
     STATIC_OVERRIDES
-        .get_or_init(|| {
-            ZeroCopyOverrides::from_static(EMBEDDED_OVERRIDES_BIN).unwrap_or_default()
-        })
+        .get_or_init(|| ZeroCopyOverrides::from_static(EMBEDDED_OVERRIDES_BIN).unwrap_or_default())
         .clone()
 }
 
@@ -586,7 +606,8 @@ impl PhoneticDatabase {
                     if let Some(entry) = self.lookup_override(stem) {
                         let mut list = Vec::with_capacity(entry.len());
                         for (stem_word, conf) in entry {
-                            let synthesized = super::morphology::apply_sandhi_join(stem_word, bengali_suf);
+                            let synthesized =
+                                super::morphology::apply_sandhi_join(stem_word, bengali_suf);
                             list.push((synthesized, conf * 0.98));
                         }
                         if !list.is_empty() {
@@ -602,7 +623,12 @@ impl PhoneticDatabase {
 
     /// Fast zero-copy prefix search on supervised phonetic overrides
     #[inline]
-    pub fn lookup_override_prefix(&self, prefix: &str, max_key_len: usize, limit: usize) -> Vec<(&str, OverrideEntry<'_>)> {
+    pub fn lookup_override_prefix(
+        &self,
+        prefix: &str,
+        max_key_len: usize,
+        limit: usize,
+    ) -> Vec<(&str, OverrideEntry<'_>)> {
         self.overrides.lookup_prefix(prefix, max_key_len, limit)
     }
 
@@ -665,8 +691,7 @@ impl PhoneticDatabase {
 
         if !loaded && dict_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&dict_path) {
-                if let Ok(raw_map) =
-                    serde_json::from_str::<HashMap<String, Vec<String>>>(&content)
+                if let Ok(raw_map) = serde_json::from_str::<HashMap<String, Vec<String>>>(&content)
                 {
                     let mut words = Vec::with_capacity(160000);
                     for (_k, v_list) in raw_map {
@@ -697,7 +722,8 @@ impl PhoneticDatabase {
         if ac_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&ac_path) {
                 if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
-                    Arc::make_mut(&mut self.autocorrect).extend(map.into_iter().filter(|(k, v)| k != v));
+                    Arc::make_mut(&mut self.autocorrect)
+                        .extend(map.into_iter().filter(|(k, v)| k != v));
                 }
             }
         }
@@ -713,7 +739,9 @@ impl PhoneticDatabase {
             let pov_json_path = dir.join("phonetic_overrides.json");
             if pov_json_path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&pov_json_path) {
-                    if let Ok(map) = serde_json::from_str::<HashMap<String, Vec<(String, f32)>>>(&content) {
+                    if let Ok(map) =
+                        serde_json::from_str::<HashMap<String, Vec<(String, f32)>>>(&content)
+                    {
                         self.overrides = ZeroCopyOverrides::from_hashbrown_map(&map);
                     }
                 }
@@ -1258,7 +1286,11 @@ impl PhoneticDatabase {
         self.get_autocorrect_raw_filtered(term, true)
     }
 
-    pub fn get_autocorrect_raw_filtered(&self, term: &str, include_shorthand: bool) -> Option<String> {
+    pub fn get_autocorrect_raw_filtered(
+        &self,
+        term: &str,
+        include_shorthand: bool,
+    ) -> Option<String> {
         let lower = term.to_lowercase();
         if let Ok(uac) = self.user_autocorrect.read() {
             if let Some(correct) = uac.get(term) {

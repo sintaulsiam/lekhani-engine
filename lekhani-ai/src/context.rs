@@ -140,10 +140,7 @@ impl PersonalScoreOverlay {
 #[inline]
 pub fn truncate_at_sentence_boundary<'a>(context: &'a [&'a str]) -> &'a [&'a str] {
     for (idx, token) in context.iter().enumerate().rev() {
-        if token.contains('।')
-            || token.contains('?')
-            || token.contains('!')
-            || token.contains('\n')
+        if token.contains('।') || token.contains('?') || token.contains('!') || token.contains('\n')
         {
             return &context[idx + 1..];
         }
@@ -263,7 +260,8 @@ impl ContextScorer {
         right_word: Option<&str>,
         candidates: &mut [String],
     ) {
-        let _ = self.rank_candidates_in_place_bidirectional_with_scores(context, right_word, candidates);
+        let _ = self
+            .rank_candidates_in_place_bidirectional_with_scores(context, right_word, candidates);
     }
 
     /// Bi-directional zero-allocation candidate ranking returning scores array.
@@ -329,7 +327,8 @@ impl ContextScorer {
             };
             let personal_boost = self.personal_overlay.boost_for(cand);
             let grammar_boost = compute_honorific_agreement_boost(prev2, prev1, cand);
-            let anvaya_boost = crate::anvaya::AnvayaAgreementEngine::compute_agreement_score(&anvaya_state, cand);
+            let anvaya_boost =
+                crate::anvaya::AnvayaAgreementEngine::compute_agreement_score(&anvaya_state, cand);
             let register_boost = compute_register_calibration_boost(register_momentum, cand);
             let right_boost = if let Some(next) = clean_next {
                 // Score transition from candidate to following word: P(next | cand)
@@ -348,7 +347,14 @@ impl ContextScorer {
                 (None, None) => 0.0,
             };
             let position_penalty = i as f32 * 0.05;
-            scores[i] = lm_score + personal_boost + grammar_boost + anvaya_boost + register_boost + right_boost + semantic_boost - position_penalty;
+            scores[i] = lm_score
+                + personal_boost
+                + grammar_boost
+                + anvaya_boost
+                + register_boost
+                + right_boost
+                + semantic_boost
+                - position_penalty;
         }
 
         let initial_primary_score = scores[0];
@@ -415,7 +421,9 @@ impl ContextScorer {
             0
         };
 
-        let score = self.lm.score_candidate_fourgram(prev3, prev2, prev1, candidate);
+        let score = self
+            .lm
+            .score_candidate_fourgram(prev3, prev2, prev1, candidate);
         if score > -1.0 {
             1000 + personal_boost + sem_boost
         } else if score > -2.0 {
@@ -489,29 +497,98 @@ pub fn word_register_bias(word: &str) -> f32 {
 
     // High-confidence formal lexical markers
     match clean {
-        "আপনি" | "আপনারা" | "আপনার" | "আপনাদের" | "তিনি" | "তাঁরা" | "তাঁর" | "তাঁদের"
-        | "জনাব" | "মহোদয়" | "মহোদয়া" | "সম্মানিত" | "বিনীত" | "নিবেদন" | "আবেদন"
-        | "দয়া" | "অনুগ্রহ" | "উপস্থিত" | "কর্তৃপক্ষ" | "প্রতিবেদন" | "মাননীয়" | "উপদেষ্টা"
-        | "অধ্যাপক" | "তদন্ত" | "প্রশাসন" | "অধিবেশন" | "উপাচার্য" | "সচিব" | "বিচারক"
-        | "আদালত" | "বিজ্ঞপ্তি" | "নীতিমালা" | "কার্যক্রম" | "বক্তব্য" | "সিদ্ধান্ত"
-        | "মন্ত্রণালয়" | "পরিচালক" | "কর্মকর্তা" | "ব্যবস্থাপনা" | "অধীন" => return 0.85,
+        "আপনি"
+        | "আপনারা"
+        | "আপনার"
+        | "আপনাদের"
+        | "তিনি"
+        | "তাঁরা"
+        | "তাঁর"
+        | "তাঁদের"
+        | "জনাব"
+        | "মহোদয়"
+        | "মহোদয়া"
+        | "সম্মানিত"
+        | "বিনীত"
+        | "নিবেদন"
+        | "আবেদন"
+        | "দয়া"
+        | "অনুগ্রহ"
+        | "উপস্থিত"
+        | "কর্তৃপক্ষ"
+        | "প্রতিবেদন"
+        | "মাননীয়"
+        | "উপদেষ্টা"
+        | "অধ্যাপক"
+        | "তদন্ত"
+        | "প্রশাসন"
+        | "অধিবেশন"
+        | "উপাচার্য"
+        | "সচিব"
+        | "বিচারক"
+        | "আদালত"
+        | "বিজ্ঞপ্তি"
+        | "নীতিমালা"
+        | "কার্যক্রম"
+        | "বক্তব্য"
+        | "সিদ্ধান্ত"
+        | "মন্ত্রণালয়"
+        | "পরিচালক"
+        | "কর্মকর্তা"
+        | "ব্যবস্থাপনা"
+        | "অধীন" => return 0.85,
         _ => {}
     }
 
     // High-confidence colloquial / chat / intimate lexical markers
     match clean {
-        "তুই" | "তোরা" | "তোর" | "তোদের" | "দোস্ত" | "মামা" | "ব্রো" | "ভাইয়া" | "ভাই"
-        | "চিল" | "প্যারা" | "সেরা" | "সেইরকম" | "কিরে" | "রে" | "নাহ" | "ধুর" | "আরে"
-        | "পুলাপাইন" | "বট" | "জোশ" | "লল" | "খাইসি" | "গেসি" | "করসি" | "আসতেসি"
-        | "যাইতেসি" | "পারুম" | "যামু" | "করুম" => return -0.85,
+        "তুই"
+        | "তোরা"
+        | "তোর"
+        | "তোদের"
+        | "দোস্ত"
+        | "মামা"
+        | "ব্রো"
+        | "ভাইয়া"
+        | "ভাই"
+        | "চিল"
+        | "প্যারা"
+        | "সেরা"
+        | "সেইরকম"
+        | "কিরে"
+        | "রে"
+        | "নাহ"
+        | "ধুর"
+        | "আরে"
+        | "পুলাপাইন"
+        | "বট"
+        | "জোশ"
+        | "লল"
+        | "খাইসি"
+        | "গেসি"
+        | "করসি"
+        | "আসতেসি"
+        | "যাইতেসি"
+        | "পারুম"
+        | "যামু"
+        | "করুম" => return -0.85,
         _ => {}
     }
 
     // Suffix-based register analysis for verbs
-    if clean.ends_with("বেন") || clean.ends_with("লেন") || clean.ends_with("তেন") || clean.ends_with("ছেন") {
+    if clean.ends_with("বেন")
+        || clean.ends_with("লেন")
+        || clean.ends_with("তেন")
+        || clean.ends_with("ছেন")
+    {
         return 0.45;
     }
-    if clean.ends_with("বা") || clean.ends_with("বি") || clean.ends_with("িস") || clean.ends_with("ছিস") || clean == "হলো" {
+    if clean.ends_with("বা")
+        || clean.ends_with("বি")
+        || clean.ends_with("িস")
+        || clean.ends_with("ছিস")
+        || clean == "হলো"
+    {
         return -0.45;
     }
 
@@ -541,7 +618,11 @@ pub fn compute_register_calibration_boost(momentum: f32, cand: &str) -> f32 {
 /// Ensures formal pronouns (e.g. আপনি) boost formal verb endings (e.g. করবেন, আছেন)
 /// and penalize familiar/intimate inflections (e.g. করবে, করবি).
 #[inline]
-pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str>, cand: &str) -> f32 {
+pub fn compute_honorific_agreement_boost(
+    prev2: Option<&str>,
+    prev1: Option<&str>,
+    cand: &str,
+) -> f32 {
     let mut boost = 0.0;
 
     // ── 1. Syntactic Postposition Concordance: Genitive + মতো vs মত ───────────
@@ -559,8 +640,21 @@ pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str
 
         // ── 2. Interrogative Wh-Head vs Polar Question: কী vs কি ─────────────
         const WH_INQUIRY_HEADS: &[&str] = &[
-            "নাম", "কারণ", "কথা", "বিষয়", "অবস্থা", "খবর", "সমস্যা",
-            "উদ্দেশ্য", "অর্থ", "মানে", "ধরনের", "রকম", "জানি", "হলো", "হল",
+            "নাম",
+            "কারণ",
+            "কথা",
+            "বিষয়",
+            "অবস্থা",
+            "খবর",
+            "সমস্যা",
+            "উদ্দেশ্য",
+            "অর্থ",
+            "মানে",
+            "ধরনের",
+            "রকম",
+            "জানি",
+            "হলো",
+            "হল",
         ];
         if WH_INQUIRY_HEADS.contains(&p1) {
             if cand == "কী" {
@@ -568,7 +662,21 @@ pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str
             } else if cand == "কি" {
                 boost -= 2.5;
             }
-        } else if matches!(p1, "তুমি" | "তোমরা" | "আপনি" | "আপনারা" | "তুই" | "তোরা" | "সে" | "তারা" | "হবে" | "যাবে" | "আছে" | "নাকি") {
+        } else if matches!(
+            p1,
+            "তুমি"
+                | "তোমরা"
+                | "আপনি"
+                | "আপনারা"
+                | "তুই"
+                | "তোরা"
+                | "সে"
+                | "তারা"
+                | "হবে"
+                | "যাবে"
+                | "আছে"
+                | "নাকি"
+        ) {
             if cand == "কি" {
                 boost += 3.0;
             } else if cand == "কী" {
@@ -578,7 +686,16 @@ pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str
 
         // ── 3. Colloquial Discourse Status: হলো vs হল ────────────────────────
         const COLLOQUIAL_STATUS_HEADS: &[&str] = &[
-            "কী", "দেরি", "শুরু", "শেষ", "দেখা", "কথা", "ভালো", "খারাপ", "কেমন", "কখন",
+            "কী",
+            "দেরি",
+            "শুরু",
+            "শেষ",
+            "দেখা",
+            "কথা",
+            "ভালো",
+            "খারাপ",
+            "কেমন",
+            "কখন",
         ];
         if COLLOQUIAL_STATUS_HEADS.contains(&p1) && cand == "হলো" {
             boost += 2.5;
@@ -598,14 +715,22 @@ pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str
     let subject = match (prev1, prev2) {
         (Some("আমি" | "আমরা" | "মোরা" | "মুই"), _) => Some(0), // 1st Person
         (_, Some("আমি" | "আমরা" | "মোরা" | "মুই")) => Some(0),
-        (Some("আপনি" | "আপনারা" | "তিনি" | "তাঁরা"), _) => Some(1), // 2nd/3rd Formal
-        (_, Some("আপনি" | "আপনারা" | "তিনি" | "তাঁরা")) => Some(1),
+        (Some("আপনি" | "আপনারা" | "তিনি" | "তাঁরা"), _) => {
+            Some(1)
+        } // 2nd/3rd Formal
+        (_, Some("আপনি" | "আপনারা" | "তিনি" | "তাঁরা")) => {
+            Some(1)
+        }
         (Some("তুমি" | "তোমরা"), _) => Some(2), // 2nd Familiar
         (_, Some("তুমি" | "তোমরা")) => Some(2),
         (Some("তুই" | "তোরা"), _) => Some(3), // 2nd Intimate
         (_, Some("তুই" | "তোরা")) => Some(3),
-        (Some("সে" | "তারা" | "ও" | "ওরা" | "যে" | "যারা"), _) => Some(4), // 3rd Ordinary
-        (_, Some("সে" | "তারা" | "ও" | "ওরা" | "যে" | "যারা")) => Some(4),
+        (Some("সে" | "তারা" | "ও" | "ওরা" | "যে" | "যারা"), _) => {
+            Some(4)
+        } // 3rd Ordinary
+        (_, Some("সে" | "তারা" | "ও" | "ওরা" | "যে" | "যারা")) => {
+            Some(4)
+        }
         _ => None,
     };
 
@@ -658,7 +783,11 @@ pub fn compute_honorific_agreement_boost(prev2: Option<&str>, prev1: Option<&str
             if is_p1_verb {
                 boost += 3.5;
             }
-            if is_p2_formal_verb || is_p2_intimate_verb || cand.ends_with("বে") || cand.ends_with("েন") {
+            if is_p2_formal_verb
+                || is_p2_intimate_verb
+                || cand.ends_with("বে")
+                || cand.ends_with("েন")
+            {
                 boost -= 4.5;
             }
         }
@@ -776,7 +905,11 @@ mod tests {
         let scorer = ContextScorer::new();
         let mut candidates = vec!["পড়া".to_string(), "পরা".to_string()];
         // With right context "হচ্ছে", bigram "পড়া হচ্ছে" is much more plausible than "পরা হচ্ছে"
-        scorer.rank_candidates_in_place_bidirectional(&["একটি", "বই"], Some("হচ্ছে"), &mut candidates);
+        scorer.rank_candidates_in_place_bidirectional(
+            &["একটি", "বই"],
+            Some("হচ্ছে"),
+            &mut candidates,
+        );
         assert_eq!(candidates[0], "পড়া");
     }
 
@@ -831,12 +964,22 @@ mod tests {
         // In context of "বই", "পড়া" (reading) gets higher homophone boost than "পরা" (wearing)
         let boost_reading = scorer.score_homophone_boost(&["বই"], "পড়া");
         let boost_wearing = scorer.score_homophone_boost(&["বই"], "পরা");
-        assert!(boost_reading > boost_wearing, "Expected reading boost {} > wearing boost {}", boost_reading, boost_wearing);
+        assert!(
+            boost_reading > boost_wearing,
+            "Expected reading boost {} > wearing boost {}",
+            boost_reading,
+            boost_wearing
+        );
 
         // In context of "শার্ট", "পরা" (wearing) gets higher homophone boost than "পড়া" (reading)
         let boost_shirt_wearing = scorer.score_homophone_boost(&["শার্ট"], "পরা");
         let boost_shirt_reading = scorer.score_homophone_boost(&["শার্ট"], "পড়া");
-        assert!(boost_shirt_wearing > boost_shirt_reading, "Expected shirt wearing boost {} > reading boost {}", boost_shirt_wearing, boost_shirt_reading);
+        assert!(
+            boost_shirt_wearing > boost_shirt_reading,
+            "Expected shirt wearing boost {} > reading boost {}",
+            boost_shirt_wearing,
+            boost_shirt_reading
+        );
     }
 
     #[test]
@@ -844,12 +987,20 @@ mod tests {
         // Chat register context
         let chat_ctx = &["কিরে", "দোস্ত", "প্যারা", "নাই"];
         let chat_momentum = compute_register_momentum(chat_ctx);
-        assert!(chat_momentum < -0.2, "Expected negative chat momentum, got {}", chat_momentum);
+        assert!(
+            chat_momentum < -0.2,
+            "Expected negative chat momentum, got {}",
+            chat_momentum
+        );
 
         // Formal register context
         let formal_ctx = &["জনাব", "মহোদয়", "বিনীত", "নিবেদন"];
         let formal_momentum = compute_register_momentum(formal_ctx);
-        assert!(formal_momentum > 0.2, "Expected positive formal momentum, got {}", formal_momentum);
+        assert!(
+            formal_momentum > 0.2,
+            "Expected positive formal momentum, got {}",
+            formal_momentum
+        );
 
         let scorer = ContextScorer::new();
         let candidates = vec!["করবেন".to_string(), "করবা".to_string()];
@@ -873,11 +1024,17 @@ mod tests {
         // With neutral context "একটি", when initial primary is "পরা", deadband keeps "পরা" #0
         let mut cands = vec!["পরা".to_string(), "পড়া".to_string()];
         scorer.rank_candidates_in_place_bidirectional(&["একটি"], None, &mut cands);
-        assert_eq!(cands[0], "পরা", "Neutral context should preserve literal primary 'পরা'");
+        assert_eq!(
+            cands[0], "পরা",
+            "Neutral context should preserve literal primary 'পরা'"
+        );
 
         // With explicit reading context "বই", "পড়া" overrides "পরা"
         let mut book_cands = vec!["পরা".to_string(), "পড়া".to_string()];
         scorer.rank_candidates_in_place_bidirectional(&["বই"], None, &mut book_cands);
-        assert_eq!(book_cands[0], "পড়া", "Explicit context 'বই' must override to 'পড়া'");
+        assert_eq!(
+            book_cands[0], "পড়া",
+            "Explicit context 'বই' must override to 'পড়া'"
+        );
     }
 }

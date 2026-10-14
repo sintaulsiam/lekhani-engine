@@ -160,41 +160,141 @@ pub fn transform_avro_strict(bn_word: &str) -> String {
 
         // 2. Modifiers (Terminal diacritics - never take inherent vowels)
         match c {
-            'ং' => { out.push_str("ng"); i += 1; continue; }
-            'ঃ' => { out.push(':'); i += 1; continue; }
-            'ঁ' => { out.push('^'); i += 1; continue; }
-            'ৎ' => { out.push_str("t``"); i += 1; continue; }
+            'ং' => {
+                out.push_str("ng");
+                i += 1;
+                continue;
+            }
+            'ঃ' => {
+                out.push(':');
+                i += 1;
+                continue;
+            }
+            'ঁ' => {
+                out.push('^');
+                i += 1;
+                continue;
+            }
+            'ৎ' => {
+                out.push_str("t``");
+                i += 1;
+                continue;
+            }
             _ => {}
         }
 
         // 3. Independent Vowels
         match c {
-            'অ' => { out.push('o'); i += 1; continue; }
-            'আ' => { out.push('a'); i += 1; continue; }
-            'ই' => { out.push('i'); i += 1; continue; }
-            'ঈ' => { out.push('I'); i += 1; continue; }
-            'উ' => { out.push('u'); i += 1; continue; }
-            'ঊ' => { out.push('U'); i += 1; continue; }
-            'ঋ' => { out.push_str("rri"); i += 1; continue; }
-            'এ' => { out.push('e'); i += 1; continue; }
-            'ঐ' => { out.push_str("oi"); i += 1; continue; }
-            'ও' => { out.push('O'); i += 1; continue; }
-            'ঔ' => { out.push_str("ou"); i += 1; continue; }
+            'অ' => {
+                out.push('o');
+                i += 1;
+                continue;
+            }
+            'আ' => {
+                out.push('a');
+                i += 1;
+                continue;
+            }
+            'ই' => {
+                out.push('i');
+                i += 1;
+                continue;
+            }
+            'ঈ' => {
+                out.push('I');
+                i += 1;
+                continue;
+            }
+            'উ' => {
+                out.push('u');
+                i += 1;
+                continue;
+            }
+            'ঊ' => {
+                out.push('U');
+                i += 1;
+                continue;
+            }
+            'ঋ' => {
+                out.push_str("rri");
+                i += 1;
+                continue;
+            }
+            'এ' => {
+                out.push('e');
+                i += 1;
+                continue;
+            }
+            'ঐ' => {
+                out.push_str("oi");
+                i += 1;
+                continue;
+            }
+            'ও' => {
+                out.push('O');
+                i += 1;
+                continue;
+            }
+            'ঔ' => {
+                out.push_str("ou");
+                i += 1;
+                continue;
+            }
             _ => {}
         }
 
         // 4. Dependent Vowel Signs (Kars)
         match c {
-            'া' => { out.push('a'); i += 1; continue; }
-            'ি' => { out.push('i'); i += 1; continue; }
-            'ী' => { out.push('I'); i += 1; continue; }
-            'ু' => { out.push('u'); i += 1; continue; }
-            'ূ' => { out.push('U'); i += 1; continue; }
-            'ৃ' => { out.push_str("rri"); i += 1; continue; }
-            'ে' => { out.push('e'); i += 1; continue; }
-            'ৈ' => { out.push_str("oi"); i += 1; continue; }
-            'ো' => { out.push('O'); i += 1; continue; }
-            'ৌ' => { out.push_str("ou"); i += 1; continue; }
+            'া' => {
+                out.push('a');
+                i += 1;
+                continue;
+            }
+            'ি' => {
+                out.push('i');
+                i += 1;
+                continue;
+            }
+            'ী' => {
+                out.push('I');
+                i += 1;
+                continue;
+            }
+            'ু' => {
+                out.push('u');
+                i += 1;
+                continue;
+            }
+            'ূ' => {
+                out.push('U');
+                i += 1;
+                continue;
+            }
+            'ৃ' => {
+                out.push_str("rri");
+                i += 1;
+                continue;
+            }
+            'ে' => {
+                out.push('e');
+                i += 1;
+                continue;
+            }
+            'ৈ' => {
+                out.push_str("oi");
+                i += 1;
+                continue;
+            }
+            'ো' => {
+                out.push('O');
+                i += 1;
+                continue;
+            }
+            'ৌ' => {
+                out.push_str("ou");
+                i += 1;
+                continue;
+            }
             _ => {}
         }
 

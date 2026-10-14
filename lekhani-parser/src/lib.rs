@@ -84,16 +84,22 @@ pub fn has_explicit_avro_intent(input: &str) -> bool {
             b'.' if i + 1 < len && bytes[i + 1] == b'.' => return true,
             b',' if i + 1 < len && bytes[i + 1] == b',' => return true,
             // Invariant Avro vowel digraph: 'rri' -> ঋ / ৃ (e.g. rritu -> ঋতু, krrishi -> কৃষি)
-            b'r' | b'R' if i + 2 < len
-                && (bytes[i + 1] == b'r' || bytes[i + 1] == b'R')
-                && (bytes[i + 2] == b'i' || bytes[i + 2] == b'I') => return true,
+            b'r' | b'R'
+                if i + 2 < len
+                    && (bytes[i + 1] == b'r' || bytes[i + 1] == b'R')
+                    && (bytes[i + 2] == b'i' || bytes[i + 2] == b'I') =>
+            {
+                return true
+            }
             // Lowercase ASCII characters prove the token is not an all-caps acronym or shout-typing
             b'a'..=b'z' => {
                 has_lower = true;
             }
             // Grammatical Avro uppercase characters mid-word (non-initial to preserve sentence-initial TitleCase):
             // O (ো), I (ঈ), U (ঊ), D (ড), G (জ্ঞ/ঘ), J (য), N (ণ), R (ড়), S (ষ), T (ট), Y (য়), Z (য)
-            b'O' | b'I' | b'U' | b'D' | b'G' | b'J' | b'N' | b'R' | b'S' | b'T' | b'Y' | b'Z' if i > 0 => {
+            b'O' | b'I' | b'U' | b'D' | b'G' | b'J' | b'N' | b'R' | b'S' | b'T' | b'Y' | b'Z'
+                if i > 0 =>
+            {
                 has_mid_avro_upper = true;
             }
             _ => {}

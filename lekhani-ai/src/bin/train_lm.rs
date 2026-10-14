@@ -51,7 +51,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    println!("[*] Training language model from {} corpus file(s)...", corpus_paths.len());
+    println!(
+        "[*] Training language model from {} corpus file(s)...",
+        corpus_paths.len()
+    );
     for p in &corpus_paths {
         println!("    - {}", p.display());
     }

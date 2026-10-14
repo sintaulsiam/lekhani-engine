@@ -649,16 +649,37 @@ mod tests {
 
     #[test]
     fn test_aspectual_compound_verbal_decomposition() {
-        assert_eq!(decompose_verbal_form("koredesi"), Some("করে দিয়েছি".to_string()));
-        assert_eq!(decompose_verbal_form("koredilam"), Some("করে দিলাম".to_string()));
-        assert_eq!(decompose_verbal_form("eshegesi"), Some("এসে গেছি".to_string()));
-        assert_eq!(decompose_verbal_form("cholejabo"), Some("চলে যাব".to_string()));
-        assert_eq!(decompose_verbal_form("bolefelse"), Some("বলে ফেলেছে".to_string()));
+        assert_eq!(
+            decompose_verbal_form("koredesi"),
+            Some("করে দিয়েছি".to_string())
+        );
+        assert_eq!(
+            decompose_verbal_form("koredilam"),
+            Some("করে দিলাম".to_string())
+        );
+        assert_eq!(
+            decompose_verbal_form("eshegesi"),
+            Some("এসে গেছি".to_string())
+        );
+        assert_eq!(
+            decompose_verbal_form("cholejabo"),
+            Some("চলে যাব".to_string())
+        );
+        assert_eq!(
+            decompose_verbal_form("bolefelse"),
+            Some("বলে ফেলেছে".to_string())
+        );
     }
 
     #[test]
     fn test_connective_inflected_verbal_decomposition() {
-        assert_eq!(decompose_verbal_form("koresilam"), Some("করেছিলাম".to_string()));
-        assert_eq!(decompose_verbal_form("dekhesilam"), Some("দেখেছিলাম".to_string()));
+        assert_eq!(
+            decompose_verbal_form("koresilam"),
+            Some("করেছিলাম".to_string())
+        );
+        assert_eq!(
+            decompose_verbal_form("dekhesilam"),
+            Some("দেখেছিলাম".to_string())
+        );
     }
 }

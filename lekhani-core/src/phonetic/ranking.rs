@@ -168,19 +168,25 @@ impl RankWeights {
     /// Safe online perceptron update. Only adaptive weights are modified.
     pub fn update_online(&mut self, chosen: &RankFeatures, rejected: &RankFeatures, eta: f32) {
         let lr = eta.clamp(5.0, 50.0);
-        self.normalized_freq = (self.normalized_freq + lr * (chosen.normalized_freq - rejected.normalized_freq))
+        self.normalized_freq = (self.normalized_freq
+            + lr * (chosen.normalized_freq - rejected.normalized_freq))
             .clamp(1000.0, 4000.0);
-        self.lm_score = (self.lm_score + lr * (chosen.lm_score - rejected.lm_score))
-            .clamp(2500.0, 8000.0);
-        self.phonetic_similarity = (self.phonetic_similarity + lr * (chosen.phonetic_similarity - rejected.phonetic_similarity))
+        self.lm_score =
+            (self.lm_score + lr * (chosen.lm_score - rejected.lm_score)).clamp(2500.0, 8000.0);
+        self.phonetic_similarity = (self.phonetic_similarity
+            + lr * (chosen.phonetic_similarity - rejected.phonetic_similarity))
             .clamp(100.0, 600.0);
-        self.length_penalty = (self.length_penalty + lr * (chosen.length_penalty - rejected.length_penalty))
+        self.length_penalty = (self.length_penalty
+            + lr * (chosen.length_penalty - rejected.length_penalty))
             .clamp(200.0, 800.0);
-        self.user_bigram_prob = (self.user_bigram_prob + lr * (chosen.user_bigram_prob - rejected.user_bigram_prob))
+        self.user_bigram_prob = (self.user_bigram_prob
+            + lr * (chosen.user_bigram_prob - rejected.user_bigram_prob))
             .clamp(1500.0, 6000.0);
-        self.context_lm_score = (self.context_lm_score + lr * (chosen.context_lm_score - rejected.context_lm_score))
+        self.context_lm_score = (self.context_lm_score
+            + lr * (chosen.context_lm_score - rejected.context_lm_score))
             .clamp(500.0, 4000.0);
-        self.gru_log_prob = (self.gru_log_prob + lr * (chosen.gru_log_prob - rejected.gru_log_prob))
+        self.gru_log_prob = (self.gru_log_prob
+            + lr * (chosen.gru_log_prob - rejected.gru_log_prob))
             .clamp(200.0, 3000.0);
     }
 }
@@ -214,8 +220,12 @@ pub fn grapheme_edit_distance(a: &str, b: &str) -> usize {
         lb += 1;
     }
 
-    if la == 0 { return lb; }
-    if lb == 0 { return la; }
+    if la == 0 {
+        return lb;
+    }
+    if lb == 0 {
+        return la;
+    }
 
     // Fast path: stack allocation for typical words <= 32 graphemes (zero heap allocation)
     if la <= STACK_LIMIT && lb <= STACK_LIMIT {
@@ -371,7 +381,8 @@ pub fn extract_candidate_features(
             f.phonetic_similarity = -((dist.min(3)) as f32);
         } else {
             f.phonetic_similarity = -(dist as f32);
-            let len_diff = (cand.text.chars().count() as isize - ctx.phonetic.chars().count() as isize)
+            let len_diff = (cand.text.chars().count() as isize
+                - ctx.phonetic.chars().count() as isize)
                 .abs() as f32;
             f.length_penalty = -len_diff;
 
@@ -391,7 +402,10 @@ pub fn extract_candidate_features(
                 } else if ctx.middle.chars().count() <= 2 && dist > 0 {
                     f.intent_modifier_boost -= 0.67;
                 }
-                if ctx.lm_score.is_some_and(|s| s > -1.5) && !ctx.has_explicit_casing && !ctx.has_backtick {
+                if ctx.lm_score.is_some_and(|s| s > -1.5)
+                    && !ctx.has_explicit_casing
+                    && !ctx.has_backtick
+                {
                     f.is_exact_phonetic = 0.9;
                 }
             }
@@ -416,7 +430,12 @@ pub fn extract_candidate_features(
                         || (s == "ো"
                             && matches!(
                                 t.as_str(),
-                                "এখনো" | "তখনো" | "কখনো" | "এমনো" | "কোনো" | "যখনো"
+                                "এখনো"
+                                    | "তখনো"
+                                    | "কখনো"
+                                    | "এমনো"
+                                    | "কোনো"
+                                    | "যখনো"
                             ))
                 })
             })
@@ -426,11 +445,15 @@ pub fn extract_candidate_features(
     }
 
     if ctx.has_clitic_i_candidate {
-        let is_valid_clitic = cand.text.ends_with('ই')
-            && (ctx.primary == ctx.phonetic || cand.text == ctx.primary);
+        let is_valid_clitic =
+            cand.text.ends_with('ই') && (ctx.primary == ctx.phonetic || cand.text == ctx.primary);
         if is_valid_clitic {
             f.clitic_alignment = 1.0;
-        } else if ctx.clitic_i_targets.iter().any(|t| t.strip_prefix(&cand.text) == Some("ই")) {
+        } else if ctx
+            .clitic_i_targets
+            .iter()
+            .any(|t| t.strip_prefix(&cand.text) == Some("ই"))
+        {
             f.clitic_alignment = -0.85;
         }
     }
@@ -479,7 +502,11 @@ pub fn extract_candidate_features(
 
     // 7f. Colloquial verbal form detection
     if is_colloquial_verbal_form(&cand.text) {
-        f.is_colloquial = if ctx.is_casual_register_context { 2.0 } else { 1.0 };
+        f.is_colloquial = if ctx.is_casual_register_context {
+            2.0
+        } else {
+            1.0
+        };
     }
 
     // 7g. Sentence-initial
@@ -499,9 +526,28 @@ pub fn extract_candidate_features(
 #[inline]
 fn count_suffix_depth(text: &str) -> usize {
     const SUFFIX_MARKERS: &[&str] = &[
-        "গুলোর", "গুলোকে", "গুলো", "দেরকে", "দের",
-        "টিকে", "টাকে", "টির", "টার", "টিতে", "টাতে", "টি", "টা",
-        "তেও", "রাও", "রা", "ের", "এর", "কে", "তে", "ও", "ই",
+        "গুলোর",
+        "গুলোকে",
+        "গুলো",
+        "দেরকে",
+        "দের",
+        "টিকে",
+        "টাকে",
+        "টির",
+        "টার",
+        "টিতে",
+        "টাতে",
+        "টি",
+        "টা",
+        "তেও",
+        "রাও",
+        "রা",
+        "ের",
+        "এর",
+        "কে",
+        "তে",
+        "ও",
+        "ই",
     ];
     let mut depth = 0usize;
     for &sfx in SUFFIX_MARKERS {
@@ -509,7 +555,10 @@ fn count_suffix_depth(text: &str) -> usize {
             depth += 1;
             if let Some(stem) = text.strip_suffix(sfx) {
                 for &sfx2 in SUFFIX_MARKERS {
-                    if stem.ends_with(sfx2) { depth += 1; break; }
+                    if stem.ends_with(sfx2) {
+                        depth += 1;
+                        break;
+                    }
                 }
             }
             break;
@@ -522,20 +571,37 @@ fn count_suffix_depth(text: &str) -> usize {
 #[inline]
 pub fn is_colloquial_verbal_form(text: &str) -> bool {
     const COLLOQUIAL_ENDINGS: &[&str] = &[
-        "চ্ছিলাম", "চ্ছিলে", "চ্ছিল",
-        "চ্ছি", "চ্ছে",
-        "ছিলাম", "ছিলে", "ছিল",
-        "বো", "বে", "বেন",
+        "চ্ছিলাম",
+        "চ্ছিলে",
+        "চ্ছিল",
+        "চ্ছি",
+        "চ্ছে",
+        "ছিলাম",
+        "ছিলে",
+        "ছিল",
+        "বো",
+        "বে",
+        "বেন",
         // Informal SMS / Dialectal inflections
-        "সি", "সিলাম", "সিলে", "সিলো", "সেন",
+        "সি",
+        "সিলাম",
+        "সিলে",
+        "সিলো",
+        "সেন",
         "সে",
-        "মু", "ম্নে",
-        "তেসি", "তেসো", "তেসে", "তেসেন",
-        "তাসি", "তাসো", "তাসে", "তাসেন",
+        "মু",
+        "ম্নে",
+        "তেসি",
+        "তেসো",
+        "তেসে",
+        "তেসেন",
+        "তাসি",
+        "তাসো",
+        "তাসে",
+        "তাসেন",
     ];
     COLLOQUIAL_ENDINGS.iter().any(|&e| text.ends_with(e))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -567,8 +633,16 @@ mod tests {
     #[test]
     fn test_perceptron_online_update_and_clamping() {
         let mut weights = RankWeights::default();
-        let chosen = RankFeatures { lm_score: 1.0, user_bigram_prob: 1.0, ..Default::default() };
-        let rejected = RankFeatures { lm_score: 0.2, user_bigram_prob: 0.0, ..Default::default() };
+        let chosen = RankFeatures {
+            lm_score: 1.0,
+            user_bigram_prob: 1.0,
+            ..Default::default()
+        };
+        let rejected = RankFeatures {
+            lm_score: 0.2,
+            user_bigram_prob: 0.0,
+            ..Default::default()
+        };
         let initial_lm = weights.lm_score;
         weights.update_online(&chosen, &rejected, 35.0);
         assert!(weights.lm_score > initial_lm);
@@ -670,14 +744,31 @@ mod tests {
     fn test_named_entity_sentinel() {
         let targets = Vec::new();
         let ctx = CandidateContext {
-            phonetic: "dhaka", primary: "ঢাকা", middle: "dhaka", term: "dhaka",
-            has_dominant_homophone: false, has_explicit_intent: false, has_explicit_casing: false, has_backtick: false,
-            has_explicit_rri_digraph: false, is_atomic_syllable: false, is_primary_in_dict: true,
-            is_short_token: false, has_clitic_o_candidate: false, has_clitic_i_candidate: false,
-            clitic_o_targets: &targets, clitic_i_targets: &targets, lm_score: None,
-            user_bigram_boost: 0, is_user_favored: false, is_user_learned: false,
-            context_lm_score: None, gru_log_prob: None, neural_alpha: 0.1,
-            is_sentence_initial: true, is_formal_register_context: false,
+            phonetic: "dhaka",
+            primary: "ঢাকা",
+            middle: "dhaka",
+            term: "dhaka",
+            has_dominant_homophone: false,
+            has_explicit_intent: false,
+            has_explicit_casing: false,
+            has_backtick: false,
+            has_explicit_rri_digraph: false,
+            is_atomic_syllable: false,
+            is_primary_in_dict: true,
+            is_short_token: false,
+            has_clitic_o_candidate: false,
+            has_clitic_i_candidate: false,
+            clitic_o_targets: &targets,
+            clitic_i_targets: &targets,
+            lm_score: None,
+            user_bigram_boost: 0,
+            is_user_favored: false,
+            is_user_learned: false,
+            context_lm_score: None,
+            gru_log_prob: None,
+            neural_alpha: 0.1,
+            is_sentence_initial: true,
+            is_formal_register_context: false,
             is_casual_register_context: false,
         };
         let cand = CandidateHypothesis {
@@ -699,7 +790,7 @@ mod tests {
     #[test]
     fn test_colloquial_verbal_form_detection() {
         assert!(is_colloquial_verbal_form("যাচ্ছি"));
-        assert!(is_colloquial_verbal_form("করছিলাম"));  // ছিলাম
+        assert!(is_colloquial_verbal_form("করছিলাম")); // ছিলাম
         assert!(!is_colloquial_verbal_form("করেছে"));
         assert!(is_colloquial_verbal_form("যাবো"));
     }

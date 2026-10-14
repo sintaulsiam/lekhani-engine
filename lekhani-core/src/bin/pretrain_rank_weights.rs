@@ -5,7 +5,9 @@ use lekhani_core::phonetic::ranking::{RankFeatures, RankWeights};
 use std::collections::HashMap;
 
 fn main() {
-    let path = std::env::args().nth(1).expect("Usage: pretrain_rank_weights <overrides.json>");
+    let path = std::env::args()
+        .nth(1)
+        .expect("Usage: pretrain_rank_weights <overrides.json>");
     let data = std::fs::read_to_string(&path).expect("Failed to read overrides JSON");
     let overrides: HashMap<String, Vec<(String, f32)>> =
         serde_json::from_str(&data).expect("Invalid JSON");
@@ -59,7 +61,11 @@ fn main() {
         })
         .collect();
 
-    eprintln!("Loaded {} training pairs from {} override entries.", pairs.len(), overrides.len());
+    eprintln!(
+        "Loaded {} training pairs from {} override entries.",
+        pairs.len(),
+        overrides.len()
+    );
 
     // Train for 500 epochs
     for epoch in 0..500 {
@@ -73,7 +79,12 @@ fn main() {
             }
         }
         if epoch % 100 == 0 {
-            eprintln!("Epoch {}: {} mistakes / {} pairs", epoch, mistakes, pairs.len());
+            eprintln!(
+                "Epoch {}: {} mistakes / {} pairs",
+                epoch,
+                mistakes,
+                pairs.len()
+            );
         }
         if mistakes == 0 {
             eprintln!("Converged at epoch {}.", epoch);

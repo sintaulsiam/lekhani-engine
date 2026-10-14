@@ -1181,7 +1181,10 @@ impl LanguageModel {
     }
 
     /// Ingest a pre-compiled binary language model file (.bin) into the live model
-    pub fn load_binary_file<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+    pub fn load_binary_file<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), std::io::Error> {
         Arc::make_mut(&mut self.inner).load_binary_file(path)
     }
 
@@ -1200,7 +1203,8 @@ impl LanguageModel {
         prev1: Option<&str>,
         word: &str,
     ) -> f32 {
-        self.inner.score_candidate_fourgram(prev3, prev2, prev1, word)
+        self.inner
+            .score_candidate_fourgram(prev3, prev2, prev1, word)
     }
 
     /// Query the most likely continuations given previous word
@@ -1218,7 +1222,8 @@ impl LanguageModel {
 
 impl LanguageModelInner {
     pub fn from_static_tables() -> Self {
-        let mut interner = StringInterner::with_capacity(UNIGRAM_LOG_PROBS.len() + BIGRAM_TRANSITIONS.len() * 2);
+        let mut interner =
+            StringInterner::with_capacity(UNIGRAM_LOG_PROBS.len() + BIGRAM_TRANSITIONS.len() * 2);
         let mut unigrams = HashMap::with_capacity(UNIGRAM_LOG_PROBS.len() + 100);
         for &(w, p) in UNIGRAM_LOG_PROBS {
             unigrams.insert(interner.intern(w), p);
@@ -1289,37 +1294,74 @@ impl LanguageModelInner {
         }
 
         if let Some(home) = std::env::var_os("HOME") {
-            let u_data = std::path::PathBuf::from(&home).join(".local/share/lekhani/data/bengali_lm.bin");
+            let u_data =
+                std::path::PathBuf::from(&home).join(".local/share/lekhani/data/bengali_lm.bin");
             candidates.push(u_data);
-            let u_dict = std::path::PathBuf::from(&home).join(".local/share/lekhani/dictionaries/bengali_lm.bin");
+            let u_dict = std::path::PathBuf::from(&home)
+                .join(".local/share/lekhani/dictionaries/bengali_lm.bin");
             candidates.push(u_dict);
         }
 
-        candidates.push(std::path::PathBuf::from("./data/dictionaries/bengali_lm.bin"));
-        candidates.push(std::path::PathBuf::from("../data/dictionaries/bengali_lm.bin"));
-        candidates.push(std::path::PathBuf::from("../../data/dictionaries/bengali_lm.bin"));
+        candidates.push(std::path::PathBuf::from(
+            "./data/dictionaries/bengali_lm.bin",
+        ));
+        candidates.push(std::path::PathBuf::from(
+            "../data/dictionaries/bengali_lm.bin",
+        ));
+        candidates.push(std::path::PathBuf::from(
+            "../../data/dictionaries/bengali_lm.bin",
+        ));
 
         if let Ok(exe) = std::env::current_exe() {
             if let Some(exe_dir) = exe.parent() {
-                candidates.push(exe_dir.join("data").join("dictionaries").join("bengali_lm.bin"));
+                candidates.push(
+                    exe_dir
+                        .join("data")
+                        .join("dictionaries")
+                        .join("bengali_lm.bin"),
+                );
                 candidates.push(exe_dir.join("data").join("bengali_lm.bin"));
                 candidates.push(exe_dir.join("bengali_lm.bin"));
                 if let Some(parent) = exe_dir.parent() {
-                    candidates.push(parent.join("data").join("dictionaries").join("bengali_lm.bin"));
+                    candidates.push(
+                        parent
+                            .join("data")
+                            .join("dictionaries")
+                            .join("bengali_lm.bin"),
+                    );
                     candidates.push(parent.join("data").join("bengali_lm.bin"));
-                    candidates.push(parent.join("share").join("lekhani").join("data").join("bengali_lm.bin"));
+                    candidates.push(
+                        parent
+                            .join("share")
+                            .join("lekhani")
+                            .join("data")
+                            .join("bengali_lm.bin"),
+                    );
                 }
             }
         }
 
         if let Some(appdata) = std::env::var_os("APPDATA") {
-            candidates.push(std::path::PathBuf::from(appdata).join("Lekhani").join("data").join("bengali_lm.bin"));
+            candidates.push(
+                std::path::PathBuf::from(appdata)
+                    .join("Lekhani")
+                    .join("data")
+                    .join("bengali_lm.bin"),
+            );
         }
 
-        candidates.push(std::path::PathBuf::from("/data/data/com.lekhani.android/files/dictionaries/bengali_lm.bin"));
-        candidates.push(std::path::PathBuf::from("/data/user/0/com.lekhani.android/files/dictionaries/bengali_lm.bin"));
-        candidates.push(std::path::PathBuf::from("/usr/local/share/lekhani/data/bengali_lm.bin"));
-        candidates.push(std::path::PathBuf::from("/usr/share/lekhani/data/bengali_lm.bin"));
+        candidates.push(std::path::PathBuf::from(
+            "/data/data/com.lekhani.android/files/dictionaries/bengali_lm.bin",
+        ));
+        candidates.push(std::path::PathBuf::from(
+            "/data/user/0/com.lekhani.android/files/dictionaries/bengali_lm.bin",
+        ));
+        candidates.push(std::path::PathBuf::from(
+            "/usr/local/share/lekhani/data/bengali_lm.bin",
+        ));
+        candidates.push(std::path::PathBuf::from(
+            "/usr/share/lekhani/data/bengali_lm.bin",
+        ));
 
         for path in candidates {
             if path.is_file() {
@@ -1377,14 +1419,18 @@ impl LanguageModelInner {
             for (pair, p) in static_bigrams {
                 self.bigrams.entry(pair.clone()).or_insert(p);
                 let entry = self.next_word_map.entry(pair.0).or_default();
-                if !entry.iter().any(|(cand, _)| cand == &pair.1) && entry.len() < MAX_WORD_CONTINUATIONS {
+                if !entry.iter().any(|(cand, _)| cand == &pair.1)
+                    && entry.len() < MAX_WORD_CONTINUATIONS
+                {
                     entry.push((pair.1, p));
                 }
             }
             for (tri, p) in static_trigrams {
                 self.trigrams.entry(tri.clone()).or_insert(p);
                 let tri_entry = self.next_trigram_map.entry((tri.0, tri.1)).or_default();
-                if !tri_entry.iter().any(|(cand, _)| cand == &tri.2) && tri_entry.len() < MAX_TRIGRAM_CONTINUATIONS {
+                if !tri_entry.iter().any(|(cand, _)| cand == &tri.2)
+                    && tri_entry.len() < MAX_TRIGRAM_CONTINUATIONS
+                {
                     tri_entry.push((tri.2, p));
                 }
             }
@@ -1451,7 +1497,10 @@ impl LanguageModelInner {
         self.load_trained_data(&compiled);
     }
 
-    pub fn load_binary_file<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), std::io::Error> {
+    pub fn load_binary_file<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), std::io::Error> {
         let path_ref = path.as_ref();
         match crate::zero_copy::ZeroCopyLanguageModel::from_file(path_ref) {
             Ok(zc) => {
@@ -1470,10 +1519,12 @@ impl LanguageModelInner {
             }
             Err(e) => {
                 let data = crate::trainer::TrainedLanguageModelData::load_binary(path_ref)
-                    .map_err(|e_fb| std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        format!("Failed to load zero-copy ({}) and fallback ({})", e, e_fb),
-                    ))?;
+                    .map_err(|e_fb| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!("Failed to load zero-copy ({}) and fallback ({})", e, e_fb),
+                        )
+                    })?;
                 self.load_trained_data(&data);
                 Ok(())
             }
@@ -1577,7 +1628,10 @@ impl LanguageModelInner {
                 || c == ','
         });
         if let Some(list) = self.next_word_map.get(clean_prev) {
-            list.iter().take(limit).map(|(w, _)| w.to_string()).collect()
+            list.iter()
+                .take(limit)
+                .map(|(w, _)| w.to_string())
+                .collect()
         } else {
             Vec::new()
         }
@@ -1616,7 +1670,10 @@ impl LanguageModelInner {
             .next_trigram_map
             .get(&BigramKey(clean_prev2, clean_prev1))
         {
-            list.iter().take(limit).map(|(w, _)| w.to_string()).collect()
+            list.iter()
+                .take(limit)
+                .map(|(w, _)| w.to_string())
+                .collect()
         } else {
             Vec::new()
         }

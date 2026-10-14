@@ -105,10 +105,17 @@ impl InputSession {
     }
 
     pub fn get_stats(&self) -> crate::ngram::UserStats {
-        self.phonetic.stats.lock().map(|s| s.clone()).unwrap_or_default()
+        self.phonetic
+            .stats
+            .lock()
+            .map(|s| s.clone())
+            .unwrap_or_default()
     }
 
-    pub fn set_shared_stats(&mut self, stats: std::sync::Arc<std::sync::Mutex<crate::ngram::UserStats>>) {
+    pub fn set_shared_stats(
+        &mut self,
+        stats: std::sync::Arc<std::sync::Mutex<crate::ngram::UserStats>>,
+    ) {
         self.phonetic.stats = stats;
     }
 
@@ -142,7 +149,10 @@ impl InputSession {
     }
 
     pub fn is_strict_avro_mode(&self) -> bool {
-        self.phonetic.suggestion_engine.get_config().strict_avro_mode
+        self.phonetic
+            .suggestion_engine
+            .get_config()
+            .strict_avro_mode
     }
 
     pub fn update_fixed_config(
@@ -335,7 +345,15 @@ pub fn evaluate_retro_correction(surrounding_context: &str) -> Option<RetroCorre
     let has_formal_subject = tokens.iter().any(|&t| {
         matches!(
             t,
-            "আপনি" | "আপনারা" | "আপনার" | "আপনাকে" | "তিনি" | "তাঁরা" | "তাঁর" | "তাঁকে" | "উনি"
+            "আপনি"
+                | "আপনারা"
+                | "আপনার"
+                | "আপনাকে"
+                | "তিনি"
+                | "তাঁরা"
+                | "তাঁর"
+                | "তাঁকে"
+                | "উনি"
         )
     });
 
@@ -386,7 +404,9 @@ pub fn evaluate_retro_correction(surrounding_context: &str) -> Option<RetroCorre
     }
 
     // 2. Intimate Concordance: Intimate Subject (তুই, তোরা, তোর)
-    let has_intimate_subject = tokens.iter().any(|&t| matches!(t, "তুই" | "তোরা" | "তোর" | "তোকে"));
+    let has_intimate_subject = tokens
+        .iter()
+        .any(|&t| matches!(t, "তুই" | "তোরা" | "তোর" | "তোকে"));
     if has_intimate_subject {
         for (idx, &token) in tokens.iter().enumerate().rev().take(2) {
             let replacement = match token {
@@ -472,7 +492,16 @@ pub fn evaluate_retro_correction(surrounding_context: &str) -> Option<RetroCorre
 
             // Case B: [শার্ট, পড়া] or [পড়া, শার্ট]
             if (matches!(t1, "শার্ট" | "প্যান্ট" | "জামা" | "কাপড়" | "জুতো" | "ঘড়ি") && t2 == "পড়া")
-                || (t1 == "পড়া" && matches!(t2, "শার্ট" | "প্যান্ট" | "জামা" | "কাপড়" | "জুতো" | "ঘড়ি"))
+                || (t1 == "পড়া"
+                    && matches!(
+                        t2,
+                        "শার্ট"
+                            | "প্যান্ট"
+                            | "জামা"
+                            | "কাপড়"
+                            | "জুতো"
+                            | "ঘড়ি"
+                    ))
             {
                 let target_idx = if t2 == "পড়া" { idx + 1 } else { idx };
                 let offset_from_end = token_count - 1 - target_idx;
@@ -596,15 +625,35 @@ mod tests {
         println!("parser tO: {:?}", parser.convert("tO"));
 
         session.process_key(VC_T, 0);
-        println!("after t: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+        println!(
+            "after t: preedit={:?}, cands={:?}",
+            session.get_preedit_text(),
+            session.get_candidates()
+        );
         session.process_key(VC_O, 0);
-        println!("after to: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+        println!(
+            "after to: preedit={:?}, cands={:?}",
+            session.get_preedit_text(),
+            session.get_candidates()
+        );
         session.process_key(VC_M, 0);
-        println!("after tom: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+        println!(
+            "after tom: preedit={:?}, cands={:?}",
+            session.get_preedit_text(),
+            session.get_candidates()
+        );
         session.process_key(VC_A, 0);
-        println!("after toma: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+        println!(
+            "after toma: preedit={:?}, cands={:?}",
+            session.get_preedit_text(),
+            session.get_candidates()
+        );
         session.process_key(VC_R, 0);
-        println!("after tomar: preedit={:?}, cands={:?}", session.get_preedit_text(), session.get_candidates());
+        println!(
+            "after tomar: preedit={:?}, cands={:?}",
+            session.get_preedit_text(),
+            session.get_candidates()
+        );
 
         let dict_candidates = [
             std::path::Path::new("../../data/dictionaries"),
@@ -626,15 +675,35 @@ mod tests {
             }
         }
         session2.process_key(VC_T, 0);
-        println!("with dict after t: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+        println!(
+            "with dict after t: preedit={:?}, cands={:?}",
+            session2.get_preedit_text(),
+            session2.get_candidates()
+        );
         session2.process_key(VC_O, 0);
-        println!("with dict after to: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+        println!(
+            "with dict after to: preedit={:?}, cands={:?}",
+            session2.get_preedit_text(),
+            session2.get_candidates()
+        );
         session2.process_key(VC_M, 0);
-        println!("with dict after tom: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+        println!(
+            "with dict after tom: preedit={:?}, cands={:?}",
+            session2.get_preedit_text(),
+            session2.get_candidates()
+        );
         session2.process_key(VC_A, 0);
-        println!("with dict after toma: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+        println!(
+            "with dict after toma: preedit={:?}, cands={:?}",
+            session2.get_preedit_text(),
+            session2.get_candidates()
+        );
         session2.process_key(VC_R, 0);
-        println!("with dict after tomar: preedit={:?}, cands={:?}", session2.get_preedit_text(), session2.get_candidates());
+        println!(
+            "with dict after tomar: preedit={:?}, cands={:?}",
+            session2.get_preedit_text(),
+            session2.get_candidates()
+        );
 
         let mut sugg = crate::phonetic::PhoneticSuggestion::new();
         sugg.set_layout(&val);
@@ -659,7 +728,10 @@ mod tests {
         // 1. Consecutive word commit
         session.phonetic.current_candidates = vec!["আমি".to_string()];
         session.commit(0);
-        assert_eq!(session.phonetic.last_committed_word, Some("আমি".to_string()));
+        assert_eq!(
+            session.phonetic.last_committed_word,
+            Some("আমি".to_string())
+        );
 
         session.phonetic.current_candidates = vec!["খাব".to_string()];
         session.commit(0);
@@ -680,7 +752,10 @@ mod tests {
         );
 
         // Check next-word suggestion promotion
-        let next_words = session.phonetic.suggestion_engine.suggest_next_words_with_context(&["আমি"]);
+        let next_words = session
+            .phonetic
+            .suggestion_engine
+            .suggest_next_words_with_context(&["আমি"]);
         assert!(next_words.contains(&"খাব".to_string()));
         assert_eq!(next_words[0], "খাব");
 
@@ -690,7 +765,10 @@ mod tests {
         session.phonetic.current_candidates = vec!["সিয়াম".to_string(), "সায়াম".to_string()];
         session.commit(1); // pick index 1 ("সায়াম")
 
-        assert_eq!(session.phonetic.candidate_memory.get("siam"), Some(&"সায়াম".to_string()));
+        assert_eq!(
+            session.phonetic.candidate_memory.get("siam"),
+            Some(&"সায়াম".to_string())
+        );
         assert_eq!(
             session
                 .phonetic
@@ -711,7 +789,10 @@ mod tests {
 
         let mut session2 = InputSession::new();
         session2.load_user_learned(&temp_file);
-        assert_eq!(session2.phonetic.candidate_memory.get("siam"), Some(&"সায়াম".to_string()));
+        assert_eq!(
+            session2.phonetic.candidate_memory.get("siam"),
+            Some(&"সায়াম".to_string())
+        );
         assert_eq!(
             session2
                 .phonetic

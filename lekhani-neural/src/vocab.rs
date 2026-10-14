@@ -153,8 +153,7 @@ impl BpeVocabulary {
     pub fn save_binary<P: AsRef<std::path::Path>>(&self, path: P) -> std::io::Result<()> {
         let file = std::fs::File::create(path)?;
         let mut writer = std::io::BufWriter::new(file);
-        bincode::serialize_into(&mut writer, self)
-            .map_err(std::io::Error::other)
+        bincode::serialize_into(&mut writer, self).map_err(std::io::Error::other)
     }
 
     /// Load vocabulary from a bincode binary file

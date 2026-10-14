@@ -84,24 +84,28 @@ impl UserStats {
             _ => return 0.0,
         };
 
-        let last_ts = self.word_last_seen.get(word).copied().unwrap_or(current_unix_ts);
+        let last_ts = self
+            .word_last_seen
+            .get(word)
+            .copied()
+            .unwrap_or(current_unix_ts);
         let delta_secs = current_unix_ts.saturating_sub(last_ts);
         let delta_days = (delta_secs as f32) / 86400.0;
 
         const LAMBDA: f32 = 0.05;
         let decay = (-LAMBDA * delta_days).exp();
 
-        let recency_multiplier = if delta_secs <= 86400 {
-            3.0
-        } else {
-            1.0
-        };
+        let recency_multiplier = if delta_secs <= 86400 { 3.0 } else { 1.0 };
 
         base_freq * decay * recency_multiplier
     }
 
     /// Populate a PersonalScoreOverlay from the current UserStats
-    pub fn populate_overlay(&self, overlay: &mut lekhani_ai::PersonalScoreOverlay, current_unix_ts: u64) {
+    pub fn populate_overlay(
+        &self,
+        overlay: &mut lekhani_ai::PersonalScoreOverlay,
+        current_unix_ts: u64,
+    ) {
         for (word, _) in &self.top_words {
             let score = self.decay_weighted_score(word, current_unix_ts);
             // Scale score to [0.0, 5.0] boost range

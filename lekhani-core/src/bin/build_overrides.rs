@@ -13,11 +13,17 @@ use std::path::{Path, PathBuf};
 use lekhani_parser::default_avro_parser;
 
 fn is_valid_bengali(word: &str) -> bool {
-    !word.is_empty() && word.chars().all(|ch| ('\u{0980}'..='\u{09FF}').contains(&ch))
+    !word.is_empty()
+        && word
+            .chars()
+            .all(|ch| ('\u{0980}'..='\u{09FF}').contains(&ch))
 }
 
 fn is_valid_latin(key: &str) -> bool {
-    !key.is_empty() && key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    !key.is_empty()
+        && key
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
 }
 
 /// Compute Bayesian smoothed & frequency scaled confidence
@@ -68,10 +74,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     // Also include common words
-    for w in &["বাল", "ফাল", "বায়", "গাম", "নাল", "সুত", "মুদ", "দেম", "সুব"] {
+    for w in &["বাল", "ফাল", "বায়", "গাম", "নাল", "সুত", "মুদ", "দেম", "সুব"]
+    {
         dict_words.insert(w.to_string());
     }
-    println!("📖 Loaded {} valid dictionary words for phonetic collision guard.", dict_words.len());
+    println!(
+        "📖 Loaded {} valid dictionary words for phonetic collision guard.",
+        dict_words.len()
+    );
 
     // 2. Define Golden Curated Overrides (hand-tuned benchmark baseline & shortcuts)
     let golden_entries: &[(&str, &[(&str, f32)])] = &[
@@ -248,7 +258,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .collect();
         merged_overrides.insert(key.to_string(), cand_vec);
     }
-    println!("🌟 Initialized {} golden curated entries.", merged_overrides.len());
+    println!(
+        "🌟 Initialized {} golden curated entries.",
+        merged_overrides.len()
+    );
 
     // 3. Read Dakshina TSVs (Strictly train split only — dev is for tuning, test is held out)
     let tsv_paths = [
@@ -292,7 +305,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             total_tsv_lines += 1;
         }
     }
-    println!("📊 Processed {} TSV records across {} unique Latin keys.", total_tsv_lines, latin_to_bn_counts.len());
+    println!(
+        "📊 Processed {} TSV records across {} unique Latin keys.",
+        total_tsv_lines,
+        latin_to_bn_counts.len()
+    );
 
     // 4. Filter, calibrate, and guard
     let mut added_from_dakshina = 0;
@@ -326,7 +343,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // If the Latin key or its inflected stem is a recognized bilingual loanword, ensure
         // the canonical Bengali loanword (or inflected form) is protected from Dakshina literal corruption.
         let mut is_loanword_collision = false;
-        if let Some((loan_bn, _)) = lekhani_core::phonetic::PhoneticDatabase::get_bilingual_loanword(&latin) {
+        if let Some((loan_bn, _)) =
+            lekhani_core::phonetic::PhoneticDatabase::get_bilingual_loanword(&latin)
+        {
             if top_bn != loan_bn {
                 is_loanword_collision = true;
             }
@@ -334,9 +353,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             for suffix_len in [1, 2, 3, 4] {
                 if latin.len() > suffix_len {
                     let stem = &latin[..latin.len() - suffix_len];
-                    if let Some((_, _)) = lekhani_core::phonetic::PhoneticDatabase::get_bilingual_loanword(stem) {
+                    if let Some((_, _)) =
+                        lekhani_core::phonetic::PhoneticDatabase::get_bilingual_loanword(stem)
+                    {
                         let suffix = &latin[latin.len() - suffix_len..];
-                        if matches!(suffix, "e" | "er" | "r" | "ta" | "ti" | "te" | "ra" | "der" | "gulo" | "gulor") {
+                        if matches!(
+                            suffix,
+                            "e" | "er" | "r" | "ta" | "ti" | "te" | "ra" | "der" | "gulo" | "gulor"
+                        ) {
                             is_loanword_collision = true;
                             break;
                         }
@@ -384,8 +408,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("✨ Added {} high-confidence entries from Dakshina.", added_from_dakshina);
-    println!("🛡️ Protected {} short-stem collisions with Avro native priority.", collision_guarded);
+    println!(
+        "✨ Added {} high-confidence entries from Dakshina.",
+        added_from_dakshina
+    );
+    println!(
+        "🛡️ Protected {} short-stem collisions with Avro native priority.",
+        collision_guarded
+    );
     println!("📦 Total compiled overrides: {}", merged_overrides.len());
 
     // 5. Output JSON
@@ -397,11 +427,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 6. Compile packed binary POVR
     let bin_path = Path::new("data/dictionaries/phonetic_overrides.bin");
     let bin_size = compile_binary_overrides(&merged_overrides, bin_path)?;
-    println!("⚡ Compiled binary POVR to {:?} ({} bytes / {:.1} KB)", bin_path, bin_size, bin_size as f32 / 1024.0);
+    println!(
+        "⚡ Compiled binary POVR to {:?} ({} bytes / {:.1} KB)",
+        bin_path,
+        bin_size,
+        bin_size as f32 / 1024.0
+    );
 
     // 7. Sync to lekhani-android assets
     let android_asset_json = Path::new("/mnt/data/lekhani-android/android/app/src/main/assets/dictionaries/phonetic_overrides.json");
-    let android_asset_bin = Path::new("/mnt/data/lekhani-android/android/app/src/main/assets/dictionaries/phonetic_overrides.bin");
+    let android_asset_bin = Path::new(
+        "/mnt/data/lekhani-android/android/app/src/main/assets/dictionaries/phonetic_overrides.bin",
+    );
     if android_asset_json.parent().is_some_and(|p| p.exists()) {
         std::fs::copy(json_path, android_asset_json)?;
         std::fs::copy(bin_path, android_asset_bin)?;

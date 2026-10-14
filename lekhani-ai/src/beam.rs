@@ -76,7 +76,9 @@ impl BeamSearchDecoder {
             for (parent_idx, parent_node) in prev_layer.iter().enumerate() {
                 let prev1 = Some(parent_node.cand);
                 let prev2 = if t >= 2 {
-                    parent_node.parent_idx.map(|p_idx| layers[t - 2][p_idx].cand)
+                    parent_node
+                        .parent_idx
+                        .map(|p_idx| layers[t - 2][p_idx].cand)
                 } else {
                     None
                 };

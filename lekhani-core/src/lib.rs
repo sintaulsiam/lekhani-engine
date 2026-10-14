@@ -25,14 +25,18 @@ pub use emojis::EmojiMap;
 pub use fixed::{FixedLayoutParser, FixedMethod};
 pub use fs::atomic_write_secure;
 pub use keycodes::*;
+pub use lekhani_parser::{
+    default_avro_parser, has_explicit_avro_intent, CompiledLayout, LekhaniParser,
+};
 pub use morpheme::{
     BengaliMorphAnalyzer, MorphemeDecomposition, RupmulDecomposition, RupmulGraphSynthesizer,
     RupmulTier, SuffixCategory,
 };
 pub use ngram::UserStats;
-pub use lekhani_parser::{default_avro_parser, has_explicit_avro_intent, CompiledLayout, LekhaniParser};
-pub use phonetic::{AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion, PhoneticSuggestionConfig};
+pub use phonetic::{
+    AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion,
+    PhoneticSuggestionConfig,
+};
 pub use session::{ActiveLayoutType, InputSession};
 pub use snippets::SnippetManager;
 pub use trie::PrefixTrie;
-

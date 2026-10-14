@@ -120,7 +120,9 @@ impl PhoneticMethod {
             true
         } else {
             // Check if user is immediately backspacing after an accidental commit (undo within 2.0s)
-            if let (Some(committed), Some(commit_time)) = (&self.last_committed_word, self.last_commit_time) {
+            if let (Some(committed), Some(commit_time)) =
+                (&self.last_committed_word, self.last_commit_time)
+            {
                 if commit_time.elapsed().as_secs_f32() <= 2.0 {
                     let prev = self.last_committed_prev_word.clone();
                     if let Ok(mut l) = self.suggestion_engine.database.learner.write() {
@@ -149,7 +151,8 @@ impl PhoneticMethod {
             &self.candidate_memory,
         );
         self.current_candidates = candidates;
-        self.current_candidate_features = self.suggestion_engine.get_last_computed_features().to_vec();
+        self.current_candidate_features =
+            self.suggestion_engine.get_last_computed_features().to_vec();
         self.selected_index = selected;
         self.default_selected_index = selected;
     }
@@ -208,12 +211,17 @@ impl PhoneticMethod {
         let text = self.current_candidates.get(index).cloned();
         if let Some(ref committed) = text {
             let typed_len = self.buffer.len();
-            let is_override = index != self.default_selected_index && !self.buffer.is_empty() && !self.is_prediction_mode;
+            let is_override = index != self.default_selected_index
+                && !self.buffer.is_empty()
+                && !self.is_prediction_mode;
             let override_data = if is_override {
                 self.candidate_memory
                     .insert(self.buffer.clone(), committed.clone());
                 let chosen_f = self.current_candidate_features.get(index).copied();
-                let rejected_f = self.current_candidate_features.get(self.default_selected_index).copied();
+                let rejected_f = self
+                    .current_candidate_features
+                    .get(self.default_selected_index)
+                    .copied();
                 self.suggestion_engine.clear_cache();
                 Some((self.buffer.as_str(), chosen_f, rejected_f))
             } else {
@@ -221,8 +229,11 @@ impl PhoneticMethod {
             };
             let prev_word = self.last_committed_word.clone();
             self.last_committed_prev_word = prev_word.clone();
-            self.suggestion_engine
-                .record_commit_feedback(prev_word.as_deref(), committed, override_data);
+            self.suggestion_engine.record_commit_feedback(
+                prev_word.as_deref(),
+                committed,
+                override_data,
+            );
             if let Ok(mut stats) = self.stats.lock() {
                 stats.record_commit(typed_len, committed);
             }
@@ -460,7 +471,10 @@ mod tests {
             .dirty;
         assert!(dirty);
 
-        assert_ne!(initial_weights, updated_weights, "Expected rank weights to update on non-default selection");
+        assert_ne!(
+            initial_weights, updated_weights,
+            "Expected rank weights to update on non-default selection"
+        );
     }
 
     #[test]
@@ -475,4 +489,3 @@ mod tests {
         assert!(!method.is_prediction_mode);
     }
 }
-

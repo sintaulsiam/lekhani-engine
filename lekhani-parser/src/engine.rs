@@ -1,9 +1,9 @@
 //! Zero-Allocation High-Speed Phonetic Parsing Engine
 
-use std::sync::Arc;
 use super::compiler::CompiledLayout;
 use super::rule::{ConditionScope, MatchType};
 use super::tables::*;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct LekhaniParser {
@@ -143,7 +143,6 @@ impl LekhaniParser {
                                 } else {
                                     false
                                 }
-
                             }
                         };
 

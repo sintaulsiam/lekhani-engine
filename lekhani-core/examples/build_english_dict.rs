@@ -1,6 +1,6 @@
+use lekhani_core::trie::PrefixTrie;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use lekhani_core::trie::PrefixTrie;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Building English PrefixTrie dictionary from top60k.txt...");
@@ -42,12 +42,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     trie.save_binary(output_path)?;
 
     let metadata = std::fs::metadata(output_path)?;
-    println!("Successfully saved {} ({} bytes, {:.2} MB)", output_path, metadata.len(), metadata.len() as f64 / 1_048_576.0);
+    println!(
+        "Successfully saved {} ({} bytes, {:.2} MB)",
+        output_path,
+        metadata.len(),
+        metadata.len() as f64 / 1_048_576.0
+    );
 
     // Verify loading
     let bytes = std::fs::read(output_path)?;
     let loaded = PrefixTrie::from_binary(&bytes)?;
-    println!("Loaded dictionary back: verified {} entries", loaded.memory_usage());
+    println!(
+        "Loaded dictionary back: verified {} entries",
+        loaded.memory_usage()
+    );
 
     // Test some common prefixes
     for prefix in ["th", "hel", "prog", "lekh"] {

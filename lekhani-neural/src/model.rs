@@ -182,8 +182,7 @@ impl MicroGruModel {
     pub fn save_binary<P: AsRef<std::path::Path>>(&self, path: P) -> std::io::Result<()> {
         let file = std::fs::File::create(path)?;
         let mut writer = std::io::BufWriter::new(file);
-        bincode::serialize_into(&mut writer, self)
-            .map_err(std::io::Error::other)
+        bincode::serialize_into(&mut writer, self).map_err(std::io::Error::other)
     }
 
     /// Forward pass through sequence of tokens.
@@ -221,7 +220,12 @@ impl MicroGruModel {
             if emb_end <= self.embeddings.len() {
                 let mut dot = 0.0;
                 let emb_slice = &self.embeddings[emb_start..emb_end];
-                for (&h_val, &emb_val) in pad.h2.iter().zip(emb_slice.iter()).take(self.embedding_dim.min(self.hidden_dim)) {
+                for (&h_val, &emb_val) in pad
+                    .h2
+                    .iter()
+                    .zip(emb_slice.iter())
+                    .take(self.embedding_dim.min(self.hidden_dim))
+                {
                     dot += h_val * emb_val;
                 }
                 *logit = dot;
@@ -230,7 +234,12 @@ impl MicroGruModel {
     }
 
     /// Top-k next token IDs and log-probabilities
-    pub fn predict_top_k(&self, token_ids: &[u32], k: usize, pad: &mut GruScratchpad) -> Vec<(u32, f32)> {
+    pub fn predict_top_k(
+        &self,
+        token_ids: &[u32],
+        k: usize,
+        pad: &mut GruScratchpad,
+    ) -> Vec<(u32, f32)> {
         if token_ids.is_empty() {
             return Vec::new();
         }
@@ -249,7 +258,8 @@ impl MicroGruModel {
         }
 
         // Sort descending
-        pad.scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        pad.scored
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let k_actual = k.min(pad.scored.len());
         pad.scored[..k_actual].to_vec()
     }

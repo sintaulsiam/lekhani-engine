@@ -50,7 +50,6 @@ fn test_golden_avro_raw_equivalence() {
         ("batas", "বাতাস"),
         ("brriShTi", "বৃষ্টি"),
         ("bidyut```", "বিদ্যুৎ"),
-
         ("megh", "মেঘ"),
         ("sUrrzo", "সূর্য"),
         ("ca^d", "চাঁদ"),
@@ -89,7 +88,10 @@ fn test_golden_avro_raw_equivalence() {
     for (input, expected) in golden_cases {
         let output = lekhani.convert(input);
         if output != expected {
-            failures.push(format!("'{}': got '{}', expected '{}'", input, output, expected));
+            failures.push(format!(
+                "'{}': got '{}', expected '{}'",
+                input, output, expected
+            ));
         }
     }
     assert!(failures.is_empty(), "Mismatches:\n{}", failures.join("\n"));

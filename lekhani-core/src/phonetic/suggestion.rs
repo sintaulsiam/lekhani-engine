@@ -5,7 +5,7 @@ use lekhani_parser::{CompiledLayout, LekhaniParser};
 use serde_json::Value;
 
 use super::database::PhoneticDatabase;
-use super::ranking::{CandidateContext, RankFeatures, extract_candidate_features};
+use super::ranking::{extract_candidate_features, CandidateContext, RankFeatures};
 use crate::chars::BengaliCharExt;
 
 use std::sync::Arc;
@@ -120,7 +120,10 @@ fn probe_neural_predictor() -> Option<Arc<lekhani_neural::NeuralContextPredictor
                 lekhani_neural::BpeVocabulary::load_json(&p_vocab),
             ) {
                 if model.vocab_size() == vocab.len() {
-                    if let Ok(pred) = lekhani_neural::NeuralContextPredictor::try_new(Arc::new(model), Arc::new(vocab)) {
+                    if let Ok(pred) = lekhani_neural::NeuralContextPredictor::try_new(
+                        Arc::new(model),
+                        Arc::new(vocab),
+                    ) {
                         return Some(Arc::new(pred));
                     }
                 }
@@ -241,7 +244,10 @@ impl PhoneticSuggestion {
         self.cache.clear();
     }
 
-    pub fn with_neural_predictor(mut self, predictor: Arc<lekhani_neural::NeuralContextPredictor>) -> Self {
+    pub fn with_neural_predictor(
+        mut self,
+        predictor: Arc<lekhani_neural::NeuralContextPredictor>,
+    ) -> Self {
         self.neural_predictor = Some(predictor);
         self
     }
@@ -356,7 +362,6 @@ impl PhoneticSuggestion {
         }
         text.to_string()
     }
-
 
     /// Generate ranked candidates for typed term with multi-token preceding context
     pub fn suggest_with_multi_context(
@@ -528,7 +533,10 @@ impl PhoneticSuggestion {
             | ((self.config.strict_avro_mode as u32) << 5);
 
         let cache_key = if context.is_empty() {
-            format!("{}:{}:{}:{}", term, include_english, use_dictionary, cfg_mask)
+            format!(
+                "{}:{}:{}:{}",
+                term, include_english, use_dictionary, cfg_mask
+            )
         } else {
             format!(
                 "{}:{}:{}:{}:{}",
@@ -650,8 +658,7 @@ impl PhoneticSuggestion {
 
         // 3b. Developer Code-Mixing Shield (e.g. "onClick", "user_id", "--help", "const", "https://...")
         let is_code = if self.config.enable_code_shield {
-            (super::code_shield::is_code_token(term)
-                || super::code_shield::is_code_token(middle))
+            (super::code_shield::is_code_token(term) || super::code_shield::is_code_token(middle))
                 && !self.database.is_exact_dictionary_word(&phonetic)
                 && !is_atomic_cv_syllable(&phonetic)
         } else {
@@ -683,7 +690,10 @@ impl PhoneticSuggestion {
                 if lower != middle {
                     let is_title_case = middle.len() >= 3
                         && middle.chars().next().is_some_and(|c| c.is_uppercase())
-                        && middle.chars().skip(1).all(|c| c.is_lowercase() || !c.is_alphabetic());
+                        && middle
+                            .chars()
+                            .skip(1)
+                            .all(|c| c.is_lowercase() || !c.is_alphabetic());
                     if is_title_case {
                         self.database.lookup_override(&lower)
                     } else {
@@ -929,16 +939,42 @@ impl PhoneticSuggestion {
         // 4b. Code-Switching Contextual Verb & State Agreement
         if let Some(&last_ctx) = context.last() {
             let last_lower = last_ctx.to_lowercase();
-            if matches!(last_lower.as_str(), "post" | "login") && middle.eq_ignore_ascii_case("koro") {
-                add_cand("করো".to_string(), CandidateSource::ExactDictionary, 9200, &mut raw_candidates, &mut seen);
+            if matches!(last_lower.as_str(), "post" | "login")
+                && middle.eq_ignore_ascii_case("koro")
+            {
+                add_cand(
+                    "করো".to_string(),
+                    CandidateSource::ExactDictionary,
+                    9200,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
             } else if last_lower == "wifi" && middle.eq_ignore_ascii_case("on") {
-                add_cand("অন".to_string(), CandidateSource::ExactDictionary, 9200, &mut raw_candidates, &mut seen);
+                add_cand(
+                    "অন".to_string(),
+                    CandidateSource::ExactDictionary,
+                    9200,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
             } else if last_lower == "bluetooth" && middle.eq_ignore_ascii_case("off") {
-                add_cand("অফ".to_string(), CandidateSource::ExactDictionary, 9200, &mut raw_candidates, &mut seen);
+                add_cand(
+                    "অফ".to_string(),
+                    CandidateSource::ExactDictionary,
+                    9200,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
             }
         }
         if middle.eq_ignore_ascii_case("pathaw") {
-            add_cand("পাঠাও".to_string(), CandidateSource::PhoneticOverride, 8800, &mut raw_candidates, &mut seen);
+            add_cand(
+                "পাঠাও".to_string(),
+                CandidateSource::PhoneticOverride,
+                8800,
+                &mut raw_candidates,
+                &mut seen,
+            );
         }
 
         // 5. Special literal matches on middle portion (e.g. (:smile:), (=12+5))
@@ -954,23 +990,65 @@ impl PhoneticSuggestion {
         }
 
         // 5b. Bilingual Digit-Units, Hyphenated Clitics & Unhyphenated Clitics
-        if let Some((digit_primary, digit_cands)) = crate::bilingual::resolve_digit_unit_candidates(middle) {
-            add_cand(digit_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
+        if let Some((digit_primary, digit_cands)) =
+            crate::bilingual::resolve_digit_unit_candidates(middle)
+        {
+            add_cand(
+                digit_primary,
+                CandidateSource::PhoneticOverride,
+                9500,
+                &mut raw_candidates,
+                &mut seen,
+            );
             for c in digit_cands {
-                add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+                add_cand(
+                    c,
+                    CandidateSource::PhoneticOverride,
+                    8500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
             }
         }
         if self.config.enable_bilingual_clitic {
-            if let Some((hyphen_primary, hyphen_cands)) = crate::bilingual::resolve_bilingual_hyphen_clitic(middle) {
-                add_cand(hyphen_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
+            if let Some((hyphen_primary, hyphen_cands)) =
+                crate::bilingual::resolve_bilingual_hyphen_clitic(middle)
+            {
+                add_cand(
+                    hyphen_primary,
+                    CandidateSource::PhoneticOverride,
+                    9500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
                 for c in hyphen_cands {
-                    add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+                    add_cand(
+                        c,
+                        CandidateSource::PhoneticOverride,
+                        8500,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
                 }
             }
-            if let Some((unhyphen_primary, unhyphen_cands)) = crate::bilingual::resolve_unhyphenated_bilingual_clitic(middle) {
-                add_cand(unhyphen_primary, CandidateSource::PhoneticOverride, 9500, &mut raw_candidates, &mut seen);
+            if let Some((unhyphen_primary, unhyphen_cands)) =
+                crate::bilingual::resolve_unhyphenated_bilingual_clitic(middle)
+            {
+                add_cand(
+                    unhyphen_primary,
+                    CandidateSource::PhoneticOverride,
+                    9500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
                 for c in unhyphen_cands {
-                    add_cand(c, CandidateSource::PhoneticOverride, 8500, &mut raw_candidates, &mut seen);
+                    add_cand(
+                        c,
+                        CandidateSource::PhoneticOverride,
+                        8500,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
                 }
             }
         }
@@ -988,11 +1066,21 @@ impl PhoneticSuggestion {
         let preferred_word = if let Some(fav) = candidate_memory
             .get(term)
             .or_else(|| candidate_memory.get(middle))
-            .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(term)))
-            .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(middle)))
-        {
+            .or_else(|| {
+                learner_guard
+                    .as_ref()
+                    .and_then(|l| l.candidate_memory.get(term))
+            })
+            .or_else(|| {
+                learner_guard
+                    .as_ref()
+                    .and_then(|l| l.candidate_memory.get(middle))
+            }) {
             Some(fav.clone())
-        } else if let Some(raw_ac) = self.database.get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand) {
+        } else if let Some(raw_ac) = self
+            .database
+            .get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand)
+        {
             let converted_ac = resolve_ac(&raw_ac);
             if !converted_ac.is_empty() {
                 add_cand(
@@ -1010,11 +1098,13 @@ impl PhoneticSuggestion {
             Some(ov_pref.clone())
         } else if let Some(ref loan_pref) = preferred_loanword {
             Some(loan_pref.clone())
-        } else if let Some(morph_pref) = if use_dictionary && !self.database.is_exact_dictionary_word(&phonetic) {
-            self.decompose_stem_suffix_override(middle)
-        } else {
-            None
-        } {
+        } else if let Some(morph_pref) =
+            if use_dictionary && !self.database.is_exact_dictionary_word(&phonetic) {
+                self.decompose_stem_suffix_override(middle)
+            } else {
+                None
+            }
+        {
             add_cand(
                 morph_pref.clone(),
                 CandidateSource::ExactDictionary,
@@ -1039,7 +1129,10 @@ impl PhoneticSuggestion {
         } else {
             let mut found_collapsed = None;
             for collapsed in super::fuzzy::collapse_elongated_runs(middle) {
-                if let Some(raw_ac) = self.database.get_autocorrect_raw_filtered(&collapsed, self.config.enable_banglish_shorthand) {
+                if let Some(raw_ac) = self
+                    .database
+                    .get_autocorrect_raw_filtered(&collapsed, self.config.enable_banglish_shorthand)
+                {
                     let converted_ac = resolve_ac(&raw_ac);
                     if !converted_ac.is_empty() {
                         add_cand(
@@ -1192,7 +1285,8 @@ impl PhoneticSuggestion {
 
             // 10b. Project "ধ্বনি-সেতু" (Dhvani-Setu) — Phonological Acoustic Recovery
             if self.config.enable_banglish_shorthand {
-                for ac_variant in super::fuzzy::DhvaniSetuEngine::generate_acoustic_variants(middle) {
+                for ac_variant in super::fuzzy::DhvaniSetuEngine::generate_acoustic_variants(middle)
+                {
                     let ac_phonetic = self.convert_phonetic(&ac_variant);
                     if self.database.is_exact_dictionary_word(&ac_phonetic) {
                         add_cand(
@@ -1332,11 +1426,10 @@ impl PhoneticSuggestion {
                 || preferred_loanword.is_some()
                 || PhoneticDatabase::get_bilingual_loanword(middle).is_some()
                 || self.database.get_autocorrect_raw(middle).is_some();
-            let segmented = super::segmenter::segment_concatenated_token(
-                middle,
-                &self.database,
-                |s| self.convert_phonetic(s),
-            );
+            let segmented =
+                super::segmenter::segment_concatenated_token(middle, &self.database, |s| {
+                    self.convert_phonetic(s)
+                });
             for seg in segmented {
                 let boost = if has_exact_single_word { 2000 } else { 6000 };
                 add_cand(
@@ -1435,7 +1528,9 @@ impl PhoneticSuggestion {
 
         let has_clitic_i_candidate = !has_explicit_rri_digraph
             && middle.ends_with('i')
-            && !raw_candidates.iter().any(|c| c.text.ends_with('ি') && self.database.is_exact_dictionary_word(&c.text))
+            && !raw_candidates
+                .iter()
+                .any(|c| c.text.ends_with('ি') && self.database.is_exact_dictionary_word(&c.text))
             && raw_candidates.iter().any(|c| {
                 c.text.ends_with('ই')
                     && self.database.is_exact_dictionary_word(&c.text)
@@ -1501,9 +1596,13 @@ impl PhoneticSuggestion {
             }
         }
 
-        let mut scored_candidates: Vec<(String, i32, RankFeatures)> = Vec::with_capacity(raw_candidates.len());
+        let mut scored_candidates: Vec<(String, i32, RankFeatures)> =
+            Vec::with_capacity(raw_candidates.len());
         let learner_guard = self.database.learner.try_read().ok();
-        let weights = learner_guard.as_ref().map(|l| l.rank_weights).unwrap_or_default();
+        let weights = learner_guard
+            .as_ref()
+            .map(|l| l.rank_weights)
+            .unwrap_or_default();
 
         let prev = if self.config.ai_profile != AiProfile::Off && !context.is_empty() {
             context.last().copied()
@@ -1525,25 +1624,55 @@ impl PhoneticSuggestion {
         //
         // is_sentence_initial: true when context is empty (start of text) OR the
         // last committed word ends with a sentence boundary marker (।, !, ?).
-        let is_sentence_initial = context.is_empty() || context.last().copied().is_some_and(|w: &str| {
-            let w = w.trim_end();
-            w.ends_with('।') || w.ends_with('!') || w.ends_with('?')
-        });
+        let is_sentence_initial = context.is_empty()
+            || context.last().copied().is_some_and(|w: &str| {
+                let w = w.trim_end();
+                w.ends_with('।') || w.ends_with('!') || w.ends_with('?')
+            });
 
         // is_formal_register_context: true when the last committed word is a known
         // Bengali formal/academic discourse connector.
         const FORMAL_DISCOURSE_HEADS: &[&str] = &[
-            "প্রসঙ্গত", "উল্লেখ্য", "উল্লেখযোগ্য", "বিবেচনায়", "বিবেচনা",
-            "পরিপ্রেক্ষিতে", "প্রেক্ষাপটে", "সংক্ষেপে", "তদুপরি", "অন্যদিকে",
-            "পাশাপাশি", "তবে", "যদিও", "তথাপি", "অর্থাৎ", "যেমন",
-            "এতদসত্ত্বেও", "তাছাড়া", "এমনকি", "যেহেতু", "সেহেতু",
+            "প্রসঙ্গত",
+            "উল্লেখ্য",
+            "উল্লেখযোগ্য",
+            "বিবেচনায়",
+            "বিবেচনা",
+            "পরিপ্রেক্ষিতে",
+            "প্রেক্ষাপটে",
+            "সংক্ষেপে",
+            "তদুপরি",
+            "অন্যদিকে",
+            "পাশাপাশি",
+            "তবে",
+            "যদিও",
+            "তথাপি",
+            "অর্থাৎ",
+            "যেমন",
+            "এতদসত্ত্বেও",
+            "তাছাড়া",
+            "এমনকি",
+            "যেহেতু",
+            "সেহেতু",
         ];
-        let is_formal_register_context = context.last().copied().is_some_and(|w: &str| {
-            FORMAL_DISCOURSE_HEADS.contains(&w.trim_matches('।'))
-        });
+        let is_formal_register_context = context
+            .last()
+            .copied()
+            .is_some_and(|w: &str| FORMAL_DISCOURSE_HEADS.contains(&w.trim_matches('।')));
 
         const CASUAL_DISCOURSE_HEADS: &[&str] = &[
-            "রে", "মামা", "ব্রো", "দোস্ত", "কিরে", "নাকি", "আরে", "ভাই", "vai", "bro", "boss", "বস",
+            "রে",
+            "মামা",
+            "ব্রো",
+            "দোস্ত",
+            "কিরে",
+            "নাকি",
+            "আরে",
+            "ভাই",
+            "vai",
+            "bro",
+            "boss",
+            "বস",
         ];
         let is_casual_register_context = context.iter().any(|&w| {
             let clean = w.trim_matches(|c: char| c.is_ascii_punctuation() || c == '।' || c == ',');
@@ -1554,11 +1683,7 @@ impl PhoneticSuggestion {
         // Computed once here so it can be used both in ranking and as a feature.
         let ngram_top_log = prev.map(|p| self.ai_context.lm().score_candidate(prev_prev, None, p));
         let neural_alpha = if self.config.ai_profile == AiProfile::Balanced {
-            lekhani_neural::compute_neural_alpha(
-                ngram_top_log.unwrap_or(-6.0),
-                true,
-                context.len(),
-            )
+            lekhani_neural::compute_neural_alpha(ngram_top_log.unwrap_or(-6.0), true, context.len())
         } else {
             0.0
         };
@@ -1619,7 +1744,10 @@ impl PhoneticSuggestion {
                 continue;
             }
             if cand.source == CandidateSource::SegmentedLattice {
-                let boost = if has_exact_single_word || has_dominant_homophone || preferred_loanword.is_some() {
+                let boost = if has_exact_single_word
+                    || has_dominant_homophone
+                    || preferred_loanword.is_some()
+                {
                     cand.initial_boost.min(2500)
                 } else {
                     cand.initial_boost
@@ -1650,10 +1778,17 @@ impl PhoneticSuggestion {
             }
 
             let lm_score = if prev.is_some() && cand.source != CandidateSource::EmojiKeyword {
-                let direct_score = self.ai_context.lm().score_candidate(prev_prev, prev, &cand.text);
+                let direct_score = self
+                    .ai_context
+                    .lm()
+                    .score_candidate(prev_prev, prev, &cand.text);
                 if let Some(ref d) = decomp {
-                    let root_score = self.ai_context.lm().score_candidate(prev_prev, prev, d.root);
-                    let inflected_score = morph_analyzer.estimate_inflected_score(root_score, d.category);
+                    let root_score = self
+                        .ai_context
+                        .lm()
+                        .score_candidate(prev_prev, prev, d.root);
+                    let inflected_score =
+                        morph_analyzer.estimate_inflected_score(root_score, d.category);
                     Some(direct_score.max(inflected_score))
                 } else {
                     Some(direct_score)
@@ -1667,7 +1802,10 @@ impl PhoneticSuggestion {
                 && self.config.ai_profile == AiProfile::Balanced
                 && cand.source != CandidateSource::EmojiKeyword
             {
-                let s = self.ai_context.lm().score_candidate_fourgram(prev_3, prev_prev, prev, &cand.text);
+                let s = self
+                    .ai_context
+                    .lm()
+                    .score_candidate_fourgram(prev_3, prev_prev, prev, &cand.text);
                 Some(s)
             } else {
                 None
@@ -1683,9 +1821,22 @@ impl PhoneticSuggestion {
                 .get(term)
                 .or_else(|| candidate_memory.get(middle))
                 .or_else(|| candidate_memory.get(&phonetic))
-                .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(term)))
-                .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(middle)))
-                .or_else(|| learner_guard.as_ref().and_then(|l| l.candidate_memory.get(&phonetic))) == Some(&cand.text);
+                .or_else(|| {
+                    learner_guard
+                        .as_ref()
+                        .and_then(|l| l.candidate_memory.get(term))
+                })
+                .or_else(|| {
+                    learner_guard
+                        .as_ref()
+                        .and_then(|l| l.candidate_memory.get(middle))
+                })
+                .or_else(|| {
+                    learner_guard
+                        .as_ref()
+                        .and_then(|l| l.candidate_memory.get(&phonetic))
+                })
+                == Some(&cand.text);
 
             let is_user_learned = learner_guard
                 .as_ref()
@@ -1710,7 +1861,14 @@ impl PhoneticSuggestion {
                 ..candidate_ctx
             };
 
-            let features = extract_candidate_features(cand, is_in_dict, freq, trie_contains, &per_cand_ctx, is_clitic_o);
+            let features = extract_candidate_features(
+                cand,
+                is_in_dict,
+                freq,
+                trie_contains,
+                &per_cand_ctx,
+                is_clitic_o,
+            );
             let score = cand.initial_boost + weights.compute_score(&features);
 
             scored_candidates.push((cand.text.clone(), score, features));
@@ -1722,7 +1880,10 @@ impl PhoneticSuggestion {
         // When explicit Avro syntax/casing is detected or strict_avro_mode is active,
         // ensure the direct transliteration candidate (phonetic) is locked at Slot 0 and protected against LM demotion.
         if has_explicit_intent || self.config.strict_avro_mode {
-            if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == &phonetic) {
+            if let Some(pos) = scored_candidates
+                .iter()
+                .position(|(t, _, _)| t == &phonetic)
+            {
                 if pos > 0 {
                     let direct = scored_candidates.remove(pos);
                     scored_candidates.insert(0, direct);
@@ -1760,8 +1921,11 @@ impl PhoneticSuggestion {
                 .collect();
 
             if top_texts.len() >= 2 {
-                self.ai_context
-                    .rank_candidates_in_place_bidirectional(context, None, &mut top_texts);
+                self.ai_context.rank_candidates_in_place_bidirectional(
+                    context,
+                    None,
+                    &mut top_texts,
+                );
 
                 let mut reordered = Vec::with_capacity(top_texts.len());
                 for text in &top_texts {
@@ -1777,7 +1941,9 @@ impl PhoneticSuggestion {
 
         let mut candidates: Vec<(String, RankFeatures)> = Vec::with_capacity(8);
         let has_english = include_english && scored_candidates.iter().any(|(c, _, _)| c == term);
-        let has_emoji = scored_candidates.iter().any(|(c, _, _)| kw_emojis.contains(c));
+        let has_emoji = scored_candidates
+            .iter()
+            .any(|(c, _, _)| kw_emojis.contains(c));
         let first_emoji = scored_candidates
             .iter()
             .find(|(c, _, _)| kw_emojis.contains(c))
@@ -1841,7 +2007,13 @@ impl PhoneticSuggestion {
         if self.cache.len() >= 128 {
             self.cache.clear();
         }
-        self.cache.insert(cache_key, (final_candidates.clone(), self.last_computed_features.clone()));
+        self.cache.insert(
+            cache_key,
+            (
+                final_candidates.clone(),
+                self.last_computed_features.clone(),
+            ),
+        );
 
         // Determine previously selected candidate index
         let selected_index = if let Some(fav) = candidate_memory
@@ -1849,10 +2021,7 @@ impl PhoneticSuggestion {
             .or_else(|| candidate_memory.get(middle))
             .or_else(|| candidate_memory.get(&phonetic))
         {
-            final_candidates
-                .iter()
-                .position(|c| c == fav)
-                .unwrap_or(0)
+            final_candidates.iter().position(|c| c == fav).unwrap_or(0)
         } else {
             0
         };
@@ -2106,7 +2275,10 @@ impl PhoneticSuggestion {
                     let mut base_candidates = Vec::new();
                     let mut has_verified_base = false;
 
-                    if let Some(ac) = self.database.get_autocorrect_raw_filtered(base_key, self.config.enable_banglish_shorthand) {
+                    if let Some(ac) = self.database.get_autocorrect_raw_filtered(
+                        base_key,
+                        self.config.enable_banglish_shorthand,
+                    ) {
                         let conv = if ac.chars().any(|c| c.is_bengali()) {
                             ac
                         } else {
@@ -2644,7 +2816,8 @@ mod tests {
         println!("cands_book: {:?}", cands_book);
         assert_eq!(
             cands_book[0], "পড়া",
-            "With context বই, পড়া must be ranked #1; got {:?}", cands_book
+            "With context বই, পড়া must be ranked #1; got {:?}",
+            cands_book
         );
 
         // When previous word is "শার্ট", "pora" should rank "পরা" first (robust even without trained LM)

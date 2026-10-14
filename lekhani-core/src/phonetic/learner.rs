@@ -144,15 +144,16 @@ impl AutonomousLearner {
             return;
         }
         // Never allow verbatim Latin selections or Latin words to overwrite phonetic mappings
-        if clean_buf.eq_ignore_ascii_case(clean_cand) || (clean_cand.is_ascii() && !clean_buf.is_empty()) {
+        if clean_buf.eq_ignore_ascii_case(clean_cand)
+            || (clean_cand.is_ascii() && !clean_buf.is_empty())
+        {
             return;
         }
         self.candidate_memory
             .insert(clean_buf.to_string(), clean_cand.to_string());
         let lower = clean_buf.to_ascii_lowercase();
         if lower != clean_buf {
-            self.candidate_memory
-                .insert(lower, clean_cand.to_string());
+            self.candidate_memory.insert(lower, clean_cand.to_string());
         }
         self.dirty = true;
         if self.candidate_memory.len() > 2200 {
@@ -174,7 +175,9 @@ impl AutonomousLearner {
         }
 
         // Never allow verbatim Latin selections or Latin words to overwrite phonetic mappings
-        if clean_buf.eq_ignore_ascii_case(clean_cand) || (clean_cand.is_ascii() && !clean_buf.is_empty()) {
+        if clean_buf.eq_ignore_ascii_case(clean_cand)
+            || (clean_cand.is_ascii() && !clean_buf.is_empty())
+        {
             return;
         }
 
@@ -202,10 +205,15 @@ impl AutonomousLearner {
     pub fn record_input_error_direct(&mut self, raw_input: &str, candidate: &str) {
         let clean_raw = raw_input.trim().to_lowercase();
         let clean_cand = candidate.trim();
-        if clean_raw.is_empty() || clean_cand.is_empty() || clean_raw == clean_cand || clean_cand.is_ascii() {
+        if clean_raw.is_empty()
+            || clean_cand.is_empty()
+            || clean_raw == clean_cand
+            || clean_cand.is_ascii()
+        {
             return;
         }
-        self.input_error_map.insert(clean_raw, clean_cand.to_string());
+        self.input_error_map
+            .insert(clean_raw, clean_cand.to_string());
         self.dirty = true;
         if self.input_error_map.len() > 2200 {
             self.prune_if_needed();
@@ -220,10 +228,19 @@ impl AutonomousLearner {
     }
 
     /// Record personal error pattern with explicit frequency threshold
-    pub fn record_input_error_with_threshold(&mut self, raw_input: &str, candidate: &str, threshold: u32) {
+    pub fn record_input_error_with_threshold(
+        &mut self,
+        raw_input: &str,
+        candidate: &str,
+        threshold: u32,
+    ) {
         let clean_raw = raw_input.trim().to_lowercase();
         let clean_cand = candidate.trim();
-        if clean_raw.is_empty() || clean_cand.is_empty() || clean_raw == clean_cand || clean_cand.is_ascii() {
+        if clean_raw.is_empty()
+            || clean_cand.is_empty()
+            || clean_raw == clean_cand
+            || clean_cand.is_ascii()
+        {
             return;
         }
 
@@ -239,7 +256,8 @@ impl AutonomousLearner {
         self.dirty = true;
 
         if *count >= threshold {
-            self.input_error_map.insert(clean_raw, clean_cand.to_string());
+            self.input_error_map
+                .insert(clean_raw, clean_cand.to_string());
             if self.input_error_map.len() > 2200 {
                 self.prune_if_needed();
             }
@@ -386,8 +404,16 @@ impl AutonomousLearner {
             entries.sort_unstable_by(|a, b| {
                 let key_a = format!("{}\t{}", a.0, a.1);
                 let key_b = format!("{}\t{}", b.0, b.1);
-                let count_a = self.candidate_selection_counts.get(&key_a).copied().unwrap_or(1);
-                let count_b = self.candidate_selection_counts.get(&key_b).copied().unwrap_or(1);
+                let count_a = self
+                    .candidate_selection_counts
+                    .get(&key_a)
+                    .copied()
+                    .unwrap_or(1);
+                let count_b = self
+                    .candidate_selection_counts
+                    .get(&key_b)
+                    .copied()
+                    .unwrap_or(1);
                 count_b.cmp(&count_a)
             });
             entries.truncate(MAX_CANDIDATES - 200);
@@ -419,11 +445,7 @@ impl AutonomousLearner {
     }
 
     /// Process a committed word and auto-learn new intact vocabulary (without storing broken stems)
-    pub fn observe_and_learn(
-        &mut self,
-        committed_word: &str,
-        trie: &PrefixTrie,
-    ) -> Vec<String> {
+    pub fn observe_and_learn(&mut self, committed_word: &str, trie: &PrefixTrie) -> Vec<String> {
         let clean = committed_word.trim();
         let mut newly_learned = Vec::new();
 
@@ -493,7 +515,9 @@ impl AutonomousLearner {
         // 5. Decay observed word frequencies
         self.observed_counts.retain(|word, count| {
             *count = ((*count as f32) * f).round() as u32;
-            *count >= 1 || self.learned_words.contains(word) || self.custom_user_words.contains(word)
+            *count >= 1
+                || self.learned_words.contains(word)
+                || self.custom_user_words.contains(word)
         });
 
         // 6. Decay bigram frequencies
@@ -590,7 +614,10 @@ impl AutonomousLearner {
             self.candidate_memory.insert(k.clone(), v.clone());
         }
         for (k, &count) in &other.candidate_selection_counts {
-            let entry = self.candidate_selection_counts.entry(k.clone()).or_insert(0);
+            let entry = self
+                .candidate_selection_counts
+                .entry(k.clone())
+                .or_insert(0);
             *entry = (*entry).max(count).min(100);
         }
         self.dirty = true;
@@ -648,7 +675,8 @@ impl AutonomousLearner {
     /// Clear background auto-learned words while preserving explicit user-added words
     pub fn clear_learned_history(&mut self) {
         self.learned_words = self.custom_user_words.clone();
-        self.observed_counts.retain(|k, _| self.custom_user_words.contains(k));
+        self.observed_counts
+            .retain(|k, _| self.custom_user_words.contains(k));
         self.user_bigrams.clear();
         self.dirty = true;
         self.pretrain_baseline();
@@ -656,7 +684,9 @@ impl AutonomousLearner {
 
     /// Retrieve count of auto-learned words
     pub fn get_learned_words_count(&self) -> usize {
-        self.learned_words.len().saturating_sub(self.custom_user_words.len())
+        self.learned_words
+            .len()
+            .saturating_sub(self.custom_user_words.len())
     }
 
     /// Import a list of raw words (e.g. from Ridmik Keyboard or Avro export)
@@ -715,8 +745,12 @@ impl AutonomousLearner {
                 if bytes.len() >= 8 && &bytes[0..4] == Self::BINARY_MAGIC {
                     let version = u32::from_le_bytes(bytes[4..8].try_into().unwrap_or([0; 4]));
                     if version == Self::BINARY_VERSION {
-                        if let Ok(mut learner) = bincode::deserialize::<AutonomousLearner>(&bytes[8..]) {
-                            learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
+                        if let Ok(mut learner) =
+                            bincode::deserialize::<AutonomousLearner>(&bytes[8..])
+                        {
+                            learner
+                                .candidate_memory
+                                .retain(|k, _| k.chars().count() > 2);
                             learner.input_error_map.retain(|k, _| k.chars().count() > 2);
                             learner.dirty = false;
                             return learner;
@@ -749,7 +783,9 @@ impl AutonomousLearner {
                             learner.input_error_map = old.input_error_map;
                             learner.input_error_counts = old.input_error_counts;
                             learner.rank_weights = old.rank_weights;
-                            learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
+                            learner
+                                .candidate_memory
+                                .retain(|k, _| k.chars().count() > 2);
                             learner.input_error_map.retain(|k, _| k.chars().count() > 2);
                             learner.dirty = true;
                             return learner;
@@ -778,13 +814,18 @@ impl AutonomousLearner {
                             learner.candidate_memory = old.candidate_memory;
                             learner.candidate_selection_counts = old.candidate_selection_counts;
                             learner.rank_weights = old.rank_weights;
-                            learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
+                            learner
+                                .candidate_memory
+                                .retain(|k, _| k.chars().count() > 2);
                             learner.dirty = true;
                             return learner;
                         }
                     }
-                } else if let Ok(mut learner) = serde_json::from_slice::<AutonomousLearner>(&bytes) {
-                    learner.candidate_memory.retain(|k, _| k.chars().count() > 2);
+                } else if let Ok(mut learner) = serde_json::from_slice::<AutonomousLearner>(&bytes)
+                {
+                    learner
+                        .candidate_memory
+                        .retain(|k, _| k.chars().count() > 2);
                     learner.input_error_map.retain(|k, _| k.chars().count() > 2);
                     learner.dirty = true;
                     return learner;
@@ -1030,11 +1071,16 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let temp_path = temp_dir.join("lekhani_test_learner_bin_roundtrip.bin");
 
-        learner.save_to_path(&temp_path).expect("Binary save must succeed");
+        learner
+            .save_to_path(&temp_path)
+            .expect("Binary save must succeed");
         assert!(!learner.dirty);
 
         let loaded = AutonomousLearner::load_from_path(&temp_path);
-        assert_eq!(loaded.get_user_bigram_boost("বাংলা", "ভাষা"), learner.get_user_bigram_boost("বাংলা", "ভাষা"));
+        assert_eq!(
+            loaded.get_user_bigram_boost("বাংলা", "ভাষা"),
+            learner.get_user_bigram_boost("বাংলা", "ভাষা")
+        );
         assert_eq!(loaded.candidate_memory.get("amr"), Some(&"আমার".to_string()));
         assert!(!loaded.dirty);
 
@@ -1123,7 +1169,10 @@ mod tests {
 
         // 2nd selection: count = 2 (>= 2 threshold), now remembered!
         learner.record_candidate_selection("kormo", "কর্ম");
-        assert_eq!(learner.candidate_memory.get("kormo"), Some(&"কর্ম".to_string()));
+        assert_eq!(
+            learner.candidate_memory.get("kormo"),
+            Some(&"কর্ম".to_string())
+        );
 
         // Short token immunity: "oi" (<= 2 chars) must NEVER be pinned even after multiple selections
         learner.record_candidate_selection("oi", "ঐ");
@@ -1133,7 +1182,10 @@ mod tests {
 
         let json = serde_json::to_string(&learner).expect("JSON serialization must succeed");
         let deserialized: AutonomousLearner = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.candidate_memory.get("kormo"), Some(&"কর্ম".to_string()));
+        assert_eq!(
+            deserialized.candidate_memory.get("kormo"),
+            Some(&"কর্ম".to_string())
+        );
         assert_eq!(deserialized.candidate_memory.get("oi"), None);
     }
 
@@ -1239,7 +1291,10 @@ mod tests {
         let mut adapted = AutonomousLearner::new();
         adapted.rank_weights.lm_score = 7500.0; // user has already adapted
         adapted.load_pretrained_rank_weights(&weights_path);
-        assert_eq!(adapted.rank_weights.lm_score, 7500.0, "Must not overwrite adapted weights");
+        assert_eq!(
+            adapted.rank_weights.lm_score, 7500.0,
+            "Must not overwrite adapted weights"
+        );
     }
 
     #[test]
@@ -1268,20 +1323,33 @@ mod tests {
         for _ in 0..5 {
             learner.observe_and_learn("পরিক্ষা", &trie);
         }
-        assert!(!learner.learned_words.contains("পরিক্ষা"), "Typo must not be learned");
+        assert!(
+            !learner.learned_words.contains("পরিক্ষা"),
+            "Typo must not be learned"
+        );
 
         // Genuinely new vocabulary should be learned
         for _ in 0..2 {
             learner.observe_and_learn("কুয়েট", &trie);
         }
-        assert!(learner.learned_words.contains("কুয়েট"), "Valid new word must be learned");
+        assert!(
+            learner.learned_words.contains("কুয়েট"),
+            "Valid new word must be learned"
+        );
 
         // 4. Recency decay
         learner.record_candidate_selection_direct("Kothay", "কোথায়");
-        assert_eq!(learner.candidate_memory.get("kothay"), Some(&"কোথায়".to_string()));
+        assert_eq!(
+            learner.candidate_memory.get("kothay"),
+            Some(&"কোথায়".to_string())
+        );
 
         // Apply decay with low factor (simulating 60 days without use)
         learner.apply_recency_decay(0.0); // complete decay of zero-frequency entries
-        assert_eq!(learner.candidate_memory.get("kothay"), None, "Decayed entry must be pruned");
+        assert_eq!(
+            learner.candidate_memory.get("kothay"),
+            None,
+            "Decayed entry must be pruned"
+        );
     }
 }

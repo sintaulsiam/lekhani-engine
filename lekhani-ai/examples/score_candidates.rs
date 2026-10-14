@@ -26,7 +26,14 @@ fn main() {
     let score2 = lm.score_candidate(Some("আমি"), Some("ভাত"), "যাচ্ছি");
     println!("  'আমি ভাত [খাচ্ছি]' log-prob: {:.3}", score1);
     println!("  'আমি ভাত [যাচ্ছি]' log-prob: {:.3}", score2);
-    println!("  -> Winner: {}\n", if score1 > score2 { "খাচ্ছি" } else { "যাচ্ছি" });
+    println!(
+        "  -> Winner: {}\n",
+        if score1 > score2 {
+            "খাচ্ছি"
+        } else {
+            "যাচ্ছি"
+        }
+    );
 
     // 2. Homophone Disambiguation
     println!("2. Homophone Context Reranking:");
@@ -43,8 +50,14 @@ fn main() {
     let homophones_rev = vec!["পরা".to_string(), "পড়া".to_string()];
     let book_context = scorer.rank_candidates(&["বই"], &homophones_rev);
     let shirt_context = scorer.rank_candidates(&["শার্ট"], &homophones_rev);
-    println!("  Input [\"পরা\", \"পড়া\"] with Context 'বই': {:?}", book_context);
-    println!("  Input [\"পরা\", \"পড়া\"] with Context 'শার্ট': {:?}\n", shirt_context);
+    println!(
+        "  Input [\"পরা\", \"পড়া\"] with Context 'বই': {:?}",
+        book_context
+    );
+    println!(
+        "  Input [\"পরা\", \"পড়া\"] with Context 'শার্ট': {:?}\n",
+        shirt_context
+    );
 
     // 3. Next-Word Prediction
     println!("3. Next-Word Continuations:");

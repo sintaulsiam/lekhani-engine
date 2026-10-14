@@ -19,7 +19,10 @@ fn main() -> anyhow::Result<()> {
         anyhow::bail!("Corpus file not found at {:?}", corpus_path);
     }
 
-    println!("[1/5] Pass 1: Scanning unigram frequencies from {:?}...", corpus_path);
+    println!(
+        "[1/5] Pass 1: Scanning unigram frequencies from {:?}...",
+        corpus_path
+    );
     let file = File::open(&corpus_path)?;
     let reader = BufReader::with_capacity(4 * 1024 * 1024, file);
 
@@ -66,7 +69,10 @@ fn main() -> anyhow::Result<()> {
         id_to_word.push(word.clone());
     }
 
-    println!("[3/5] Pass 2: Accumulating symmetric co-occurrence matrix (window={})...", WINDOW_SIZE);
+    println!(
+        "[3/5] Pass 2: Accumulating symmetric co-occurrence matrix (window={})...",
+        WINDOW_SIZE
+    );
     let file = File::open(&corpus_path)?;
     let reader = BufReader::with_capacity(4 * 1024 * 1024, file);
 
@@ -150,7 +156,10 @@ fn main() -> anyhow::Result<()> {
     // Free cooccur to save RAM
     drop(cooccur);
 
-    println!("[5/5] Spherical Subspace Matrix Factorization to {} dimensions...", EMBEDDING_DIM);
+    println!(
+        "[5/5] Spherical Subspace Matrix Factorization to {} dimensions...",
+        EMBEDDING_DIM
+    );
     // Initialize random projection matrix Omega (VOCAB_SIZE x EMBEDDING_DIM)
     // Deterministic pseudo-random number generator (xorshift64)
     let mut seed = 0x8543290123891047u64;
@@ -169,7 +178,11 @@ fn main() -> anyhow::Result<()> {
     // Power iterations: Y = PPMI * (PPMI * Y)
     let mut temp = vec![0.0f32; VOCAB_SIZE * EMBEDDING_DIM];
     for iter in 0..POWER_ITERATIONS {
-        println!("  Subspace Power Iteration {}/{}...", iter + 1, POWER_ITERATIONS);
+        println!(
+            "  Subspace Power Iteration {}/{}...",
+            iter + 1,
+            POWER_ITERATIONS
+        );
         // temp = PPMI * Y
         temp.fill(0.0);
         for i in 0..VOCAB_SIZE {
@@ -257,7 +270,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     let bin_bytes = embeddings.save_binary();
-    println!("\nSerialized embeddings binary size: {} KB", bin_bytes.len() / 1024);
+    println!(
+        "\nSerialized embeddings binary size: {} KB",
+        bin_bytes.len() / 1024
+    );
 
     let target_paths = &[
         Path::new("./data/dictionaries/bengali_embeddings.bin"),
@@ -275,6 +291,9 @@ fn main() -> anyhow::Result<()> {
         println!("Successfully written to {:?}", path);
     }
 
-    println!("\nEmbeddings training completed in {:.2}s!", start_time.elapsed().as_secs_f32());
+    println!(
+        "\nEmbeddings training completed in {:.2}s!",
+        start_time.elapsed().as_secs_f32()
+    );
     Ok(())
 }

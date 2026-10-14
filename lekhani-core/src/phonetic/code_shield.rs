@@ -6,21 +6,148 @@
 
 /// Common programming keywords and developer tokens that should never be transliterated (alphabetically sorted for binary search)
 pub const CODE_KEYWORDS: &[&str] = &[
-    "apt", "async", "auto", "await", "awk", "bash", "bench", "bool", "branch", "break",
-    "brew", "build", "bun", "byte", "cargo", "case", "cat", "catch", "char", "checkout",
-    "cherry-pick", "clang", "class", "clone", "cmake", "code", "commit", "const", "continue",
-    "cpp", "crate", "curl", "debug", "def", "deno", "deploy", "diff", "dnf", "docker",
-    "double", "elif", "else", "enum", "except", "export", "extern", "false", "fetch",
-    "finally", "find", "float", "fn", "for", "from", "func", "function", "gcc", "git",
-    "github", "gitlab", "goto", "grep", "if", "impl", "import", "include", "init", "install",
-    "instanceof", "int", "interface", "let", "long", "loop", "make", "match", "merge",
-    "module", "namespace", "nano", "nil", "node", "none", "npm", "null", "nvim", "package",
-    "pacman", "pip", "pnpm", "private", "protected", "pub", "public", "pull", "push",
-    "python", "raise", "rebase", "release", "remote", "require", "reset", "return", "run",
-    "rustc", "scp", "sed", "self", "short", "signed", "sizeof", "ssh", "stash", "status",
-    "str", "string", "struct", "sudo", "super", "switch", "test", "this", "throw", "tmux",
-    "trait", "true", "try", "type", "typeof", "undefined", "unsigned", "use", "val", "var",
-    "vim", "void", "wget", "while", "yarn", "yield", "zsh",
+    "apt",
+    "async",
+    "auto",
+    "await",
+    "awk",
+    "bash",
+    "bench",
+    "bool",
+    "branch",
+    "break",
+    "brew",
+    "build",
+    "bun",
+    "byte",
+    "cargo",
+    "case",
+    "cat",
+    "catch",
+    "char",
+    "checkout",
+    "cherry-pick",
+    "clang",
+    "class",
+    "clone",
+    "cmake",
+    "code",
+    "commit",
+    "const",
+    "continue",
+    "cpp",
+    "crate",
+    "curl",
+    "debug",
+    "def",
+    "deno",
+    "deploy",
+    "diff",
+    "dnf",
+    "docker",
+    "double",
+    "elif",
+    "else",
+    "enum",
+    "except",
+    "export",
+    "extern",
+    "false",
+    "fetch",
+    "finally",
+    "find",
+    "float",
+    "fn",
+    "for",
+    "from",
+    "func",
+    "function",
+    "gcc",
+    "git",
+    "github",
+    "gitlab",
+    "goto",
+    "grep",
+    "if",
+    "impl",
+    "import",
+    "include",
+    "init",
+    "install",
+    "instanceof",
+    "int",
+    "interface",
+    "let",
+    "long",
+    "loop",
+    "make",
+    "match",
+    "merge",
+    "module",
+    "namespace",
+    "nano",
+    "nil",
+    "node",
+    "none",
+    "npm",
+    "null",
+    "nvim",
+    "package",
+    "pacman",
+    "pip",
+    "pnpm",
+    "private",
+    "protected",
+    "pub",
+    "public",
+    "pull",
+    "push",
+    "python",
+    "raise",
+    "rebase",
+    "release",
+    "remote",
+    "require",
+    "reset",
+    "return",
+    "run",
+    "rustc",
+    "scp",
+    "sed",
+    "self",
+    "short",
+    "signed",
+    "sizeof",
+    "ssh",
+    "stash",
+    "status",
+    "str",
+    "string",
+    "struct",
+    "sudo",
+    "super",
+    "switch",
+    "test",
+    "this",
+    "throw",
+    "tmux",
+    "trait",
+    "true",
+    "try",
+    "type",
+    "typeof",
+    "undefined",
+    "unsigned",
+    "use",
+    "val",
+    "var",
+    "vim",
+    "void",
+    "wget",
+    "while",
+    "yarn",
+    "yield",
+    "zsh",
 ];
 
 /// Check if a Latin token is a developer code token, CLI flag, URL, or structured identifier
@@ -31,10 +158,20 @@ pub fn is_code_token(token: &str) -> bool {
     }
 
     // 1. CLI Flags: starts with "--" or "-" followed by ascii letters (e.g. "--help", "-rf", "-v")
-    if trimmed.starts_with("--") && trimmed.len() >= 3 && trimmed.chars().skip(2).all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+    if trimmed.starts_with("--")
+        && trimmed.len() >= 3
+        && trimmed
+            .chars()
+            .skip(2)
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
         return true;
     }
-    if trimmed.starts_with('-') && !trimmed.starts_with("--") && trimmed.len() >= 2 && trimmed.chars().skip(1).all(|c| c.is_ascii_alphabetic()) {
+    if trimmed.starts_with('-')
+        && !trimmed.starts_with("--")
+        && trimmed.len() >= 2
+        && trimmed.chars().skip(1).all(|c| c.is_ascii_alphabetic())
+    {
         return true;
     }
 
@@ -42,29 +179,62 @@ pub fn is_code_token(token: &str) -> bool {
     if trimmed.contains("://") || trimmed.starts_with("www.") || trimmed.starts_with("localhost:") {
         return true;
     }
-    if (trimmed.ends_with(".com") || trimmed.ends_with(".org") || trimmed.ends_with(".net")
-        || trimmed.ends_with(".io") || trimmed.ends_with(".dev") || trimmed.ends_with(".app")
-        || trimmed.ends_with(".edu") || trimmed.ends_with(".gov") || trimmed.ends_with(".bd"))
+    if (trimmed.ends_with(".com")
+        || trimmed.ends_with(".org")
+        || trimmed.ends_with(".net")
+        || trimmed.ends_with(".io")
+        || trimmed.ends_with(".dev")
+        || trimmed.ends_with(".app")
+        || trimmed.ends_with(".edu")
+        || trimmed.ends_with(".gov")
+        || trimmed.ends_with(".bd"))
         && trimmed.contains('.')
     {
         return true;
     }
 
     // 3. Email addresses
-    if trimmed.contains('@') && trimmed.contains('.') && !trimmed.starts_with('@') && !trimmed.ends_with('@') {
+    if trimmed.contains('@')
+        && trimmed.contains('.')
+        && !trimmed.starts_with('@')
+        && !trimmed.ends_with('@')
+    {
         return true;
     }
 
     // 4. File paths and extensions (e.g. "/etc/hosts", "./scripts/run.sh", "main.rs", "Cargo.toml")
     if (trimmed.starts_with("./") || trimmed.starts_with("../") || trimmed.starts_with('/'))
-        && trimmed.chars().all(|c| c.is_ascii_alphanumeric() || c == '/' || c == '.' || c == '_' || c == '-')
+        && trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '/' || c == '.' || c == '_' || c == '-')
     {
         return true;
     }
     if let Some(dot_pos) = trimmed.rfind('.') {
         if dot_pos > 0 && dot_pos + 1 < trimmed.len() {
             let ext = &trimmed[dot_pos + 1..];
-            if matches!(ext, "rs" | "js" | "ts" | "py" | "go" | "c" | "cpp" | "h" | "html" | "css" | "json" | "toml" | "yaml" | "yml" | "sh" | "md" | "txt" | "png" | "jpg" | "svg") {
+            if matches!(
+                ext,
+                "rs" | "js"
+                    | "ts"
+                    | "py"
+                    | "go"
+                    | "c"
+                    | "cpp"
+                    | "h"
+                    | "html"
+                    | "css"
+                    | "json"
+                    | "toml"
+                    | "yaml"
+                    | "yml"
+                    | "sh"
+                    | "md"
+                    | "txt"
+                    | "png"
+                    | "jpg"
+                    | "svg"
+            ) {
                 return true;
             }
         }
@@ -74,7 +244,9 @@ pub fn is_code_token(token: &str) -> bool {
     if trimmed.contains('_')
         && !trimmed.starts_with('_')
         && !trimmed.ends_with('_')
-        && trimmed.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
     {
         return true;
     }
@@ -82,7 +254,11 @@ pub fn is_code_token(token: &str) -> bool {
     // 6. kebab-case with ASCII letters (e.g. "user-profile", "btn-primary")
     if trimmed.contains('-') && !trimmed.starts_with('-') && !trimmed.ends_with('-') {
         let parts: Vec<&str> = trimmed.split('-').collect();
-        if parts.len() >= 2 && parts.iter().all(|p| p.len() >= 2 && p.chars().all(|c| c.is_ascii_alphanumeric())) {
+        if parts.len() >= 2
+            && parts
+                .iter()
+                .all(|p| p.len() >= 2 && p.chars().all(|c| c.is_ascii_alphanumeric()))
+        {
             return true;
         }
     }

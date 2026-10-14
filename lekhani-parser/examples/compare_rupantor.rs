@@ -1,7 +1,7 @@
-use std::time::Instant;
 use lekhani_parser::default_avro_parser;
 use rupantor::parser::PhoneticParser;
 use serde_json::Value;
+use std::time::Instant;
 
 fn main() {
     println!("══════════════════════════════════════════════════════════════════════════════");
@@ -12,7 +12,11 @@ fn main() {
 
     let json_bytes = include_str!("../data/avrophonetic.json");
     let val: Value = serde_json::from_str(json_bytes).unwrap();
-    let layout_obj = if let Some(l) = val.get("layout") { l } else { &val };
+    let layout_obj = if let Some(l) = val.get("layout") {
+        l
+    } else {
+        &val
+    };
     let rupantor = PhoneticParser::new(layout_obj);
 
     let test_suites = [
@@ -20,13 +24,22 @@ fn main() {
         ("Medium word (\"bangla\")", "bangla"),
         ("Complex conjunct (\"shikkhok\")", "shikkhok"),
         ("Heavy conjuncts (\"brriShTi\")", "brriShTi"),
-        ("Standard sentence (\"amader bangladesh\")", "amader bangladesh"),
-        ("Long sentence (\"ami banglay gan gai ami banglar gan gai\")", "ami banglay gan gai ami banglar gan gai"),
+        (
+            "Standard sentence (\"amader bangladesh\")",
+            "amader bangladesh",
+        ),
+        (
+            "Long sentence (\"ami banglay gan gai ami banglar gan gai\")",
+            "ami banglay gan gai ami banglar gan gai",
+        ),
     ];
 
     const ITERATIONS: u32 = 100_000;
 
-    println!("{:<32} | {:<16} | {:<16} | {:<10}", "Workload", "Rupantor", "Lekhani (alloc)", "Speedup");
+    println!(
+        "{:<32} | {:<16} | {:<16} | {:<10}",
+        "Workload", "Rupantor", "Lekhani (alloc)", "Speedup"
+    );
     println!("{:-<32}-+-{:-<16}-+-{:-<16}-+-{:-<10}", "", "", "", "");
 
     for (desc, input) in &test_suites {
@@ -64,7 +77,10 @@ fn main() {
     println!("   🚀 Zero-Allocation Hot-Path (convert_into reusing caller scratch buffer)");
     println!("══════════════════════════════════════════════════════════════════════════════\n");
 
-    println!("{:<32} | {:<16} | {:<16} | {:<10}", "Workload", "Rupantor (alloc)", "Lekhani (0-alloc)", "Speedup");
+    println!(
+        "{:<32} | {:<16} | {:<16} | {:<10}",
+        "Workload", "Rupantor (alloc)", "Lekhani (0-alloc)", "Speedup"
+    );
     println!("{:-<32}-+-{:-<16}-+-{:-<16}-+-{:-<10}", "", "", "", "");
 
     let mut buf = String::with_capacity(128);

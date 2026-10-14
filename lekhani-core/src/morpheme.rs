@@ -19,27 +19,44 @@ pub struct MorphemeDecomposition<'a> {
 }
 
 /// Definitive markers (নির্দিষ্টতাবাচক প্রত্যয়)
-pub const DEFINITIVES: &[&str] = &[
-    "গুলো", "গুলি", "গুলা", "খানা", "খানি", "টুকুন", "টুকু", "টা", "টি",
-];
+pub const DEFINITIVES: &[&str] = &["গুলো", "গুলি", "গুলা", "খানা", "খানি", "টুকুন", "টুকু", "টা", "টি"];
 
 /// Nominal & pronominal case markers (কারক-বিভক্তি)
 pub const CASE_MARKERS: &[&str] = &[
-    "দেরকে", "দের", "ের", "কে", "রে", "তে", "েতে", "য়ে", "র", "ে",
+    "দেরকে",
+    "দের",
+    "ের",
+    "কে",
+    "রে",
+    "তে",
+    "েতে",
+    "য়ে",
+    "র",
+    "ে",
 ];
 
 /// Verb tense-aspect-person inflections (ক্রিয়া বিভক্তি)
 pub const VERB_INFLECTIONS: &[&str] = &[
-    "ছিলেন", "ছিলাম", "ছিলে", "ছিল",
-    "ছেন", "ছি", "ছিস", "ছে", "ছো",
-    "লাম", "লেন", "লে",
-    "বেন", "বে", "বা", "ব",
+    "ছিলেন",
+    "ছিলাম",
+    "ছিলে",
+    "ছিল",
+    "ছেন",
+    "ছি",
+    "ছিস",
+    "ছে",
+    "ছো",
+    "লাম",
+    "লেন",
+    "লে",
+    "বেন",
+    "বে",
+    "বা",
+    "ব",
 ];
 
 /// Colloquial & emphatic clitic particles (অনুগামী প্রত্যয়)
-pub const PARTICLES: &[&str] = &[
-    "ই", "ও", "তো", "না",
-];
+pub const PARTICLES: &[&str] = &["ই", "ও", "তো", "না"];
 
 /// Morpheme Analyzer for decomposing inflected Bengali words into root and suffix
 #[derive(Debug, Clone, Default)]
@@ -58,7 +75,8 @@ impl BengaliMorphAnalyzer {
         }
 
         // 1. Try compound definitives first (e.g. "-গুলোর", "-গুলির", "-টার", "-টির")
-        for def in &["গুলোর", "গুলির", "গুলার", "টার", "টির", "খানার", "খানির"] {
+        for def in &["গুলোর", "গুলির", "গুলার", "টার", "টির", "খানার", "খানির"]
+        {
             if word.ends_with(def) {
                 let cut_idx = word.len() - def.len();
                 let root = &word[..cut_idx];
@@ -210,11 +228,12 @@ impl RupmulGraphSynthesizer {
         let mut results = Vec::with_capacity(16);
         let mut seen = hashbrown::HashSet::new();
 
-        let add = |form: String, results: &mut Vec<String>, seen: &mut hashbrown::HashSet<String>| {
-            if seen.insert(form.clone()) {
-                results.push(form);
-            }
-        };
+        let add =
+            |form: String, results: &mut Vec<String>, seen: &mut hashbrown::HashSet<String>| {
+                if seen.insert(form.clone()) {
+                    results.push(form);
+                }
+            };
 
         // 1. Direct Case Inflections (Tier 3)
         // Sandhi check: if root ends with vowel/kar, use -র instead of -ের
@@ -315,7 +334,8 @@ impl RupmulGraphSynthesizer {
             }
         }
 
-        for &classifier in &["খানা", "খানি", "টুকু", "টুকুন", "টি", "টা"] {
+        for &classifier in &["খানা", "খানি", "টুকু", "টুকুন", "টি", "টা"]
+        {
             if current.ends_with(classifier) && current.len() > classifier.len() {
                 let stem = &current[..current.len() - classifier.len()];
                 if stem.chars().count() >= 2 {
@@ -364,7 +384,9 @@ mod tests {
         assert_eq!(dec_boi_ti.category, SuffixCategory::Definitive);
 
         // Case markers
-        let dec_manush = analyzer.decompose("মানুষদের").expect("Should decompose মানুষদের");
+        let dec_manush = analyzer
+            .decompose("মানুষদের")
+            .expect("Should decompose মানুষদের");
         assert_eq!(dec_manush.root, "মানুষ");
         assert_eq!(dec_manush.suffix, "দের");
         assert_eq!(dec_manush.category, SuffixCategory::CaseMarker);
@@ -375,7 +397,9 @@ mod tests {
         assert_eq!(dec_kolom.category, SuffixCategory::CaseMarker);
 
         // Verb inflections
-        let dec_korchi = analyzer.decompose("করছিলাম").expect("Should decompose করছিলাম");
+        let dec_korchi = analyzer
+            .decompose("করছিলাম")
+            .expect("Should decompose করছিলাম");
         assert_eq!(dec_korchi.root, "কর");
         assert_eq!(dec_korchi.suffix, "ছিলাম");
         assert_eq!(dec_korchi.category, SuffixCategory::VerbInflection);
@@ -420,7 +444,9 @@ mod tests {
         ));
 
         // 3. Decompose multi-tier agglutinative chain
-        let decomp = synth.decompose_dag("মানুষগুলোরও").expect("Should decompose মানুষগুলোরও");
+        let decomp = synth
+            .decompose_dag("মানুষগুলোরও")
+            .expect("Should decompose মানুষগুলোরও");
         assert_eq!(decomp.root, "মানুষ");
         assert!(decomp.chain.contains(&"গুলো".to_string()));
         assert!(decomp.chain.contains(&"ও".to_string()));

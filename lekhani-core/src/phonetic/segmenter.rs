@@ -87,7 +87,8 @@ pub fn segment_concatenated_token(
         let part1 = &lower[..i];
         let part2 = &lower[i..];
 
-        if let (Some((bn1, freq1)), Some((bn2, freq2))) = (resolve_part(part1), resolve_part(part2)) {
+        if let (Some((bn1, freq1)), Some((bn2, freq2))) = (resolve_part(part1), resolve_part(part2))
+        {
             if is_isolated_consonant(&bn1) || is_isolated_consonant(&bn2) {
                 continue;
             }

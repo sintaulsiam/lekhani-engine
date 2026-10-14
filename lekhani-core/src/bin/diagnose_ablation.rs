@@ -7,7 +7,7 @@
 
 use hashbrown::{HashMap, HashSet};
 use lekhani_core::chars::canonicalize;
-use lekhani_core::personas::{transform_avro_strict, transform_natural};
+use lekhani_core::personas::transform_avro_strict;
 use lekhani_core::phonetic::PhoneticSuggestion;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -47,15 +47,13 @@ fn load_test_pairs() -> Vec<(String, String)> {
     let file = File::open(test_path).expect("Failed to open test.tsv");
     let reader = BufReader::new(file);
     let mut pairs = Vec::new();
-    for line in reader.lines() {
-        if let Ok(l) = line {
-            let parts: Vec<&str> = l.split('\t').collect();
-            if parts.len() >= 2 {
-                let bn = canonicalize(parts[0].trim());
-                let latin = parts[1].trim().to_string();
-                if !bn.is_empty() && !latin.is_empty() {
-                    pairs.push((bn, latin));
-                }
+    for l in reader.lines().map_while(Result::ok) {
+        let parts: Vec<&str> = l.split('\t').collect();
+        if parts.len() >= 2 {
+            let bn = canonicalize(parts[0].trim());
+            let latin = parts[1].trim().to_string();
+            if !bn.is_empty() && !latin.is_empty() {
+                pairs.push((bn, latin));
             }
         }
     }
@@ -92,7 +90,11 @@ fn main() {
     let raw_parser = lekhani_parser::default_avro_parser();
     let empty_memory = HashMap::new();
 
-    println!("Loaded {} test pairs, {} dict words.\n", test_pairs.len(), dict_words.len());
+    println!(
+        "Loaded {} test pairs, {} dict words.\n",
+        test_pairs.len(),
+        dict_words.len()
+    );
 
     // ────────────────────────────────────────────────────────────────
     // PART 1: Ablation on Natural Persona
@@ -111,7 +113,8 @@ fn main() {
     // Condition B: No Overrides (use_dictionary = true, overrides = empty)
     let mut sugg_no_ov = setup_engine();
     let empty_ov_map = hashbrown::HashMap::new();
-    sugg_no_ov.database.overrides = lekhani_core::phonetic::overrides::ZeroCopyOverrides::from_hashbrown_map(&empty_ov_map);
+    sugg_no_ov.database.overrides =
+        lekhani_core::phonetic::overrides::ZeroCopyOverrides::from_hashbrown_map(&empty_ov_map);
     let mut no_ov_top1 = 0;
     let mut no_ov_top3 = 0;
 
@@ -121,7 +124,8 @@ fn main() {
 
     // Condition D: No Overrides & No Dictionary
     let mut sugg_no_both = setup_engine();
-    sugg_no_both.database.overrides = lekhani_core::phonetic::overrides::ZeroCopyOverrides::from_hashbrown_map(&empty_ov_map);
+    sugg_no_both.database.overrides =
+        lekhani_core::phonetic::overrides::ZeroCopyOverrides::from_hashbrown_map(&empty_ov_map);
     let mut no_both_top1 = 0;
     let mut no_both_top3 = 0;
 
@@ -139,7 +143,11 @@ fn main() {
 
     for (bn_target, latin) in &test_pairs {
         let is_seen = dict_words.contains(bn_target);
-        if is_seen { seen_total += 1; } else { unseen_total += 1; }
+        if is_seen {
+            seen_total += 1;
+        } else {
+            unseen_total += 1;
+        }
 
         // Track length-stratified Seen vs Unseen
         let lat_len = latin.chars().count();
@@ -186,7 +194,8 @@ fn main() {
 
         // C. No Dictionary
         let (cands_nodict, _) = sugg_full.suggest(latin, true, false, &empty_memory);
-        let cands_nodict_canon: Vec<String> = cands_nodict.iter().map(|s| canonicalize(s)).collect();
+        let cands_nodict_canon: Vec<String> =
+            cands_nodict.iter().map(|s| canonicalize(s)).collect();
         if cands_nodict_canon.first() == Some(bn_target) {
             nodict_top1 += 1;
         }
@@ -196,7 +205,8 @@ fn main() {
 
         // D. No Overrides & No Dictionary
         let (cands_no_both, _) = sugg_no_both.suggest(latin, true, false, &empty_memory);
-        let cands_no_both_canon: Vec<String> = cands_no_both.iter().map(|s| canonicalize(s)).collect();
+        let cands_no_both_canon: Vec<String> =
+            cands_no_both.iter().map(|s| canonicalize(s)).collect();
         if cands_no_both_canon.first() == Some(bn_target) {
             no_both_top1 += 1;
         }
@@ -211,7 +221,10 @@ fn main() {
         }
     }
 
-    println!("{:<36} {:>10} {:>10}", "Ablation Configuration", "Top-1 Acc", "Top-3 Acc");
+    println!(
+        "{:<36} {:>10} {:>10}",
+        "Ablation Configuration", "Top-1 Acc", "Top-3 Acc"
+    );
     println!("──────────────────────────────────────────────────────────────────────");
     println!(
         "{:<36} {:>9.2}% {:>9.2}%",
@@ -247,24 +260,41 @@ fn main() {
     println!(
         "Overall Seen vs Unseen: Seen Top-1 = {:.2}% ({}/{}) | Unseen Top-1 = {:.2}% ({}/{})\n",
         full_seen_top1 as f64 / seen_total as f64 * 100.0,
-        full_seen_top1, seen_total,
+        full_seen_top1,
+        seen_total,
         full_unseen_top1 as f64 / unseen_total as f64 * 100.0,
-        full_unseen_top1, unseen_total
+        full_unseen_top1,
+        unseen_total
     );
 
     println!("📊 Stratified Seen vs Unseen Top-1 by Latin Character Length:");
     println!("──────────────────────────────────────────────────────────────────────");
-    println!("{:<14} {:<24} {:<24}", "Length Bucket", "Seen Words Top-1", "Unseen Words Top-1");
+    println!(
+        "{:<14} {:<24} {:<24}",
+        "Length Bucket", "Seen Words Top-1", "Unseen Words Top-1"
+    );
     println!("──────────────────────────────────────────────────────────────────────");
     let bucket_names = ["1-3 chars", "4-6 chars", "7+ chars"];
     for i in 0..3 {
-        let s_acc = if len_seen_total[i] > 0 { len_seen_top1[i] as f64 / len_seen_total[i] as f64 * 100.0 } else { 0.0 };
-        let u_acc = if len_unseen_total[i] > 0 { len_unseen_top1[i] as f64 / len_unseen_total[i] as f64 * 100.0 } else { 0.0 };
+        let s_acc = if len_seen_total[i] > 0 {
+            len_seen_top1[i] as f64 / len_seen_total[i] as f64 * 100.0
+        } else {
+            0.0
+        };
+        let u_acc = if len_unseen_total[i] > 0 {
+            len_unseen_top1[i] as f64 / len_unseen_total[i] as f64 * 100.0
+        } else {
+            0.0
+        };
         println!(
             "{:<14} {:>6.2}% ({:>4}/{:<4})      {:>6.2}% ({:>4}/{:<4})",
             bucket_names[i],
-            s_acc, len_seen_top1[i], len_seen_total[i],
-            u_acc, len_unseen_top1[i], len_unseen_total[i]
+            s_acc,
+            len_seen_top1[i],
+            len_seen_total[i],
+            u_acc,
+            len_unseen_top1[i],
+            len_unseen_total[i]
         );
     }
     println!("──────────────────────────────────────────────────────────────────────\n");
@@ -299,10 +329,16 @@ fn main() {
             traced, latin, bn_target
         );
         match rank {
-            Some(r) => println!("  ➔ Target found at Rank {} (Slot {}) in candidate list!", r, r),
+            Some(r) => println!(
+                "  ➔ Target found at Rank {} (Slot {}) in candidate list!",
+                r, r
+            ),
             None => println!("  ➔ Target NOT in candidate list at any rank (REACHABILITY FAILURE)"),
         }
-        println!("  ➔ Returned Candidates: {:?}", cands_canon.iter().take(5).collect::<Vec<_>>());
+        println!(
+            "  ➔ Returned Candidates: {:?}",
+            cands_canon.iter().take(5).collect::<Vec<_>>()
+        );
         println!("  ─────────────────────────────────────────────────────────────");
 
         if traced >= 20 {
@@ -342,7 +378,8 @@ fn main() {
     let mut mapper_flaws = 0;
     let mut engine_displacement = 0;
 
-    for (target, keystrokes, raw_conv, engine_top, raw_matches) in avro_strict_diffs.iter().take(25) {
+    for (target, keystrokes, raw_conv, engine_top, raw_matches) in avro_strict_diffs.iter().take(25)
+    {
         if !raw_matches {
             mapper_flaws += 1;
             println!(
@@ -357,14 +394,24 @@ fn main() {
             );
         }
     }
+    println!(
+        "  Summary (first 25 sampled): {} mapper flaws, {} engine displacements",
+        mapper_flaws, engine_displacement
+    );
 
     let total_avro_fails = avro_strict_diffs.len();
     let total_mapper = avro_strict_diffs.iter().filter(|d| !d.4).count();
     let total_displaced = avro_strict_diffs.iter().filter(|d| d.4).count();
 
-    println!("\nAvro-Strict Failure Triage Total ({} failures / {} items):", total_avro_fails, total);
-    println!("  - Mapper Gaps (Raw parser doesn't produce target from keystrokes): {} ({:.1}%)",
-        total_mapper, total_mapper as f64 / total_avro_fails as f64 * 100.0);
+    println!(
+        "\nAvro-Strict Failure Triage Total ({} failures / {} items):",
+        total_avro_fails, total
+    );
+    println!(
+        "  - Mapper Gaps (Raw parser doesn't produce target from keystrokes): {} ({:.1}%)",
+        total_mapper,
+        total_mapper as f64 / total_avro_fails as f64 * 100.0
+    );
     println!("  - Engine Displacement (Raw parser DOES produce target, but Engine Slot 0 overrides it): {} ({:.1}%)",
         total_displaced, total_displaced as f64 / total_avro_fails as f64 * 100.0);
 
@@ -406,7 +453,10 @@ fn main() {
     let mut distinct_failed_targets: Vec<String> = failures_by_target.keys().cloned().collect();
     distinct_failed_targets.sort(); // Lexicographical sort to cover the entire alphabet
     let num_distinct = distinct_failed_targets.len();
-    println!("Found failures across {} distinct target Bengali words.", num_distinct);
+    println!(
+        "Found failures across {} distinct target Bengali words.",
+        num_distinct
+    );
 
     // Uniformly sample 100 distinct target words across the sorted vocabulary
     let sample_size = 100.min(num_distinct);
@@ -418,7 +468,7 @@ fn main() {
         let target_word = &distinct_failed_targets[target_idx];
         if let Some(cases) = failures_by_target.get(target_word) {
             if let Some(case) = cases.first() {
-                let mut c = FailureCase {
+                let c = FailureCase {
                     id: i + 1,
                     input: case.input.clone(),
                     target: case.target.clone(),
@@ -432,6 +482,7 @@ fn main() {
     }
 
     let json_out = serde_json::to_string_pretty(&sampled_failures).expect("Serialize failures");
-    std::fs::write("data/eval/failures_100_stratified.json", json_out).expect("Write failures_100_stratified.json");
+    std::fs::write("data/eval/failures_100_stratified.json", json_out)
+        .expect("Write failures_100_stratified.json");
     println!("✅ Dumped {} Natural persona failures across {} DISTINCT targets to data/eval/failures_100_stratified.json for hand audit.", sampled_failures.len(), sample_size);
 }

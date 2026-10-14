@@ -2,8 +2,8 @@
 //!
 //! Enables zero-overhead in-browser and Node.js Bengali phonetic transliteration.
 
-use wasm_bindgen::prelude::*;
 use crate::default_avro_parser;
+use wasm_bindgen::prelude::*;
 
 /// WASM-compatible wrapper around the compiled Avro phonetic parser.
 #[wasm_bindgen]

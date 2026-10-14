@@ -1,5 +1,5 @@
-use std::path::Path;
 use lekhani_neural::{BpeVocabulary, MicroGruModel};
+use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dict_dirs = [

@@ -95,7 +95,11 @@ fn test_quality_fixes_regression() {
 
     // 3. Dictionary vs Non-Dictionary Ranking Fix
     let (cands_laglo, _) = sugg.suggest("laglo", true, true, &empty_memory);
-    assert!(cands_laglo[0] == "লাগল" || cands_laglo[0] == "লাগলো", "Expected 'লাগল' or 'লাগলো' for 'laglo'; got {:?}", cands_laglo);
+    assert!(
+        cands_laglo[0] == "লাগল" || cands_laglo[0] == "লাগলো",
+        "Expected 'লাগল' or 'লাগলো' for 'laglo'; got {:?}",
+        cands_laglo
+    );
 
     let (cands_boiti, _) = sugg.suggest("boiti", true, true, &empty_memory);
     assert_eq!(cands_boiti[0], "বইটি", "Expected 'বইটি' for 'boiti'");
@@ -437,10 +441,16 @@ fn test_casual_banglish_and_colloquial_verbs() {
     assert!(cands_korsi[0] == "করছি" || cands_korsi.contains(&"করছি".to_string()));
 
     let (cands_kortasi, _) = sugg.suggest("kortasi", true, true, &empty_memory);
-    assert!(cands_kortasi.contains(&"করছি".to_string()) || cands_kortasi.contains(&"করতেছি".to_string()));
+    assert!(
+        cands_kortasi.contains(&"করছি".to_string())
+            || cands_kortasi.contains(&"করতেছি".to_string())
+    );
 
     let (cands_korsilam, _) = sugg.suggest("korsilam", true, true, &empty_memory);
-    assert!(cands_korsilam.contains(&"করছিলাম".to_string()) || cands_korsilam.contains(&"করেছিলাম".to_string()));
+    assert!(
+        cands_korsilam.contains(&"করছিলাম".to_string())
+            || cands_korsilam.contains(&"করেছিলাম".to_string())
+    );
 
     let (cands_jamu, _) = sugg.suggest("jamu", true, true, &empty_memory);
     assert!(cands_jamu.contains(&"যাব".to_string()));
@@ -451,12 +461,18 @@ fn test_casual_banglish_and_colloquial_verbs() {
     // Verify toggle off for shorthand
     sugg.config.enable_banglish_shorthand = false;
     let (cands_drkr_no_shorthand, _) = sugg.suggest("drkr", true, true, &empty_memory);
-    assert_ne!(cands_drkr_no_shorthand[0], "দরকার", "Disabling shorthand must prevent 'drkr' -> 'দরকার'");
+    assert_ne!(
+        cands_drkr_no_shorthand[0], "দরকার",
+        "Disabling shorthand must prevent 'drkr' -> 'দরকার'"
+    );
     sugg.config.enable_banglish_shorthand = true;
 
     // 3. Exact Backtick and Explicit Case Veto (writing experience preservation)
     let (cands_amr_backtick, _) = sugg.suggest("amr`", true, true, &empty_memory);
-    assert_ne!(cands_amr_backtick[0], "আমার", "Backtick must veto casual shorthand");
+    assert_ne!(
+        cands_amr_backtick[0], "আমার",
+        "Backtick must veto casual shorthand"
+    );
 
     // Standard Avro remains 100% faithful
     let (cands_bhalo, _) = sugg.suggest("bhalo", true, true, &empty_memory);
@@ -614,19 +630,37 @@ fn test_emphatic_participle_stems() {
     assert_eq!(c8[0], "বললেও", "Expected 'বললেও' at rank #1 for 'bolleo'");
 
     let (c9, _) = sugg.suggest("korssi", true, true, &empty_memory);
-    assert!(c9.contains(&"করছি".to_string()), "Expected 'করছি' for 'korssi'");
+    assert!(
+        c9.contains(&"করছি".to_string()),
+        "Expected 'করছি' for 'korssi'"
+    );
 
     let (c10, _) = sugg.suggest("vabsi", true, true, &empty_memory);
-    assert!(c10.contains(&"ভাবছি".to_string()), "Expected 'ভাবছি' for 'vabsi'");
+    assert!(
+        c10.contains(&"ভাবছি".to_string()),
+        "Expected 'ভাবছি' for 'vabsi'"
+    );
 
     let (c_amio, _) = sugg.suggest("amio", true, true, &empty_memory);
-    assert_eq!(c_amio[0], "আমিও", "Expected 'আমিও' for 'amio', got {:?}", c_amio);
+    assert_eq!(
+        c_amio[0], "আমিও",
+        "Expected 'আমিও' for 'amio', got {:?}",
+        c_amio
+    );
 
     let (c_tumio, _) = sugg.suggest("tumio", true, true, &empty_memory);
-    assert_eq!(c_tumio[0], "তুমিও", "Expected 'তুমিও' for 'tumio', got {:?}", c_tumio);
+    assert_eq!(
+        c_tumio[0], "তুমিও",
+        "Expected 'তুমিও' for 'tumio', got {:?}",
+        c_tumio
+    );
 
     let (c_ekhono, _) = sugg.suggest("ekhono", true, true, &empty_memory);
-    assert_eq!(c_ekhono[0], "এখনো", "Expected 'এখনো' for 'ekhono', got {:?}", c_ekhono);
+    assert_eq!(
+        c_ekhono[0], "এখনো",
+        "Expected 'এখনো' for 'ekhono', got {:?}",
+        c_ekhono
+    );
 }
 
 #[test]
@@ -659,8 +693,6 @@ fn test_real_world_writing_experience_and_unforced_uncertainty() {
         }
     }
     let empty_memory = HashMap::new();
-
-
 
     let expected_top = [
         ("kormo", "কর্ম"),
@@ -874,6 +906,3 @@ fn test_cache_invalidated_on_database_reload() {
     // This confirms the cache was not served stale
     let _ = pre_load; // pre_load may or may not contain ভালো (no dict), that's fine
 }
-
-
-
