@@ -1,0 +1,20 @@
+# Third-Party Notices and Dataset Attributions
+
+## 1. The Dakshina Dataset
+
+Portions of the phonetic evaluation and alignment benchmark assets in `data/eval/` (specifically `bn.translit.sampled.test.tsv` and derived lexicon samples) are from the **Dakshina Dataset**, developed by Google Research.
+
+- **License**: Creative Commons Attribution 4.0 International (CC BY 4.0)
+- **License URL**: https://creativecommons.org/licenses/by/4.0/
+- **Copyright**: © 2020 Google LLC
+- **Citation**:
+  Brian Roark, Lawrence Wolf-Sonkin, Christo Kirov, Ying Sheng, Narsheel Ranjan, Sanjeev Satheesh, Mark Elliot, Yuval Novotny, Dirk Padfield.
+  "Processing South Asian Languages Written in the Latin Script: the Dakshina Dataset."
+  In Proceedings of the 12th Language Resources and Evaluation Conference (LREC 2020), pages 2413–2423.
+  https://aclanthology.org/2020.lrec-1.294/
+
+## 2. Avro Phonetic & OpenBangla Lexicons
+
+Root word lists in `data/dictionaries/` are derived from the OpenBangla / Avro Phonetic community dictionaries.
+- **License**: Mozilla Public License 2.0 (MPL 2.0)
+- **Copyright**: © OmicronLab / OpenBangla Community
