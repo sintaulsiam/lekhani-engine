@@ -532,10 +532,72 @@ impl PhoneticDatabase {
         }
     }
 
+    /// Common peelable suffixes for supervised phonetic overrides
+    pub const OVERRIDE_SUFFIXES: &'static [(&'static str, &'static str)] = &[
+        ("gulote", "গুলোতে"),
+        ("gulor", "গুলোর"),
+        ("gulate", "গুলাতে"),
+        ("gular", "গুলার"),
+        ("derke", "দেরকে"),
+        ("gulo", "গুলো"),
+        ("gula", "গুলা"),
+        ("der", "দের"),
+        ("khana", "খানা"),
+        ("khani", "খানি"),
+        ("ey", "েই"),
+        ("er", "ের"),
+        ("ke", "কে"),
+        ("te", "তে"),
+        ("ra", "রা"),
+        ("ta", "টা"),
+        ("ti", "টি"),
+        ("to", "তো"),
+        ("ni", "নি"),
+        ("i", "ই"),
+        ("o", "ও"),
+    ];
+
     /// Fast zero-copy lookup for supervised phonetic overrides (colloquialisms, texting slang, proper nouns)
     #[inline]
     pub fn lookup_override(&self, input: &str) -> Option<OverrideEntry<'_>> {
         self.overrides.lookup(input)
+    }
+
+    /// Look up supervised overrides, falling back to agglutinative suffix peeling with Sandhi joining
+    /// if uninflected match fails. Bounded pre-allocated Vec (Tier 2 memory policy).
+    pub fn lookup_override_inflected(&self, input: &str) -> Option<Vec<(String, f32)>> {
+        if let Some(entry) = self.lookup_override(input) {
+            let mut list = Vec::with_capacity(entry.len());
+            for (word, conf) in entry {
+                list.push((word.to_string(), conf));
+            }
+            return Some(list);
+        }
+
+        // Suffix peeling on input (minimum stem length: 3 characters)
+        if input.chars().count() <= 3 {
+            return None;
+        }
+
+        for &(latin_suf, bengali_suf) in Self::OVERRIDE_SUFFIXES {
+            if input.ends_with(latin_suf) && input.len() > latin_suf.len() {
+                let stem = &input[..input.len() - latin_suf.len()];
+                if stem.chars().count() >= 3 {
+                    if let Some(entry) = self.lookup_override(stem) {
+                        let mut list = Vec::with_capacity(entry.len());
+                        for (stem_word, conf) in entry {
+                            let synthesized = super::morphology::apply_sandhi_join(stem_word, bengali_suf);
+                            list.push((synthesized, conf * 0.98));
+                        }
+                        if !list.is_empty() {
+                            return Some(list);
+                        }
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     /// Fast zero-copy prefix search on supervised phonetic overrides
@@ -1992,5 +2054,38 @@ mod tests {
         // Word should now have 9500 frequency and be recognized as exact dictionary word
         assert_eq!(db.get_frequency(test_word), 9500);
         assert!(db.is_exact_dictionary_word(test_word));
+    }
+
+    #[test]
+    fn test_lookup_override_inflected() {
+        let mut db = PhoneticDatabase::new();
+        // Load bundled static overrides
+        let mut ov_map = std::collections::HashMap::new();
+        ov_map.insert("daktar".to_string(), vec![("ডাক্তার".to_string(), 1.0)]);
+        ov_map.insert("manush".to_string(), vec![("মানুষ".to_string(), 1.0)]);
+        db.overrides = crate::phonetic::ZeroCopyOverrides::from_map(&ov_map);
+
+        // 1. Direct uninflected match
+        let direct = db.lookup_override_inflected("daktar");
+        assert!(direct.is_some());
+        assert_eq!(direct.unwrap()[0].0, "ডাক্তার");
+
+        // 2. Suffix peeling: daktarke -> ডাক্তারকে
+        let inflected_ke = db.lookup_override_inflected("daktarke");
+        assert!(inflected_ke.is_some());
+        assert_eq!(inflected_ke.unwrap()[0].0, "ডাক্তারকে");
+
+        // 3. Suffix peeling with Sandhi E-kar: daktarer -> ডাক্তারের
+        let inflected_er = db.lookup_override_inflected("daktarer");
+        assert!(inflected_er.is_some());
+        assert_eq!(inflected_er.unwrap()[0].0, "ডাক্তারের");
+
+        // 4. Plural marker peeling: manushgulo -> মানুষগুলো
+        let inflected_gulo = db.lookup_override_inflected("manushgulo");
+        assert!(inflected_gulo.is_some());
+        assert_eq!(inflected_gulo.unwrap()[0].0, "মানুষগুলো");
+
+        // 5. Unknown word returns None
+        assert!(db.lookup_override_inflected("unknownwordxyz").is_none());
     }
 }

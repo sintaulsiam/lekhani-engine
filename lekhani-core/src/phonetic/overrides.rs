@@ -15,9 +15,11 @@ pub struct OverrideCandidate<'a> {
     pub confidence: f32,
 }
 
+pub const MAX_OVERRIDE_CANDIDATES: usize = 6;
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct OverrideEntry<'a> {
-    items: [(&'a str, f32); 4],
+    items: [(&'a str, f32); MAX_OVERRIDE_CANDIDATES],
     len: usize,
 }
 
@@ -25,14 +27,14 @@ impl<'a> OverrideEntry<'a> {
     #[inline]
     pub fn new() -> Self {
         Self {
-            items: [("", 0.0); 4],
+            items: [("", 0.0); MAX_OVERRIDE_CANDIDATES],
             len: 0,
         }
     }
 
     #[inline]
     pub fn push(&mut self, word: &'a str, conf: f32) {
-        if self.len < 4 {
+        if self.len < MAX_OVERRIDE_CANDIDATES {
             self.items[self.len] = (word, conf);
             self.len += 1;
         }
@@ -287,7 +289,7 @@ impl ZeroCopyOverrides {
                     let cand_count = u16::from_le_bytes(data[pos + 10..pos + 12].try_into().unwrap()) as usize;
 
                     let mut entry = OverrideEntry::new();
-                    for i in 0..cand_count.min(4) {
+                    for i in 0..cand_count.min(MAX_OVERRIDE_CANDIDATES) {
                         let c_idx = cand_start + i;
                         if c_idx >= self.cand_count { break; }
                         let c_pos = self.cands_offset + c_idx * Self::CAND_RECORD_LEN;
@@ -357,7 +359,7 @@ impl ZeroCopyOverrides {
             let cand_count = u16::from_le_bytes(data[pos + 10..pos + 12].try_into().unwrap()) as usize;
 
             let mut entry = OverrideEntry::new();
-            for i in 0..cand_count.min(4) {
+            for i in 0..cand_count.min(MAX_OVERRIDE_CANDIDATES) {
                 let c_idx = cand_start + i;
                 if c_idx >= self.cand_count { break; }
                 let c_pos = self.cands_offset + c_idx * Self::CAND_RECORD_LEN;
