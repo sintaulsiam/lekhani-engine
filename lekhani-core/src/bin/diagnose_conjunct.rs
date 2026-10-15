@@ -145,7 +145,8 @@ fn main() {
                 _ => raw_input.clone(),
             };
 
-            let (cands, _) = sugg.suggest(&input, true, true, &empty_mem);
+            let (raw_cands, _) = sugg.suggest(&input, true, true, &empty_mem);
+            let cands: Vec<String> = raw_cands.iter().map(|s| canonicalize(s)).collect();
             let is_top1 = cands.first().map(|c| c == target).unwrap_or(false);
             let is_top3 = cands.iter().take(3).any(|c| c == target);
             let is_reachable = cands.iter().any(|c| c == target);

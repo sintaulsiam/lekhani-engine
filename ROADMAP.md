@@ -56,15 +56,22 @@ The Lekhani phonetic engine has exactly **two operating modes**, controlled by a
 - Stripped all unverified unigrams and locked the lexicon strictly to `data/dictionaries/dictionary.json` (SHA-256: `8a51b4d98bcbe147771751c60fa1d2919a84b0b910232bdcf863617ecc88fbdb`).
 - Added automated CI regression gates that panic if the dictionary hash or accuracy thresholds are tampered with.
 
-### Step 3: Conjunct Failure Localization & Tokenization Inventory
-- Evaluated baseline Avro stratified by conjunct density and character length:
-  - Non-conjunct words: **28.63% Top-1** (60.17% unreachable).
-  - **Long words with conjuncts ($7+$ chars)**: **19.91% Top-1** (**74.32% unreachable**).
-  - Proved that the 74% unreachable conjunct-heavy words are the primary bottleneck of Bengali typing.
-- Built fine-grained linguistic tokenization ([`tokenization.rs`](lekhani-core/src/tokenization.rs)):
-  - Grouped atomic conjuncts ($C + \text{্} + C$) and separated vowel kars.
-  - Collapsed combinatorial explosion down to a clean, bounded inventory: **437 Bengali tokens** and **66 Roman tokens**.
-  - Verified **100.0000% lossless round-trip concatenation** across all 113,053 Dakshina pairs and all 159,423 `dictionary.json` words.
+### Step 3: Linguistic Tokenization, Inventory & Stratification
+- **Stratified Baseline on DEV (Target Bengali Unicode Char Count)**:
+  - Input variation is the primary bottleneck: even short non-conjunct words (1–3 chars) have a **60.05% unreachability rate** and 27.48% Top-1.
+  - Conjuncts impose an additional 7–8 percentage point Top-1 penalty within matched length strata (4–6 chars: 29.29% vs 21.93%; 7+ chars: 27.87% vs 19.97%).
+  - Top-1 DEV reproduces `baseline.json` bit-for-bit at **24.86%** ($2,307 / 9,279$).
+- **Strict Train-Derived Inventory**:
+  - Derived strictly from 94,546 Train pairs and `dictionary.json` (zero test leakage).
+  - 437 Bengali tokens (including 273 Train conjunct types / 362 Train+Dict types) and 66 Roman tokens.
+  - Rule-based conjuncts ($C + \text{্} + C$) with deterministic backoff to single consonants + hasanta (Dev conjunct OOV is only 0.23% tokens; Test OOV 0.39%).
+  - Pre-pruning co-occurrence candidate translation units in Train: **9,998**.
+- **Roman Segmentation Lattice**:
+  - Implemented `roman_segmentation_lattice` to offer both decomposed and digraph paths (`ng` vs `n`+`g`), preventing premature greedy segmentation errors.
+- **Automated Property Tests & Gates**:
+  - 100% round-trip concatenation verified across all 113,053 pairs and 159,423 dictionary entries.
+  - Invariants verified: no mid-word boundary hasantas, no word-initial KARs, 100% tokenization idempotence.
+  - Real disk file hash tampering test verified: mutating 1 byte panics CI gate on real loader path.
 
 ---
 

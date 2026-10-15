@@ -155,3 +155,145 @@ fn test_loader_rejects_unlogged_drops_and_preserves_full_dev_set() {
         kept
     );
 }
+
+#[test]
+fn test_no_hasanta_at_token_boundary_except_word_end() {
+    let dev_path = find_file(&[
+        "data/eval/bn.translit.sampled.dev.tsv",
+        "../data/eval/bn.translit.sampled.dev.tsv",
+        "../../data/eval/bn.translit.sampled.dev.tsv",
+    ]);
+    let file = File::open(&dev_path).expect("Open dev.tsv");
+    let reader = BufReader::new(file);
+
+    for line in reader.lines().map_while(Result::ok) {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 2 {
+            let target = canonicalize(parts[0].trim());
+            let tokens = tokenize_bengali(&target);
+            let n = tokens.len();
+            for (idx, tok) in tokens.iter().enumerate() {
+                // If it's not the last token of the word, it must not end with hasanta
+                if idx + 1 < n {
+                    assert!(
+                        !tok.text.ends_with('্'),
+                        "Mid-word hasanta boundary violation in '{}' (token #{}: '{}')",
+                        target,
+                        idx,
+                        tok.text
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_no_kar_at_word_start() {
+    let dev_path = find_file(&[
+        "data/eval/bn.translit.sampled.dev.tsv",
+        "../data/eval/bn.translit.sampled.dev.tsv",
+        "../../data/eval/bn.translit.sampled.dev.tsv",
+    ]);
+    let file = File::open(&dev_path).expect("Open dev.tsv");
+    let reader = BufReader::new(file);
+
+    for line in reader.lines().map_while(Result::ok) {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 2 {
+            let target = canonicalize(parts[0].trim());
+            let tokens = tokenize_bengali(&target);
+            if let Some(first) = tokens.first() {
+                assert!(
+                    !first.is_vowel_kar(),
+                    "Phonotactic violation: dependent KAR at word start in '{}'",
+                    target
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_tokenization_idempotence_on_dev() {
+    let dev_path = find_file(&[
+        "data/eval/bn.translit.sampled.dev.tsv",
+        "../data/eval/bn.translit.sampled.dev.tsv",
+        "../../data/eval/bn.translit.sampled.dev.tsv",
+    ]);
+    let file = File::open(&dev_path).expect("Open dev.tsv");
+    let reader = BufReader::new(file);
+
+    for line in reader.lines().map_while(Result::ok) {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 2 {
+            let target = canonicalize(parts[0].trim());
+            let tokens = tokenize_bengali(&target);
+            let joined: String = tokens.iter().map(|t| t.text.as_str()).collect();
+            let re_tokens = tokenize_bengali(&joined);
+            assert_eq!(
+                tokens, re_tokens,
+                "Idempotence failed for target '{}'",
+                target
+            );
+        }
+    }
+}
+
+#[test]
+fn test_special_character_accounting_and_decisions() {
+    let dev_path = find_file(&[
+        "data/eval/bn.translit.sampled.dev.tsv",
+        "../data/eval/bn.translit.sampled.dev.tsv",
+        "../../data/eval/bn.translit.sampled.dev.tsv",
+    ]);
+    let file = File::open(&dev_path).expect("Open dev.tsv");
+    let reader = BufReader::new(file);
+
+    let mut two_count = 0;
+    let mut trailing_hasanta_count = 0;
+    let mut zwnj_count = 0;
+
+    for line in reader.lines().map_while(Result::ok) {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 2 {
+            let target = canonicalize(parts[0].trim());
+            if target.contains('২') {
+                two_count += 1;
+            }
+            if target.ends_with('্') {
+                trailing_hasanta_count += 1;
+            }
+            if target.contains('\u{200C}') {
+                zwnj_count += 1;
+            }
+        }
+    }
+
+    // In DEV:
+    // 0 rows contain '২' (digit reduplication)
+    // 9 rows have trailing hasanta (Arabic honorifics like 'আল্লাহ্' and English loan transliterations like 'টাইমস্')
+    // 0 rows contain ZWNJ
+    assert_eq!(two_count, 0);
+    assert_eq!(trailing_hasanta_count, 9);
+    assert_eq!(zwnj_count, 0);
+}
+
+#[test]
+fn test_roman_segmentation_lattice_offers_both_decomposed_and_digraph_paths() {
+    use lekhani_core::tokenization::roman_segmentation_lattice;
+
+    // 1. Digraph 'ng' and 'bh': bhangon
+    let paths_bhangon = roman_segmentation_lattice("bhangon");
+    // Must contain greedy digraph path ["bh", "a", "ng", "o", "n"]
+    assert!(paths_bhangon.iter().any(|p| p == &["bh", "a", "ng", "o", "n"]));
+    // Must also contain decomposed path allowing 'n' + 'g' ["bh", "a", "n", "g", "o", "n"]
+    assert!(paths_bhangon.iter().any(|p| p == &["bh", "a", "n", "g", "o", "n"]));
+
+    // 2. Doubled consonant 'tt': kotto
+    let paths_kotto = roman_segmentation_lattice("kotto");
+    // Must contain both ["k", "o", "tt", "o"] and ["k", "o", "t", "t", "o"]
+    assert!(paths_kotto.iter().any(|p| p == &["k", "o", "tt", "o"]));
+    assert!(paths_kotto.iter().any(|p| p == &["k", "o", "t", "t", "o"]));
+}
+

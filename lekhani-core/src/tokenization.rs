@@ -113,6 +113,21 @@ pub fn tokenize_bengali(text: &str) -> Vec<BengaliToken> {
     while i < n {
         let c = chars[i];
 
+        // Composite independent vowel: অ/এ + ্ + য [+ া] (e.g. অ্যা in অ্যাসিড, অ্যাসোসিয়েশন)
+        if (c == 'অ' || c == 'এ') && i + 2 < n && chars[i + 1] == '\u{09CD}' && chars[i + 2] == 'য' {
+            let mut vow = String::with_capacity(8);
+            vow.push(c);
+            vow.push(chars[i + 1]);
+            vow.push(chars[i + 2]);
+            i += 3;
+            if i < n && chars[i] == 'া' {
+                vow.push(chars[i]);
+                i += 1;
+            }
+            tokens.push(BengaliToken::new(BengaliTokenKind::IndependentVowel, vow));
+            continue;
+        }
+
         if is_bengali_independent_vowel(c) {
             tokens.push(BengaliToken::new(BengaliTokenKind::IndependentVowel, c.to_string()));
             i += 1;
@@ -233,6 +248,79 @@ pub fn tokenize_roman(text: &str) -> Vec<String> {
     }
 
     tokens
+}
+
+/// Returns all valid segmentation paths for a normalized Roman string.
+/// Unlike greedy longest-match, this generates a lattice of valid segmentations,
+/// allowing digraphs (e.g. "ng", "kh", "th") and doubled consonants ("tt", "bb")
+/// to be evaluated either as atomic units or individual single letters by the aligner.
+pub fn roman_segmentation_lattice(text: &str) -> Vec<Vec<String>> {
+    let norm = normalize_roman(text);
+    let chars: Vec<char> = norm.chars().collect();
+    let n = chars.len();
+    if n == 0 {
+        return vec![Vec::new()];
+    }
+
+    fn recurse(
+        chars: &[char],
+        start: usize,
+        memo: &mut hashbrown::HashMap<usize, Vec<Vec<String>>>,
+    ) -> Vec<Vec<String>> {
+        if start == chars.len() {
+            return vec![Vec::new()];
+        }
+        if let Some(cached) = memo.get(&start) {
+            return cached.clone();
+        }
+
+        let n = chars.len();
+        let mut paths = Vec::new();
+
+        // 1. Single character
+        let s1 = chars[start].to_string();
+        for sub in recurse(chars, start + 1, memo) {
+            let mut p = Vec::with_capacity(sub.len() + 1);
+            p.push(s1.clone());
+            p.extend(sub);
+            paths.push(p);
+        }
+
+        // 2. Digraph or doubled consonant (2 chars)
+        if start + 2 <= n {
+            let sub_str: String = chars[start..start + 2].iter().collect();
+            let is_digraph = CONSONANT_DIGRAPHS.contains(&sub_str.as_str())
+                || VOWEL_DIGRAPHS.contains(&sub_str.as_str());
+            let is_doubled = chars[start] == chars[start + 1] && chars[start].is_ascii_alphabetic();
+            if is_digraph || is_doubled {
+                for sub in recurse(chars, start + 2, memo) {
+                    let mut p = Vec::with_capacity(sub.len() + 1);
+                    p.push(sub_str.clone());
+                    p.extend(sub);
+                    paths.push(p);
+                }
+            }
+        }
+
+        // 3. 3-char "chh"
+        if start + 3 <= n {
+            let sub_str: String = chars[start..start + 3].iter().collect();
+            if sub_str == "chh" {
+                for sub in recurse(chars, start + 3, memo) {
+                    let mut p = Vec::with_capacity(sub.len() + 1);
+                    p.push(sub_str.clone());
+                    p.extend(sub);
+                    paths.push(p);
+                }
+            }
+        }
+
+        memo.insert(start, paths.clone());
+        paths
+    }
+
+    let mut memo = hashbrown::HashMap::new();
+    recurse(&chars, 0, &mut memo)
 }
 
 #[inline]
