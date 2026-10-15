@@ -81,9 +81,9 @@ The Lekhani phonetic engine has exactly **two operating modes**, controlled by a
 |:---:|:---|:---:|:---|:---:|
 | **1** | **Hermetic Re-Baseline** | **DONE** | Established true baseline: 24.80% DEV, 25.28% TEST. Locked SHA-256 dictionary gate. | [`61b565f`](file:///mnt/data/lekhani-engine) |
 | **2** | **Data Accounting & Audit** | **DONE** | Uncovered byte length bug (50.1% conjunct rows dropped). Established Filters-OFF policy. | [`3129ff1`](file:///mnt/data/lekhani-engine), [`4261f73`](file:///mnt/data/lekhani-engine) |
-| **3** | **Linguistic Tokenization** | **DONE** | 437 BN / 66 Roman units. 100% round-trip verified. Measured 74.3% conjunct failure. | [`f6e7654`](file:///mnt/data/lekhani-engine) |
-| **4** | **M2M Alignment on Full Data** | **NEXT** | EM alignment on full 94,546 pairs with Avro soft prior. Export 200-sample audit CSV. | *In Progress* |
-| **5** | **Translation Unit N-Gram LM** | Pending | Joint $(R, B)$ unit language model. Full DEV reachability gap analysis. | — |
+| **3** | **Linguistic Tokenization** | **DONE** | 437 BN / 66 Roman units. 100% round-trip verified. Measured 74.3% conjunct failure. | [`4817e6a`](file:///mnt/data/lekhani-engine) |
+| **4** | **M2M Alignment on Full Data** | **DONE** | 2:2 profile selected (33.44% DEV reach). 0.03% DEV OOV. 200 audit CSV committed. | *Current* |
+| **5** | **Translation Unit N-Gram LM** | **NEXT** | Joint $(R, B)$ unit language model. Full DEV reachability gap analysis. | — |
 | **6** | **Trie Beam Search Decoder** | Pending | Lexicon-constrained beam search integrating PrefixTrie. Sub-100 µs latency. | — |
 | **7** | **Perceptron Feature Ranker** | Pending | Structured perceptron with 6 feature templates + Dakshina row weighting. | — |
 | **8** | **Hyperparameter DEV Tuning** | Pending | Tune beam width, LM weights ($\lambda$), and pruning thresholds exclusively on DEV. | — |

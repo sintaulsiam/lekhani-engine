@@ -1,0 +1,201 @@
+id,bengali_word,roman_input,has_conjunct,viterbi_alignment,greedy_roman_tokens,viterbi_roman_tokens,segmentation_match,alignment_grade
+1,"অঙ্গ","ango",true,"a→অ | ng→ঙ্গ | o→ε","a ng o","a ng o",true,UNGRADED
+2,"অনলাইনে","anline",false,"a→অ | n→ন | l→ল | i→া | ε→ই | n→ন | e→ে","a n l i n e","a n l i n e",true,UNGRADED
+3,"অপলক","aplak",false,"a→অ | p→প | la→ল | k→ক","a p l a k","a p la k",false,UNGRADED
+4,"অমঙ্গলের","omongoler",true,"o→অ | mo→ম | ng→ঙ্গ | ol→ল | e→ে | r→র","o m o ng o l e r","o mo ng ol e r",false,UNGRADED
+5,"অর্ধেন্দু","ordhendoo",true,"o→অ | rd→র্ধ | h→ε | e→ে | nd→ন্দ | oo→ু","o r dh e n d oo","o rd h e nd oo",false,UNGRADED
+6,"অসিলেটর","oscilator",false,"o→অ | sc→স | i→ি | l→ল | a→ে | t→ট | or→র","o s c i l a t o r","o sc i l a t or",false,UNGRADED
+7,"অসুখ","ashookh",false,"a→অ | sh→স | oo→ু | kh→খ","a sh oo kh","a sh oo kh",true,UNGRADED
+8,"আইওয়া","iowa",false,"ε→আ | i→ই | ow→ও | ε→য় | a→া","i o w a","i ow a",false,UNGRADED
+9,"আদর্শবাদের","aadarsbader",true,"aa→আ | da→দ | rs→র্শ | b→ব | a→া | d→দ | e→ে | r→র","aa d a r s b a d e r","aa da rs b a d e r",false,UNGRADED
+10,"আমিনকে","aminke",false,"a→আ | m→ম | i→ি | n→ন | k→ক | e→ে","a m i n k e","a m i n k e",true,UNGRADED
+11,"আমৃত্যু","aamreetyu",true,"aa→আ | mr→ম | ee→ৃ | ty→ত্য | u→ু","aa m r ee t y u","aa mr ee ty u",false,UNGRADED
+12,"আরডিআরএস","rdrs",false,"","r d r s","",false,UNGRADED
+13,"আসক্তি","asakti",true,"a→আ | sa→স | kt→ক্ত | i→ি","a s a k t i","a sa kt i",false,UNGRADED
+14,"ইনিংসটি","inningsti",false,"i→ই | nn→ন | i→ি | ng→ং | s→স | t→ট | i→ি","i nn i ng s t i","i nn i ng s t i",true,UNGRADED
+15,"ইন্ডিপেনডেন্ট","indipendent",true,"i→ই | nd→ন্ড | i→ি | p→প | e→ে | n→ন | d→ড | e→ে | nt→ন্ট","i n d i p e n d e n t","i nd i p e n d e nt",false,UNGRADED
+16,"ইরাকি","iraqi",false,"i→ই | r→র | a→া | q→ক | i→ি","i r a q i","i r a q i",true,UNGRADED
+17,"ইসহাক","ishhak",false,"i→ই | sh→স | h→হ | a→া | k→ক","i sh h a k","i sh h a k",true,UNGRADED
+18,"উত্তাপের","uttaper",true,"u→উ | tt→ত্ত | a→া | p→প | e→ে | r→র","u tt a p e r","u tt a p e r",true,UNGRADED
+19,"উত্থানে","utthane",true,"u→উ | tt→ত্থ | h→ε | a→া | n→ন | e→ে","u tt h a n e","u tt h a n e",true,UNGRADED
+20,"উপনেতা","ooponetaa",false,"oo→উ | po→প | n→ন | e→ে | ta→ত | a→া","oo p o n e t aa","oo po n e ta a",false,UNGRADED
+21,"উপযুক্তভাবে","upojuktobhabe",true,"u→উ | po→প | j→য | u→ু | kt→ক্ত | o→ε | bh→ভ | a→া | b→ব | e→ে","u p o j u k t o bh a b e","u po j u kt o bh a b e",false,UNGRADED
+22,"উপরের","uporer",false,"u→উ | po→প | r→র | e→ে | r→র","u p o r e r","u po r e r",false,UNGRADED
+23,"উল্লেখ্যযোগ্য","ullekhyozoggyo",true,"u→উ | ll→ল্ল | e→ে | kh→খ্য | yo→ε | z→য | o→ো | gg→গ্য | yo→ε","u ll e kh y o z o gg y o","u ll e kh yo z o gg yo",false,UNGRADED
+24,"এক্সচেঞ্জ","eksachenza",true,"e→এ | ks→ক্স | a→ε | ch→চ | e→ে | nz→ঞ্জ | a→ε","e k s a ch e n z a","e ks a ch e nz a",false,UNGRADED
+25,"এগারতম","egarotomo",false,"e→এ | g→গ | a→া | r→র | o→ε | to→ত | mo→ম","e g a r o t o m o","e g a r o to mo",false,UNGRADED
+26,"এস্কিমো","eshkeemo",true,"e→এ | sh→ε | k→স্ক | ee→ি | m→ম | o→ো","e sh k ee m o","e sh k ee m o",true,UNGRADED
+27,"ওয়্যার","waayaar",true,"w→ও | a→ε | ay→য়্য | a→া | ar→র","w aa y aa r","w a ay a ar",false,UNGRADED
+28,"কণ্যার","konyar",true,"ko→ক | ny→ণ্য | a→া | r→র","k o n y a r","ko ny a r",false,UNGRADED
+29,"কবরগুলো","koborgulo",false,"ko→ক | bo→ব | r→র | g→গ | u→ু | l→ল | o→ো","k o b o r g u l o","ko bo r g u l o",false,UNGRADED
+30,"কর্ডোবা","cordoba",true,"co→ক | rd→র্ড | o→ো | b→ব | a→া","c o r d o b a","co rd o b a",false,UNGRADED
+31,"কর্পোরেশনের","corporationer",true,"co→ক | rp→র্প | o→ো | r→র | a→ে | ti→শ | on→ন | e→ে | r→র","c o r p o r a t i o n e r","co rp o r a ti on e r",false,UNGRADED
+32,"কর্মপদ্ধতি","karmapaddhati",true,"ka→ক | rm→র্ম | a→ε | pa→প | dd→দ্ধ | ha→ε | t→ত | i→ি","k a r m a p a dd h a t i","ka rm a pa dd ha t i",false,UNGRADED
+33,"কাজকর্ম","kaazkormo",true,"ka→ক | a→া | z→জ | ko→ক | rm→র্ম | o→ε","k aa z k o r m o","ka a z ko rm o",false,UNGRADED
+34,"কার্জন","carzon",true,"c→ক | a→া | rz→র্জ | on→ন","c a r z o n","c a rz on",false,UNGRADED
+35,"কার্যবিধির","kaarjobidhir",true,"ka→ক | a→া | rj→র্য | ob→ব | i→ি | dh→ধ | i→ি | r→র","k aa r j o b i dh i r","ka a rj ob i dh i r",false,UNGRADED
+36,"কাল্পনিক","kalpanik",true,"k→ক | a→া | lp→ল্প | an→ন | i→ি | k→ক","k a l p a n i k","k a lp an i k",false,UNGRADED
+37,"কাশেম","kaashem",false,"ka→ক | a→া | sh→শ | e→ে | m→ম","k aa sh e m","ka a sh e m",false,UNGRADED
+38,"কিংবদন্তী","kingbodonti",true,"k→ক | i→ি | ng→ং | bo→ব | do→দ | nt→ন্ত | i→ী","k i ng b o d o n t i","k i ng bo do nt i",false,UNGRADED
+39,"কিংবা","kingba",false,"k→ক | i→ি | ng→ং | b→ব | a→া","k i ng b a","k i ng b a",true,UNGRADED
+40,"কীসের","kiser",false,"k→ক | i→ী | s→স | e→ে | r→র","k i s e r","k i s e r",true,UNGRADED
+41,"কুরুক্ষেত্রে","kurukkhetre",true,"k→ক | u→ু | r→র | u→ু | kk→ক্ষ | h→ε | e→ে | tr→ত্র | e→ে","k u r u kk h e t r e","k u r u kk h e tr e",false,UNGRADED
+42,"কোনরকমে","konrokome",false,"k→ক | o→ো | n→ন | r→র | ok→ক | om→ম | e→ে","k o n r o k o m e","k o n r ok om e",false,UNGRADED
+43,"কোবরার","kobrar",false,"k→ক | o→ো | b→ব | r→র | a→া | r→র","k o b r a r","k o b r a r",true,UNGRADED
+44,"কোম্পানী","company",true,"c→ক | o→ো | mp→ম্প | a→া | n→ন | y→ী","c o m p a n y","c o mp a n y",false,UNGRADED
+45,"কোরিয়া","koriya",false,"k→ক | o→ো | r→র | i→ি | y→য় | a→া","k o r i y a","k o r i y a",true,UNGRADED
+46,"ক্ষেত্রও","kkhetroo",true,"kk→ক্ষ | h→ε | e→ে | tr→ত্র | o→ও | o→ε","kk h e t r oo","kk h e tr o o",false,UNGRADED
+47,"খলিফার","kholifar",false,"kh→খ | ol→ল | i→ি | f→ফ | a→া | r→র","kh o l i f a r","kh ol i f a r",false,UNGRADED
+48,"গঠনের","gathaner",false,"ga→গ | th→ঠ | an→ন | e→ে | r→র","g a th a n e r","ga th an e r",false,UNGRADED
+49,"গর্ভনিরোধ","gorbhonirodh",true,"go→গ | rb→র্ভ | ho→ε | n→ন | i→ি | r→র | o→ো | dh→ধ","g o r bh o n i r o dh","go rb ho n i r o dh",false,UNGRADED
+50,"গাইবান্ধা","gayibandha",true,"g→গ | a→া | yi→ই | b→ব | a→া | nd→ন্ধ | h→ε | a→া","g a y i b a n dh a","g a yi b a nd h a",false,UNGRADED
+51,"গিল্ড","geeld",true,"g→গ | ee→ি | ld→ল্ড","g ee l d","g ee ld",false,UNGRADED
+52,"গুন্ডা","goonda",true,"g→গ | oo→ু | nd→ন্ড | a→া","g oo n d a","g oo nd a",false,UNGRADED
+53,"গোলাপগঞ্জে","golapganje",true,"g→গ | o→ো | l→ল | a→া | p→প | ga→গ | nj→ঞ্জ | e→ে","g o l a p g a nj e","g o l a p ga nj e",false,UNGRADED
+54,"গোলাপের","golaper",false,"g→গ | o→ো | l→ল | a→া | p→প | e→ে | r→র","g o l a p e r","g o l a p e r",true,UNGRADED
+55,"ঘট","ghat",false,"gh→ঘ | at→ট","gh a t","gh at",false,UNGRADED
+56,"চক্রে","chakre",true,"ch→চ | a→ε | kr→ক্র | e→ে","ch a k r e","ch a kr e",false,UNGRADED
+57,"চাহিদাই","chahedae",false,"ch→চ | a→া | h→হ | e→ি | d→দ | a→া | e→ই","ch a h e d a e","ch a h e d a e",true,UNGRADED
+58,"চিত্রণ","cheetron",true,"ch→চ | ee→ি | tr→ত্র | on→ণ","ch ee t r o n","ch ee tr on",false,UNGRADED
+59,"চুষে","chuse",false,"ch→চ | u→ু | s→ষ | e→ে","ch u s e","ch u s e",true,UNGRADED
+60,"চেন্নাই","chennay",true,"ch→চ | e→ে | nn→ন্ন | a→া | y→ই","ch e nn a y","ch e nn a y",true,UNGRADED
+61,"চেয়ার","cheeyara",false,"ch→চ | ee→ে | y→য় | a→া | ra→র","ch ee y a r a","ch ee y a ra",false,UNGRADED
+62,"চেলসির","chelseer",false,"ch→চ | e→ে | l→ল | s→স | ee→ি | r→র","ch e l s ee r","ch e l s ee r",true,UNGRADED
+63,"চোক","chake",false,"ch→চ | a→ো | ke→ক","ch a k e","ch a ke",false,UNGRADED
+64,"ছন্দের","chhonder",true,"ch→ছ | ho→ε | nd→ন্দ | e→ে | r→র","chh o n d e r","ch ho nd e r",false,UNGRADED
+65,"ছাত্রদেরকে","chatroderoke",true,"ch→ছ | a→া | tr→ত্র | od→দ | e→ে | r→র | ok→ক | e→ে","ch a t r o d e r o k e","ch a tr od e r ok e",false,UNGRADED
+66,"জনিত","jonito",false,"j→জ | on→ন | i→ি | to→ত","j o n i t o","j on i to",false,UNGRADED
+67,"জন্তু","jantoo",true,"ja→জ | nt→ন্ত | oo→ু","j a n t oo","ja nt oo",false,UNGRADED
+68,"জন্যই","jannyoi",true,"ja→জ | nn→ন্য | yo→ε | i→ই","j a nn y oi","ja nn yo i",false,UNGRADED
+69,"জাপানীরা","japaneera",false,"j→জ | a→া | p→প | a→া | n→ন | ee→ী | r→র | a→া","j a p a n ee r a","j a p a n ee r a",true,UNGRADED
+70,"জীববিদ্যা","jeebabidya",true,"j→জ | ee→ী | ba→ব | b→ব | i→ি | dy→দ্য | a→া","j ee b a b i d y a","j ee ba b i dy a",false,UNGRADED
+71,"জ্বালা","jala",true,"j→জ্ব | a→া | l→ল | a→া","j a l a","j a l a",true,UNGRADED
+72,"ঝরণার","jhornar",false,"jh→ঝ | or→র | n→ণ | a→া | r→র","j h o r n a r","jh or n a r",false,UNGRADED
+73,"ঝরার","jhorar",false,"jh→ঝ | or→র | a→া | r→র","j h o r a r","jh or a r",false,UNGRADED
+74,"ট্র্যাকার","treker",true,"tr→ট্র্য | e→া | k→ক | e→া | r→র","t r e k e r","tr e k e r",false,UNGRADED
+75,"ডলারেরও","dolarero",false,"d→ড | ol→ল | a→া | r→র | e→ে | r→র | o→ও","d o l a r e r o","d ol a r e r o",false,UNGRADED
+76,"ডানে","dane",false,"d→ড | a→া | n→ন | e→ে","d a n e","d a n e",true,UNGRADED
+77,"ডারউইন","darween",false,"d→ড | a→া | r→র | w→উ | ee→ই | n→ন","d a r w ee n","d a r w ee n",true,UNGRADED
+78,"ততক্ষণ","totokshon",true,"to→ত | to→ত | ks→ক্ষ | h→ε | on→ণ","t o t o k sh o n","to to ks h on",false,UNGRADED
+79,"তথাগত","tathagato",false,"ta→ত | th→থ | a→া | ga→গ | to→ত","t a th a g a t o","ta th a ga to",false,UNGRADED
+80,"তথ্যবহুল","tothhobohool",true,"to→ত | th→থ্য | ho→ε | bo→ব | h→হ | oo→ু | l→ল","t o th h o b o h oo l","to th ho bo h oo l",false,UNGRADED
+81,"তলব","talab",false,"ta→ত | la→ল | b→ব","t a l a b","ta la b",false,UNGRADED
+82,"তল্লাসির","tollaashir",true,"to→ত | ll→ল্ল | a→া | a→ε | sh→স | i→ি | r→র","t o ll aa sh i r","to ll a a sh i r",false,UNGRADED
+83,"তাও","taoo",false,"t→ত | a→া | o→ε | o→ও","t a oo","t a o o",false,UNGRADED
+84,"তামা","tama",false,"t→ত | a→া | m→ম | a→া","t a m a","t a m a",true,UNGRADED
+85,"তুললেও","tulleo",false,"t→ত | u→ু | l→ল | l→ল | e→ে | o→ও","t u ll e o","t u l l e o",false,UNGRADED
+86,"তেজি","tejee",false,"t→ত | e→ে | j→জ | ee→ি","t e j ee","t e j ee",true,UNGRADED
+87,"থেকেই","thekei",false,"th→থ | e→ে | k→ক | e→ে | i→ই","th e k e i","th e k e i",true,UNGRADED
+88,"দফতরের","dophtorer",false,"do→দ | ph→ফ | to→ত | r→র | e→ে | r→র","d o ph t o r e r","do ph to r e r",false,UNGRADED
+89,"দশকের","dashaker",false,"da→দ | sh→শ | ak→ক | e→ে | r→র","d a sh a k e r","da sh ak e r",false,UNGRADED
+90,"দাঁতের","danter",false,"d→দ | a→া | n→ঁ | t→ত | e→ে | r→র","d a n t e r","d a n t e r",true,UNGRADED
+91,"দাতার","dataar",false,"d→দ | a→া | ta→ত | a→া | r→র","d a t aa r","d a ta a r",false,UNGRADED
+92,"দুজনকে","doojonke",false,"d→দ | oo→ু | j→জ | on→ন | k→ক | e→ে","d oo j o n k e","d oo j on k e",false,UNGRADED
+93,"দুলারী","dulari",false,"d→দ | u→ু | l→ল | a→া | r→র | i→ী","d u l a r i","d u l a r i",true,UNGRADED
+94,"দেখেতে","dekhete",false,"d→দ | e→ে | kh→খ | e→ে | t→ত | e→ে","d e kh e t e","d e kh e t e",true,UNGRADED
+95,"দো","do",false,"d→দ | o→ো","d o","d o",true,UNGRADED
+96,"ধর্মনিরপেক্ষ","dhormoniropekkho",true,"dh→ধ | o→ε | rm→র্ম | on→ন | i→ি | r→র | op→প | e→ে | kk→ক্ষ | ho→ε","dh o r m o n i r o p e kk h o","dh o rm on i r op e kk ho",false,UNGRADED
+97,"ধর্ষকদের","dharshokder",true,"dh→ধ | ar→র্ষ | sh→ε | ok→ক | d→দ | e→ে | r→র","dh a r sh o k d e r","dh ar sh ok d e r",false,UNGRADED
+98,"নবকুমার","nobokumar",false,"n→ন | ob→ব | ok→ক | u→ু | m→ম | a→া | r→র","n o b o k u m a r","n ob ok u m a r",false,UNGRADED
+99,"নামেই","namiye",false,"n→ন | a→া | m→ম | i→ে | ye→ই","n a m i y e","n a m i ye",false,UNGRADED
+100,"নিন","nin",false,"n→ন | i→ি | n→ন","n i n","n i n",true,UNGRADED
+101,"নিম্নাঞ্চলের","nimnanchaler",true,"n→ন | i→ি | mn→ম্ন | a→া | nc→ঞ্চ | ha→ε | l→ল | e→ে | r→র","n i m n a n ch a l e r","n i mn a nc ha l e r",false,UNGRADED
+102,"নির্দেশনা","nirdeshana",true,"n→ন | i→ি | rd→র্দ | e→ে | sh→শ | an→ন | a→া","n i r d e sh a n a","n i rd e sh an a",false,UNGRADED
+103,"নিশ্চিতকরণ","nishchitkoron",true,"n→ন | i→ি | sh→ε | ch→শ্চ | i→ি | t→ত | ko→ক | r→র | on→ণ","n i sh ch i t k o r o n","n i sh ch i t ko r on",false,UNGRADED
+104,"পণ্যসম্ভার","ponyosombhar",true,"po→প | ny→ণ্য | o→ε | so→স | mb→ম্ভ | h→ε | a→া | r→র","p o n y o s o m bh a r","po ny o so mb h a r",false,UNGRADED
+105,"পদ্মা","podma",true,"po→প | dm→দ্ম | a→া","p o d m a","po dm a",false,UNGRADED
+106,"পরার","paraar",false,"pa→প | r→র | a→া | ar→র","p a r aa r","pa r a ar",false,UNGRADED
+107,"পরিচালকরা","porichalakra",false,"po→প | r→র | i→ি | ch→চ | a→া | la→ল | k→ক | r→র | a→া","p o r i ch a l a k r a","po r i ch a la k r a",false,UNGRADED
+108,"পরিষ্কারভাবে","poriskarvabe",true,"po→প | r→র | i→ি | sk→ষ্ক | a→া | r→র | v→ভ | a→া | b→ব | e→ে","p o r i s k a r v a b e","po r i sk a r v a b e",false,UNGRADED
+109,"পরিসংখ্যান","porishongkhan",true,"po→প | r→র | i→ি | sh→স | o→ε | ng→ং | kh→খ্য | a→া | n→ন","p o r i sh o ng kh a n","po r i sh o ng kh a n",false,UNGRADED
+110,"পরে","pore",false,"po→প | r→র | e→ে","p o r e","po r e",false,UNGRADED
+111,"পর্যবেক্ষক","porjobekshok",true,"po→প | rj→র্য | ob→ব | e→ে | ks→ক্ষ | ho→ε | k→ক","p o r j o b e k sh o k","po rj ob e ks ho k",false,UNGRADED
+112,"পারস্য","pershhia",true,"p→প | e→া | r→র | sh→ε | h→ε | ia→স্য","p e r sh h i a","p e r sh h ia",false,UNGRADED
+113,"পার্কটিতে","parktite",true,"p→প | a→া | rk→র্ক | t→ট | i→ি | t→ত | e→ে","p a r k t i t e","p a rk t i t e",false,UNGRADED
+114,"পুচ্ছ","puccho",true,"p→প | u→ু | cc→চ্ছ | ho→ε","p u cc h o","p u cc ho",false,UNGRADED
+115,"পুনর্জাগরণের","punorzagaroner",true,"p→প | u→ু | n→ন | o→ε | rz→র্জ | a→া | ga→গ | r→র | on→ণ | e→ে | r→র","p u n o r z a g a r o n e r","p u n o rz a ga r on e r",false,UNGRADED
+116,"পূর্ণিমাতে","purnimatey",true,"p→প | u→ূ | rn→র্ণ | i→ি | m→ম | a→া | t→ত | e→ে | y→ε","p u r n i m a t e y","p u rn i m a t e y",false,UNGRADED
+117,"পেটের","peter",false,"p→প | e→ে | t→ট | e→ে | r→র","p e t e r","p e t e r",true,UNGRADED
+118,"পেতেন","peten",false,"p→প | e→ে | t→ত | e→ে | n→ন","p e t e n","p e t e n",true,UNGRADED
+119,"পেলেও","peleo",false,"p→প | e→ে | l→ল | e→ে | o→ও","p e l e o","p e l e o",true,UNGRADED
+120,"প্রযুক্ত","prajukta",true,"pr→প্র | aj→য | u→ু | kt→ক্ত | a→ε","p r a j u k t a","pr aj u kt a",false,UNGRADED
+121,"প্রযুক্তির","projuktir",true,"pr→প্র | oj→য | u→ু | kt→ক্ত | i→ি | r→র","p r o j u k t i r","pr oj u kt i r",false,UNGRADED
+122,"প্রসারণের","prasaraner",true,"pr→প্র | a→ε | s→স | a→া | r→র | an→ণ | e→ে | r→র","p r a s a r a n e r","pr a s a r an e r",false,UNGRADED
+123,"প্রাণীও","pranio",true,"pr→প্র | a→া | n→ণ | i→ী | o→ও","p r a n i o","pr a n i o",false,UNGRADED
+124,"প্রানীদের","praaniider",true,"pr→প্র | a→া | an→ন | i→ী | i→ε | d→দ | e→ে | r→র","p r aa n ii d e r","pr a an i i d e r",false,UNGRADED
+125,"প্রোটন","proton",true,"pr→প্র | o→ো | t→ট | on→ন","p r o t o n","pr o t on",false,UNGRADED
+126,"ফাইনম্যান","fineman",true,"f→ফ | i→া | ε→ই | ne→ন | m→ম্য | a→া | n→ন","f i n e m a n","f i ne m a n",false,UNGRADED
+127,"ফিতের","phiter",false,"ph→ফ | i→ি | t→ত | e→ে | r→র","ph i t e r","ph i t e r",true,UNGRADED
+128,"ফোর্সেস","phorces",true,"ph→ফ | o→ো | rc→র্স | e→ে | s→স","ph o r c e s","ph o rc e s",false,UNGRADED
+129,"বনরুই","bonorui",false,"bo→ব | n→ন | or→র | u→ু | i→ই","b o n o r u i","bo n or u i",false,UNGRADED
+130,"বর্ষসেরা","borshoshera",true,"bo→ব | rs→র্ষ | ho→ε | sh→স | e→ে | r→র | a→া","b o r sh o sh e r a","bo rs ho sh e r a",false,UNGRADED
+131,"বাঙালী","bangalii",false,"b→ব | a→া | ng→ঙ | a→া | li→ল | i→ী","b a ng a l ii","b a ng a li i",false,UNGRADED
+132,"বাজাতে","bazate",false,"b→ব | a→া | z→জ | a→া | t→ত | e→ে","b a z a t e","b a z a t e",true,UNGRADED
+133,"বাদামের","badamer",false,"b→ব | a→া | d→দ | a→া | m→ম | e→ে | r→র","b a d a m e r","b a d a m e r",true,UNGRADED
+134,"বিচারকার্য","bicarkarjo",true,"b→ব | i→ি | c→চ | a→া | r→র | k→ক | a→া | rj→র্য | o→ε","b i c a r k a r j o","b i c a r k a rj o",false,UNGRADED
+135,"বিচারের","bicharer",false,"b→ব | i→ি | ch→চ | a→া | r→র | e→ে | r→র","b i ch a r e r","b i ch a r e r",true,UNGRADED
+136,"বিবর্তিত","bibartita",true,"b→ব | i→ি | ba→ব | rt→র্ত | i→ি | ta→ত","b i b a r t i t a","b i ba rt i ta",false,UNGRADED
+137,"বিবেচনা","bibechana",false,"b→ব | i→ি | b→ব | e→ে | ch→চ | an→ন | a→া","b i b e ch a n a","b i b e ch an a",false,UNGRADED
+138,"বিমানবন্দরটি","bimaanbandarti",true,"b→ব | i→ি | ma→ম | a→া | n→ন | ba→ব | nd→ন্দ | ar→র | t→ট | i→ি","b i m aa n b a n d a r t i","b i ma a n ba nd ar t i",false,UNGRADED
+139,"বিমানবন্দরে","bimanbondorey",true,"b→ব | i→ি | m→ম | a→া | n→ন | bo→ব | nd→ন্দ | or→র | e→ে | y→ε","b i m a n b o n d o r e y","b i m a n bo nd or e y",false,UNGRADED
+140,"বীজে","beezey",false,"b→ব | ee→ী | z→জ | e→ে | y→ε","b ee z e y","b ee z e y",true,UNGRADED
+141,"বুদ্ধকে","buddhakey",true,"b→ব | u→ু | dd→দ্ধ | ha→ε | k→ক | e→ে | y→ε","b u dd h a k e y","b u dd ha k e y",false,UNGRADED
+142,"বৈদ্যনাথ","baiddanath",true,"b→ব | ai→ৈ | dd→দ্য | an→ন | a→া | th→থ","b ai dd a n a th","b ai dd an a th",false,UNGRADED
+143,"বোতলের","botoler",false,"b→ব | o→ো | to→ত | l→ল | e→ে | r→র","b o t o l e r","b o to l e r",false,UNGRADED
+144,"ব্রাসেলস","brussels",true,"br→ব্র | u→া | ss→স | e→ে | l→ল | s→স","b r u ss e l s","br u ss e l s",false,UNGRADED
+145,"ভাবাদর্শ","bhabadorsho",true,"bh→ভ | a→া | b→ব | a→া | do→দ | rs→র্শ | ho→ε","bh a b a d o r sh o","bh a b a do rs ho",false,UNGRADED
+146,"ভালব","bhalb",false,"bh→ভ | a→া | l→ল | b→ব","bh a l b","bh a l b",true,UNGRADED
+147,"ভাষাটির","bhasaatir",false,"bh→ভ | a→া | sa→ষ | a→া | t→ট | i→ি | r→র","bh a s aa t i r","bh a sa a t i r",false,UNGRADED
+148,"ভ্যারিয়েবল","bhyariyeebala",true,"bh→ভ্য | y→ε | a→া | r→র | i→ি | ye→য় | e→ে | ba→ব | la→ল","bh y a r i y ee b a l a","bh y a r i ye e ba la",false,UNGRADED
+149,"মতলব","motlob",false,"m→ম | ot→ত | l→ল | ob→ব","m o t l o b","m ot l ob",false,UNGRADED
+150,"মনোভাবের","manovaber",false,"ma→ম | n→ন | o→ো | v→ভ | a→া | b→ব | e→ে | r→র","m a n o v a b e r","ma n o v a b e r",false,UNGRADED
+151,"মন্ডলীর","mondoleer",true,"mo→ম | nd→ন্ড | ol→ল | ee→ী | r→র","m o n d o l ee r","mo nd ol ee r",false,UNGRADED
+152,"মন্ত্রি","montri",true,"mo→ম | nt→ন্ত্র | r→ε | i→ি","m o n t r i","mo nt r i",false,UNGRADED
+153,"মাঝখানে","majhkhane",false,"m→ম | a→া | jh→ঝ | kh→খ | a→া | n→ন | e→ে","m a j h kh a n e","m a jh kh a n e",false,UNGRADED
+154,"মাদকের","madaker",false,"m→ম | a→া | da→দ | k→ক | e→ে | r→র","m a d a k e r","m a da k e r",false,UNGRADED
+155,"মান্যতা","manyata",true,"m→ম | a→া | ny→ন্য | at→ত | a→া","m a n y a t a","m a ny at a",false,UNGRADED
+156,"মারাঠী","maratthee",false,"m→ম | a→া | r→র | a→া | t→ε | th→ঠ | ee→ী","m a r a tt h ee","m a r a t th ee",false,UNGRADED
+157,"মার্সেল","marcel",true,"m→ম | a→া | rc→র্স | e→ে | l→ল","m a r c e l","m a rc e l",false,UNGRADED
+158,"মিশ্রণকে","mishronkey",true,"m→ম | i→ি | sh→শ্র | r→ε | on→ণ | k→ক | e→ে | y→ε","m i sh r o n k e y","m i sh r on k e y",false,UNGRADED
+159,"মুন্ডির","mundir",true,"m→ম | u→ু | nd→ন্ড | i→ি | r→র","m u n d i r","m u nd i r",false,UNGRADED
+160,"মেধ","medh",false,"m→ম | e→ে | dh→ধ","m e dh","m e dh",true,UNGRADED
+161,"রণকৌশল","rankoushal",false,"r→র | an→ণ | k→ক | ou→ৌ | sh→শ | al→ল","r a n k ou sh a l","r an k ou sh al",false,UNGRADED
+162,"রসদ","rosod",false,"r→র | o→ε | so→স | d→দ","r o s o d","r o so d",false,UNGRADED
+163,"রাজ্যকে","rajyakey",true,"r→র | a→া | jy→জ্য | ak→ক | e→ে | y→ε","r a j y a k e y","r a jy ak e y",false,UNGRADED
+164,"রিড","rid",false,"r→র | i→ি | d→ড","r i d","r i d",true,UNGRADED
+165,"রীতা","rita",false,"r→র | i→ী | t→ত | a→া","r i t a","r i t a",true,UNGRADED
+166,"রুথ","ruth",false,"r→র | u→ু | th→থ","r u th","r u th",true,UNGRADED
+167,"লক্ষ্যে","lokshye",true,"lo→ল | ks→ক্ষ্য | hy→ε | e→ে","l o k sh y e","lo ks hy e",false,UNGRADED
+168,"লীগের","leaguer",false,"l→ল | e→ী | a→ε | gu→গ | e→ে | r→র","l e a g u e r","l e a gu e r",false,UNGRADED
+169,"লোকেশনের","lokesoner",false,"l→ল | o→ো | k→ক | e→ে | s→শ | on→ন | e→ে | r→র","l o k e s o n e r","l o k e s on e r",false,UNGRADED
+170,"শব্দহীন","shabdoheen",true,"sh→শ | a→ε | bd→ব্দ | oh→হ | ee→ী | n→ন","sh a b d o h ee n","sh a bd oh ee n",false,UNGRADED
+171,"শাওলিন","shaolin",false,"sh→শ | a→া | o→ও | l→ল | i→ি | n→ন","sh a o l i n","sh a o l i n",true,UNGRADED
+172,"শিরীন","siriin",false,"s→শ | i→ি | ri→র | i→ী | n→ন","s i r ii n","s i ri i n",false,UNGRADED
+173,"শিশুসাহিত্য","sisushahittyo",true,"s→শ | i→ি | s→শ | u→ু | sh→স | a→া | h→হ | i→ি | tt→ত্য | yo→ε","s i s u sh a h i tt y o","s i s u sh a h i tt yo",false,UNGRADED
+174,"শুম্ভ","soombho",true,"s→শ | oo→ু | mb→ম্ভ | ho→ε","s oo m bh o","s oo mb ho",false,UNGRADED
+175,"শূন্যে","shunye",true,"sh→শ | u→ূ | ny→ন্য | e→ে","sh u n y e","sh u ny e",false,UNGRADED
+176,"শৃঙ্খলের","srinkhaler",true,"sr→শ | i→ৃ | nk→ঙ্খ | ha→ε | l→ল | e→ে | r→র","s r i n kh a l e r","sr i nk ha l e r",false,UNGRADED
+177,"শেষবারের","sheshbarer",false,"sh→শ | e→ে | sh→ষ | b→ব | a→া | r→র | e→ে | r→র","sh e sh b a r e r","sh e sh b a r e r",true,UNGRADED
+178,"শ্বাসরুদ্ধকর","swasruddhokar",true,"sw→শ্ব | a→া | s→স | r→র | u→ু | dd→দ্ধ | ho→ε | ka→ক | r→র","s w a s r u dd h o k a r","sw a s r u dd ho ka r",false,UNGRADED
+179,"শ্রমিকরা","shromeekra",true,"sh→শ্র | ro→ε | m→ম | ee→ি | k→ক | r→র | a→া","sh r o m ee k r a","sh ro m ee k r a",false,UNGRADED
+180,"সংবাদপত্রের","sanbadpotrer",true,"s→স | an→ং | b→ব | a→া | d→দ | po→প | tr→ত্র | e→ে | r→র","s a n b a d p o t r e r","s an b a d po tr e r",false,UNGRADED
+181,"সংস্করণ","sangaskaran",true,"sa→স | ng→ং | a→ε | sk→স্ক | ar→র | an→ণ","s a ng a s k a r a n","sa ng a sk ar an",false,UNGRADED
+182,"সমর্থনের","smarthaner",true,"s→স | ma→ম | rt→র্থ | ha→ε | n→ন | e→ে | r→র","s m a r th a n e r","s ma rt ha n e r",false,UNGRADED
+183,"সমৃদ্ধি","somriddhi",true,"so→স | mr→ম | i→ৃ | dd→দ্ধ | h→ε | i→ি","s o m r i dd h i","so mr i dd h i",false,UNGRADED
+184,"সরণি","saroni",false,"sa→স | r→র | on→ণ | i→ি","s a r o n i","sa r on i",false,UNGRADED
+185,"সরু","saru",false,"sa→স | r→র | u→ু","s a r u","sa r u",false,UNGRADED
+186,"সর্দার","sarder",true,"sa→স | rd→র্দ | e→া | r→র","s a r d e r","sa rd e r",false,UNGRADED
+187,"সাজা","saaza",false,"sa→স | a→া | z→জ | a→া","s aa z a","sa a z a",false,UNGRADED
+188,"সামর্থবান","samarthaban",true,"s→স | a→া | ma→ম | rt→র্থ | ha→ε | b→ব | a→া | n→ন","s a m a r th a b a n","s a ma rt ha b a n",false,UNGRADED
+189,"সালাহউদ্দিন","salahouddin",true,"s→স | a→া | l→ল | a→া | ho→হ | u→উ | dd→দ্দ | i→ি | n→ন","s a l a h ou dd i n","s a l a ho u dd i n",false,UNGRADED
+190,"সিলিং","sheilin",false,"sh→স | e→ε | i→ি | l→ল | i→ি | n→ং","sh e i l i n","sh e i l i n",true,UNGRADED
+191,"সুতারখালী","sutarkhali",false,"s→স | u→ু | t→ত | a→া | r→র | kh→খ | a→া | l→ল | i→ী","s u t a r kh a l i","s u t a r kh a l i",true,UNGRADED
+192,"সুপ্ত","supta",true,"s→স | u→ু | pt→প্ত | a→ε","s u p t a","s u pt a",false,UNGRADED
+193,"সুলাইমান","sulaimaan",false,"s→স | u→ু | l→ল | a→া | i→ই | ma→ম | a→া | n→ন","s u l ai m aa n","s u l a i ma a n",false,UNGRADED
+194,"সূত্রেই","sutreyi",true,"s→স | u→ূ | tr→ত্র | e→ে | yi→ই","s u t r e y i","s u tr e yi",false,UNGRADED
+195,"সেন্সরশিপ","sensarashipa",true,"s→স | e→ে | ns→ন্স | ar→র | a→ε | sh→শ | i→ি | pa→প","s e n s a r a sh i p a","s e ns ar a sh i pa",false,UNGRADED
+196,"স্টাডি","staadii",true,"st→স্ট | a→ε | a→া | d→ড | i→ি | i→ε","s t aa d ii","st a a d i i",false,UNGRADED
+197,"স্যামুয়েল","samueel",true,"s→স্য | a→া | m→ম | u→ু | ε→য় | ee→ে | l→ল","s a m u ee l","s a m u ee l",true,UNGRADED
+198,"হবেনা","hobena",false,"ho→হ | b→ব | e→ে | n→ন | a→া","h o b e n a","ho b e n a",false,UNGRADED
+199,"হালিম","halimm",false,"h→হ | a→া | l→ল | i→ি | mm→ম","h a l i mm","h a l i mm",true,UNGRADED
+200,"হিশাম","hisam",false,"h→হ | i→ি | s→শ | a→া | m→ম","h i s a m","h i s a m",true,UNGRADED
