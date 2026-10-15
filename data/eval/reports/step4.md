@@ -114,24 +114,17 @@ A real segmentation disagreement is defined as a Viterbi alignment boundary that
 
 ---
 
-## 8. Human Linguistic Grading of `align_audit.csv`
+## 8. Alignment Audit Tool & Evaluation Protocol
 
-The committed 200-sample audit dataset was evaluated through individual linguistic inspection by a native Bengali speaker:
-- **Sampling**: Fixed PRNG seed 42, uniformly sampled across distinct target Bengali words.
-- **Stratification**: 104 Conjunct pairs (52.0%), 96 Non-Conjunct pairs (48.0%).
-- **Grading Standard**: A row is graded `CORRECT` if and only if **every** unit pairing in the alignment is phonologically valid according to Bengali orthography and common mobile romanization conventions.
+Per the human-in-the-loop audit protocol, the 200-sample audit dataset (`data/eval/align_audit_ungraded.csv`) is preserved in its clean, ungraded state. No automated, synthetic, or agent-generated grades are included.
 
-### Audit Grading Results:
-| Stratum | Evaluated Pairs | Graded CORRECT | Graded INCORRECT | Accuracy (%) |
-|:---|:---:|:---:|:---:|:---:|
-| **Conjunct Pairs** | 104 | 100 | 4 | **96.15%** |
-| **Non-Conjunct Pairs** | 96 | 91 | 5 | **94.79%** |
-| **Total Audit Sample** | **200** | **191** | **9** | **95.50%** |
-| **50-Row Dual Inter-Rater Agreement** | 50 | 50 | 0 | **100.00%** |
+### Audit Tool & Sampler Deliverables:
+- **`tools/grade_alignment.html`**: A fully self-contained zero-dependency HTML/JS grading tool with keyboard shortcuts (`1`=Correct, `2`=Incorrect, `3`=Unsure, `←`=Back, `→`=Skip), large Bengali font display, visual alignment chips (`r ↓ b` with visible `ε`), blind header sanitization, required error-type validation on `INCORRECT`, `localStorage` autosave/resume, and UTF-8 BOM CSV export.
+- **`tools/make_rater2_ids.py`**: PRNG sampler (fixed seed 42) that sampled 50 row IDs uniformly at random into [`data/eval/align_audit_rater2_ids.txt`](file:///mnt/data/lekhani-engine/data/eval/align_audit_rater2_ids.txt).
+- **`tools/audit_stats.py`**: Read-only analysis script computing overall and stratified counts, Wilson 95% confidence intervals (conservative and conditional), error-type breakdowns, and Cohen's Kappa coefficient for dual raters.
 
-### Breakdown of the 9 Incorrect Rows:
-1. **Coverage Errors (5 rows)**: English loanword acronyms or infrequent geminates (e.g. `আরডিআরএস` $\rightarrow$ `rdrs`, `প্রানীদের` $\rightarrow$ `praaniider`, `বাঙালী` $\rightarrow$ `bangalii`, `শিরীন` $\rightarrow$ `siriin`, `স্টাডি` $\rightarrow$ `staadii`).
-2. **English Loan Diphthong Splits (3 rows)**: English loanwords with the `/aɪ/` diphthong (e.g. `অনলাইনে` $\rightarrow$ `anline`, `ফাইনম্যান` $\rightarrow$ `fineman`, `সুলাইমান` $\rightarrow$ `sulaimaan`), where `line`/`fine` was aligned via `i → া` and inserted `ε → ই`.
-3. **Cross-Category Suffix Misalign (1 row)**: English suffix `-tion` in `কর্পোরেশনের` (`corporationer`), where `i → শ`.
-
-All ratings, error classifications, and rater notes have been committed to [`data/eval/align_audit.csv`](file:///mnt/data/lekhani-engine/data/eval/align_audit.csv).
+### Commit Protocol:
+1. First commit (`a9479e8`): Tool, sampled IDs file, audit script, and clean ungraded CSVs (`align_audit_ungraded.csv` and `align_audit.csv`).
+2. Human grading: The rater evaluates the 200 rows in `tools/grade_alignment.html` and exports `align_audit_rater1.csv` (and optionally `align_audit_rater2.csv` using the 50 subset IDs).
+3. Second commit: Human audit CSV(s) are committed unchanged in an isolated commit.
+4. Report update: `tools/audit_stats.py` is executed against the committed human CSV(s), and the verified empirical audit statistics, Wilson CIs, and Kappa agreement are appended here with exact commit SHA citations.
