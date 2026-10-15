@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lekhani Alignment Audit Tool</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-green-hover: #16a34a;
+      --accent-red: #ef4444;
+      --accent-red-hover: #dc2626;
+      --accent-amber: #f59e0b;
+      --accent-amber-hover: #d97706;
+      --chip-bg: #090d16;
+      --chip-border: #475569;
+      --font-bengali: "Noto Sans Bengali", "Kalpurush", "Nirmala UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header & Nav */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-badge {
+      background: #0284c7;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+    }
+
+    .btn-secondary {
+      background: var(--card-bg);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 8px 14px;
+      font-size: 14px;
+      min-height: 40px;
+    }
+    .btn-secondary:hover {
+      background: #334155;
+    }
+
+    .btn-export {
+      background: #0284c7;
+      color: #fff;
+      padding: 8px 16px;
+      font-size: 14px;
+      min-height: 40px;
+    }
+    .btn-export:hover {
+      background: #0369a1;
+    }
+
+    /* Rubric Banner */
+    .rubric-banner {
+      background: #172554;
+      border: 1px solid #1e40af;
+      color: #bfdbfe;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      line-height: 1.4;
+    }
+
+    /* Card Panels */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Setup Screen */
+    .setup-group {
+      margin-bottom: 20px;
+    }
+    .setup-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+    }
+    .setup-group input[type="text"] {
+      width: 100%;
+      padding: 10px 14px;
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text-main);
+      font-size: 15px;
+    }
+    .drop-zone {
+      width: 100%;
+      padding: 16px;
+      background: #090d16;
+      border: 2px dashed var(--card-border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+    .drop-zone.dragover {
+      border-color: var(--primary);
+      background: #1e293b;
+    }
+    .drop-zone input[type="file"] {
+      display: none;
+    }
+    .helper-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 5px;
+    }
+    .paste-toggle {
+      font-size: 12px;
+      color: var(--primary);
+      cursor: pointer;
+      margin-top: 6px;
+      display: inline-block;
+      text-decoration: underline;
+    }
+    .paste-area {
+      display: none;
+      width: 100%;
+      height: 90px;
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      color: var(--text-main);
+      font-family: monospace;
+      font-size: 12px;
+      padding: 8px;
+      margin-top: 6px;
+    }
+    .resume-box {
+      background: #064e3b;
+      border: 1px solid #059669;
+      color: #a7f3d0;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Grading Interface */
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: #334155;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+
+    .row-meta {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .word-display {
+      text-align: center;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 20px;
+    }
+    .bengali-word {
+      font-family: var(--font-bengali);
+      font-size: 46px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.2;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+    .roman-word {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 26px;
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* Alignment Chips */
+    .alignment-chips-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+      justify-content: center;
+      align-items: center;
+    }
+    .chip {
+      background: var(--chip-bg);
+      border: 1px solid var(--chip-border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 60px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .chip-roman {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--primary);
+    }
+    .chip-arrow {
+      color: #64748b;
+      font-size: 14px;
+      margin: 4px 0;
+    }
+    .chip-bengali {
+      font-family: var(--font-bengali);
+      font-size: 24px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .epsilon {
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    /* Action Buttons */
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .btn-grade {
+      padding: 16px 8px;
+      font-size: 18px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: #fff;
+      min-height: 60px;
+      justify-content: center;
+    }
+    .shortcut-hint {
+      font-size: 12px;
+      font-weight: 400;
+      opacity: 0.85;
+    }
+    .btn-correct {
+      background: var(--accent-green);
+    }
+    .btn-correct:hover, .btn-correct.selected {
+      background: var(--accent-green-hover);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4);
+    }
+    .btn-incorrect {
+      background: var(--accent-red);
+    }
+    .btn-incorrect:hover, .btn-incorrect.selected {
+      background: var(--accent-red-hover);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4);
+    }
+    .btn-unsure {
+      background: var(--accent-amber);
+    }
+    .btn-unsure:hover, .btn-unsure.selected {
+      background: var(--accent-amber-hover);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4);
+    }
+
+    /* Error Details Panel */
+    .error-panel {
+      background: #090d16;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .error-panel.visible {
+      display: block;
+    }
+    .error-panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fca5a5;
+      margin-bottom: 8px;
+    }
+    .error-select {
+      width: 100%;
+      padding: 10px 12px;
+      background: #1e293b;
+      border: 1px solid #64748b;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .error-note {
+      width: 100%;
+      padding: 10px 12px;
+      background: #1e293b;
+      border: 1px solid #64748b;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    /* Nav Buttons */
+    .nav-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      gap: 8px;
+    }
+
+    /* Alert banner */
+    .alert-banner {
+      background: #7f1d1d;
+      border: 1px solid #ef4444;
+      color: #fecaca;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      display: none;
+      line-height: 1.4;
+    }
+
+    /* Summary Screen */
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .summary-table th, .summary-table td {
+      border: 1px solid var(--card-border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+    .summary-table th {
+      background: #090d16;
+      color: var(--text-muted);
+    }
+    .skipped-list {
+      max-height: 200px;
+      overflow-y: auto;
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    .skipped-item {
+      padding: 8px 10px;
+      border-bottom: 1px solid #1e293b;
+      cursor: pointer;
+      color: var(--primary);
+    }
+    .skipped-item:hover {
+      background: #1e293b;
+    }
+
+    /* Responsive phone layout */
+    @media (max-width: 600px) {
+      body {
+        padding: 8px;
+      }
+      .card {
+        padding: 16px;
+      }
+      .bengali-word {
+        font-size: 38px;
+      }
+      .roman-word {
+        font-size: 22px;
+      }
+      .button-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .btn-grade {
+        min-height: 52px;
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 12px 18px;
+      }
+      .nav-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .nav-row button {
+        width: 100%;
+      }
+      .nav-row span {
+        text-align: center;
+        order: -1;
+        margin-bottom: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="logo-area">
+        <span class="logo-badge">PRAGYAN</span>
+        <span class="title">Alignment Audit Tool</span>
+      </div>
+      <div class="header-actions">
+        <button id="btnTopSummary" class="btn-secondary" style="display: none;">View Summary</button>
+        <button id="btnTopExport" class="btn-export" style="display: none;">Export CSV</button>
+      </div>
+    </header>
+
+    <div class="rubric-banner">
+      <span>ℹ️</span>
+      <span><strong>Rubric:</strong> Mark <em>CORRECT</em> only if every unit is plausible. Judge the pairing, not the dataset's spelling.</span>
+    </div>
+
+    <div id="alertBanner" class="alert-banner"></div>
+
+    <!-- 1. SETUP VIEW -->
+    <div id="setupView" class="card">
+      <h2 style="margin-bottom: 16px; font-size: 20px;">Load Alignment Dataset</h2>
+
+      <div id="resumeBox" class="resume-box" style="display: none;">
+        <div>
+          <strong>Existing session detected!</strong>
+          <div id="resumeDetails" style="font-size: 13px; opacity: 0.9;"></div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="btnResume" class="btn-secondary" style="background: #059669; color: #fff; border: none;">Resume</button>
+          <button id="btnDismissResume" class="btn-secondary" style="background: transparent; color: #fca5a5; border: 1px solid #7f1d1d;">Dismiss</button>
+        </div>
+      </div>
+
+      <div class="setup-group">
+        <label for="raterNameInput">Rater Name (Required):</label>
+        <input type="text" id="raterNameInput" placeholder="e.g. Evaluator_1, Sintaul" autocomplete="off">
+        <div class="helper-text">Your name will be stored in every row of the exported CSV.</div>
+      </div>
+
+      <div class="setup-group">
+        <label>Audit CSV File (Required):</label>
+        <div id="csvDropZone" class="drop-zone">
+          <span id="csvFileNameDisplay">Click to browse or drag & drop <code>align_audit_ungraded.csv</code> here</span>
+          <input type="file" id="csvFileInput" accept=".csv">
+        </div>
+        <span id="csvPasteToggle" class="paste-toggle">Or paste CSV text directly</span>
+        <textarea id="csvPasteArea" class="paste-area" placeholder="Paste full CSV content with headers here..."></textarea>
+        <div class="helper-text">Any existing grades, error types, notes or rater columns will be discarded automatically.</div>
+      </div>
+
+      <div class="setup-group">
+        <label>Subset IDs Filter (Optional, e.g. for Rater 2):</label>
+        <div id="idsDropZone" class="drop-zone">
+          <span id="idsFileNameDisplay">Click to browse or drag & drop <code>align_audit_rater2_ids.txt</code> (optional)</span>
+          <input type="file" id="idsFileInput" accept=".txt">
+        </div>
+        <span id="idsPasteToggle" class="paste-toggle">Or paste subset IDs directly</span>
+        <textarea id="idsPasteArea" class="paste-area" placeholder="Paste row IDs here (one per line, e.g. 2, 7, 8)..."></textarea>
+        <div class="helper-text">If provided, only rows matching these IDs will be evaluated.</div>
+      </div>
+
+      <button id="btnStart" class="btn-export" style="width: 100%; padding: 14px; font-size: 16px; margin-top: 8px;">Start Grading</button>
+    </div>
+
+    <!-- 2. GRADING VIEW -->
+    <div id="gradingView" class="card" style="display: none;">
+      <div class="progress-bar-container">
+        <div id="progressBarFill" class="progress-bar-fill"></div>
+      </div>
+
+      <div class="row-meta">
+        <span id="progressText">1 / 200</span>
+        <span id="rowMetaInfo">ID: 1 | Conjunct: Yes</span>
+      </div>
+
+      <div class="word-display">
+        <div id="displayBengali" class="bengali-word">অঙ্গ</div>
+        <div id="displayRoman" class="roman-word">ango</div>
+      </div>
+
+      <div class="alignment-chips-title">Viterbi Alignment Units:</div>
+      <div id="chipsContainer" class="chips-row">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="button-row">
+        <button id="btnGradeCorrect" class="btn-grade btn-correct">
+          <span>Correct</span>
+          <span class="shortcut-hint">[Key: 1]</span>
+        </button>
+        <button id="btnGradeIncorrect" class="btn-grade btn-incorrect">
+          <span>Incorrect</span>
+          <span class="shortcut-hint">[Key: 2]</span>
+        </button>
+        <button id="btnGradeUnsure" class="btn-grade btn-unsure">
+          <span>Unsure</span>
+          <span class="shortcut-hint">[Key: 3]</span>
+        </button>
+      </div>
+
+      <!-- Error classification dropdown (required for Incorrect) -->
+      <div id="errorPanel" class="error-panel">
+        <div class="error-panel-title">Required: Select Error Category</div>
+        <select id="errorTypeSelect" class="error-select">
+          <option value="" disabled selected>-- Select Error Type --</option>
+          <option value="consonant_wrong">consonant_wrong (wrong Bengali consonant mapped)</option>
+          <option value="vowel_wrong">vowel_wrong (wrong vowel / kar mapped)</option>
+          <option value="dropped_consonant">dropped_consonant (essential consonant dropped as ε)</option>
+          <option value="conjunct_split">conjunct_split (conjunct cluster fragmented improperly)</option>
+          <option value="English_loan">English_loan (English spelling / diphthong mismatch)</option>
+          <option value="gold_spelling_odd">gold_spelling_odd (dataset gold spelling irregular)</option>
+          <option value="other">other</option>
+        </select>
+        <input type="text" id="noteInput" class="error-note" placeholder="Optional 1-line note (e.g. 'i mapped to aa')">
+        <div style="text-align: right; margin-top: 10px;">
+          <button id="btnConfirmError" class="btn-secondary" style="background: #334155; padding: 8px 16px;">Confirm & Advance [Enter]</button>
+        </div>
+      </div>
+
+      <div class="nav-row">
+        <button id="btnBack" class="btn-secondary">← Back [←]</button>
+        <span style="font-size: 12px; color: var(--text-muted);">Keys: 1=Correct | 2=Incorrect | 3=Unsure | ←=Back | →=Skip</span>
+        <button id="btnSkip" class="btn-secondary">Skip → [→]</button>
+      </div>
+    </div>
+
+    <!-- 3. SUMMARY VIEW -->
+    <div id="summaryView" class="card" style="display: none;">
+      <h2 style="margin-bottom: 16px; font-size: 20px;">Grading Summary</h2>
+      
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Stratum</th>
+            <th>Total Rows</th>
+            <th>Correct</th>
+            <th>Incorrect</th>
+            <th>Unsure</th>
+            <th>Ungraded</th>
+          </tr>
+        </thead>
+        <tbody id="summaryTableBody">
+          <!-- Rendered dynamically -->
+        </tbody>
+      </table>
+
+      <div id="skippedSection" style="margin-top: 16px;">
+        <h4 style="font-size: 14px; color: var(--text-muted);">Skipped Rows (<span id="skippedCount">0</span>):</h4>
+        <div id="skippedList" class="skipped-list"></div>
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap;">
+        <button id="btnSummaryBack" class="btn-secondary" style="flex: 1; padding: 12px;">Return to Grading</button>
+        <button id="btnSummaryExport" class="btn-export" style="flex: 2; padding: 12px;">Export Completed CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let raterName = "";
+    let csvFileName = "align_audit.csv";
+    let allRows = [];       // Full parsed clean rows
+    let activeIndices = []; // Filtered indices to grade (e.g. if subset ids provided)
+    let currentIndex = 0;   // Index into activeIndices
+
+    // DOM Elements
+    const setupView = document.getElementById("setupView");
+    const gradingView = document.getElementById("gradingView");
+    const summaryView = document.getElementById("summaryView");
+    const alertBanner = document.getElementById("alertBanner");
+    const raterNameInput = document.getElementById("raterNameInput");
+    
+    const csvDropZone = document.getElementById("csvDropZone");
+    const csvFileInput = document.getElementById("csvFileInput");
+    const csvFileNameDisplay = document.getElementById("csvFileNameDisplay");
+    const csvPasteToggle = document.getElementById("csvPasteToggle");
+    const csvPasteArea = document.getElementById("csvPasteArea");
+
+    const idsDropZone = document.getElementById("idsDropZone");
+    const idsFileInput = document.getElementById("idsFileInput");
+    const idsFileNameDisplay = document.getElementById("idsFileNameDisplay");
+    const idsPasteToggle = document.getElementById("idsPasteToggle");
+    const idsPasteArea = document.getElementById("idsPasteArea");
+
+    const btnStart = document.getElementById("btnStart");
+    const btnResume = document.getElementById("btnResume");
+    const btnDismissResume = document.getElementById("btnDismissResume");
+    const resumeBox = document.getElementById("resumeBox");
+    const resumeDetails = document.getElementById("resumeDetails");
+    const btnTopExport = document.getElementById("btnTopExport");
+    const btnTopSummary = document.getElementById("btnTopSummary");
+
+    const progressBarFill = document.getElementById("progressBarFill");
+    const progressText = document.getElementById("progressText");
+    const rowMetaInfo = document.getElementById("rowMetaInfo");
+    const displayBengali = document.getElementById("displayBengali");
+    const displayRoman = document.getElementById("displayRoman");
+    const chipsContainer = document.getElementById("chipsContainer");
+
+    const btnGradeCorrect = document.getElementById("btnGradeCorrect");
+    const btnGradeIncorrect = document.getElementById("btnGradeIncorrect");
+    const btnGradeUnsure = document.getElementById("btnGradeUnsure");
+    const errorPanel = document.getElementById("errorPanel");
+    const errorTypeSelect = document.getElementById("errorTypeSelect");
+    const noteInput = document.getElementById("noteInput");
+    const btnConfirmError = document.getElementById("btnConfirmError");
+    const btnBack = document.getElementById("btnBack");
+    const btnSkip = document.getElementById("btnSkip");
+
+    const summaryTableBody = document.getElementById("summaryTableBody");
+    const skippedList = document.getElementById("skippedList");
+    const skippedCount = document.getElementById("skippedCount");
+    const btnSummaryBack = document.getElementById("btnSummaryBack");
+    const btnSummaryExport = document.getElementById("btnSummaryExport");
+
+    // Utilities
+    function showAlert(msg) {
+      alertBanner.textContent = msg;
+      alertBanner.style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(() => {
+        alertBanner.style.display = "none";
+      }, 5000);
+    }
+
+    // Toggle paste textareas
+    csvPasteToggle.addEventListener("click", () => {
+      const isVisible = csvPasteArea.style.display === "block";
+      csvPasteArea.style.display = isVisible ? "none" : "block";
+      if (!isVisible) csvPasteArea.focus();
+    });
+    idsPasteToggle.addEventListener("click", () => {
+      const isVisible = idsPasteArea.style.display === "block";
+      idsPasteArea.style.display = isVisible ? "none" : "block";
+      if (!isVisible) idsPasteArea.focus();
+    });
+
+    // Dropzone setup
+    function setupDropZone(dropZone, fileInput, displaySpan) {
+      dropZone.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files.length > 0) {
+          displaySpan.textContent = `✓ Selected: ${fileInput.files[0].name}`;
+          displaySpan.style.color = "var(--primary)";
+        }
+      });
+      ["dragenter", "dragover"].forEach(evtName => {
+        dropZone.addEventListener(evtName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.add("dragover");
+        });
+      });
+      ["dragleave", "drop"].forEach(evtName => {
+        dropZone.addEventListener(evtName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.remove("dragover");
+        });
+      });
+      dropZone.addEventListener("drop", (e) => {
+        if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+          fileInput.files = e.dataTransfer.files;
+          displaySpan.textContent = `✓ Selected: ${e.dataTransfer.files[0].name}`;
+          displaySpan.style.color = "var(--primary)";
+        }
+      });
+    }
+    setupDropZone(csvDropZone, csvFileInput, csvFileNameDisplay);
+    setupDropZone(idsDropZone, idsFileInput, idsFileNameDisplay);
+
+    // CSV Parser with proper quotes and escaping
+    function parseCSV(text) {
+      let lines = [];
+      let row = [];
+      let inQuotes = false;
+      let curr = "";
+
+      // Strip BOM if present
+      if (text.charCodeAt(0) === 0xFEFF) {
+        text = text.slice(1);
+      }
+
+      for (let i = 0; i < text.length; i++) {
+        let c = text[i];
+        let next = text[i + 1];
+
+        if (c === '"') {
+          if (inQuotes && next === '"') {
+            curr += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (c === ',' && !inQuotes) {
+          row.push(curr);
+          curr = "";
+        } else if ((c === '\r' || c === '\n') && !inQuotes) {
+          if (c === '\r' && next === '\n') {
+            i++;
+          }
+          row.push(curr);
+          if (row.some(cell => cell.trim().length > 0)) {
+            lines.push(row);
+          }
+          row = [];
+          curr = "";
+        } else {
+          curr += c;
+        }
+      }
+      if (curr.length > 0 || row.length > 0) {
+        row.push(curr);
+        if (row.some(cell => cell.trim().length > 0)) {
+          lines.push(row);
+        }
+      }
+      return lines;
+    }
+
+    // Check LocalStorage on initial load
+    function checkLocalStorage() {
+      try {
+        const lastSessionKey = "lekhani_audit_last_session";
+        const lastSession = localStorage.getItem(lastSessionKey);
+        if (lastSession) {
+          const session = JSON.parse(lastSession);
+          if (session && session.rater && session.fileName && session.allRows) {
+            resumeDetails.textContent = `Rater: ${session.rater} | File: ${session.fileName} | Graded: ${session.savedCount || 0} / ${session.activeIndices.length} rows`;
+            resumeBox.style.display = "flex";
+            btnResume.onclick = () => {
+              raterName = session.rater;
+              csvFileName = session.fileName;
+              allRows = session.allRows;
+              activeIndices = session.activeIndices;
+              currentIndex = session.currentIndex || 0;
+              launchGrading();
+            };
+            btnDismissResume.onclick = () => {
+              resumeBox.style.display = "none";
+              localStorage.removeItem(lastSessionKey);
+            };
+          }
+        }
+      } catch (e) {
+        console.warn("Storage check failed", e);
+      }
+    }
+    checkLocalStorage();
+
+    // Save to LocalStorage
+    function autoSave() {
+      try {
+        if (!raterName || !csvFileName) return;
+        const storageKey = `lekhani_audit_${raterName}_${csvFileName}`;
+        let gradedCount = allRows.filter(r => r.grade && r.grade !== "UNGRADED").length;
+        const state = {
+          rater: raterName,
+          fileName: csvFileName,
+          allRows: allRows,
+          activeIndices: activeIndices,
+          currentIndex: currentIndex,
+          savedCount: gradedCount,
+          timestamp: new Date().toISOString()
+        };
+        localStorage.setItem(storageKey, JSON.stringify(state));
+        localStorage.setItem("lekhani_audit_last_session", JSON.stringify(state));
+      } catch (e) {
+        showAlert("Warning: localStorage autosave failed. You can still export your CSV directly.");
+      }
+    }
+
+    // Start Button
+    btnStart.addEventListener("click", async () => {
+      raterName = raterNameInput.value.trim();
+      if (!raterName) {
+        showAlert("Please enter your name as Rater.");
+        raterNameInput.focus();
+        return;
+      }
+
+      let csvText = "";
+      if (csvFileInput.files.length > 0) {
+        csvFileName = csvFileInput.files[0].name;
+        csvText = await csvFileInput.files[0].text();
+      } else if (csvPasteArea.value.trim().length > 0) {
+        csvFileName = "pasted_dataset.csv";
+        csvText = csvPasteArea.value.trim();
+      } else {
+        showAlert("Please select an audit CSV file or paste the CSV content.");
+        return;
+      }
+
+      const rawLines = parseCSV(csvText);
+      if (rawLines.length < 2) {
+        showAlert("CSV file appears to be empty or missing header.");
+        return;
+      }
+
+      const headers = rawLines[0].map(h => h.trim().toLowerCase());
+      const idIdx = headers.indexOf("id");
+      const bnIdx = headers.indexOf("bengali_word");
+      const latIdx = headers.indexOf("roman_input");
+      const conjIdx = headers.indexOf("has_conjunct");
+      const alignIdx = headers.indexOf("viterbi_alignment");
+      const greedyIdx = headers.indexOf("greedy_roman_tokens");
+      const viterbiIdx = headers.indexOf("viterbi_roman_tokens");
+      const segMatchIdx = headers.indexOf("segmentation_match");
+
+      if (idIdx === -1 || bnIdx === -1 || latIdx === -1 || alignIdx === -1) {
+        showAlert("Missing required standard columns (id, bengali_word, roman_input, viterbi_alignment).");
+        return;
+      }
+
+      // Read optional subset IDs
+      let allowedIds = null;
+      let idsRaw = "";
+      if (idsFileInput.files.length > 0) {
+        idsRaw = await idsFileInput.files[0].text();
+      } else if (idsPasteArea.value.trim().length > 0) {
+        idsRaw = idsPasteArea.value.trim();
+      }
+
+      if (idsRaw.trim().length > 0) {
+        allowedIds = new Set(
+          idsRaw
+            .split(/[\r\n,]+/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0)
+            .map(Number)
+        );
+      }
+
+      // Hard Rule 3: Strip any existing grades, error types, notes, rater columns
+      allRows = [];
+      activeIndices = [];
+
+      for (let i = 1; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        if (line.length <= Math.max(idIdx, bnIdx, latIdx, alignIdx)) continue;
+        const rowId = parseInt(line[idIdx], 10);
+        if (isNaN(rowId)) continue;
+
+        const rowObj = {
+          id: rowId,
+          bengali_word: line[bnIdx],
+          roman_input: line[latIdx],
+          has_conjunct: conjIdx !== -1 ? line[conjIdx] : "false",
+          viterbi_alignment: line[alignIdx],
+          greedy_roman_tokens: greedyIdx !== -1 ? line[greedyIdx] : "",
+          viterbi_roman_tokens: viterbiIdx !== -1 ? line[viterbiIdx] : "",
+          segmentation_match: segMatchIdx !== -1 ? line[segMatchIdx] : "true",
+          // Reset cleanly (blind)
+          grade: "",
+          error_type: "",
+          note: "",
+          graded_at: ""
+        };
+
+        const globalIdx = allRows.length;
+        allRows.push(rowObj);
+
+        if (!allowedIds || allowedIds.has(rowId)) {
+          activeIndices.push(globalIdx);
+        }
+      }
+
+      if (activeIndices.length === 0) {
+        showAlert("No rows matched the filter criteria.");
+        return;
+      }
+
+      currentIndex = 0;
+      launchGrading();
+    });
+
+    function launchGrading() {
+      setupView.style.display = "none";
+      summaryView.style.display = "none";
+      gradingView.style.display = "block";
+      btnTopExport.style.display = "inline-block";
+      btnTopSummary.style.display = "inline-block";
+      renderCurrentRow();
+    }
+
+    // Render single row
+    function renderCurrentRow() {
+      if (currentIndex >= activeIndices.length) {
+        showSummary();
+        return;
+      }
+
+      const globalIdx = activeIndices[currentIndex];
+      const row = allRows[globalIdx];
+
+      // Progress ("37 / 200")
+      const currentNum = currentIndex + 1;
+      const totalNum = activeIndices.length;
+      progressText.textContent = `${currentNum} / ${totalNum}`;
+      progressBarFill.style.width = `${((currentNum - 1) / totalNum) * 100}%`;
+
+      const isConj = String(row.has_conjunct).toLowerCase() === "true";
+      rowMetaInfo.textContent = `ID: ${row.id} | Conjunct: ${isConj ? "Yes" : "No"}`;
+
+      // Large word display (>= 36px font)
+      displayBengali.textContent = row.bengali_word;
+      displayRoman.textContent = row.roman_input;
+
+      // Render Alignment Chips
+      chipsContainer.innerHTML = "";
+      const rawAlign = row.viterbi_alignment || "";
+      const pairs = rawAlign.split("|").map(p => p.trim()).filter(p => p.length > 0);
+
+      if (pairs.length === 0) {
+        chipsContainer.innerHTML = '<span style="color:#ef4444; font-size:14px; font-weight:600;">[No alignment path found (empty)]</span>';
+      } else {
+        pairs.forEach(pairStr => {
+          const parts = pairStr.split("→");
+          let rChunk = parts[0] ? parts[0].trim() : "ε";
+          let bChunk = parts[1] ? parts[1].trim() : "ε";
+          if (!rChunk) rChunk = "ε";
+          if (!bChunk) bChunk = "ε";
+
+          const chip = document.createElement("div");
+          chip.className = "chip";
+
+          const rSpan = document.createElement("span");
+          rSpan.className = "chip-roman" + (rChunk === "ε" ? " epsilon" : "");
+          rSpan.textContent = rChunk;
+
+          const arrSpan = document.createElement("span");
+          arrSpan.className = "chip-arrow";
+          arrSpan.textContent = "↓";
+
+          const bSpan = document.createElement("span");
+          bSpan.className = "chip-bengali" + (bChunk === "ε" ? " epsilon" : "");
+          bSpan.textContent = bChunk;
+
+          chip.appendChild(rSpan);
+          chip.appendChild(arrSpan);
+          chip.appendChild(bSpan);
+          chipsContainer.appendChild(chip);
+        });
+      }
+
+      // Reset selection styling
+      btnGradeCorrect.classList.remove("selected");
+      btnGradeIncorrect.classList.remove("selected");
+      btnGradeUnsure.classList.remove("selected");
+
+      if (row.grade === "CORRECT") {
+        btnGradeCorrect.classList.add("selected");
+        errorPanel.classList.remove("visible");
+      } else if (row.grade === "INCORRECT") {
+        btnGradeIncorrect.classList.add("selected");
+        errorPanel.classList.add("visible");
+        errorTypeSelect.value = row.error_type || "";
+        noteInput.value = row.note || "";
+      } else if (row.grade === "UNSURE") {
+        btnGradeUnsure.classList.add("selected");
+        errorPanel.classList.add("visible");
+        errorTypeSelect.value = row.error_type || "";
+        noteInput.value = row.note || "";
+      } else {
+        errorPanel.classList.remove("visible");
+        errorTypeSelect.value = "";
+        noteInput.value = "";
+      }
+
+      autoSave();
+    }
+
+    // Grade handlers
+    function applyGrade(grade) {
+      const globalIdx = activeIndices[currentIndex];
+      const row = allRows[globalIdx];
+      row.grade = grade;
+      row.graded_at = new Date().toISOString();
+
+      if (grade === "CORRECT") {
+        row.error_type = "";
+        row.note = "";
+        errorPanel.classList.remove("visible");
+        currentIndex++;
+        renderCurrentRow();
+      } else {
+        // Incorrect or Unsure requires/allows error type
+        errorPanel.classList.add("visible");
+        errorTypeSelect.focus();
+        btnGradeCorrect.classList.remove("selected");
+        btnGradeIncorrect.classList.toggle("selected", grade === "INCORRECT");
+        btnGradeUnsure.classList.toggle("selected", grade === "UNSURE");
+      }
+    }
+
+    btnGradeCorrect.addEventListener("click", () => applyGrade("CORRECT"));
+    btnGradeIncorrect.addEventListener("click", () => applyGrade("INCORRECT"));
+    btnGradeUnsure.addEventListener("click", () => applyGrade("UNSURE"));
+
+    btnConfirmError.addEventListener("click", () => {
+      const globalIdx = activeIndices[currentIndex];
+      const row = allRows[globalIdx];
+
+      if (row.grade === "INCORRECT" && !errorTypeSelect.value) {
+        showAlert("Error type is required when marking a row Incorrect!");
+        errorTypeSelect.focus();
+        return;
+      }
+
+      row.error_type = errorTypeSelect.value;
+      row.note = noteInput.value.trim();
+      currentIndex++;
+      renderCurrentRow();
+    });
+
+    btnBack.addEventListener("click", () => {
+      if (currentIndex > 0) {
+        currentIndex--;
+        renderCurrentRow();
+      }
+    });
+
+    btnSkip.addEventListener("click", () => {
+      currentIndex++;
+      renderCurrentRow();
+    });
+
+    btnTopSummary.addEventListener("click", () => {
+      showSummary();
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener("keydown", (e) => {
+      if (gradingView.style.display !== "block") return;
+      if (e.target === noteInput) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          btnConfirmError.click();
+        }
+        return;
+      }
+      if (e.target === errorTypeSelect && e.key === "Enter") {
+        e.preventDefault();
+        btnConfirmError.click();
+        return;
+      }
+
+      if (e.key === "1") {
+        e.preventDefault();
+        applyGrade("CORRECT");
+      } else if (e.key === "2") {
+        e.preventDefault();
+        applyGrade("INCORRECT");
+      } else if (e.key === "3") {
+        e.preventDefault();
+        applyGrade("UNSURE");
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        btnBack.click();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        btnSkip.click();
+      }
+    });
+
+    // Summary Screen
+    function showSummary() {
+      gradingView.style.display = "none";
+      summaryView.style.display = "block";
+
+      const rowsSubset = activeIndices.map(idx => allRows[idx]);
+      const total = rowsSubset.length;
+
+      const conjRows = rowsSubset.filter(r => String(r.has_conjunct).toLowerCase() === "true");
+      const nonConjRows = rowsSubset.filter(r => String(r.has_conjunct).toLowerCase() === "false");
+
+      function countStratum(list) {
+        let c = 0, inc = 0, u = 0, ung = 0;
+        list.forEach(r => {
+          if (r.grade === "CORRECT") c++;
+          else if (r.grade === "INCORRECT") inc++;
+          else if (r.grade === "UNSURE") u++;
+          else ung++;
+        });
+        return { c, inc, u, ung, total: list.length };
+      }
+
+      const totalStats = countStratum(rowsSubset);
+      const conjStats = countStratum(conjRows);
+      const nonConjStats = countStratum(nonConjRows);
+
+      summaryTableBody.innerHTML = `
+        <tr>
+          <td><strong>Overall</strong></td>
+          <td>${totalStats.total}</td>
+          <td><strong style="color:var(--accent-green);">${totalStats.c}</strong> (${(totalStats.c/totalStats.total*100||0).toFixed(1)}%)</td>
+          <td><strong style="color:var(--accent-red);">${totalStats.inc}</strong> (${(totalStats.inc/totalStats.total*100||0).toFixed(1)}%)</td>
+          <td><strong style="color:var(--accent-amber);">${totalStats.u}</strong></td>
+          <td>${totalStats.ung}</td>
+        </tr>
+        <tr>
+          <td>With Conjunct (যুক্তবর্ণ)</td>
+          <td>${conjStats.total}</td>
+          <td>${conjStats.c} (${(conjStats.c/conjStats.total*100||0).toFixed(1)}%)</td>
+          <td>${conjStats.inc}</td>
+          <td>${conjStats.u}</td>
+          <td>${conjStats.ung}</td>
+        </tr>
+        <tr>
+          <td>Without Conjunct</td>
+          <td>${nonConjStats.total}</td>
+          <td>${nonConjStats.c} (${(nonConjStats.c/nonConjStats.total*100||0).toFixed(1)}%)</td>
+          <td>${nonConjStats.inc}</td>
+          <td>${nonConjStats.u}</td>
+          <td>${nonConjStats.ung}</td>
+        </tr>
+      `;
+
+      // Skipped / Ungraded rows list
+      skippedList.innerHTML = "";
+      const skipped = [];
+      activeIndices.forEach((gIdx, indexInActive) => {
+        const r = allRows[gIdx];
+        if (!r.grade || r.grade === "UNGRADED") {
+          skipped.push({ gIdx, indexInActive, row: r });
+        }
+      });
+
+      skippedCount.textContent = skipped.length;
+      if (skipped.length === 0) {
+        skippedList.innerHTML = '<div style="color:var(--accent-green); padding:6px;">✓ All rows have been evaluated!</div>';
+      } else {
+        skipped.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "skipped-item";
+          div.textContent = `Jump to Row #${item.indexInActive + 1} (ID: ${item.row.id} - ${item.row.bengali_word} / ${item.row.roman_input})`;
+          div.onclick = () => {
+            currentIndex = item.indexInActive;
+            summaryView.style.display = "none";
+            gradingView.style.display = "block";
+            renderCurrentRow();
+          };
+          skippedList.appendChild(div);
+        });
+      }
+    }
+
+    btnSummaryBack.addEventListener("click", () => {
+      currentIndex = Math.min(currentIndex, activeIndices.length - 1);
+      summaryView.style.display = "none";
+      gradingView.style.display = "block";
+      renderCurrentRow();
+    });
+
+    // CSV Quoting Helper
+    function escapeCSV(val) {
+      if (val === null || val === undefined) return '""';
+      let str = String(val);
+      if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return '"' + str + '"';
+    }
+
+    // Export Functionality
+    function exportCSV() {
+      // Validate: check if any Incorrect item is missing error_type
+      const invalidRows = allRows.filter(r => r.grade === "INCORRECT" && !r.error_type);
+      if (invalidRows.length > 0) {
+        const firstBad = invalidRows[0];
+        showAlert(`Export blocked: Row ID ${firstBad.id} (${firstBad.bengali_word}) is marked Incorrect but missing required error type!`);
+        const targetIdx = activeIndices.findIndex(idx => allRows[idx].id === firstBad.id);
+        if (targetIdx !== -1) {
+          currentIndex = targetIdx;
+          summaryView.style.display = "none";
+          gradingView.style.display = "block";
+          renderCurrentRow();
+        }
+        return;
+      }
+
+      const ungradedCount = allRows.filter(r => !r.grade || r.grade === "UNGRADED").length;
+      if (ungradedCount > 0) {
+        const proceed = confirm(`${ungradedCount} rows are still ungraded. Do you want to export anyway?`);
+        if (!proceed) return;
+      }
+
+      const headers = [
+        "id",
+        "bengali_word",
+        "roman_input",
+        "has_conjunct",
+        "viterbi_alignment",
+        "greedy_roman_tokens",
+        "viterbi_roman_tokens",
+        "segmentation_match",
+        "rater",
+        "grade",
+        "error_type",
+        "note",
+        "graded_at"
+      ];
+
+      let csvContent = "\uFEFF"; // UTF-8 BOM for Excel
+      csvContent += headers.map(escapeCSV).join(",") + "\r\n";
+
+      for (const row of allRows) {
+        const line = [
+          row.id,
+          row.bengali_word,
+          row.roman_input,
+          row.has_conjunct,
+          row.viterbi_alignment,
+          row.greedy_roman_tokens,
+          row.viterbi_roman_tokens,
+          row.segmentation_match,
+          raterName,
+          row.grade || "",
+          row.error_type || "",
+          row.note || "",
+          row.graded_at || ""
+        ];
+        csvContent += line.map(escapeCSV).join(",") + "\r\n";
+      }
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeRater = (raterName || "rater").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.href = url;
+      a.download = `align_audit_${safeRater}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    btnTopExport.addEventListener("click", exportCSV);
+    btnSummaryExport.addEventListener("click", exportCSV);
+  </script>
+</body>
+</html>
