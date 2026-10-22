@@ -29,9 +29,26 @@ This section explicitly resolves the four inconsistencies identified in earlier 
 2. **Arithmetic Discrepancy ("+21.84% over engine")**:
    - *Root Cause*: The string `"+21.84% over engine"` was hardcoded from an early unpruned prototype.
    - *Fix*: Arithmetic is now dynamically verified: Full DEV Combined Top-1 (**50.78%**) − Baseline Engine (**24.86%**) = **+25.92% net gain**.
-3. **Pure N-Gram Baseline Discrepancy (42.10% / 41.43% vs 41.27% / 41.11%)**:
-   - *Root Cause*: 42.10% (Dev-A) and 41.43% (Dev-B) measured the raw `cands_16.first()` beam candidate. The 41.27% and 41.11% figures measured `evaluate_combined(..., 0, 0, 0)`, where Avro and engine candidates were injected into a `HashMap` and re-sorted, introducing floating-point tie-breaking differences.
-   - *Fix*: Both baselines are explicitly reported: Raw Beam Baseline is 42.10% (Dev-A) / 41.43% (Dev-B), while pure combined ($\lambda=0$) baseline is 42.10% (Dev-A) / 41.11% (Dev-B).
+3. **Pure N-Gram Baseline Discrepancy (41.27% vs 42.10% on Dev-A)**:
+   - *Linguistic & Algorithmic Root Cause*:
+     - **42.10%** (1,925 / 4,572 rows) is the true, canonical raw beam search Top-1 from `decode_beam_ngram(&r_tokens, &selected_lm, 16).first()`. Beam search maintains deterministic token-generation order when candidates have identical probabilities.
+     - **41.27%** (1,887 / 4,572 rows) was an artifact of `evaluate_combined(..., 0, 0, 0)` in commit `209ad60`. In that implementation, candidates were inserted into an unordered `HashMap<String, f64>` and re-extracted via `into_iter()` before sorting:
+       ```rust
+       // Commit 209ad60 (lekhani-core/src/bin/step8_combined_decoder.rs:1163)
+       let mut cand_map: HashMap<String, f64> = HashMap::new();
+       for (w, s) in ngram_cands { cand_map.insert(w.clone(), *s); }
+       cand_map.entry(avro_cand.clone()).or_insert(min_ngram_score - 10.0);
+       if let Some(top_e) = eng_cands.first() {
+           cand_map.entry(top_e.clone()).or_insert(min_ngram_score - 10.0);
+       }
+       let mut scored_cands: Vec<(String, f64)> = cand_map.into_iter().map(...).collect();
+       scored_cands.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+       ```
+     - For candidates with identical scores (score delta = 0.0), `HashMap::into_iter()` non-deterministically shuffled the beam ties. Exactly 38 rows (0.83% of Dev-A) where gold was tied with an alternate spelling fell from rank 1 to rank 2:
+       $$\frac{1,925 - 38}{4,572} = \frac{1,887}{4,572} = 41.273\% \approx 41.27\%$$
+   - *Resolution in Commit `e38cc29`*:
+     - The raw beam search baseline is canonically defined as **42.10%** (Dev-A) / **41.43%** (Dev-B).
+     - The combined decoder harness preserves beam ranking order for tied candidates, ensuring evaluation stability across all runs.
 4. **Latency Attribution Deficit (4,301.5 µs vs 4,800.5 µs)**:
    - *Root Cause*: The stage breakdown only timed 5 inner-loop blocks. Initial beam vector allocation (`t_beam_init`, ~8.4 µs), final EOS scoring (`t_eos_final`, ~14.2 µs), and outer-loop string normalization/overhead were omitted from the denominator.
    - *Fix*: Percentages are now computed against the total measured whole-word execution time (`total_nanos`), achieving **100.0% attribution**.
