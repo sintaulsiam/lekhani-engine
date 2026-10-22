@@ -82,7 +82,7 @@ The Lekhani phonetic engine has exactly **two operating modes**, controlled by a
 | **1** | **Hermetic Re-Baseline** | **DONE** | Established true baseline: 24.80% DEV, 25.28% TEST. Locked SHA-256 dictionary gate. | [`61b565f`](file:///mnt/data/lekhani-engine) |
 | **2** | **Data Accounting & Audit** | **DONE** | Uncovered byte length bug (50.1% conjunct rows dropped). Established Filters-OFF policy. | [`3129ff1`](file:///mnt/data/lekhani-engine), [`4261f73`](file:///mnt/data/lekhani-engine) |
 | **3** | **Linguistic Tokenization** | **DONE** | 437 BN / 66 Roman units. 100% round-trip verified. Measured 74.3% conjunct failure. | [`4817e6a`](file:///mnt/data/lekhani-engine) |
-| **4** | **M2M Alignment on Full Data** | **DONE** | 98.76% forced reach, 97.8% model error diagnosed, 95.5% human-graded audit. | [`791f5d3`](file:///mnt/data/lekhani-engine) |
+| **4** | **M2M Alignment on Full Data** | **DONE** | 98.76% forced reach, 97.8% model error diagnosed, human audit protocol delivered. | [`791f5d3`](file:///mnt/data/lekhani-engine), [`a9479e8`](file:///mnt/data/lekhani-engine) |
 | **5** | **Translation Unit N-Gram LM** | **NEXT** | Joint $(R, B)$ unit language model. Full DEV reachability gap analysis. | — |
 | **6** | **Trie Beam Search Decoder** | Pending | Lexicon-constrained beam search integrating PrefixTrie. Sub-100 µs latency. | — |
 | **7** | **Perceptron Feature Ranker** | Pending | Structured perceptron with 6 feature templates + Dakshina row weighting. | — |
