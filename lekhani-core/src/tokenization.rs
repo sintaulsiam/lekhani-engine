@@ -22,6 +22,7 @@
 //! - 2:1 for doubled consonants only.
 //! - Hard constraints: no unit begins with a KAR unless Roman side is a vowel; conjuncts are atomic.
 
+use crate::session::ShiftOrigin;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -248,6 +249,103 @@ pub fn tokenize_roman(text: &str) -> Vec<String> {
     }
 
     tokens
+}
+
+/// Normalizes a Roman string while strictly preserving character case distinctions
+/// (e.g. distinguishing Avro retroflex 'T' from dental 't', 'D' from 'd', 'S' from 's', 'O' from 'o'),
+/// while collapsing 3+ repeated letters to 2.
+pub fn normalize_roman_cased(text: &str) -> String {
+    let mut res = String::with_capacity(text.len());
+    for c in text.chars() {
+        let len = res.len();
+        if len >= 2 {
+            let bytes = res.as_bytes();
+            let c_lower = c.to_ascii_lowercase();
+            let b1_lower = (bytes[len - 1] as char).to_ascii_lowercase();
+            let b2_lower = (bytes[len - 2] as char).to_ascii_lowercase();
+            if b1_lower == c_lower && b2_lower == c_lower {
+                continue;
+            }
+        }
+        res.push(c);
+    }
+    res
+}
+
+/// Tokenizes a Roman input string using greedy longest-match while preserving case distinctions.
+/// Digraphs match case-insensitively (e.g. "th", "Th", "TH", "kkh", "Kkh", "Chh"),
+/// preserving the exact casing of the underlying characters.
+pub fn tokenize_roman_cased(text: &str) -> Vec<String> {
+    let norm = normalize_roman_cased(text);
+    let chars: Vec<char> = norm.chars().collect();
+    let n = chars.len();
+    let mut tokens = Vec::with_capacity(n);
+    let mut i = 0;
+
+    while i < n {
+        // 1. Try 3-char digraph ("chh", "Chh", etc.)
+        if i + 3 <= n {
+            let sub_lower: String = chars[i..i + 3].iter().map(|c| c.to_ascii_lowercase()).collect();
+            if CONSONANT_DIGRAPHS.contains(&sub_lower.as_str()) {
+                let token: String = chars[i..i + 3].iter().collect();
+                tokens.push(token);
+                i += 3;
+                continue;
+            }
+        }
+
+        // 2. Try 2-char digraphs or doubled consonants
+        if i + 2 <= n {
+            let sub_lower: String = chars[i..i + 2].iter().map(|c| c.to_ascii_lowercase()).collect();
+            let is_digraph = CONSONANT_DIGRAPHS.contains(&sub_lower.as_str())
+                || VOWEL_DIGRAPHS.contains(&sub_lower.as_str());
+            let is_doubled = chars[i].to_ascii_lowercase() == chars[i + 1].to_ascii_lowercase()
+                && chars[i].is_ascii_alphabetic();
+
+            if is_digraph || is_doubled {
+                let token: String = chars[i..i + 2].iter().collect();
+                tokens.push(token);
+                i += 2;
+                continue;
+            }
+        }
+
+        // 3. Fallback: single character (cased)
+        tokens.push(chars[i].to_string());
+        i += 1;
+    }
+
+    tokens
+}
+
+/// Tokenizes a Roman input string with awareness of the shift origin.
+/// If `origin == ShiftOrigin::AutoCapitalize` and the first character is uppercase while all subsequent
+/// characters are lowercase (e.g. sentence-initial "Taka" or "Tumi"), the initial character is treated
+/// as uncapitalized ("taka" / "tumi") to prevent auto-capitalization from triggering accidental retroflex Avro mapping.
+/// If `origin == ShiftOrigin::Manual` or mid-word uppercase is present (e.g. "daKTar"), full case is preserved.
+pub fn tokenize_roman_with_origin(text: &str, origin: ShiftOrigin) -> Vec<String> {
+    let text = match origin {
+        ShiftOrigin::AutoCapitalize => {
+            let chars: Vec<char> = text.chars().collect();
+            if chars.first().is_some_and(|c| c.is_ascii_uppercase())
+                && chars.iter().skip(1).all(|c| !c.is_ascii_uppercase())
+            {
+                // TitleCase produced by system auto-capitalization: uncapitalize initial char
+                let mut uncap = String::with_capacity(text.len());
+                if let Some(first) = chars.first() {
+                    uncap.push(first.to_ascii_lowercase());
+                }
+                for &c in chars.iter().skip(1) {
+                    uncap.push(c);
+                }
+                uncap
+            } else {
+                text.to_string()
+            }
+        }
+        ShiftOrigin::Manual => text.to_string(),
+    };
+    tokenize_roman_cased(&text)
 }
 
 /// Returns all valid segmentation paths for a normalized Roman string.

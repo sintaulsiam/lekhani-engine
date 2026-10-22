@@ -297,3 +297,51 @@ fn test_roman_segmentation_lattice_offers_both_decomposed_and_digraph_paths() {
     assert!(paths_kotto.iter().any(|p| p == &["k", "o", "t", "t", "o"]));
 }
 
+#[test]
+fn test_shift_origin_and_cased_tokenization() {
+    use lekhani_core::tokenization::{tokenize_roman_cased, tokenize_roman_with_origin};
+    use lekhani_core::ShiftOrigin;
+    let avro_parser = lekhani_parser::default_avro_parser();
+
+    // 1. Taka with Manual Shift (user held Shift to explicitly type retroflex 'ট'):
+    let cands_manual_taka = tokenize_roman_with_origin("Taka", ShiftOrigin::Manual);
+    assert_eq!(cands_manual_taka, vec!["T", "a", "k", "a"]);
+    let cased_reconstructed: String = cands_manual_taka.join("");
+    assert_eq!(cased_reconstructed, "Taka");
+    let conv_manual = avro_parser.convert(&cased_reconstructed);
+    assert_eq!(conv_manual, "টাকা", "Manual shift on T must yield retroflex টাকা");
+
+    // 2. Tumi with AutoCapitalize at sentence start:
+    // Auto-capitalization must uncapitalize initial char to prevent accidental retroflex 'টুমি'
+    let cands_auto_tumi = tokenize_roman_with_origin("Tumi", ShiftOrigin::AutoCapitalize);
+    assert_eq!(cands_auto_tumi, vec!["t", "u", "m", "i"]);
+    let conv_auto_tumi = avro_parser.convert(&cands_auto_tumi.join(""));
+    assert_eq!(conv_auto_tumi, "তুমি", "Auto-capitalized Tumi must yield dental তুমি");
+
+    // Contrast with manual shift Tumi:
+    let cands_manual_tumi = tokenize_roman_with_origin("Tumi", ShiftOrigin::Manual);
+    assert_eq!(cands_manual_tumi, vec!["T", "u", "m", "i"]);
+    let conv_manual_tumi = avro_parser.convert(&cands_manual_tumi.join(""));
+    assert_eq!(conv_manual_tumi, "টুমি", "Explicit manual shift on Tumi yields retroflex টুমি");
+
+    let expected_daktar = "\u{09A6}\u{09BE}\u{0995}\u{09CD}\u{099F}\u{09BE}\u{09B0}";
+    let cands_daktar_auto = tokenize_roman_with_origin("daKTar", ShiftOrigin::AutoCapitalize);
+    assert_eq!(cands_daktar_auto, vec!["d", "a", "K", "T", "a", "r"]);
+    let conv_daktar_auto = avro_parser.convert(&cands_daktar_auto.join(""));
+    assert_eq!(conv_daktar_auto, expected_daktar, "Mid-word K and T must preserve case and yield retroflex ক্ট");
+
+    let cands_daktar_manual = tokenize_roman_with_origin("daKTar", ShiftOrigin::Manual);
+    assert_eq!(cands_daktar_manual, vec!["d", "a", "K", "T", "a", "r"]);
+    let conv_daktar_manual = avro_parser.convert(&cands_daktar_manual.join(""));
+    assert_eq!(conv_daktar_manual, expected_daktar, "Mid-word K and T must preserve case and yield retroflex ক্ট");
+
+    // 4. Tokenizer keeps case information on digraphs and doubled consonants
+    let cased_th = tokenize_roman_cased("Thik");
+    assert_eq!(cased_th, vec!["Th", "i", "k"]);
+    let cased_kh = tokenize_roman_cased("biKhat");
+    assert_eq!(cased_kh, vec!["b", "i", "Kh", "a", "t"]);
+    let cased_kk = tokenize_roman_cased("biKkhat");
+    assert_eq!(cased_kk, vec!["b", "i", "Kk", "h", "a", "t"]);
+}
+
+

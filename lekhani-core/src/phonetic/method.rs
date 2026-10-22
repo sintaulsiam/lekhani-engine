@@ -11,6 +11,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::ngram::UserStats;
+use crate::session::ShiftOrigin;
 
 #[derive(Debug, Clone, Default)]
 pub struct PhoneticMethod {
@@ -23,6 +24,7 @@ pub struct PhoneticMethod {
     pub default_selected_index: usize,
     pub use_dictionary: bool,
     pub include_english: bool,
+    pub shift_origin: ShiftOrigin,
     pub last_committed_word: Option<String>,
     pub last_committed_prev_word: Option<String>,
     pub last_commit_time: Option<std::time::Instant>,
@@ -51,6 +53,7 @@ impl PhoneticMethod {
             stats: Arc::new(Mutex::new(UserStats::new())),
             is_prediction_mode: false,
             is_prediction_navigated: false,
+            shift_origin: ShiftOrigin::AutoCapitalize,
         }
     }
 
@@ -86,12 +89,24 @@ impl PhoneticMethod {
         false
     }
 
-    pub fn process_key(&mut self, key: u16, _modifier: u8) -> bool {
+    pub fn process_key(&mut self, key: u16, modifier: u8) -> bool {
+        self.process_key_with_origin(key, modifier, ShiftOrigin::AutoCapitalize)
+    }
+
+    pub fn process_key_with_origin(
+        &mut self,
+        key: u16,
+        _modifier: u8,
+        origin: ShiftOrigin,
+    ) -> bool {
         self.last_commit_time = None;
         if self.is_prediction_mode {
             self.is_prediction_mode = false;
             self.current_candidates.clear();
             self.selected_index = 0;
+        }
+        if origin == ShiftOrigin::Manual {
+            self.shift_origin = ShiftOrigin::Manual;
         }
         if let Some(ch) = keycode_to_char(key) {
             self.buffer.push(ch);
@@ -114,6 +129,7 @@ impl PhoneticMethod {
             if !self.buffer.is_empty() {
                 self.update_suggestions();
             } else {
+                self.shift_origin = ShiftOrigin::AutoCapitalize;
                 self.current_candidates.clear();
                 self.selected_index = 0;
             }
@@ -254,6 +270,7 @@ impl PhoneticMethod {
 
     pub fn reset(&mut self) {
         self.buffer.clear();
+        self.shift_origin = ShiftOrigin::AutoCapitalize;
         self.current_candidates.clear();
         self.current_candidate_features.clear();
         self.selected_index = 0;

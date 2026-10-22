@@ -38,6 +38,6 @@ pub use phonetic::{
     AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion,
     PhoneticSuggestionConfig,
 };
-pub use session::{ActiveLayoutType, InputSession};
+pub use session::{ActiveLayoutType, InputSession, ShiftOrigin};
 pub use snippets::SnippetManager;
 pub use trie::PrefixTrie;

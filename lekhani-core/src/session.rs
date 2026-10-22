@@ -5,6 +5,13 @@ use serde_json::Value;
 use crate::fixed::FixedMethod;
 use crate::phonetic::PhoneticMethod;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
+pub enum ShiftOrigin {
+    #[default]
+    AutoCapitalize,
+    Manual,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveLayoutType {
     Phonetic,
@@ -173,8 +180,20 @@ impl InputSession {
     }
 
     pub fn process_key(&mut self, keycode: u16, modifier_mask: u8) -> bool {
+        self.process_key_with_origin(keycode, modifier_mask, ShiftOrigin::AutoCapitalize)
+    }
+
+    pub fn process_key_with_origin(
+        &mut self,
+        keycode: u16,
+        modifier_mask: u8,
+        origin: ShiftOrigin,
+    ) -> bool {
         match self.active_layout_type {
-            ActiveLayoutType::Phonetic => self.phonetic.process_key(keycode, modifier_mask),
+            ActiveLayoutType::Phonetic => {
+                self.phonetic
+                    .process_key_with_origin(keycode, modifier_mask, origin)
+            }
             ActiveLayoutType::Fixed => self.fixed.process_key(keycode, modifier_mask).is_some(),
         }
     }
