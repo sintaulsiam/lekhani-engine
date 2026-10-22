@@ -659,6 +659,38 @@ pub fn phonetic_equivalence_key(word: &str) -> String {
     out
 }
 
+pub fn is_valid_bengali_word(
+    w: &str,
+    dict: &HashSet<String>,
+    dict_keys: &HashSet<String>,
+) -> bool {
+    if dict.contains(w) {
+        return true;
+    }
+    if dict_keys.contains(&phonetic_equivalence_key(w)) {
+        return true;
+    }
+    const SUFFIXES: &[&str] = &[
+        "গুলোর", "গুলোতে", "গুলোকে", "গুলোরে", "গুলো",
+        "গুলির", "গুলিতে", "গুলিকে", "গুলি",
+        "দেরকে", "দের",
+        "টিতে", "টাতে", "টির", "টার", "টিকে", "টাকে", "টি", "টা",
+        "খানা", "খানি", "খানির",
+        "ভাবে", "মূলক",
+        "েরটি", "েরটা", "ের", "কে", "তে", "ে", "রা", "র", "য়", "য়ে", "ও"
+    ];
+    for sfx in SUFFIXES {
+        if let Some(stem) = w.strip_suffix(sfx) {
+            if stem.chars().count() >= 2
+                && (dict.contains(stem) || dict_keys.contains(&phonetic_equivalence_key(stem)))
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 pub fn transform_natural_autocap(raw_roman: &str, rng: &mut SimpleRng) -> String {
     let mut chars: Vec<char> = raw_roman.chars().collect();
     if let Some(first) = chars.first_mut() {
@@ -1102,6 +1134,7 @@ fn main() {
 
     let dict_words = load_dict_words(dict_path);
     println!("Loaded {} canonical dictionary entries from {:?}", dict_words.len(), dict_path);
+    let dict_keys: HashSet<String> = dict_words.iter().map(|w| phonetic_equivalence_key(w)).collect();
 
     let (train_pairs, train_dropped) = load_dataset(train_path);
     let (dev_a_pairs, dev_a_dropped) = load_dataset(dev_a_path);
@@ -1554,14 +1587,17 @@ fn main() {
                                  avro_uncap_cand: Option<&str>,
                                  eng_cands: &[String],
                                  dict_words: &HashSet<String>,
+                                 dict_keys: &HashSet<String>,
                                  l_dict: f64,
                                  l_avro: f64,
                                  l_eng: f64| -> Vec<(String, f64)> {
+        let top_s = ngram_cands.first().map(|c| c.1).unwrap_or(0.0);
         let min_s = ngram_cands.last().map(|c| c.1).unwrap_or(-50.0);
-        let floor_s = min_s - 8.0;
+        let floor_s = min_s.max(top_s - 3.5);
 
         let has_intent = lekhani_parser::has_explicit_avro_intent(raw_roman);
-        let avro_in_dict = dict_words.contains(avro_cand);
+        let is_avro_cased = is_avro_specific_token(raw_roman);
+        let avro_in_dict = is_valid_bengali_word(avro_cand, dict_words, dict_keys);
 
         let mut cand_map: HashMap<String, f64> = HashMap::with_capacity(ngram_cands.len() + 4);
         for (w, s) in ngram_cands {
@@ -1570,19 +1606,17 @@ fn main() {
 
         // Task B2 Injection Guard:
         // Inject Avro candidates ONLY when they exist in the dictionary OR when explicit intent is present.
-        if avro_in_dict || has_intent {
+        if avro_in_dict || has_intent || is_avro_cased || eng_cands.contains(&avro_cand.to_string()) {
             cand_map.entry(avro_cand.to_string()).or_insert(floor_s);
         }
         if let Some(u) = avro_uncap_cand {
-            if dict_words.contains(u) {
+            if is_valid_bengali_word(u, dict_words, dict_keys) {
                 cand_map.entry(u.to_string()).or_insert(floor_s);
             }
         }
         if let Some(top_e) = eng_cands.first() {
             cand_map.entry(top_e.clone()).or_insert(floor_s);
         }
-
-        let is_avro_cased = is_avro_specific_token(raw_roman);
 
         let mut scored: Vec<(String, f64)> = cand_map
             .into_iter()
@@ -1606,12 +1640,13 @@ fn main() {
 
                 if is_avro {
                     let in_beam = ngram_cands.iter().any(|c| c.0 == w);
+                    let is_dict = is_valid_bengali_word(&w, dict_words, dict_keys);
                     if has_intent || is_avro_cased {
                         s += l_avro;
-                    } else if avro_in_dict {
-                        s += l_avro * 0.25;
+                    } else if is_dict {
+                        s += l_avro * 0.85;
                     } else if in_beam {
-                        s += l_avro * 0.15;
+                        s += l_avro * 0.40;
                     }
                 }
 
@@ -1688,7 +1723,7 @@ fn main() {
             let is_gold_seen = dict_words.contains(gold);
             if is_gold_seen { seen_total += 1; } else { unseen_total += 1; }
 
-            let scored = run_deployable_policy(raw_r, ngram_cands, avro_cand, avro_uncap.as_deref(), eng_cands, &dict_words, l_dict, l_avro, l_eng);
+            let scored = run_deployable_policy(raw_r, ngram_cands, avro_cand, avro_uncap.as_deref(), eng_cands, &dict_words, &dict_keys, l_dict, l_avro, l_eng);
             let is_top1 = scored.first().map(|c| &c.0 == gold).unwrap_or(false);
             hit_vec.push(is_top1);
 
@@ -1714,8 +1749,8 @@ fn main() {
     println!("  └─ Vowel-Drop30: 15% (weight 0.15)");
     println!("Constraint: Top-1(Avro-Strict) >= 88.30% (Gate G4 Compliance)");
 
-    let lambda_dict_vals = [4.0, 6.0, 8.0, 10.0, 12.0];
-    let lambda_avro_vals = [0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0];
+    let lambda_dict_vals = [6.0, 8.0, 10.0, 12.0, 14.0];
+    let lambda_avro_vals = [0.0, 4.0, 8.0, 12.0, 16.0, 20.0];
     let lambda_eng_vals = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
 
     #[derive(Clone, Debug)]
@@ -1989,7 +2024,7 @@ fn main() {
                 let (raw_eng, _) = phonetic_sugg.lock().unwrap().suggest(input, true, true, &empty_memory);
                 let eng_cands: Vec<String> = raw_eng.iter().map(|s| canonicalize(s)).collect();
 
-                let scored = run_deployable_policy(input, &ngram_cands, &avro_cand, avro_uncap_cand.as_deref(), &eng_cands, &dict_words, best_l_dict, best_l_avro, best_l_eng);
+                let scored = run_deployable_policy(input, &ngram_cands, &avro_cand, avro_uncap_cand.as_deref(), &eng_cands, &dict_words, &dict_keys, best_l_dict, best_l_avro, best_l_eng);
                 scored.first().map(|c| &c.0 == target).unwrap_or(false)
             })
             .collect();
@@ -2025,7 +2060,7 @@ fn main() {
     let mut any_attested_hits = 0;
 
     for (gold, raw_r, avro_cand, avro_uncap, eng_cands, ngram_cands) in &dev_full_hypotheses {
-        let scored = run_deployable_policy(raw_r, ngram_cands, avro_cand, avro_uncap.as_deref(), eng_cands, &dict_words, best_l_dict, best_l_avro, best_l_eng);
+        let scored = run_deployable_policy(raw_r, ngram_cands, avro_cand, avro_uncap.as_deref(), eng_cands, &dict_words, &dict_keys, best_l_dict, best_l_avro, best_l_eng);
         let top_word = scored.first().map(|c| c.0.as_str()).unwrap_or("");
         let is_exact_hit = top_word == gold;
 
