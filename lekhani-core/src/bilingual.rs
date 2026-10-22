@@ -296,7 +296,7 @@ pub fn resolve_bilingual_hyphen_clitic(input: &str) -> Option<(String, Vec<Strin
         return None;
     }
 
-    if lekhani_parser::has_explicit_avro_intent(base) {
+    if base.chars().any(|c| matches!(c, '^' | '`' | ':' | '$')) {
         return None;
     }
 
@@ -345,7 +345,7 @@ pub fn resolve_unhyphenated_bilingual_clitic(input: &str) -> Option<(String, Vec
                 continue;
             }
 
-            if lekhani_parser::has_explicit_avro_intent(base) {
+            if base.chars().any(|c| matches!(c, '^' | '`' | ':' | '$')) {
                 continue;
             }
 
