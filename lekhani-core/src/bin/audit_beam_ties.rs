@@ -706,37 +706,39 @@ fn main() {
         println!("   Evaluating {} (N = {})", split_name, pairs.len());
         println!("──────────────────────────────────────────────────────────────────────────────────");
 
-        let mut hits_256_std = 0;
-        let mut hits_16_std = 0;
-        let mut hits_16_det = 0;
-        let mut tied_rows = Vec::new();
-        let mut beam_pruned_rows = Vec::new();
+        let row_results: Vec<_> = pairs
+            .par_iter()
+            .enumerate()
+            .map(|(idx, pair)| {
+                let cands_256 = decode_beam_ngram(&pair.roman_tokens, &lm, 256, false, &dict_words);
+                let cands_16_std = decode_beam_ngram(&pair.roman_tokens, &lm, 16, false, &dict_words);
+                let cands_16_det = decode_beam_ngram(&pair.roman_tokens, &lm, 16, true, &dict_words);
 
-        for (idx, pair) in pairs.iter().enumerate() {
-            let cands_256 = decode_beam_ngram(&pair.roman_tokens, &lm, 256, false, &dict_words);
-            let cands_16_std = decode_beam_ngram(&pair.roman_tokens, &lm, 16, false, &dict_words);
-            let cands_16_det = decode_beam_ngram(&pair.roman_tokens, &lm, 16, true, &dict_words);
+                let hit_256 = cands_256.first().map(|c| c.0 == pair.raw_bengali).unwrap_or(false);
+                let hit_16_std = cands_16_std.first().map(|c| c.0 == pair.raw_bengali).unwrap_or(false);
+                let hit_16_det = cands_16_det.first().map(|c| c.0 == pair.raw_bengali).unwrap_or(false);
 
-            let hit_256 = cands_256.first().map(|c| c.0 == pair.raw_bengali).unwrap_or(false);
-            let hit_16_std = cands_16_std.first().map(|c| c.0 == pair.raw_bengali).unwrap_or(false);
-            let hit_16_det = cands_16_det.first().map(|c| c.0 == pair.raw_bengali).unwrap_or(false);
+                let mut tied = None;
+                if cands_16_std.len() >= 2 && (cands_16_std[0].1 - cands_16_std[1].1).abs() < 1e-9 {
+                    tied = Some((idx + 1, pair.raw_bengali.clone(), pair.raw_roman.clone(), cands_16_std[0].clone(), cands_16_std[1].clone()));
+                }
 
-            if hit_256 { hits_256_std += 1; }
-            if hit_16_std { hits_16_std += 1; }
-            if hit_16_det { hits_16_det += 1; }
+                let mut pruned = None;
+                if hit_256 && !hit_16_std {
+                    let rank_in_16 = cands_16_std.iter().position(|c| c.0 == pair.raw_bengali);
+                    let top_16 = cands_16_std.first().map(|c| c.0.clone()).unwrap_or_else(|| "NONE".into());
+                    pruned = Some((idx + 1, pair.raw_bengali.clone(), pair.raw_roman.clone(), top_16, rank_in_16));
+                }
 
-            // Check if top candidates had identical scores
-            if cands_16_std.len() >= 2 && (cands_16_std[0].1 - cands_16_std[1].1).abs() < 1e-9 {
-                tied_rows.push((idx + 1, pair.raw_bengali.clone(), pair.raw_roman.clone(), cands_16_std[0].clone(), cands_16_std[1].clone()));
-            }
+                (hit_256, hit_16_std, hit_16_det, tied, pruned)
+            })
+            .collect();
 
-            // Dissect why K=256 hit but K=16 missed
-            if hit_256 && !hit_16_std {
-                let rank_in_16 = cands_16_std.iter().position(|c| c.0 == pair.raw_bengali);
-                let top_16 = cands_16_std.first().map(|c| c.0.clone()).unwrap_or_else(|| "NONE".into());
-                beam_pruned_rows.push((idx + 1, pair.raw_bengali.clone(), pair.raw_roman.clone(), top_16, rank_in_16));
-            }
-        }
+        let hits_256_std = row_results.iter().filter(|r| r.0).count();
+        let hits_16_std = row_results.iter().filter(|r| r.1).count();
+        let hits_16_det = row_results.iter().filter(|r| r.2).count();
+        let tied_rows: Vec<_> = row_results.iter().filter_map(|r| r.3.clone()).collect();
+        let beam_pruned_rows: Vec<_> = row_results.iter().filter_map(|r| r.4.clone()).collect();
 
         println!("Top-1 Accuracy on {}:", split_name);
         println!("  ├─ Beam K=256 (Standard)     : {} / {} ({:.2}%)", hits_256_std, pairs.len(), hits_256_std as f64 / pairs.len() as f64 * 100.0);
