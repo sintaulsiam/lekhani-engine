@@ -647,29 +647,43 @@ impl PhoneticDatabase {
         let dir = dir.as_ref();
         let dict_path = dir.join(dict_filename);
 
+        let dict_bin_path = dir.join("dictionary.bin");
+        let loaded_bin = if dict_bin_path.exists() {
+            if let Ok(bin_trie) = crate::trie::PrefixTrie::load_binary(&dict_bin_path) {
+                *Arc::make_mut(&mut self.trie) = bin_trie;
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         if dict_path.exists() {
             let content = std::fs::read_to_string(&dict_path)?;
             let hash = crate::fs::compute_sha256_hex(content.as_bytes());
             self.dictionary_path = Some(dict_path.clone());
             self.dictionary_hash = Some(hash);
 
-            if let Ok(raw_map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&content)
-            {
-                let mut words = Vec::with_capacity(160000);
-                for val in raw_map.values() {
-                    if let Some(list) = val.as_array() {
-                        for item in list {
-                            if let Some(s) = item.as_str() {
-                                words.push(crate::chars::canonicalize(s));
-                            } else if let Some(arr) = item.as_array() {
-                                if let Some(s) = arr.first().and_then(|v| v.as_str()) {
+            if !loaded_bin {
+                if let Ok(raw_map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&content)
+                {
+                    let mut words = Vec::with_capacity(160000);
+                    for val in raw_map.values() {
+                        if let Some(list) = val.as_array() {
+                            for item in list {
+                                if let Some(s) = item.as_str() {
                                     words.push(crate::chars::canonicalize(s));
+                                } else if let Some(arr) = item.as_array() {
+                                    if let Some(s) = arr.first().and_then(|v| v.as_str()) {
+                                        words.push(crate::chars::canonicalize(s));
+                                    }
                                 }
                             }
                         }
                     }
+                    Arc::make_mut(&mut self.trie).insert_bulk(words);
                 }
-                Arc::make_mut(&mut self.trie).insert_bulk(words);
             }
         }
 

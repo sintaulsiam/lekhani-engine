@@ -32,5 +32,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Verify Hermetic Dictionary SHA-256 Hash
+        run: |
+          echo "8a51b4d98bcbe147771751c60fa1d2919a84b0b910232bdcf863617ecc88fbdb  data/dictionaries/dictionary.json" | sha256sum --check
       - name: Run workspace unit and regression tests
         run: cargo test --workspace --release
+
