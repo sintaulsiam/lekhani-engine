@@ -839,7 +839,12 @@ fn main() {
     println!("  🚀 Lekhani Multi-Persona Transliteration Evaluation Harness & Regression Gate");
     println!("══════════════════════════════════════════════════════════════════════════════════════════════════\n");
 
-    let dict_filename = "dictionary.json";
+    let args: Vec<String> = std::env::args().collect();
+    let dict_filename = if args.iter().any(|a| a == "--dict-bin") {
+        "dictionary.bin"
+    } else {
+        "dictionary.json"
+    };
     let (mut sugg, dict_path, dict_hash) = setup_engine(dict_filename);
 
     let git_sha = get_git_sha();
@@ -857,10 +862,9 @@ fn main() {
     );
     println!("  ➔ Cluster Boot   : clustered by target Bengali word (1,000 iterations)\n");
 
-    let dict_words = load_dict_words(&dict_path);
-    println!("Loaded {} canonical dictionary entries from {}.\n", dict_words.len(), dict_filename);
-
-    let args: Vec<String> = std::env::args().collect();
+    let json_path = dict_path.with_file_name("dictionary.json");
+    let dict_words = load_dict_words(&json_path);
+    println!("Loaded {} canonical dictionary entries from {}.\n", dict_words.len(), json_path.display());
     let benchmark_runs = args
         .iter()
         .position(|a| a == "--benchmark-latency")
@@ -1031,44 +1035,63 @@ fn main() {
     println!("Loaded {} dev pairs from {:?}", dev_pairs.len(), dev_path);
     let dev_report = evaluate_split("dev", &dev_pairs, &dev_gold, &dict_words, &mut sugg, seed, &mut all_worst_cases);
 
-    // ── TEST SPLIT EVALUATION ─────────────────────────────────────────────
-    println!("\n▶️  Loading and Evaluating Held-Out TEST split...");
-    let (test_rows, test_gold, test_path) = load_split_data("test");
-    let test_pairs: Vec<(String, String)> = test_rows.into_iter().map(|r| (r.bn_target, r.latin)).collect();
-    println!("Loaded {} test pairs from {:?}", test_pairs.len(), test_path);
-    let test_report = evaluate_split("test", &test_pairs, &test_gold, &dict_words, &mut sugg, seed + 100, &mut all_worst_cases);
+    let dev_only = args.iter().any(|a| a == "--dev-only");
+    let update_baseline = args.iter().any(|a| a == "--update-baseline");
 
-    // ── SUMMARY TABLES ───────────────────────────────────────────────────
     print_split_table("DEV SET EVALUATION SUMMARY", &dev_report);
-    print_split_table("TEST SET EVALUATION SUMMARY", &test_report);
 
-    let mut raw_avro_top1 = HashMap::new();
-    raw_avro_top1.insert("dev".to_string(), dev_report.raw_avro_top1);
-    raw_avro_top1.insert("test".to_string(), test_report.raw_avro_top1);
-
-    let report = MultiPersonaReport {
-        run: RunMeta {
-            git_sha,
-            dirty_tree,
-            seed,
-            canonical: "nfc+khanda".to_string(),
-            dictionary_file: dict_path.display().to_string(),
-            dictionary_hash: dict_hash.clone(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        },
-        raw_avro_top1,
-        dev: dev_report,
-        test: test_report.clone(),
-        personas: test_report.personas, // Alias for backward compatibility
-        worst_cases: all_worst_cases,
-    };
-
-    let baseline_path = Path::new("data/eval/baseline.json");
-    if let Ok(json) = serde_json::to_string_pretty(&report) {
-        let _ = std::fs::write(baseline_path, json);
-        println!(
-            "\n💾 Saved updated multi-persona baseline report to {:?}",
-            baseline_path
+    if !dev_only {
+        // Log to test_runs.log per Standing Rule 5
+        let log_path = Path::new("data/eval/test_runs.log");
+        let now = chrono::Utc::now().to_rfc3339();
+        let log_entry = format!(
+            "{} | SHA: {} | Multi-persona test run; dict: {}\n",
+            now, git_sha, dict_path.display()
         );
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open(log_path) {
+            use std::io::Write;
+            let _ = f.write_all(log_entry.as_bytes());
+        }
+
+        // ── TEST SPLIT EVALUATION ─────────────────────────────────────────────
+        println!("\n▶️  Loading and Evaluating Held-Out TEST split...");
+        let (test_rows, test_gold, test_path) = load_split_data("test");
+        let test_pairs: Vec<(String, String)> = test_rows.into_iter().map(|r| (r.bn_target, r.latin)).collect();
+        println!("Loaded {} test pairs from {:?}", test_pairs.len(), test_path);
+        let test_report = evaluate_split("test", &test_pairs, &test_gold, &dict_words, &mut sugg, seed + 100, &mut all_worst_cases);
+
+        print_split_table("TEST SET EVALUATION SUMMARY", &test_report);
+
+        if update_baseline {
+            let mut raw_avro_top1 = HashMap::new();
+            raw_avro_top1.insert("dev".to_string(), dev_report.raw_avro_top1);
+            raw_avro_top1.insert("test".to_string(), test_report.raw_avro_top1);
+
+            let report = MultiPersonaReport {
+                run: RunMeta {
+                    git_sha,
+                    dirty_tree,
+                    seed,
+                    canonical: "nfc+khanda".to_string(),
+                    dictionary_file: dict_path.display().to_string(),
+                    dictionary_hash: dict_hash.clone(),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                },
+                raw_avro_top1,
+                dev: dev_report,
+                test: test_report.clone(),
+                personas: test_report.personas, // Alias for backward compatibility
+                worst_cases: all_worst_cases,
+            };
+
+            let baseline_path = Path::new("data/eval/baseline.json");
+            if let Ok(json) = serde_json::to_string_pretty(&report) {
+                let _ = std::fs::write(baseline_path, json);
+                println!(
+                    "\n💾 Saved updated multi-persona baseline report to {:?}",
+                    baseline_path
+                );
+            }
+        }
     }
 }

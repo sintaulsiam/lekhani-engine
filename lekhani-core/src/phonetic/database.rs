@@ -638,7 +638,7 @@ impl PhoneticDatabase {
         self.overrides.lookup_prefix(prefix, max_key_len, limit)
     }
 
-    /// Load database from a directory containing the specified dictionary (defaulting strictly to dictionary.json)
+    /// Load database from a directory containing the specified dictionary (e.g. dictionary.json or dictionary.bin)
     pub fn load_from_dir_with_dict<P: AsRef<Path>>(
         &mut self,
         dir: P,
@@ -647,27 +647,26 @@ impl PhoneticDatabase {
         let dir = dir.as_ref();
         let dict_path = dir.join(dict_filename);
 
-        let dict_bin_path = dir.join("dictionary.bin");
-        let loaded_bin = if dict_bin_path.exists() {
-            if let Ok(bin_trie) = crate::trie::PrefixTrie::load_binary(&dict_bin_path) {
+        if dict_filename.ends_with(".bin") {
+            if dict_path.exists() {
+                let bytes = std::fs::read(&dict_path)?;
+                let hash = crate::fs::compute_sha256_hex(&bytes);
+                self.dictionary_path = Some(dict_path.clone());
+                self.dictionary_hash = Some(hash);
+
+                let bin_trie = crate::trie::PrefixTrie::load_binary(&dict_path)?;
                 *Arc::make_mut(&mut self.trie) = bin_trie;
-                true
             } else {
-                false
+                return Err(format!("Dictionary binary not found: {}", dict_path.display()).into());
             }
         } else {
-            false
-        };
+            if dict_path.exists() {
+                let content = std::fs::read_to_string(&dict_path)?;
+                let hash = crate::fs::compute_sha256_hex(content.as_bytes());
+                self.dictionary_path = Some(dict_path.clone());
+                self.dictionary_hash = Some(hash);
 
-        if dict_path.exists() {
-            let content = std::fs::read_to_string(&dict_path)?;
-            let hash = crate::fs::compute_sha256_hex(content.as_bytes());
-            self.dictionary_path = Some(dict_path.clone());
-            self.dictionary_hash = Some(hash);
-
-            if !loaded_bin {
-                if let Ok(raw_map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&content)
-                {
+                if let Ok(raw_map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&content) {
                     let mut words = Vec::with_capacity(160000);
                     for val in raw_map.values() {
                         if let Some(list) = val.as_array() {
@@ -682,8 +681,12 @@ impl PhoneticDatabase {
                             }
                         }
                     }
-                    Arc::make_mut(&mut self.trie).insert_bulk(words);
+                    let mut trie = crate::trie::PrefixTrie::new();
+                    trie.insert_bulk(words);
+                    *Arc::make_mut(&mut self.trie) = trie;
                 }
+            } else {
+                return Err(format!("Dictionary file not found: {}", dict_path.display()).into());
             }
         }
 

@@ -9,7 +9,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
+use std::path::PathBuf;
 
 use lekhani_core::chars::canonicalize;
 use lekhani_core::fs::compute_sha256_hex;
@@ -23,14 +23,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   📚 Lekhani Hermetic Dictionary Builder (build_dict)");
     println!("══════════════════════════════════════════════════════════════════\n");
 
-    let dict_path = Path::new("data/dictionaries/dictionary.json");
+    let args: Vec<String> = std::env::args().collect();
+    let dict_path = if args.len() > 1 {
+        PathBuf::from(&args[1])
+    } else {
+        PathBuf::from("data/dictionaries/dictionary.json")
+    };
+    let out_bin_path = if args.len() > 2 {
+        PathBuf::from(&args[2])
+    } else {
+        PathBuf::from("data/dictionaries/dictionary.bin")
+    };
+
     if !dict_path.exists() {
         eprintln!("❌ Fatal: dictionary.json not found at {:?}", dict_path);
         std::process::exit(1);
     }
 
     println!("1. Reading and verifying SHA-256 of source lexicon: {:?}", dict_path);
-    let raw_bytes = std::fs::read(dict_path)?;
+    let raw_bytes = std::fs::read(&dict_path)?;
     let actual_hash = compute_sha256_hex(&raw_bytes);
     println!("   ├─ Expected SHA-256: {}", EXPECTED_DICT_JSON_SHA256);
     println!("   ├─ Actual SHA-256  : {}", actual_hash);
@@ -87,11 +98,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     trie.ensure_sorted();
     println!("   └─ ✓ Trie compiled with {} sorted entries.", trie.len());
 
-    let out_bin_path = Path::new("data/dictionaries/dictionary.bin");
     println!("\n4. Serializing to LDI3 binary format: {:?}", out_bin_path);
-    trie.save_binary(out_bin_path)?;
+    trie.save_binary(&out_bin_path)?;
 
-    let bin_bytes = std::fs::read(out_bin_path)?;
+    let bin_bytes = std::fs::read(&out_bin_path)?;
     let bin_hash = compute_sha256_hex(&bin_bytes);
     println!(
         "   ├─ Binary File Size : {} bytes ({:.2} MB)",

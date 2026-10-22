@@ -356,3 +356,103 @@ fn test_dakshina_baseline_gate_against_json() {
         gate_eval.err()
     );
 }
+
+#[test]
+fn test_bin_vs_json_dev_natural_hit_parity() {
+    let dev_candidates = [
+        PathBuf::from("data/eval/bn.translit.sampled.dev.tsv"),
+        PathBuf::from("../data/eval/bn.translit.sampled.dev.tsv"),
+        PathBuf::from("../../data/eval/bn.translit.sampled.dev.tsv"),
+    ];
+    let dev_path = match dev_candidates.iter().find(|p| p.exists()) {
+        Some(p) => p.clone(),
+        None => return,
+    };
+    let dict_candidates = [
+        PathBuf::from("data/dictionaries"),
+        PathBuf::from("../data/dictionaries"),
+        PathBuf::from("../../data/dictionaries"),
+    ];
+    let dict_dir = match dict_candidates.iter().find(|p| p.join("dictionary.json").exists()) {
+        Some(p) => p.clone(),
+        None => return,
+    };
+    let layout_candidates = [
+        PathBuf::from("data/layouts/avrophonetic.json"),
+        PathBuf::from("../data/layouts/avrophonetic.json"),
+        PathBuf::from("../../data/layouts/avrophonetic.json"),
+    ];
+    let layout_json = layout_candidates.iter().find_map(|p| {
+        std::fs::read_to_string(p).ok().and_then(|c| serde_json::from_str(&c).ok())
+    });
+
+    let mut sugg_json = PhoneticSuggestion::new();
+    if let Some(ref l) = layout_json {
+        sugg_json.set_layout(l);
+    }
+    sugg_json
+        .database
+        .load_from_dir_with_dict(&dict_dir, "dictionary.json")
+        .expect("load dictionary.json");
+
+    let mut sugg_bin = PhoneticSuggestion::new();
+    if let Some(ref l) = layout_json {
+        sugg_bin.set_layout(l);
+    }
+    sugg_bin
+        .database
+        .load_from_dir_with_dict(&dict_dir, "dictionary.bin")
+        .expect("load dictionary.bin");
+
+    let file = std::fs::File::open(&dev_path).expect("open dev.tsv");
+    let reader = std::io::BufReader::new(file);
+    let mut pairs = Vec::new();
+    for l in std::io::BufRead::lines(reader).map_while(Result::ok) {
+        let parts: Vec<&str> = l.split('\t').collect();
+        if parts.len() >= 2 {
+            pairs.push((parts[0].trim().to_string(), parts[1].trim().to_string()));
+        }
+    }
+
+    let empty_mem = HashMap::new();
+    let mut hits_json = 0usize;
+    let mut hits_bin = 0usize;
+    let mut diff_count = 0usize;
+
+    for (target, input) in &pairs {
+        let (cands_json, _) = sugg_json.suggest(input, true, true, &empty_mem);
+        let (cands_bin, _) = sugg_bin.suggest(input, true, true, &empty_mem);
+
+        let target_norm = lekhani_core::chars::canonicalize(target);
+        let json_hit = cands_json
+            .first()
+            .map(|c| lekhani_core::chars::canonicalize(c) == target_norm)
+            .unwrap_or(false);
+        let bin_hit = cands_bin
+            .first()
+            .map(|c| lekhani_core::chars::canonicalize(c) == target_norm)
+            .unwrap_or(false);
+
+        if json_hit {
+            hits_json += 1;
+        }
+        if bin_hit {
+            hits_bin += 1;
+        }
+        if cands_json.first() != cands_bin.first() {
+            diff_count += 1;
+        }
+    }
+
+    println!(
+        "\nHit Parity Verification on Dev Natural (N={}): JSON hits = {}, BIN hits = {}, Disagreements = {}",
+        pairs.len(), hits_json, hits_bin, diff_count
+    );
+
+    assert_eq!(hits_json, hits_bin, "Hits must be identical between JSON and BIN");
+    assert_eq!(
+        diff_count, 0,
+        "Top-1 candidate must be 100% identical between JSON and BIN across all rows"
+    );
+    assert_eq!(hits_json, 2307, "Dev Natural hit count must be exactly 2,307");
+}
