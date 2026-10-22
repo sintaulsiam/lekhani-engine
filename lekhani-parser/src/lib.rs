@@ -63,6 +63,7 @@ pub fn has_explicit_avro_intent(input: &str) -> bool {
 
     let mut has_lower = false;
     let mut has_mid_avro_upper = false;
+    let mut has_avro_o = false;
 
     let mut i = 0;
     while i < len {
@@ -83,23 +84,29 @@ pub fn has_explicit_avro_intent(input: &str) -> bool {
             // Double-dot or double-comma hasanta operators
             b'.' if i + 1 < len && bytes[i + 1] == b'.' => return true,
             b',' if i + 1 < len && bytes[i + 1] == b',' => return true,
-            // Invariant Avro vowel digraph: 'rri' -> ঋ / ৃ (e.g. rritu -> ঋতু, krrishi -> কৃষি)
-            b'r' | b'R'
-                if i + 2 < len
-                    && (bytes[i + 1] == b'r' || bytes[i + 1] == b'R')
-                    && (bytes[i + 2] == b'i' || bytes[i + 2] == b'I') =>
-            {
-                return true
+            // Invariant Avro vowel digraph or Reph: 'rri' -> ঋ / ৃ (rritu, krrishi) or 'rr' + consonant -> Reph (rrk, rrm)
+            b'r' | b'R' if i + 1 < len && (bytes[i + 1] == b'r' || bytes[i + 1] == b'R') => {
+                if i + 2 < len {
+                    let b3 = bytes[i + 2];
+                    if b3 == b'i' || b3 == b'I' {
+                        return true;
+                    }
+                    // Non-vowel following rr indicates Reph before consonant (e.g. rrk, rrm, rrn)
+                    if !matches!(b3, b'a' | b'e' | b'o' | b'u' | b'A' | b'E' | b'O' | b'U') {
+                        return true;
+                    }
+                }
+            }
+            // Capital O: Avro special character for O-kar (ো) or independent O (ও)
+            b'O' => {
+                has_avro_o = true;
             }
             // Lowercase ASCII characters prove the token is not an all-caps acronym or shout-typing
             b'a'..=b'z' => {
                 has_lower = true;
             }
-            // Grammatical Avro uppercase characters mid-word (non-initial to preserve sentence-initial TitleCase):
-            // O (ো), I (ঈ), U (ঊ), D (ড), G (জ্ঞ/ঘ), J (য), N (ণ), R (ড়), S (ষ), T (ট), Y (য়), Z (য)
-            b'O' | b'I' | b'U' | b'D' | b'G' | b'J' | b'N' | b'R' | b'S' | b'T' | b'Y' | b'Z'
-                if i > 0 =>
-            {
+            // Any uppercase ASCII character mid-word (non-initial) indicates deliberate Avro rule typing
+            b'A'..=b'Z' if i > 0 => {
                 has_mid_avro_upper = true;
             }
             _ => {}
@@ -107,8 +114,8 @@ pub fn has_explicit_avro_intent(input: &str) -> bool {
         i += 1;
     }
 
-    // Mid-word case distinctions only apply when the word is not entirely all-caps
-    has_mid_avro_upper && has_lower
+    // Mid-word case distinctions and special Avro 'O' only apply when the word is not entirely all-caps
+    (has_mid_avro_upper || has_avro_o) && has_lower
 }
 
 #[cfg(test)]
@@ -139,14 +146,19 @@ mod tests {
         assert!(!has_explicit_avro_intent("shikkha"));
 
         // Mid-word Avro uppercase distinctions
+        assert!(has_explicit_avro_intent("daKTar"));
+        assert!(has_explicit_avro_intent("ashonNo"));
+        assert!(has_explicit_avro_intent("kOrmi"));
         assert!(has_explicit_avro_intent("kZackZacani"));
         assert!(has_explicit_avro_intent("paR"));
         assert!(has_explicit_avro_intent("poR"));
         assert!(has_explicit_avro_intent("kOno"));
+        assert!(has_explicit_avro_intent("Oti"));
         assert!(has_explicit_avro_intent("kaTh"));
         assert!(has_explicit_avro_intent("biSTi"));
         assert!(has_explicit_avro_intent("bODh"));
         assert!(has_explicit_avro_intent("bigganI"));
+        assert!(has_explicit_avro_intent("rrk"));
 
         // Sentence-initial titlecase must NOT trigger
         assert!(!has_explicit_avro_intent("Tumi"));
