@@ -381,7 +381,7 @@ pub fn viterbi_forced_alignment(
     model: &HashMap<(String, String), f64>,
     max_r: usize,
     max_b: usize,
-) -> Vec<(String, String)> {
+) -> (f64, Vec<(String, String)>) {
     let m = pair.roman_tokens.len();
     let n = pair.bengali_tokens.len();
 
@@ -432,7 +432,7 @@ pub fn viterbi_forced_alignment(
     }
 
     if viterbi[m][n] == f64::NEG_INFINITY {
-        return Vec::new();
+        return (f64::NEG_INFINITY, Vec::new());
     }
 
     let mut path = Vec::new();
@@ -450,7 +450,7 @@ pub fn viterbi_forced_alignment(
     }
 
     path.reverse();
-    path
+    (viterbi[m][n], path)
 }
 
 pub type UnitId = u16;
@@ -876,8 +876,29 @@ fn main() {
     let mut raw_train_sequences: Vec<(Vec<(String, String)>, f64)> = Vec::with_capacity(train_pairs.len());
     let mut all_unique_units: HashSet<(String, String)> = HashSet::new();
 
+    use lekhani_core::tokenization::roman_segmentation_lattice;
     for (i, pair) in train_pairs.iter().enumerate() {
-        let align = viterbi_forced_alignment(pair, &aligner_model, 1, 1);
+        let lattice_paths = roman_segmentation_lattice(&pair.roman_norm);
+        let mut best_score = f64::NEG_INFINITY;
+        let mut align = Vec::new();
+
+        for path in &lattice_paths {
+            let mut temp_pair = pair.clone();
+            temp_pair.roman_tokens = path.clone();
+            let (score, a) = viterbi_forced_alignment(&temp_pair, &aligner_model, 1, 1);
+            if score > best_score {
+                best_score = score;
+                align = a;
+            }
+        }
+
+        if best_score == f64::NEG_INFINITY {
+            let (score, a) = viterbi_forced_alignment(pair, &aligner_model, 1, 1);
+            if score > best_score {
+                align = a;
+            }
+        }
+
         if align.is_empty() {
             continue;
         }

@@ -814,7 +814,12 @@ impl IncrementalSession {
         }
 
         let mut sorted_cands: Vec<BeamCandidate> = dedup_map.into_values().collect();
-        sorted_cands.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_cands.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.bengali.cmp(&b.bengali))
+        });
         sorted_cands.truncate(beam_width);
         self.beam = sorted_cands;
 
@@ -828,7 +833,11 @@ impl IncrementalSession {
                 }
             }
         }
-        cands.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        cands.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
         cands
     }
 }
@@ -922,7 +931,12 @@ pub fn decode_beam_ngram(
         }
 
         let mut sorted_cands: Vec<BeamCandidate> = dedup_map.into_values().collect();
-        sorted_cands.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_cands.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.bengali.cmp(&b.bengali))
+        });
         sorted_cands.truncate(beam_width);
 
         beam = sorted_cands;
@@ -944,7 +958,11 @@ pub fn decode_beam_ngram(
         }
     }
 
-    final_cands.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    final_cands.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.0.cmp(&b.0))
+    });
     final_cands
 }
 
@@ -1023,19 +1041,46 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 2. Train Selected Unit LM (Type-Level Order 4 Level 1, 3.07 MB)
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n▶️  Training 1:1 Aligner on TRAIN...");
+    println!("\n▶️  Training 1:1 Constrained Aligner on TRAIN...");
     let aligner_model = train_m2m_aligner(&train_pairs, DEFAULT_EM_ITERATIONS, 50.0, 1, 1);
 
-    let mut aligned_train_seqs = Vec::with_capacity(train_pairs.len());
-    let mut all_unique_units = HashSet::new();
+    use lekhani_core::tokenization::roman_segmentation_lattice;
+    let aligned_train_seqs: Vec<(Vec<(String, String)>, f64)> = train_pairs
+        .par_iter()
+        .filter_map(|pair| {
+            let lattice_paths = roman_segmentation_lattice(&pair.roman_norm);
+            let mut best_score = f64::NEG_INFINITY;
+            let mut best_align = Vec::new();
 
-    for pair in &train_pairs {
-        let (s_forced, align) = viterbi_forced_alignment(pair, &aligner_model, 1, 1);
-        if s_forced != f64::NEG_INFINITY && !align.is_empty() {
-            for (r, b) in &align {
-                all_unique_units.insert((r.clone(), b.clone()));
+            for path in &lattice_paths {
+                let mut temp_pair = pair.clone();
+                temp_pair.roman_tokens = path.clone();
+                let (score, align) = viterbi_forced_alignment(&temp_pair, &aligner_model, 1, 1);
+                if score > best_score {
+                    best_score = score;
+                    best_align = align;
+                }
             }
-            aligned_train_seqs.push((align, pair.count));
+
+            if best_score == f64::NEG_INFINITY {
+                let (score, align) = viterbi_forced_alignment(pair, &aligner_model, 1, 1);
+                if score > best_score {
+                    best_align = align;
+                }
+            }
+
+            if !best_align.is_empty() {
+                Some((best_align, pair.count))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let mut all_unique_units = HashSet::new();
+    for (align, _) in &aligned_train_seqs {
+        for (r, b) in align {
+            all_unique_units.insert((r.clone(), b.clone()));
         }
     }
 
@@ -1133,11 +1178,9 @@ fn main() {
             reranked.sort_by(|a, b| {
                 let a_in = dict_words.contains(&a.0) as u8;
                 let b_in = dict_words.contains(&b.0) as u8;
-                if a_in != b_in {
-                    b_in.cmp(&a_in)
-                } else {
-                    b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-                }
+                b_in.cmp(&a_in)
+                    .then_with(|| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .then_with(|| a.0.cmp(&b.0))
             });
 
             let dict_top = reranked.first().map(|c| &c.0 == gold).unwrap_or(false);
@@ -1288,7 +1331,12 @@ fn main() {
 
             let t4 = Instant::now();
             let mut sorted_cands: Vec<BeamCandidate> = dedup_map.into_values().collect();
-            sorted_cands.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            sorted_cands.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.bengali.cmp(&b.bengali))
+            });
             sorted_cands.truncate(16);
             t_sort_prune += t4.elapsed().as_nanos();
 
@@ -1309,7 +1357,11 @@ fn main() {
                 }
             }
         }
-        final_cands.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        final_cands.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
         t_eos_final += t5.elapsed().as_nanos();
     }
 
@@ -1474,7 +1526,16 @@ fn main() {
             })
             .collect();
 
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    let a_in = dict_words.contains(&a.0) as u8;
+                    let b_in = dict_words.contains(&b.0) as u8;
+                    b_in.cmp(&a_in)
+                })
+                .then_with(|| a.0.cmp(&b.0))
+        });
         scored
     };
 
@@ -1580,18 +1641,18 @@ fn main() {
     println!("   🔬 STEP 8 ITEM 4: CONFIRMATION ON HELD-OUT DEV-B & CLUSTER BOOTSTRAP CI");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
+    let (base_a_top1, base_a_seen, base_a_unseen, _base_a_hits) = evaluate_hypotheses(&dev_a_hypotheses, 0.0, 0.0, 0.0);
+    let (conf_a_top1, conf_a_seen, conf_a_unseen, _conf_a_hits) = evaluate_hypotheses(&dev_a_hypotheses, best_l_dict, best_l_avro, best_l_eng);
     let (base_b_top1, base_b_seen, base_b_unseen, base_b_hits) = evaluate_hypotheses(&dev_b_hypotheses, 0.0, 0.0, 0.0);
     let (conf_b_top1, conf_b_seen, conf_b_unseen, conf_b_hits) = evaluate_hypotheses(&dev_b_hypotheses, best_l_dict, best_l_avro, best_l_eng);
 
     println!("| Split | Model | Top-1 Accuracy (%) | Gold in Dict (%) | Gold Unseen in Dict (%) | Absolute Gain |");
     println!("|:---|:---|:---:|:---:|:---:|:---:|");
-    println!("| **Dev-A (Tuning)** | Pure N-Gram (λ=0) | 42.10% | 46.32% | 38.88% | Baseline |");
+    println!("| **Dev-A (Tuning)** | Pure N-Gram (λ=0, K=16) | {:.2}% | {:.2}% | {:.2}% | Baseline |",
+        base_a_top1, base_a_seen, base_a_unseen);
     println!("| **Dev-A (Tuning)** | Combined Decoder  | **{:.2}%** | {:.2}% | {:.2}% | **{:+0.2}%** |",
-        best_score,
-        evaluate_hypotheses(&dev_a_hypotheses, best_l_dict, best_l_avro, best_l_eng).1,
-        evaluate_hypotheses(&dev_a_hypotheses, best_l_dict, best_l_avro, best_l_eng).2,
-        best_score - 42.10);
-    println!("| **Dev-B (Confirm)** | Pure N-Gram (λ=0) | {:.2}% | {:.2}% | {:.2}% | Baseline |",
+        conf_a_top1, conf_a_seen, conf_a_unseen, conf_a_top1 - base_a_top1);
+    println!("| **Dev-B (Confirm)** | Pure N-Gram (λ=0, K=16) | {:.2}% | {:.2}% | {:.2}% | Baseline |",
         base_b_top1, base_b_seen, base_b_unseen);
     println!("| **Dev-B (Confirm)** | Combined Decoder  | **{:.2}%** | {:.2}% | {:.2}% | **{:+0.2}%** |",
         conf_b_top1, conf_b_seen, conf_b_unseen, conf_b_top1 - base_b_top1);
