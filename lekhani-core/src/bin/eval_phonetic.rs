@@ -841,6 +841,162 @@ fn main() {
     let dict_words = load_dict_words(&dict_path);
     println!("Loaded {} canonical dictionary entries from {}.\n", dict_words.len(), dict_filename);
 
+    let args: Vec<String> = std::env::args().collect();
+    let benchmark_runs = args
+        .iter()
+        .position(|a| a == "--benchmark-latency")
+        .and_then(|idx| args.get(idx + 1).and_then(|s| s.parse::<usize>().ok()))
+        .or_else(|| {
+            if args.iter().any(|a| a == "--benchmark-latency") {
+                Some(5)
+            } else {
+                None
+            }
+        });
+
+    if let Some(num_runs) = benchmark_runs {
+        println!("══════════════════════════════════════════════════════════════════════════════════════════════════");
+        println!("   ⏱️  QUIET-MACHINE LATENCY BENCHMARK ({} RUNS ON HELD-OUT DEV)", num_runs);
+        println!("══════════════════════════════════════════════════════════════════════════════════════════════════\n");
+
+        let (dev_rows, dev_gold, _) = load_split_data("dev");
+        let dev_pairs: Vec<(String, String)> =
+            dev_rows.into_iter().map(|r| (r.bn_target, r.latin)).collect();
+
+        let personas = [
+            "avro_strict",
+            "lazy",
+            "natural",
+            "vowel_drop_p30",
+            "vowel_drop_p60",
+            "vowel_drop_p90",
+        ];
+        let mut runs_p50: HashMap<&str, Vec<f64>> = HashMap::new();
+        let mut runs_p95: HashMap<&str, Vec<f64>> = HashMap::new();
+        let mut runs_p99: HashMap<&str, Vec<f64>> = HashMap::new();
+
+        for run_idx in 1..=num_runs {
+            println!("▶️  Executing Run {} / {} on idle system...", run_idx, num_runs);
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            let mut wc = Vec::new();
+            let report = evaluate_split(
+                "dev",
+                &dev_pairs,
+                &dev_gold,
+                &dict_words,
+                &mut sugg,
+                seed + run_idx as u64,
+                &mut wc,
+            );
+
+            for &p in &personas {
+                if let Some(m) = report.personas.get(p) {
+                    runs_p50.entry(p).or_default().push(m.latency_us.p50);
+                    runs_p95.entry(p).or_default().push(m.latency_us.p95);
+                    runs_p99.entry(p).or_default().push(m.latency_us.p99);
+                }
+            }
+        }
+
+        println!("\n══════════════════════════════════════════════════════════════════════════════════════════════════");
+        println!("   📊 QUIET-MACHINE LATENCY DISTRIBUTIONS (N = {} Runs, DEV 9,279 rows)", num_runs);
+        println!("══════════════════════════════════════════════════════════════════════════════════════════════════");
+        println!("| Persona | Median p50 (µs) | Median p95 (µs) | Median p99 (µs) | p95 Spread [Min, Max] (µs) | All Run p95s (µs) |");
+        println!("|:---|:---:|:---:|:---:|:---:|:---|");
+
+        let mut medians: HashMap<String, LatencyMetrics> = HashMap::new();
+        for &p in &personas {
+            let mut p50s = runs_p50.get(p).cloned().unwrap_or_default();
+            let mut p95s = runs_p95.get(p).cloned().unwrap_or_default();
+            let mut p99s = runs_p99.get(p).cloned().unwrap_or_default();
+
+            p50s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            p95s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            p99s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            let med_p50 = p50s[p50s.len() / 2];
+            let med_p95 = p95s[p95s.len() / 2];
+            let med_p99 = p99s[p99s.len() / 2];
+
+            let min_p95 = *p95s.first().unwrap_or(&0.0);
+            let max_p95 = *p95s.last().unwrap_or(&0.0);
+
+            medians.insert(
+                p.to_string(),
+                LatencyMetrics {
+                    p50: med_p50,
+                    p95: med_p95,
+                    p99: med_p99,
+                },
+            );
+
+            let raw_p95_str: Vec<String> = runs_p95
+                .get(p)
+                .unwrap()
+                .iter()
+                .map(|v| format!("{:.0}", v))
+                .collect();
+
+            println!(
+                "| **{:<14}** | {:>7.1} | {:>7.1} | {:>7.1} | [{:>6.1}, {:>6.1}] (Δ={:>5.1}) | {} |",
+                p,
+                med_p50,
+                med_p95,
+                med_p99,
+                min_p95,
+                max_p95,
+                max_p95 - min_p95,
+                raw_p95_str.join(", ")
+            );
+        }
+
+        // Save raw timings JSON
+        let raw_output = serde_json::json!({
+            "num_runs": num_runs,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "p50_runs": runs_p50,
+            "p95_runs": runs_p95,
+            "p99_runs": runs_p99,
+            "medians": medians,
+        });
+        let raw_json_path = Path::new("data/eval/quiet_latency_runs.json");
+        std::fs::write(
+            raw_json_path,
+            serde_json::to_string_pretty(&raw_output).unwrap(),
+        )
+        .expect("Failed to write quiet_latency_runs.json");
+        println!("\n💾 Saved raw multi-run timings to {:?}", raw_json_path);
+
+        // Update baseline.json with restored median quiet-machine latencies
+        let baseline_path = Path::new("data/eval/baseline.json");
+        if baseline_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(baseline_path) {
+                if let Ok(mut base_json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    for (p, m) in &medians {
+                        if let Some(dev_persona) = base_json
+                            .get_mut("dev")
+                            .and_then(|d| d.get_mut("personas"))
+                            .and_then(|ps| ps.get_mut(p))
+                        {
+                            dev_persona["latency_us"] = serde_json::json!({
+                                "p50": m.p50,
+                                "p95": m.p95,
+                                "p99": m.p99,
+                            });
+                        }
+                    }
+                    std::fs::write(
+                        baseline_path,
+                        serde_json::to_string_pretty(&base_json).unwrap(),
+                    )
+                    .expect("Failed to update baseline.json with quiet-machine medians");
+                    println!("💾 Restored quiet-machine median latencies in {:?}", baseline_path);
+                }
+            }
+        }
+        return;
+    }
+
     let mut all_worst_cases = Vec::new();
 
     // ── DEV SPLIT EVALUATION ──────────────────────────────────────────────
