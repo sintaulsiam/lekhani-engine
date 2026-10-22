@@ -417,7 +417,7 @@ fn evaluate_persona(
 
         let t0 = Instant::now();
         let (raw_candidates, _) = sugg.suggest(input, true, true, &empty_memory);
-        let elapsed_us = t0.elapsed().as_micros() as f64;
+        let elapsed_us = t0.elapsed().as_nanos() as f64 / 1000.0;
         latencies_us.push(elapsed_us);
 
         let candidates: Vec<String> = raw_candidates.iter().map(|s| canonicalize(s)).collect();
@@ -639,116 +639,135 @@ fn evaluate_split(
     let raw_avro_top1 = compute_raw_avro_top1(raw_pairs);
     let mut report_personas = HashMap::new();
 
-    // 1. Natural
-    println!("  ▶️  Evaluating [{}] - [Natural]...", split_name);
-    let natural_cases: Vec<(String, String)> = raw_pairs
-        .iter()
-        .map(|(bn, latin)| (transform_natural(latin), bn.clone()))
-        .collect();
-    let natural_metrics = evaluate_persona(
-        split_name,
-        "natural",
-        &natural_cases,
-        sugg,
-        dict_words,
-        Some(gold_index),
-        seed + 1,
-        worst_cases_out,
-    );
-    report_personas.insert("natural".to_string(), natural_metrics);
+    let mut persona_order = [0, 1, 2, 3, 4, 5];
+    let mut rng_order = SimpleRng::new(seed);
+    for i in (1..6).rev() {
+        let j = (rng_order.next_u64() as usize) % (i + 1);
+        persona_order.swap(i, j);
+    }
 
-    // 2. Lazy
-    println!("  ▶️  Evaluating [{}] - [Lazy]...", split_name);
-    let lazy_cases: Vec<(String, String)> = raw_pairs
-        .iter()
-        .map(|(bn, latin)| (transform_lazy(latin), bn.clone()))
-        .collect();
-    let lazy_metrics = evaluate_persona(
-        split_name,
-        "lazy",
-        &lazy_cases,
-        sugg,
-        dict_words,
-        Some(gold_index),
-        seed + 2,
-        worst_cases_out,
-    );
-    report_personas.insert("lazy".to_string(), lazy_metrics);
-
-    // 3. Vowel-Dropped p=0.30
-    println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.30]...", split_name);
-    let mut rng_p30 = SimpleRng::new(seed + 30);
-    let vdrop_p30_cases: Vec<(String, String)> = raw_pairs
-        .iter()
-        .map(|(bn, latin)| (transform_vowel_drop(latin, 0.30, &mut rng_p30), bn.clone()))
-        .collect();
-    let vdrop_p30_metrics = evaluate_persona(
-        split_name,
-        "vowel_drop_p30",
-        &vdrop_p30_cases,
-        sugg,
-        dict_words,
-        None,
-        seed + 3,
-        worst_cases_out,
-    );
-    report_personas.insert("vowel_drop_p30".to_string(), vdrop_p30_metrics);
-
-    // 4. Vowel-Dropped p=0.60
-    println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.60]...", split_name);
-    let mut rng_p60 = SimpleRng::new(seed + 60);
-    let vdrop_p60_cases: Vec<(String, String)> = raw_pairs
-        .iter()
-        .map(|(bn, latin)| (transform_vowel_drop(latin, 0.60, &mut rng_p60), bn.clone()))
-        .collect();
-    let vdrop_p60_metrics = evaluate_persona(
-        split_name,
-        "vowel_drop_p60",
-        &vdrop_p60_cases,
-        sugg,
-        dict_words,
-        None,
-        seed + 4,
-        worst_cases_out,
-    );
-    report_personas.insert("vowel_drop_p60".to_string(), vdrop_p60_metrics);
-
-    // 5. Vowel-Dropped p=0.90
-    println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.90]...", split_name);
-    let mut rng_p90 = SimpleRng::new(seed + 90);
-    let vdrop_p90_cases: Vec<(String, String)> = raw_pairs
-        .iter()
-        .map(|(bn, latin)| (transform_vowel_drop(latin, 0.90, &mut rng_p90), bn.clone()))
-        .collect();
-    let vdrop_p90_metrics = evaluate_persona(
-        split_name,
-        "vowel_drop_p90",
-        &vdrop_p90_cases,
-        sugg,
-        dict_words,
-        None,
-        seed + 5,
-        worst_cases_out,
-    );
-    report_personas.insert("vowel_drop_p90".to_string(), vdrop_p90_metrics);
-
-    // 6. Avro-Strict
-    println!("  ▶️  Evaluating [{}] - [Avro-Strict]...", split_name);
-    let avro_cases: Vec<(String, String)> = raw_pairs
-        .iter()
-        .map(|(bn, _)| (transform_avro_strict(bn), bn.clone()))
-        .collect();
-    let avro_metrics = evaluate_persona(
-        split_name,
-        "avro_strict",
-        &avro_cases,
-        sugg,
-        dict_words,
-        None,
-        seed + 6,
-        worst_cases_out,
-    );
-    report_personas.insert("avro_strict".to_string(), avro_metrics);
+    for &p_idx in &persona_order {
+        match p_idx {
+            0 => {
+                // 1. Natural
+                println!("  ▶️  Evaluating [{}] - [Natural]...", split_name);
+                let natural_cases: Vec<(String, String)> = raw_pairs
+                    .iter()
+                    .map(|(bn, latin)| (transform_natural(latin), bn.clone()))
+                    .collect();
+                let natural_metrics = evaluate_persona(
+                    split_name,
+                    "natural",
+                    &natural_cases,
+                    sugg,
+                    dict_words,
+                    Some(gold_index),
+                    seed + 1,
+                    worst_cases_out,
+                );
+                report_personas.insert("natural".to_string(), natural_metrics);
+            }
+            1 => {
+                // 2. Lazy
+                println!("  ▶️  Evaluating [{}] - [Lazy]...", split_name);
+                let lazy_cases: Vec<(String, String)> = raw_pairs
+                    .iter()
+                    .map(|(bn, latin)| (transform_lazy(latin), bn.clone()))
+                    .collect();
+                let lazy_metrics = evaluate_persona(
+                    split_name,
+                    "lazy",
+                    &lazy_cases,
+                    sugg,
+                    dict_words,
+                    Some(gold_index),
+                    seed + 2,
+                    worst_cases_out,
+                );
+                report_personas.insert("lazy".to_string(), lazy_metrics);
+            }
+            2 => {
+                // 3. Vowel-Dropped p=0.30
+                println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.30]...", split_name);
+                let mut rng_p30 = SimpleRng::new(seed + 30);
+                let vdrop_p30_cases: Vec<(String, String)> = raw_pairs
+                    .iter()
+                    .map(|(bn, latin)| (transform_vowel_drop(latin, 0.30, &mut rng_p30), bn.clone()))
+                    .collect();
+                let vdrop_p30_metrics = evaluate_persona(
+                    split_name,
+                    "vowel_drop_p30",
+                    &vdrop_p30_cases,
+                    sugg,
+                    dict_words,
+                    None,
+                    seed + 3,
+                    worst_cases_out,
+                );
+                report_personas.insert("vowel_drop_p30".to_string(), vdrop_p30_metrics);
+            }
+            3 => {
+                // 4. Vowel-Dropped p=0.60
+                println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.60]...", split_name);
+                let mut rng_p60 = SimpleRng::new(seed + 60);
+                let vdrop_p60_cases: Vec<(String, String)> = raw_pairs
+                    .iter()
+                    .map(|(bn, latin)| (transform_vowel_drop(latin, 0.60, &mut rng_p60), bn.clone()))
+                    .collect();
+                let vdrop_p60_metrics = evaluate_persona(
+                    split_name,
+                    "vowel_drop_p60",
+                    &vdrop_p60_cases,
+                    sugg,
+                    dict_words,
+                    None,
+                    seed + 4,
+                    worst_cases_out,
+                );
+                report_personas.insert("vowel_drop_p60".to_string(), vdrop_p60_metrics);
+            }
+            4 => {
+                // 5. Vowel-Dropped p=0.90
+                println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.90]...", split_name);
+                let mut rng_p90 = SimpleRng::new(seed + 90);
+                let vdrop_p90_cases: Vec<(String, String)> = raw_pairs
+                    .iter()
+                    .map(|(bn, latin)| (transform_vowel_drop(latin, 0.90, &mut rng_p90), bn.clone()))
+                    .collect();
+                let vdrop_p90_metrics = evaluate_persona(
+                    split_name,
+                    "vowel_drop_p90",
+                    &vdrop_p90_cases,
+                    sugg,
+                    dict_words,
+                    None,
+                    seed + 5,
+                    worst_cases_out,
+                );
+                report_personas.insert("vowel_drop_p90".to_string(), vdrop_p90_metrics);
+            }
+            5 => {
+                // 6. Avro-Strict
+                println!("  ▶️  Evaluating [{}] - [Avro-Strict]...", split_name);
+                let avro_cases: Vec<(String, String)> = raw_pairs
+                    .iter()
+                    .map(|(bn, _)| (transform_avro_strict(bn), bn.clone()))
+                    .collect();
+                let avro_metrics = evaluate_persona(
+                    split_name,
+                    "avro_strict",
+                    &avro_cases,
+                    sugg,
+                    dict_words,
+                    None,
+                    seed + 6,
+                    worst_cases_out,
+                );
+                report_personas.insert("avro_strict".to_string(), avro_metrics);
+            }
+            _ => unreachable!(),
+        }
+    }
 
     let unique_targets = raw_pairs
         .iter()
@@ -874,6 +893,12 @@ fn main() {
         let mut runs_p50: HashMap<&str, Vec<f64>> = HashMap::new();
         let mut runs_p95: HashMap<&str, Vec<f64>> = HashMap::new();
         let mut runs_p99: HashMap<&str, Vec<f64>> = HashMap::new();
+
+        println!("🔥 Executing warm-up pass (1,000 queries) to eliminate cold-start cache/page-fault overhead...");
+        let warm_memory = HashMap::new();
+        for (_, lat) in dev_pairs.iter().take(1000) {
+            let _ = sugg.suggest(lat, true, true, &warm_memory);
+        }
 
         for run_idx in 1..=num_runs {
             println!("▶️  Executing Run {} / {} on idle system...", run_idx, num_runs);
