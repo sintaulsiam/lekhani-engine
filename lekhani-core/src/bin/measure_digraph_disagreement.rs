@@ -64,7 +64,7 @@ pub fn load_dataset(path: &Path) -> (Vec<AlignerPair>, usize) {
         }
 
         let bn_tokens = tokenize_bengali(&bn);
-        let r_tokens = tokenize_roman(&lat_norm);
+        let r_tokens: Vec<String> = lat_norm.chars().map(|c| c.to_string()).collect();
 
         pairs.push(AlignerPair {
             roman_tokens: r_tokens,
@@ -323,7 +323,7 @@ pub fn viterbi_forced_alignment(
     model: &HashMap<(String, String), f64>,
     max_r: usize,
     max_b: usize,
-) -> Vec<(String, String)> {
+) -> (f64, Vec<(String, String)>) {
     let m = pair.roman_tokens.len();
     let n = pair.bengali_tokens.len();
 
@@ -372,8 +372,9 @@ pub fn viterbi_forced_alignment(
         }
     }
 
-    if viterbi[m][n] == f64::NEG_INFINITY {
-        return Vec::new();
+    let final_score = viterbi[m][n];
+    if final_score == f64::NEG_INFINITY {
+        return (f64::NEG_INFINITY, Vec::new());
     }
 
     let mut alignment = Vec::new();
@@ -390,7 +391,7 @@ pub fn viterbi_forced_alignment(
     }
 
     alignment.reverse();
-    alignment
+    (final_score, alignment)
 }
 
 fn is_consonant_char(c: char) -> bool {
@@ -434,7 +435,7 @@ fn main() {
         let results: Vec<(bool, bool, Vec<String>, Vec<String>)> = train_pairs
             .par_iter()
             .map(|pair| {
-                let alignment = viterbi_forced_alignment(pair, model, max_r, max_b);
+                let (_, alignment) = viterbi_forced_alignment(pair, model, max_r, max_b);
                 let greedy_tokens = tokenize_roman(&pair.roman_norm);
 
                 // 1. Identify interior character boundaries of multi-char greedy tokens
@@ -526,5 +527,149 @@ fn main() {
         for (del, cnt) in sorted_dels.iter().take(15) {
             println!("    {:>10} : {:>5} occurrences", del, cnt);
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Constrained Model: Aligned strictly on Roman tokens with lattice options
+    // ─────────────────────────────────────────────────────────────────────────────
+    println!("\n══════════════════════════════════════════════════════════════════════════════════");
+    println!("   🛡️  TRAINING CONSTRAINED ATOMIC TOKEN ALIGNER (LATTICE OPTIONS ONLY)");
+    println!("══════════════════════════════════════════════════════════════════════════════════");
+    
+    // Convert pairs to atomic Roman tokens (greedy tokens by default)
+    let token_pairs: Vec<AlignerPair> = train_pairs
+        .iter()
+        .map(|p| {
+            let mut cp = p.clone();
+            cp.roman_tokens = tokenize_roman(&p.roman_norm);
+            cp
+        })
+        .collect();
+
+    let t2 = Instant::now();
+    println!("▶️  Training Constrained 1:1 Aligner on TRAIN...");
+    let mut model_constrained = initialize_model(&token_pairs, 1, 1, 50.0);
+    for _ in 1..=DEFAULT_EM_ITERATIONS {
+        model_constrained = em_iteration(&token_pairs, &model_constrained, 1, 1);
+    }
+    println!("   Constrained Aligner training complete in {:.2}s", t2.elapsed().as_secs_f64());
+
+    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!("   Auditing: Constrained Atomic Token Model (with Lattice Options)");
+    println!("──────────────────────────────────────────────────────────────────────────────────");
+
+    let results_constrained: Vec<(bool, bool, Vec<String>, Vec<String>)> = train_pairs
+        .par_iter()
+        .map(|pair| {
+            use lekhani_core::tokenization::roman_segmentation_lattice;
+            let lattice_paths = roman_segmentation_lattice(&pair.roman_norm);
+            
+            let mut best_score = f64::NEG_INFINITY;
+            let mut best_alignment = Vec::new();
+
+            for path in &lattice_paths {
+                let mut temp_pair = pair.clone();
+                temp_pair.roman_tokens = path.clone();
+                let (score, alignment) = viterbi_forced_alignment(&temp_pair, &model_constrained, 1, 1);
+                if score > best_score {
+                    best_score = score;
+                    best_alignment = alignment;
+                }
+            }
+
+            // Fallback if none reachable
+            if best_score == f64::NEG_INFINITY {
+                let (score, alignment) = viterbi_forced_alignment(pair, &model_constrained, 1, 1);
+                if score > best_score {
+                    best_alignment = alignment;
+                }
+            }
+
+            let greedy_tokens = tokenize_roman(&pair.roman_norm);
+
+            let mut interior_char_indices = HashSet::new();
+            let mut curr_char = 0;
+            for tok in &greedy_tokens {
+                let len = tok.len();
+                if len >= 2 {
+                    for off in 1..len {
+                        interior_char_indices.insert(curr_char + off);
+                    }
+                }
+                curr_char += len;
+            }
+
+            let mut viterbi_cuts = HashSet::new();
+            let mut v_char = 0;
+            let mut split_digraphs = Vec::new();
+            let mut consonant_deletions = Vec::new();
+
+            for (r, b) in &best_alignment {
+                if !r.is_empty() {
+                    v_char += r.len();
+                    viterbi_cuts.insert(v_char);
+                }
+                if !r.is_empty() && b.is_empty() {
+                    if r.chars().any(is_consonant_char) {
+                        consonant_deletions.push(format!("{}→ε", r));
+                    }
+                }
+            }
+
+            let has_split = interior_char_indices.iter().any(|idx| viterbi_cuts.contains(idx));
+            if has_split {
+                let mut tok_start = 0;
+                for tok in &greedy_tokens {
+                    let tok_end = tok_start + tok.len();
+                    if tok.len() >= 2 {
+                        let was_cut = (tok_start + 1..tok_end).any(|c| viterbi_cuts.contains(&c));
+                        if was_cut {
+                            split_digraphs.push(tok.clone());
+                        }
+                    }
+                    tok_start = tok_end;
+                }
+            }
+
+            (has_split, !consonant_deletions.is_empty(), split_digraphs, consonant_deletions)
+        })
+        .collect();
+
+    let total_c = results_constrained.len();
+    let split_count_c = results_constrained.iter().filter(|r| r.0).count();
+    let deletion_count_c = results_constrained.iter().filter(|r| r.1).count();
+    let either_defect_c = results_constrained.iter().filter(|r| r.0 || r.1).count();
+
+    println!("Audit Results on All {} Pairs:", total_c);
+    println!("  ├─ Pairs with Internal Digraph Split : {:>6} / {} ({:>6.2}%)", split_count_c, total_c, split_count_c as f64 / total_c as f64 * 100.0);
+    println!("  ├─ Pairs with Consonant Deleted (→ε) : {:>6} / {} ({:>6.2}%)", deletion_count_c, total_c, deletion_count_c as f64 / total_c as f64 * 100.0);
+    println!("  └─ Pairs with EITHER Defect          : {:>6} / {} ({:>6.2}%)", either_defect_c, total_c, either_defect_c as f64 / total_c as f64 * 100.0);
+
+    let mut digraph_freq_c: HashMap<String, usize> = HashMap::new();
+    for r in &results_constrained {
+        for d in &r.2 {
+            *digraph_freq_c.entry(d.clone()).or_default() += 1;
+        }
+    }
+    let mut sorted_digraphs_c: Vec<_> = digraph_freq_c.into_iter().collect();
+    sorted_digraphs_c.sort_by(|a, b| b.1.cmp(&a.1));
+
+    println!("\nTop Split Digraphs / Tokens (Constrained Model):");
+    for (tok, cnt) in sorted_digraphs_c.iter().take(15) {
+        println!("    {:>6} : {:>5} occurrences ({:.2}% of split pairs)", tok, cnt, *cnt as f64 / split_count_c.max(1) as f64 * 100.0);
+    }
+
+    let mut del_freq_c: HashMap<String, usize> = HashMap::new();
+    for r in &results_constrained {
+        for d in &r.3 {
+            *del_freq_c.entry(d.clone()).or_default() += 1;
+        }
+    }
+    let mut sorted_dels_c: Vec<_> = del_freq_c.into_iter().collect();
+    sorted_dels_c.sort_by(|a, b| b.1.cmp(&a.1));
+
+    println!("\nTop Consonant Deletions (→ε) (Constrained Model):");
+    for (del, cnt) in sorted_dels_c.iter().take(15) {
+        println!("    {:>10} : {:>5} occurrences", del, cnt);
     }
 }
