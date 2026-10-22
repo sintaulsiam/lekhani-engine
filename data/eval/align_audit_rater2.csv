@@ -1,0 +1,51 @@
+﻿id,bengali_word,roman_input,has_conjunct,viterbi_alignment,greedy_roman_tokens,viterbi_roman_tokens,segmentation_match,alignment_grade,error_type,rater2_notes
+2,অনলাইনে,anline,false,a→অ | n→ন | l→ল | i→া | ε→ই | n→ন | e→ে,a n l i n e,a n l i n e,true,INCORRECT,English_loan,"i→া and ε→ই split one sound; combined it is right, the units are not"
+7,অসুখ,ashookh,false,a→অ | sh→স | oo→ু | kh→খ,a sh oo kh,a sh oo kh,true,CORRECT,,sh→স is common in this data
+8,আইওয়া,iowa,false,ε→আ | i→ই | ow→ও | ε→য় | a→া,i o w a,i ow a,false,INCORRECT,English_loan,ε→আ inserted; i→আই split
+9,আদর্শবাদের,aadarsbader,true,aa→আ | da→দ | rs→র্শ | b→ব | a→া | d→দ | e→ে | r→র,aa d a r s b a d e r,aa da rs b a d e r,false,CORRECT,,
+12,আরডিআরএস,rdrs,false,,r d r s,,false,INCORRECT,other,no alignment produced (acronym)
+23,উল্লেখ্যযোগ্য,ullekhyozoggyo,true,u→উ | ll→ল্ল | e→ে | kh→খ্য | yo→ε | z→য | o→ো | gg→গ্য | yo→ε,u ll e kh y o z o gg y o,u ll e kh yo z o gg yo,false,INCORRECT,conjunct_split,"kh→খ্য, then yo→ε swallows y"
+24,এক্সচেঞ্জ,eksachenza,true,e→এ | ks→ক্স | a→ε | ch→চ | e→ে | nz→ঞ্জ | a→ε,e k s a ch e n z a,e ks a ch e nz a,false,CORRECT,,
+25,এগারতম,egarotomo,false,e→এ | g→গ | a→া | r→র | o→ε | to→ত | mo→ম,e g a r o t o m o,e g a r o to mo,false,CORRECT,,
+27,ওয়্যার,waayaar,true,w→ও | a→ε | ay→য়্য | a→া | ar→র,w aa y aa r,w a ay a ar,false,UNSURE,,vowel letters absorbed into consonant units; no clearly correct split
+29,কবরগুলো,koborgulo,false,ko→ক | bo→ব | r→র | g→গ | u→ু | l→ল | o→ো,k o b o r g u l o,ko bo r g u l o,false,CORRECT,,
+36,কাল্পনিক,kalpanik,true,k→ক | a→া | lp→ল্প | an→ন | i→ি | k→ক,k a l p a n i k,k a lp an i k,false,CORRECT,,
+40,কীসের,kiser,false,k→ক | i→ী | s→স | e→ে | r→র,k i s e r,k i s e r,true,CORRECT,,
+41,কুরুক্ষেত্রে,kurukkhetre,true,k→ক | u→ু | r→র | u→ু | kk→ক্ষ | h→ε | e→ে | tr→ত্র | e→ে,k u r u kk h e t r e,k u r u kk h e tr e,false,INCORRECT,conjunct_split,kk→ক্ষ plus h→ε splits kkh
+51,গিল্ড,geeld,true,g→গ | ee→ি | ld→ল্ড,g ee l d,g ee ld,false,CORRECT,,
+56,চক্রে,chakre,true,ch→চ | a→ε | kr→ক্র | e→ে,ch a k r e,ch a kr e,false,CORRECT,,
+57,চাহিদাই,chahedae,false,ch→চ | a→া | h→হ | e→ি | d→দ | a→া | e→ই,ch a h e d a e,ch a h e d a e,true,CORRECT,,
+58,চিত্রণ,cheetron,true,ch→চ | ee→ি | tr→ত্র | on→ণ,ch ee t r o n,ch ee tr on,false,CORRECT,,
+60,চেন্নাই,chennay,true,ch→চ | e→ে | nn→ন্ন | a→া | y→ই,ch e nn a y,ch e nn a y,true,CORRECT,,
+63,চোক,chake,false,ch→চ | a→ো | ke→ক,ch a k e,ch a ke,false,INCORRECT,other,a→ো implausible; roman does not match gold (noisy pair)
+68,জন্যই,jannyoi,true,ja→জ | nn→ন্য | yo→ε | i→ই,j a nn y oi,ja nn yo i,false,INCORRECT,conjunct_split,"nn→ন্য, yo→ε"
+71,জ্বালা,jala,true,j→জ্ব | a→া | l→ল | a→া,j a l a,j a l a,true,UNSURE,,j→জ্ব forced by a dropped ব-ফলা; pollutes the j unit
+72,ঝরণার,jhornar,false,jh→ঝ | or→র | n→ণ | a→া | r→র,j h o r n a r,jh or n a r,false,CORRECT,,
+87,থেকেই,thekei,false,th→থ | e→ে | k→ক | e→ে | i→ই,th e k e i,th e k e i,true,CORRECT,,
+88,দফতরের,dophtorer,false,do→দ | ph→ফ | to→ত | r→র | e→ে | r→র,d o ph t o r e r,do ph to r e r,false,CORRECT,,
+89,দশকের,dashaker,false,da→দ | sh→শ | ak→ক | e→ে | r→র,d a sh a k e r,da sh ak e r,false,CORRECT,,
+92,দুজনকে,doojonke,false,d→দ | oo→ু | j→জ | on→ন | k→ক | e→ে,d oo j o n k e,d oo j on k e,false,CORRECT,,
+98,নবকুমার,nobokumar,false,n→ন | ob→ব | ok→ক | u→ু | m→ম | a→া | r→র,n o b o k u m a r,n ob ok u m a r,false,CORRECT,,
+108,পরিষ্কারভাবে,poriskarvabe,true,po→প | r→র | i→ি | sk→ষ্ক | a→া | r→র | v→ভ | a→া | b→ব | e→ে,p o r i s k a r v a b e,po r i sk a r v a b e,false,CORRECT,,
+109,পরিসংখ্যান,porishongkhan,true,po→প | r→র | i→ি | sh→স | o→ε | ng→ং | kh→খ্য | a→া | n→ন,p o r i sh o ng kh a n,po r i sh o ng kh a n,false,UNSURE,,kh→খ্য forced by a dropped ্য
+115,পুনর্জাগরণের,punorzagaroner,true,p→প | u→ু | n→ন | o→ε | rz→র্জ | a→া | ga→গ | r→র | on→ণ | e→ে | r→র,p u n o r z a g a r o n e r,p u n o rz a ga r on e r,false,CORRECT,,
+118,পেতেন,peten,false,p→প | e→ে | t→ত | e→ে | n→ন,p e t e n,p e t e n,true,CORRECT,,
+130,বর্ষসেরা,borshoshera,true,bo→ব | rs→র্ষ | ho→ε | sh→স | e→ে | r→র | a→া,b o r sh o sh e r a,bo rs ho sh e r a,false,INCORRECT,other,rs|ho splits sh; ho→ε
+138,বিমানবন্দরটি,bimaanbandarti,true,b→ব | i→ি | ma→ম | a→া | n→ন | ba→ব | nd→ন্দ | ar→র | t→ট | i→ি,b i m aa n b a n d a r t i,b i ma a n ba nd ar t i,false,CORRECT,,"aa split as ma|a, but each unit is plausible"
+140,বীজে,beezey,false,b→ব | ee→ী | z→জ | e→ে | y→ε,b ee z e y,b ee z e y,true,CORRECT,,
+144,ব্রাসেলস,brussels,true,br→ব্র | u→া | ss→স | e→ে | l→ল | s→স,b r u ss e l s,br u ss e l s,false,CORRECT,,u→া is plausible for an English loan
+151,মন্ডলীর,mondoleer,true,mo→ম | nd→ন্ড | ol→ল | ee→ী | r→র,m o n d o l ee r,mo nd ol ee r,false,CORRECT,,
+152,মন্ত্রি,montri,true,mo→ম | nt→ন্ত্র | r→ε | i→ি,m o n t r i,mo nt r i,false,INCORRECT,conjunct_split,"nt→ন্ত্র, r→ε"
+155,মান্যতা,manyata,true,m→ম | a→া | ny→ন্য | at→ত | a→া,m a n y a t a,m a ny at a,false,CORRECT,,
+164,রিড,rid,false,r→র | i→ি | d→ড,r i d,r i d,true,CORRECT,,
+167,লক্ষ্যে,lokshye,true,lo→ল | ks→ক্ষ্য | hy→ε | e→ে,l o k sh y e,lo ks hy e,false,INCORRECT,other,ks|hy splits sh
+169,লোকেশনের,lokesoner,false,l→ল | o→ো | k→ক | e→ে | s→শ | on→ন | e→ে | r→র,l o k e s o n e r,l o k e s on e r,false,CORRECT,,
+174,শুম্ভ,soombho,true,s→শ | oo→ু | mb→ম্ভ | ho→ε,s oo m bh o,s oo mb ho,false,INCORRECT,other,mb|ho splits bh
+182,সমর্থনের,smarthaner,true,s→স | ma→ম | rt→র্থ | ha→ε | n→ন | e→ে | r→র,s m a r th a n e r,s ma rt ha n e r,false,INCORRECT,other,rt|ha splits th
+183,সমৃদ্ধি,somriddhi,true,so→স | mr→ম | i→ৃ | dd→দ্ধ | h→ε | i→ি,s o m r i dd h i,so mr i dd h i,false,INCORRECT,other,dd|h splits dh; mr|i splits ri
+186,সর্দার,sarder,true,sa→স | rd→র্দ | e→া | r→র,s a r d e r,sa rd e r,false,UNSURE,,e→া unusual (er→ার)
+189,সালাহউদ্দিন,salahouddin,true,s→স | a→া | l→ল | a→া | ho→হ | u→উ | dd→দ্দ | i→ি | n→ন,s a l a h ou dd i n,s a l a ho u dd i n,false,CORRECT,,
+190,সিলিং,sheilin,false,sh→স | e→ε | i→ি | l→ল | i→ি | n→ং,sh e i l i n,sh e i l i n,true,CORRECT,,
+191,সুতারখালী,sutarkhali,false,s→স | u→ু | t→ত | a→া | r→র | kh→খ | a→া | l→ল | i→ী,s u t a r kh a l i,s u t a r kh a l i,true,CORRECT,,
+192,সুপ্ত,supta,true,s→স | u→ু | pt→প্ত | a→ε,s u p t a,s u pt a,false,CORRECT,,
+198,হবেনা,hobena,false,ho→হ | b→ব | e→ে | n→ন | a→া,h o b e n a,ho b e n a,false,CORRECT,,
