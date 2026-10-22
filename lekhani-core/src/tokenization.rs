@@ -277,32 +277,7 @@ pub fn roman_segmentation_lattice(text: &str) -> Vec<Vec<String>> {
         let n = chars.len();
         let mut paths = Vec::new();
 
-        // 1. Single character
-        let s1 = chars[start].to_string();
-        for sub in recurse(chars, start + 1, memo) {
-            let mut p = Vec::with_capacity(sub.len() + 1);
-            p.push(s1.clone());
-            p.extend(sub);
-            paths.push(p);
-        }
-
-        // 2. Digraph or doubled consonant (2 chars)
-        if start + 2 <= n {
-            let sub_str: String = chars[start..start + 2].iter().collect();
-            let is_digraph = CONSONANT_DIGRAPHS.contains(&sub_str.as_str())
-                || VOWEL_DIGRAPHS.contains(&sub_str.as_str());
-            let is_doubled = chars[start] == chars[start + 1] && chars[start].is_ascii_alphabetic();
-            if is_digraph || is_doubled {
-                for sub in recurse(chars, start + 2, memo) {
-                    let mut p = Vec::with_capacity(sub.len() + 1);
-                    p.push(sub_str.clone());
-                    p.extend(sub);
-                    paths.push(p);
-                }
-            }
-        }
-
-        // 3. 3-char "chh"
+        // 1. Try 3-char "chh" (indivisible)
         if start + 3 <= n {
             let sub_str: String = chars[start..start + 3].iter().collect();
             if sub_str == "chh" {
@@ -312,7 +287,62 @@ pub fn roman_segmentation_lattice(text: &str) -> Vec<Vec<String>> {
                     p.extend(sub);
                     paths.push(p);
                 }
+                memo.insert(start, paths.clone());
+                return paths;
             }
+        }
+
+        // 2. Try 2-char tokens
+        if start + 2 <= n {
+            let sub_str: String = chars[start..start + 2].iter().collect();
+            let is_doubled = chars[start] == chars[start + 1] && chars[start].is_ascii_alphabetic();
+
+            // Known ambiguous digraphs and doubled consonants that allow lattice alternatives:
+            // "ng" (ng vs n|g), "sh" (sh vs s|h), and geminates (tt vs t|t)
+            if sub_str == "ng" || sub_str == "sh" || is_doubled {
+                // Option A: Take as single atomic token
+                for sub in recurse(chars, start + 2, memo) {
+                    let mut p = Vec::with_capacity(sub.len() + 1);
+                    p.push(sub_str.clone());
+                    p.extend(sub);
+                    paths.push(p);
+                }
+                // Option B: Take as single character and continue
+                let s1 = chars[start].to_string();
+                for sub in recurse(chars, start + 1, memo) {
+                    let mut p = Vec::with_capacity(sub.len() + 1);
+                    p.push(s1.clone());
+                    p.extend(sub);
+                    paths.push(p);
+                }
+                memo.insert(start, paths.clone());
+                return paths;
+            }
+
+            // All other digraphs ("kh", "gh", "ch", "th", "dh", "ph", "bh", "nj", "aa", "ee", "oo", "oi", "ou", "ai", "au")
+            // are INDIVISIBLE ATOMIC units; alternative decomposition is strictly forbidden.
+            let is_indivisible = CONSONANT_DIGRAPHS.contains(&sub_str.as_str())
+                || VOWEL_DIGRAPHS.contains(&sub_str.as_str());
+
+            if is_indivisible {
+                for sub in recurse(chars, start + 2, memo) {
+                    let mut p = Vec::with_capacity(sub.len() + 1);
+                    p.push(sub_str.clone());
+                    p.extend(sub);
+                    paths.push(p);
+                }
+                memo.insert(start, paths.clone());
+                return paths;
+            }
+        }
+
+        // 3. Fallback: single character
+        let s1 = chars[start].to_string();
+        for sub in recurse(chars, start + 1, memo) {
+            let mut p = Vec::with_capacity(sub.len() + 1);
+            p.push(s1.clone());
+            p.extend(sub);
+            paths.push(p);
         }
 
         memo.insert(start, paths.clone());
@@ -379,8 +409,9 @@ pub fn is_authorized_multi_token_unit(roman: &str, bengali_tokens: &[BengaliToke
 
 /// Enforces the hard constraints on a candidate translation unit:
 /// 1. No unit begins with a KAR unless the Roman side is a vowel token.
-/// 2. A conjunct (CONJ) is an atomic token; it is never split.
-/// 3. Default ratio is 1:1, 1:0 (deletion), 0:1 (insertion). Multi-token units must match whitelist.
+/// 2. Consonant deletion to ε is forbidden (only Roman vowel tokens may delete to ε).
+/// 3. A conjunct (CONJ) is an atomic token; it is never split.
+/// 4. Default ratio is 1:1, 1:0 (vowel deletion only), 0:1 (insertion). Multi-token units must match whitelist.
 pub fn is_valid_translation_unit(
     roman_tokens: &[String],
     bengali_tokens: &[BengaliToken],
@@ -400,7 +431,18 @@ pub fn is_valid_translation_unit(
         }
     }
 
-    // Hard Constraint 2: Ratio checks (1:1, 1:0, 0:1, or authorized whitelist)
+    // Hard Constraint 2: Consonant deletion to ε is forbidden.
+    // Roman deletion (bengali_tokens is empty): ONLY vowels are allowed to delete to ε.
+    if bengali_tokens.is_empty() {
+        return roman_tokens.iter().all(|r| is_roman_vowel_token(r));
+    }
+
+    // Bengali insertion (roman_tokens is empty): max 1 Bengali token (e.g. independent vowel or modifier)
+    if roman_tokens.is_empty() {
+        return bengali_tokens.len() == 1;
+    }
+
+    // Hard Constraint 3: Ratio checks (1:1, or authorized whitelist)
     let r_len = roman_tokens.len();
     let b_len = bengali_tokens.len();
 
