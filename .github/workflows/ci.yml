@@ -32,9 +32,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Verify Hermetic Dictionary SHA-256 Hash
+      - name: Verify Hermetic Dictionary Hashes
         run: |
           echo "8a51b4d98bcbe147771751c60fa1d2919a84b0b910232bdcf863617ecc88fbdb  data/dictionaries/dictionary.json" | sha256sum --check
+          echo "1653d08badea1faa78979463db82364fac379afb903482c2fc5c9eef0f4643e4  data/dictionaries/dictionary.bin" | sha256sum --check
+      - name: Rebuild dictionary.bin and verify byte-for-byte reproducibility
+        run: |
+          cargo run --release -p lekhani-core --bin build_dict -- data/dictionaries/dictionary.json /tmp/rebuilt_dictionary.bin
+          cmp -s data/dictionaries/dictionary.bin /tmp/rebuilt_dictionary.bin || (echo "Rebuilt dictionary.bin differs from committed file!" && exit 1)
       - name: Run workspace unit and regression tests
         run: cargo test --workspace --release
+
 
