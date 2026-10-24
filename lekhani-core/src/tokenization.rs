@@ -299,7 +299,7 @@ pub fn tokenize_roman_cased(text: &str) -> Vec<String> {
             let sub_lower: String = chars[i..i + 2].iter().map(|c| c.to_ascii_lowercase()).collect();
             let is_digraph = CONSONANT_DIGRAPHS.contains(&sub_lower.as_str())
                 || VOWEL_DIGRAPHS.contains(&sub_lower.as_str());
-            let is_doubled = chars[i].to_ascii_lowercase() == chars[i + 1].to_ascii_lowercase()
+            let is_doubled = chars[i].eq_ignore_ascii_case(&chars[i + 1])
                 && chars[i].is_ascii_alphabetic();
 
             if is_digraph || is_doubled {
@@ -550,10 +550,12 @@ pub fn is_valid_translation_unit(
 
     // 2 or 3 Roman consonant tokens mapping to a single Bengali conjunct token
     // (e.g. [r, sh] -> র্ষ, [m, bh] -> ম্ভ, [r, th] -> র্থ, [k, kh] -> ক্ষ, [d, dh] -> দ্ধ, [s, t] -> স্ত/ষ্ট, [n, t, r] -> ন্ত্র)
-    if (r_len == 2 || r_len == 3) && b_len == 1 && bengali_tokens[0].is_conjunct() {
-        if roman_tokens.iter().all(|r| is_roman_consonant_token(r)) {
-            return true;
-        }
+    if (r_len == 2 || r_len == 3)
+        && b_len == 1
+        && bengali_tokens[0].is_conjunct()
+        && roman_tokens.iter().all(|r| is_roman_consonant_token(r))
+    {
+        return true;
     }
 
     let roman_joined = roman_tokens.join("");

@@ -35,8 +35,8 @@ pub use morpheme::{
 };
 pub use ngram::UserStats;
 pub use phonetic::{
-    AutonomousLearner, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion,
-    PhoneticSuggestionConfig,
+    AutonomousLearner, JointUnitLM, PhoneticDatabase, PhoneticMethod, PhoneticSuggestion,
+    PhoneticSuggestionConfig, PragyanConfig, PragyanEngine, UnitVocab,
 };
 pub use session::{ActiveLayoutType, InputSession, ShiftOrigin};
 pub use snippets::SnippetManager;
