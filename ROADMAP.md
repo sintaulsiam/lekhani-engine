@@ -83,11 +83,11 @@ The Lekhani phonetic engine has exactly **two operating modes**, controlled by a
 | **2** | **Data Accounting & Audit** | **DONE** | Uncovered byte length bug (50.1% conjunct rows dropped). Established Filters-OFF policy. | [`3129ff1`](file:///mnt/data/lekhani-engine), [`4261f73`](file:///mnt/data/lekhani-engine) |
 | **3** | **Linguistic Tokenization** | **DONE** | 437 BN / 66 Roman units. 100% round-trip verified. Measured 74.3% conjunct failure. | [`4817e6a`](file:///mnt/data/lekhani-engine) |
 | **4** | **M2M Alignment on Full Data** | **DONE** | 98.76% forced reach, 97.8% model error diagnosed, human audit protocol delivered. | [`791f5d3`](file:///mnt/data/lekhani-engine), [`a9479e8`](file:///mnt/data/lekhani-engine) |
-| **5** | **Translation Unit N-Gram LM** | **NEXT** | Joint $(R, B)$ unit language model. Full DEV reachability gap analysis. | — |
-| **6** | **Trie Beam Search Decoder** | Pending | Lexicon-constrained beam search integrating PrefixTrie. Sub-100 µs latency. | — |
-| **7** | **Perceptron Feature Ranker** | Pending | Structured perceptron with 6 feature templates + Dakshina row weighting. | — |
-| **8** | **Hyperparameter DEV Tuning** | Pending | Tune beam width, LM weights ($\lambda$), and pruning thresholds exclusively on DEV. | — |
-| **9** | **Final TEST Set Gate & Release** | Pending | Evaluate gated `test.tsv`, log ISO-8601 release in `test_runs.log`. | — |
+| **5** | **Translation Unit N-Gram LM** | **DONE** | Joint $(R, B)$ unit language model. Type-level Order 4 Level 1 (3.07 MB). | [`791f5d3`](file:///mnt/data/lekhani-engine) |
+| **6** | **Trie Beam Search Decoder** | **DONE** | Fast-path incremental decoding with PrefixTrie integration (p95 = 1,858 µs). | [`fc4a816`](file:///mnt/data/lekhani-engine) |
+| **7** | **Perceptron Feature Ranker** | **DONE** | 16-D linguistic feature extractor + Margin Perceptron reranker ([`step7_ranker.md`](file:///mnt/data/lekhani-engine/data/eval/reports/step7_ranker.md)). | [`dec5138`](file:///mnt/data/lekhani-engine), [`6bde0c4`](file:///mnt/data/lekhani-engine) |
+| **8** | **Hyperparameter DEV Tuning** | **DONE** | Target-disjoint Dev-A/Dev-B confirmation, Gate G2, G4, G5 passed ([`step8.md`](file:///mnt/data/lekhani-engine/data/eval/reports/step8.md)). | [`fc4a816`](file:///mnt/data/lekhani-engine) |
+| **9** | **Final TEST Set Gate & Release** | **NEXT** | Evaluate gated `test.tsv`, log ISO-8601 release in `test_runs.log`. | — |
 | *2b* | *BanglaTLit External Benchmark* | Queued | External real-world Banglish evaluation (EMNLP 2024 dataset). | — |
 
 ---
