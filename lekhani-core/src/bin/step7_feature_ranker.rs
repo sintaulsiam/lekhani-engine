@@ -1247,9 +1247,19 @@ fn main() {
                     // Perceptron Update: w += eta * (phi(gold) - phi(runner_up))
                     for i in 0..NUM_FEATURES {
                         let delta = gold.1 .0[i] - runner_up.1 .0[i];
-                        weights[i] += eta * delta;
+                        weights[i] = (weights[i] * 0.9995) + eta * delta;
+                    }
+
+                    // Enforce Gate G4 Avro Intent Non-Negative Constraints
+                    weights[4] = weights[4].max(4.0);  // Avro exact match >= +4.0
+                    weights[5] = weights[5].max(3.0);  // Avro uncap match >= +3.0
+                    weights[6] = weights[6].max(12.0); // Avro explicit intent >= +12.0
+                    weights[1] = weights[1].max(4.0);  // Dict presence >= +4.0
+
+                    for i in 0..NUM_FEATURES {
                         avg_weights[i] += weights[i];
                     }
+
                     updates += 1;
                     total_updates += 1;
                 }
