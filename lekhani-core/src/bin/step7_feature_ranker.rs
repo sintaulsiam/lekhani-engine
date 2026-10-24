@@ -1255,8 +1255,8 @@ fn main() {
 
                     // Enforce Gate G4 Avro Intent Constraints:
                     let dict_w = weights[1].max(5.0);
-                    weights[4] = weights[4].max(dict_w * 0.40); // Soft Avro in dict
-                    weights[5] = weights[5].max(dict_w * 0.35); // Soft Avro uncap
+                    weights[4] = weights[4].max(dict_w * 1.15); // Avro in dict (matches Step 8 ratio: 6.8/6.0 = 1.13)
+                    weights[5] = weights[5].max(dict_w * 0.90); // Soft Avro uncap
                     weights[6] = weights[6].max(dict_w * 2.20); // Dominant Avro explicit intent (Gate G4 protection)
 
                     for i in 0..NUM_FEATURES {
