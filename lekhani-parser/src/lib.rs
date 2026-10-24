@@ -6,6 +6,7 @@
 
 pub mod compiler;
 pub mod engine;
+pub mod lps;
 pub mod pipeline;
 pub mod rule;
 pub mod tables;
