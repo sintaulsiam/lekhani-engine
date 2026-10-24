@@ -528,6 +528,141 @@ pub fn apply_sandhi_join(base: &str, suffix: &str) -> String {
     result
 }
 
+/// Productive compound and derivational suffixes for Bengali compound word synthesis
+pub const PRODUCTIVE_COMPOUND_SUFFIXES: &[(&str, &str)] = &[
+    ("shongkranto", "সংক্রান্ত"),
+    ("shilotar", "শীলতার"),
+    ("shilota", "শীলতা"),
+    ("sheelota", "শীলতা"),
+    ("hinbhabe", "হীনভাবে"),
+    ("heenbhabe", "হীনভাবে"),
+    ("mulokbhabe", "মূলকভাবে"),
+    ("dorshider", "দর্শীদের"),
+    ("babosthar", "ব্যবস্থার"),
+    ("babostha", "ব্যবস্থা"),
+    ("shongsthan", "সংস্থান"),
+    ("shonghar", "সংহার"),
+    ("shleshon", "শ্লেষণ"),
+    ("bekkhan", "বেক্ষণ"),
+    ("gulotei", "গুলোতেই"),
+    ("guloteo", "গুলোতেও"),
+    ("derkei", "দেরকেই"),
+    ("derkeo", "দেরকেও"),
+    ("guloke", "গুলোকে"),
+    ("gulote", "গুলোতে"),
+    ("gulor", "গুলোর"),
+    ("hinta", "হীনতা"),
+    ("heenta", "হীনতা"),
+    ("derke", "দেরকে"),
+    ("tattiker", "তাত্ত্বিকের"),
+    ("tattik", "তাত্ত্বিক"),
+    ("banjoner", "ব্যঞ্জনের"),
+    ("banjon", "ব্যঞ্জন"),
+    ("bhabe", "ভাবে"),
+    ("vabe", "ভাবে"),
+    ("sheel", "শীল"),
+    ("shil", "শীল"),
+    ("heen", "হীন"),
+    ("hin", "হীন"),
+    ("mulok", "মূলক"),
+    ("jonit", "জনিত"),
+    ("bhittik", "ভিত্তিক"),
+    ("prapto", "প্রাপ্ত"),
+    ("dorshi", "দর্শী"),
+    ("gulo", "গুলো"),
+    ("gula", "গুলা"),
+    ("guli", "গুলি"),
+    ("der", "দের"),
+    ("purwok", "পূর্বক"),
+    ("purbok", "পূর্বক"),
+    ("shishto", "বিশিষ্ট"),
+    ("biddaloy", "বিদ্যালয়"),
+    ("porichalona", "পরিচালনা"),
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompoundHypothesis {
+    pub unified: String,
+    pub hyphenated: Option<String>,
+    pub stem: String,
+    pub suffix: String,
+}
+
+/// Decompose a compound token (either hyphenated like "bishwobiddaloy-gulote" or
+/// unhyphenated agglutinative compounds like "antorjatikbhabe") using the morphological
+/// compound lattice and a stem resolution function.
+pub fn decompose_compound_token<F>(input: &str, mut resolve_stem: F) -> Option<CompoundHypothesis>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    if input.is_empty() || !input.is_ascii() {
+        return None;
+    }
+    let lower = input.to_ascii_lowercase();
+
+    // 1. Soft-hyphen compound resolution (e.g. bishwobiddaloy-gulote -> বিশ্ববিদ্যালয়গুলোতে)
+    if input.contains('-') && !input.starts_with('-') && !input.ends_with('-') {
+        let parts: Vec<&str> = input.split('-').collect();
+        if parts.len() >= 2
+            && parts
+                .iter()
+                .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+        {
+            let mut bn_parts = Vec::with_capacity(parts.len());
+            for p in &parts {
+                if let Some(bn) = resolve_stem(p) {
+                    if !bn.is_empty() {
+                        bn_parts.push(bn);
+                        continue;
+                    }
+                }
+                return None;
+            }
+            if bn_parts.len() == parts.len() {
+                let unified = bn_parts.join("");
+                let hyphenated = bn_parts.join("-");
+                return Some(CompoundHypothesis {
+                    unified: unified.clone(),
+                    hyphenated: if hyphenated != unified {
+                        Some(hyphenated)
+                    } else {
+                        None
+                    },
+                    stem: bn_parts[..bn_parts.len() - 1].join(""),
+                    suffix: bn_parts.last().cloned().unwrap_or_default(),
+                });
+            }
+        }
+    }
+
+    // 2. Unhyphenated morpheme snapping for long compound words (len >= 6)
+    if lower.len() >= 6 {
+        for &(suf, b_suf) in PRODUCTIVE_COMPOUND_SUFFIXES {
+            if lower.ends_with(suf) && lower.len() > suf.len() + 1 {
+                let stem = &lower[..lower.len() - suf.len()];
+                if let Some(stem_bn) = resolve_stem(stem) {
+                    if !stem_bn.is_empty() && stem_bn.chars().count() >= 2 {
+                        let unified = apply_sandhi_join(&stem_bn, b_suf);
+                        let hyphenated = format!("{}-{}", stem_bn, b_suf);
+                        return Some(CompoundHypothesis {
+                            unified: unified.clone(),
+                            hyphenated: if hyphenated != unified {
+                                Some(hyphenated)
+                            } else {
+                                None
+                            },
+                            stem: stem_bn,
+                            suffix: b_suf.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
 /// Attempt to extract the underlying base root of an inflected Bengali word recursively
 pub fn extract_root_stem(word: &str) -> Option<String> {
     let word = word.trim();
@@ -682,4 +817,31 @@ mod tests {
             Some("দেখেছিলাম".to_string())
         );
     }
+
+    #[test]
+    fn test_decompose_compound_token() {
+        let resolve = |stem: &str| match stem {
+            "antorjatik" => Some("আন্তর্জাতিক".to_string()),
+            "bishwobiddaloy" => Some("বিশ্ববিদ্যালয়".to_string()),
+            "gulote" => Some("গুলোতে".to_string()),
+            "dayitto" => Some("দায়িত্ব".to_string()),
+            _ => None,
+        };
+
+        // 1. Soft-hyphen compound
+        let hyp = decompose_compound_token("bishwobiddaloy-gulote", resolve)
+            .expect("Should resolve bishwobiddaloy-gulote");
+        assert_eq!(hyp.unified, "বিশ্ববিদ্যালয়গুলোতে");
+        assert_eq!(hyp.hyphenated, Some("বিশ্ববিদ্যালয়-গুলোতে".to_string()));
+
+        // 2. Unhyphenated morpheme snapping
+        let snap1 = decompose_compound_token("antorjatikbhabe", resolve)
+            .expect("Should resolve antorjatikbhabe");
+        assert_eq!(snap1.unified, "আন্তর্জাতিকভাবে");
+
+        let snap2 = decompose_compound_token("dayittoshilota", resolve)
+            .expect("Should resolve dayittoshilota");
+        assert_eq!(snap2.unified, "দায়িত্বশীলতা");
+    }
 }
+
