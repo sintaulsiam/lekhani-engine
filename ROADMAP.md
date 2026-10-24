@@ -87,8 +87,8 @@ The Lekhani phonetic engine has exactly **two operating modes**, controlled by a
 | **6** | **Trie Beam Search Decoder** | **DONE** | Fast-path incremental decoding with PrefixTrie integration (p95 = 1,858 µs). | [`fc4a816`](file:///mnt/data/lekhani-engine) |
 | **7** | **Perceptron Feature Ranker** | **DONE** | 16-D linguistic feature extractor + Margin Perceptron reranker ([`step7_ranker.md`](file:///mnt/data/lekhani-engine/data/eval/reports/step7_ranker.md)). | [`dec5138`](file:///mnt/data/lekhani-engine), [`6bde0c4`](file:///mnt/data/lekhani-engine) |
 | **8** | **Hyperparameter DEV Tuning** | **DONE** | Target-disjoint Dev-A/Dev-B confirmation, Gate G2, G4, G5 passed ([`step8.md`](file:///mnt/data/lekhani-engine/data/eval/reports/step8.md)). | [`fc4a816`](file:///mnt/data/lekhani-engine) |
-| **9** | **Final TEST Set Gate & Release** | **NEXT** | Evaluate gated `test.tsv`, log ISO-8601 release in `test_runs.log`. | — |
-| *2b* | *BanglaTLit External Benchmark* | Queued | External real-world Banglish evaluation (EMNLP 2024 dataset). | — |
+| **9** | **Final TEST Set Gate & Release** | **DONE** | Evaluated gated `test.tsv`: **48.03%** Exact Top-1 (+22.70% over 25.33% baseline), **55.43%** Homophone Top-1, **71.47%** Top-5. Gates G2, G4, G5 passed ([`step9.md`](data/eval/reports/step9.md), [`test_runs.log`](data/eval/test_runs.log)). | [`2eb1187`](file:///mnt/data/lekhani-engine) |
+| *2b* | *BanglaTLit External Benchmark* | **NEXT** | External real-world Banglish evaluation (EMNLP 2024 dataset). | — |
 
 ---
 
