@@ -663,6 +663,59 @@ where
     None
 }
 
+/// Regional dialect verbal inflections (suffix, dialect_form, standard_form)
+pub const BENGALI_DIALECT_CONJUGATIONS: &[(&str, &str, &str)] = &[
+    ("tachi", "তাছি", "ছি"),
+    ("tasi", "তাসি", "ছি"),
+    ("eika", "েইকা", "ে"),
+    ("oiya", "ইয়া", "ে"),
+    ("jka", "জকা", "কা"),
+    ("ibo", "ইব", "ব"),
+    ("um", "ুম", "ব"),
+    ("mu", "মু", "ব"),
+    ("os", "স", "িস"),
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DialectMorphHypothesis {
+    pub dialect: String,
+    pub standard: String,
+}
+
+/// Decompose a regional dialect verbal form (e.g. kortachi -> করতাছি/করছি, jamu -> যামু/যাব, dhoros -> ধরস/ধরিস)
+pub fn decompose_dialect_verbal_token<F>(input: &str, mut resolve_stem: F) -> Option<DialectMorphHypothesis>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    if input.is_empty() || !input.is_ascii() {
+        return None;
+    }
+    let lower = input.to_ascii_lowercase();
+
+    for &(suf, d_form, s_form) in BENGALI_DIALECT_CONJUGATIONS {
+        if lower.ends_with(suf) && lower.len() > suf.len() {
+            let stem = &lower[..lower.len() - suf.len()];
+            if !stem.is_empty() {
+                // If stem starts with 'j' in dialect (e.g. jaitachi, jamu), allow mapping to 'z' (যা)
+                let stem_effective = if stem.starts_with('j') && !stem.starts_with("jj") {
+                    format!("z{}", &stem[1..])
+                } else {
+                    stem.to_string()
+                };
+
+                if let Some(stem_bn) = resolve_stem(&stem_effective).or_else(|| resolve_stem(stem)) {
+                    if !stem_bn.is_empty() {
+                        let dialect = format!("{}{}", stem_bn, d_form);
+                        let standard = format!("{}{}", stem_bn, s_form);
+                        return Some(DialectMorphHypothesis { dialect, standard });
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Attempt to extract the underlying base root of an inflected Bengali word recursively
 pub fn extract_root_stem(word: &str) -> Option<String> {
     let word = word.trim();
@@ -842,6 +895,31 @@ mod tests {
         let snap2 = decompose_compound_token("dayittoshilota", resolve)
             .expect("Should resolve dayittoshilota");
         assert_eq!(snap2.unified, "দায়িত্বশীলতা");
+    }
+
+    #[test]
+    fn test_decompose_dialect_verbal_token() {
+        let resolve = |stem: &str| match stem {
+            "kor" => Some("কর".to_string()),
+            "za" => Some("যা".to_string()),
+            "dhor" => Some("ধর".to_string()),
+            _ => None,
+        };
+
+        let tachi = decompose_dialect_verbal_token("kortachi", resolve)
+            .expect("Should resolve kortachi");
+        assert_eq!(tachi.dialect, "করতাছি");
+        assert_eq!(tachi.standard, "করছি");
+
+        let jamu = decompose_dialect_verbal_token("jamu", resolve)
+            .expect("Should resolve jamu");
+        assert_eq!(jamu.dialect, "যামু");
+        assert_eq!(jamu.standard, "যাব");
+
+        let dhoros = decompose_dialect_verbal_token("dhoros", resolve)
+            .expect("Should resolve dhoros");
+        assert_eq!(dhoros.dialect, "ধরস");
+        assert_eq!(dhoros.standard, "ধরিস");
     }
 }
 
