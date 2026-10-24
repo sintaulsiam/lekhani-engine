@@ -948,94 +948,225 @@ impl PhoneticDatabase {
         }
         let lower = input.to_ascii_lowercase();
 
-        // 1. Generate phonetic variant keys from sound laws and compact beams
-        let mut variant_keys = crate::phonetic::fuzzy::generate_phonetic_variants(&lower);
+        let mut variant_keys: Vec<String> = Vec::with_capacity(16);
 
-        // 2. Add targeted retroflex stops & flap r if input is all-lowercase
-        let is_all_lower = input.chars().all(|c| c.is_ascii_lowercase());
-        if is_all_lower {
-            // Initial & medial t <-> T, d <-> D
+        // 1. Ja-phola geminate contraction: 'kky' -> 'ky' / 'kyo', 'tty' -> 'ty' / 'tyo', etc.
+        // e.g. 'bakkya' -> 'bakyo' -> বাক্য
+        if lower.contains("kky")
+            || lower.contains("tty")
+            || lower.contains("bby")
+            || lower.contains("ppy")
+            || lower.contains("mmy")
+            || lower.contains("lly")
+            || lower.contains("ddy")
+            || lower.contains("zzy")
+            || lower.contains("jgy")
+        {
+            let contracted = lower
+                .replace("kky", "ky")
+                .replace("tty", "ty")
+                .replace("bby", "by")
+                .replace("ppy", "py")
+                .replace("mmy", "my")
+                .replace("lly", "ly")
+                .replace("ddy", "dy")
+                .replace("zzy", "zy")
+                .replace("jgy", "gy");
+            if contracted.ends_with('a') {
+                variant_keys.push(format!("{}o", &contracted[..contracted.len() - 1]));
+            }
+            variant_keys.push(contracted);
+        }
+
+        // 2. S-class sibilant swap (words >= 4 chars to preserve basic syllables):
+        // Initial: 'shomporko' -> 'somporko', 'shomossa' -> 'somossa'
+        if lower.len() >= 4 {
+            if lower.starts_with("sh") {
+                variant_keys.push(lower.replacen("sh", "s", 1));
+            } else if lower.starts_with('s') {
+                variant_keys.push(lower.replacen('s', "sh", 1));
+            }
+            let vowels = "aeiouy";
+            if let Some(idx) = lower.find("sh") {
+                if idx + 2 < lower.len() && vowels.contains(lower.as_bytes()[idx + 2] as char) {
+                    let mut v = lower.clone();
+                    v.replace_range(idx..idx + 2, "s");
+                    variant_keys.push(v);
+                }
+            }
+        }
+
+        // 3. Dharma / Karma / Antor / Ontor phonetic vowel harmony
+        if lower.starts_with("dhar") {
+            variant_keys.push(lower.replacen("dhar", "dhor", 1));
+        } else if lower.starts_with("kar") {
+            variant_keys.push(lower.replacen("kar", "kor", 1));
+        }
+        if lower.starts_with("ontor") {
+            variant_keys.push(lower.replacen("ontor", "antor", 1));
+        }
+
+        // 4. Reph doubling (single 'r' before consonant -> 'rr')
+        // In Avro grammar, Reph requires 'rr' before a consonant (e.g. 'antorrjatik' -> আন্তর্জাতিক,
+        // 'ontorrbhukto' -> অন্তর্ভুক্ত, 'dhorrmo' -> ধর্ম, 'somporrko' -> সম্পর্ক).
+        let mut reph_keys = Vec::new();
+        let consonants = "bcdgjkmnpstvz";
+        let base_keys: Vec<String> = std::iter::once(lower.clone())
+            .chain(variant_keys.iter().cloned())
+            .collect();
+        for base in &base_keys {
+            let bytes = base.as_bytes();
+            for i in 0..bytes.len().saturating_sub(1) {
+                if bytes[i] == b'r'
+                    && (i == 0 || bytes[i - 1] != b'r')
+                    && (i + 1 < bytes.len() && bytes[i + 1] != b'r')
+                {
+                    let next = bytes[i + 1] as char;
+                    if consonants.contains(next) {
+                        let mut with_reph = String::with_capacity(base.len() + 1);
+                        with_reph.push_str(&base[..=i]);
+                        with_reph.push('r');
+                        with_reph.push_str(&base[i + 1..]);
+                        reph_keys.push(with_reph);
+                    }
+                }
+            }
+        }
+        variant_keys.extend(reph_keys);
+
+        // 5. Initial 'j' -> 'z' for Ontostho-Ja (য)
+        if !lower.starts_with("jj") {
+            if let Some(stripped) = lower.strip_prefix('j') {
+                variant_keys.push(format!("z{}", stripped));
+            }
+        }
+
+        // 6. Flap Rhotic 'r' -> 'R' (ড়)
+        let is_explicit_common_base = self.lookup_override(input).is_some() || self.lookup_override(&lower).is_some();
+        let parser_base = convert_fn(&lower);
+        let is_exact_dict_base = !parser_base.is_empty() && (self.is_exact_dictionary_word(&parser_base) || is_explicit_common_base);
+        if !is_exact_dict_base && lower.contains('r') {
+            let r_indices: Vec<usize> = lower
+                .char_indices()
+                .filter_map(|(idx, ch)| if ch == 'r' { Some(idx) } else { None })
+                .collect();
+            for &idx in &r_indices {
+                let mut with_cap_r = lower.clone();
+                with_cap_r.replace_range(idx..idx + 1, "R");
+                variant_keys.push(with_cap_r);
+            }
+        }
+
+        // 7. Diphthong 'oi' -> 'OI' (ঐ / ৈ)
+        if lower.contains("oi") {
+            variant_keys.push(lower.replace("oi", "OI"));
+            if lower.contains("sh") {
+                variant_keys.push(lower.replace("oi", "OI").replace("sh", "s"));
+            }
+        }
+
+        // 8. Sanskrit ya-phola on retroflex sibilant cluster: '-shto' -> '-shtyo' / '-sHtyo' (e.g. boishishto -> বৈশিষ্ট্য)
+        if let Some(base_shto) = lower.strip_suffix("shto") {
+            variant_keys.push(format!("{}sHtyo", base_shto));
+            variant_keys.push(format!("{}shtyo", base_shto));
+            if base_shto.contains("oi") {
+                variant_keys.push(format!("{}sHtyo", base_shto.replace("oi", "OI")));
+            }
+        }
+
+        // 9. Ri-kar vocalic onset (consonant + 'ri' -> 'rri', e.g. 'kri' -> 'krri' -> কৃ, 'krittrim' -> 'krritrim' -> কৃত্রিম)
+        if lower.contains("ri") {
+            let with_rri = lower.replace("ri", "rri");
+            variant_keys.push(with_rri.clone());
+            if lower.contains("ttri") {
+                variant_keys.push(lower.replace("ttri", "tri"));
+                variant_keys.push(with_rri.replace("ttri", "tri"));
+            }
+        }
+
+        // 10. Va-phola on dental aspirate: 'dhoni' -> 'dhwoni' (ধ্বনি)
+        if lower.contains("dhoni") {
+            variant_keys.push(lower.replace("dhoni", "dhwoni"));
+        }
+
+        // 11. Retroflex Stop auto-disambiguation (t <-> T, d <-> D)
+        if lower.len() >= 3 {
+            if let Some(stripped) = lower.strip_prefix('t') {
+                if !["tha", "tho", "the", "thi", "thu"].contains(&lower.as_str()) {
+                    variant_keys.push(format!("T{}", stripped));
+                }
+                if let Some(stripped_th) = lower.strip_prefix("th") {
+                    if lower.len() >= 4 {
+                        variant_keys.push(format!("Th{}", stripped_th));
+                    }
+                }
+            }
+            if let Some(stripped) = lower.strip_prefix('d') {
+                if !["dha", "dho", "dhe", "dhi", "dhu"].contains(&lower.as_str()) {
+                    variant_keys.push(format!("D{}", stripped));
+                }
+                if let Some(stripped_dh) = lower.strip_prefix("dh") {
+                    if lower.len() >= 4 {
+                        variant_keys.push(format!("Dh{}", stripped_dh));
+                    }
+                }
+            }
+        }
+        if lower.len() >= 3 && (lower.ends_with("da") || lower.ends_with("to") || lower.ends_with("ta") || lower.ends_with("ti")) {
+            if lower.ends_with("da") {
+                let len = lower.len();
+                let mut with_d = lower.clone();
+                with_d.replace_range(len - 2..len - 1, "D");
+                variant_keys.push(with_d);
+            }
+            if lower.ends_with("to") {
+                let len = lower.len();
+                let mut with_t = lower.clone();
+                with_t.replace_range(len - 2..len - 1, "T");
+                variant_keys.push(with_t);
+            }
+        }
+        if lower.len() >= 3 && !is_exact_dict_base {
             if lower.contains('t') {
                 for (idx, ch) in lower.char_indices() {
                     if ch == 't' {
-                        let mut v = lower.clone();
-                        v.replace_range(idx..idx + 1, "T");
-                        if !variant_keys.contains(&v) {
-                            variant_keys.push(v);
-                        }
+                        let mut with_cap_t = lower.clone();
+                        with_cap_t.replace_range(idx..idx + 1, "T");
+                        variant_keys.push(with_cap_t);
                     }
                 }
             }
             if lower.contains('d') {
                 for (idx, ch) in lower.char_indices() {
                     if ch == 'd' {
-                        let mut v = lower.clone();
-                        v.replace_range(idx..idx + 1, "D");
-                        if !variant_keys.contains(&v) {
-                            variant_keys.push(v);
-                        }
+                        let mut with_cap_d = lower.clone();
+                        with_cap_d.replace_range(idx..idx + 1, "D");
+                        variant_keys.push(with_cap_d);
                     }
                 }
             }
-            // Flap rhotic r <-> R
-            if lower.contains('r') {
-                for (idx, ch) in lower.char_indices() {
-                    if ch == 'r' {
-                        let mut v = lower.clone();
-                        v.replace_range(idx..idx + 1, "R");
-                        if !variant_keys.contains(&v) {
-                            variant_keys.push(v);
-                        }
-                    }
+        }
+
+        // 12. Missing Inherent Vowel Elision for Casual Banglish (e.g. bndhu -> bondhu -> বন্ধু)
+        if !is_exact_dict_base && lower.len() >= 3 && !lower.contains('o') {
+            let consonants = "bcdgjklmnpqstvxz";
+            let bytes = lower.as_bytes();
+            for i in 0..bytes.len().saturating_sub(1) {
+                let c1 = bytes[i] as char;
+                let c2 = bytes[i + 1] as char;
+                if c1 != c2 && consonants.contains(c1) && consonants.contains(c2) {
+                    let mut with_o = String::with_capacity(lower.len() + 1);
+                    with_o.push_str(&lower[..=i]);
+                    with_o.push('o');
+                    with_o.push_str(&lower[i + 1..]);
+                    variant_keys.push(with_o);
                 }
             }
-            // Geminates and Ja-phola transliterations (e.g. bakkyo -> bakzo, babbostha -> babzostha)
-            const GEMINATE_PATTERNS: &[(&str, &[&str])] = &[
-                ("kky", &["kZ", "ky"]),
-                ("kkya", &["kZa", "kya"]),
-                ("bby", &["bZ", "by"]),
-                ("bbya", &["bZa", "bya"]),
-                ("ppy", &["pZ", "py"]),
-                ("ppya", &["pZa", "pya"]),
-                ("mmy", &["mZ", "my"]),
-                ("mmya", &["mZa", "mya"]),
-                ("lly", &["lZ", "ly"]),
-                ("llya", &["lZa", "lya"]),
-                ("ddy", &["dZ", "dy"]),
-                ("ddya", &["dZa", "dya"]),
-                ("zzy", &["zZ", "zy"]),
-                ("zzya", &["zZa", "zya"]),
-                ("jgy", &["gZ", "jNG"]),
-                ("nch", &["nc", "n`ch"]),
-            ];
-            for &(src, targets) in GEMINATE_PATTERNS {
-                if lower.contains(src) {
-                    for target in targets {
-                        let replaced = lower.replace(src, target);
-                        if !variant_keys.contains(&replaced) {
-                            variant_keys.push(replaced);
-                        }
-                    }
-                }
-            }
-            // Missing vowel 'o' between consonants for casual Banglish (e.g. bndhu -> bondhu)
-            if lower.len() >= 3 && !lower.contains('o') {
-                let consonants = "bcdgjklmnpqstvxz";
-                let bytes = lower.as_bytes();
-                for i in 0..bytes.len().saturating_sub(1) {
-                    let c1 = bytes[i] as char;
-                    let c2 = bytes[i + 1] as char;
-                    if c1 != c2 && consonants.contains(c1) && consonants.contains(c2) {
-                        let mut with_o = String::with_capacity(lower.len() + 1);
-                        with_o.push_str(&lower[..=i]);
-                        with_o.push('o');
-                        with_o.push_str(&lower[i + 1..]);
-                        if !variant_keys.contains(&with_o) {
-                            variant_keys.push(with_o);
-                        }
-                    }
-                }
-            }
+        }
+
+        // 13. Colloquial dialect verb inflection: 'nch' -> 'n`ch' (e.g. 'hunchos' -> 'hun`chos')
+        if lower.contains("nch") {
+            variant_keys.push(lower.replace("nch", "n`ch"));
         }
 
         // 3. Resolve candidates and score by frequency
