@@ -1250,11 +1250,12 @@ fn main() {
                         weights[i] = (weights[i] * 0.9995) + eta * delta;
                     }
 
-                    // Enforce Gate G4 Avro Intent Non-Negative Constraints
-                    weights[4] = weights[4].max(4.0);  // Avro exact match >= +4.0
-                    weights[5] = weights[5].max(3.0);  // Avro uncap match >= +3.0
-                    weights[6] = weights[6].max(12.0); // Avro explicit intent >= +12.0
-                    weights[1] = weights[1].max(4.0);  // Dict presence >= +4.0
+                    // Enforce Gate G4 Avro Intent Proportional Constraints:
+                    // In Step 8, lambda_avro / lambda_dict = 8.0 / 6.0 = 1.33 was required to preserve Gate G4 >= 88.30%.
+                    let dict_w = weights[1].max(10.0);
+                    weights[4] = weights[4].max(dict_w * 1.35); // Avro exact match >= 1.35 * dict
+                    weights[5] = weights[5].max(dict_w * 0.90); // Avro uncap match >= 0.90 * dict
+                    weights[6] = weights[6].max(dict_w * 1.80); // Avro explicit intent >= 1.80 * dict
 
                     for i in 0..NUM_FEATURES {
                         avg_weights[i] += weights[i];
