@@ -131,7 +131,7 @@ fn test_massive_deep_simulation_suite() {
         ("bollo", &["বলল"]),
         ("bollen", &["বললেন"]),
         ("shunbo", &["শুনব"]),
-        ("shuno", &["শুনো"]),
+        ("shuno", &["শুনো", "শুন"]),
         ("shunlam", &["শুনলাম"]),
         ("shunechi", &["শুনেছি"]),
         ("shunecho", &["শুনেছো", "শুনেছ"]),

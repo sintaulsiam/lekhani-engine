@@ -24,6 +24,7 @@ pub enum CandidateSource {
     EmojiKeyword,
     CodeShield,
     SegmentedLattice,
+    PragyanBeam,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +58,7 @@ pub struct PhoneticSuggestionConfig {
     pub auto_dari: bool,
     pub enable_bilingual_clitic: bool,
     pub strict_avro_mode: bool,
+    pub enable_pragyan: bool,
 }
 
 impl Default for PhoneticSuggestionConfig {
@@ -75,6 +77,7 @@ impl Default for PhoneticSuggestionConfig {
             auto_dari: true,
             enable_bilingual_clitic: false,
             strict_avro_mode: false,
+            enable_pragyan: true,
         }
     }
 }
@@ -89,6 +92,7 @@ pub struct PhoneticSuggestion {
     pub ai_decoder: lekhani_ai::BeamSearchDecoder,
     pub config: PhoneticSuggestionConfig,
     pub neural_predictor: Option<Arc<lekhani_neural::NeuralContextPredictor>>,
+    pub pragyan_engine: Option<Arc<crate::phonetic::pragyan::PragyanEngine>>,
     /// Generation number mirroring database.generation. When they diverge the
     /// local cache is stale and must be cleared before the next lookup.
     cache_generation: u64,
@@ -131,6 +135,10 @@ fn probe_neural_predictor() -> Option<Arc<lekhani_neural::NeuralContextPredictor
         }
     }
     None
+}
+
+fn probe_pragyan_engine() -> Option<Arc<crate::phonetic::pragyan::PragyanEngine>> {
+    crate::phonetic::pragyan::PragyanEngine::probe()
 }
 
 impl std::fmt::Debug for PhoneticSuggestion {
@@ -224,7 +232,7 @@ impl Default for PhoneticSuggestion {
 impl PhoneticSuggestion {
     pub fn new() -> Self {
         let lm = lekhani_ai::LanguageModel::new();
-        Self {
+        let mut sugg = Self {
             database: PhoneticDatabase::new(),
             phonetic_parser: Some(Arc::new(lekhani_parser::default_avro_parser())),
             cache: HashMap::new(),
@@ -233,10 +241,13 @@ impl PhoneticSuggestion {
             ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
             neural_predictor: probe_neural_predictor(),
+            pragyan_engine: probe_pragyan_engine(),
             cache_generation: 0,
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
-        }
+        };
+        sugg.sync_pragyan_dictionary();
+        sugg
     }
 
     pub fn set_neural_predictor(&mut self, predictor: Arc<lekhani_neural::NeuralContextPredictor>) {
@@ -250,6 +261,29 @@ impl PhoneticSuggestion {
     ) -> Self {
         self.neural_predictor = Some(predictor);
         self
+    }
+
+    pub fn set_pragyan_engine(&mut self, engine: Arc<crate::phonetic::pragyan::PragyanEngine>) {
+        self.pragyan_engine = Some(engine);
+        self.sync_pragyan_dictionary();
+        self.cache.clear();
+    }
+
+    pub fn with_pragyan_engine(
+        mut self,
+        engine: Arc<crate::phonetic::pragyan::PragyanEngine>,
+    ) -> Self {
+        self.pragyan_engine = Some(engine);
+        self.sync_pragyan_dictionary();
+        self
+    }
+
+    pub fn sync_pragyan_dictionary(&mut self) {
+        if let Some(ref mut engine) = self.pragyan_engine {
+            let mut new_engine = (**engine).clone();
+            new_engine.sync_dictionary(&self.database.trie);
+            *engine = Arc::new(new_engine);
+        }
     }
 
     /// Check if a layout JSON structure contains valid phonetic patterns
@@ -276,7 +310,7 @@ impl PhoneticSuggestion {
             None
         };
         let lm = lekhani_ai::LanguageModel::new();
-        Self {
+        let mut sugg = Self {
             database: PhoneticDatabase::new(),
             phonetic_parser: parser,
             cache: HashMap::new(),
@@ -285,10 +319,13 @@ impl PhoneticSuggestion {
             ai_decoder: lekhani_ai::BeamSearchDecoder::with_language_model(lm, 4),
             config: PhoneticSuggestionConfig::default(),
             neural_predictor: probe_neural_predictor(),
+            pragyan_engine: probe_pragyan_engine(),
             cache_generation: 0,
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
-        }
+        };
+        sugg.sync_pragyan_dictionary();
+        sugg
     }
 
     pub fn set_layout(&mut self, layout_json: &Value) -> bool {
@@ -649,15 +686,25 @@ impl PhoneticSuggestion {
                         source,
                         initial_boost,
                     });
-                } else if source == CandidateSource::MorphologicalInflection
+                } else if source == CandidateSource::Autocorrect
+                    || source == CandidateSource::PhoneticOverride
+                    || source == CandidateSource::MorphologicalInflection
                     || source == CandidateSource::ExactDictionary
+                    || source == CandidateSource::PragyanBeam
                 {
                     if let Some(existing) = raw_candidates.iter_mut().find(|c| c.text == text) {
-                        if existing.source == CandidateSource::DirectTransliteration
-                            || existing.source == CandidateSource::TypoFallback
-                        {
+                        let can_upgrade = match source {
+                            CandidateSource::Autocorrect | CandidateSource::PhoneticOverride => true,
+                            _ => matches!(
+                                existing.source,
+                                CandidateSource::DirectTransliteration
+                                    | CandidateSource::TypoFallback
+                                    | CandidateSource::PragyanBeam
+                            ),
+                        };
+                        if can_upgrade && initial_boost > existing.initial_boost {
                             existing.source = source;
-                            existing.initial_boost = existing.initial_boost.max(initial_boost);
+                            existing.initial_boost = initial_boost;
                         }
                     }
                 }
@@ -680,6 +727,23 @@ impl PhoneticSuggestion {
                 &mut raw_candidates,
                 &mut seen,
             );
+        }
+
+        // 3a. Pragyan Statistical Phonetic Decoding (Mode 2: Smart Adaptive)
+        if !self.config.strict_avro_mode && self.config.enable_pragyan && !is_code {
+            if let Some(ref engine) = self.pragyan_engine {
+                let pragyan_cands = engine.suggest(middle, crate::session::ShiftOrigin::AutoCapitalize);
+                for (idx, cand) in pragyan_cands.into_iter().take(4).enumerate() {
+                    let boost = 5500 - (idx as i32 * 300);
+                    add_cand(
+                        cand,
+                        CandidateSource::PragyanBeam,
+                        boost,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+            }
         }
 
         // 3c. Supervised Phonetic Overrides (e.g. colloquialisms, texting slang, proper nouns)
@@ -1173,7 +1237,8 @@ impl PhoneticSuggestion {
         let primary_raw = preferred_word.as_deref().unwrap_or(&phonetic);
         let primary_norm = fix_chandra_bindu_position(primary_raw);
         let primary = primary_norm.as_str();
-        let is_primary_in_dict = self.database.is_exact_dictionary_word(primary);
+        let is_primary_in_dict = self.database.is_exact_dictionary_word(primary)
+            || preferred_word.is_some();
 
         // 7. Direct Transliterations
         if is_primary_in_dict {
@@ -1758,7 +1823,7 @@ impl PhoneticSuggestion {
                 {
                     cand.initial_boost.min(2500)
                 } else {
-                    cand.initial_boost
+                    cand.initial_boost + 6000
                 };
                 scored_candidates.push((cand.text.clone(), boost, RankFeatures::default()));
                 continue;
@@ -2367,6 +2432,27 @@ impl PhoneticSuggestion {
                                 return Some(joined);
                             }
                         }
+                    }
+                }
+                if let Some(ac) = self.database.get_autocorrect_raw_filtered(
+                    base_key,
+                    self.config.enable_banglish_shorthand,
+                ) {
+                    let base_stem = if ac.chars().any(|c| c.is_bengali()) {
+                        ac
+                    } else {
+                        self.convert_phonetic(&ac)
+                    };
+                    let joined = super::morphology::apply_sandhi_join(&base_stem, suffix);
+                    if self.database.is_exact_dictionary_word(&joined) {
+                        return Some(joined);
+                    }
+                }
+                let base_bn = self.convert_phonetic(base_key);
+                if self.database.is_exact_dictionary_word(&base_bn) {
+                    let joined = super::morphology::apply_sandhi_join(&base_bn, suffix);
+                    if self.database.is_exact_dictionary_word(&joined) {
+                        return Some(joined);
                     }
                 }
             }

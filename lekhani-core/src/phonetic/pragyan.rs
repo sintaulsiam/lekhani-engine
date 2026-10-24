@@ -236,6 +236,24 @@ pub fn decode_beam_ngram(
         return Vec::new();
     }
 
+    // Precompute matching units for all (pos, kr) pairs up to 3 tokens (zero allocations in hot loop)
+    let mut step_matches: Vec<Vec<(usize, &[UnitId])>> = Vec::with_capacity(m);
+    let mut key_buf = String::with_capacity(8);
+    for pos in 0..m {
+        let mut matches_at_pos = Vec::with_capacity(3);
+        for kr in 1..=3.min(m - pos) {
+            key_buf.clear();
+            for tok in &roman_tokens[pos..pos + kr] {
+                key_buf.push_str(tok);
+            }
+            if let Some(matching) = lm.vocab.roman_to_units.get(&key_buf) {
+                matches_at_pos.push((kr, matching.as_slice()));
+            }
+        }
+        step_matches.push(matches_at_pos);
+    }
+    let empty_r_units = lm.vocab.roman_to_units.get("").map(|v| v.as_slice()).unwrap_or(&[]);
+
     let initial_hist = vec![BOS_TOKEN; lm.order - 1];
     let mut beam = vec![BeamCandidate {
         pos: 0,
@@ -254,71 +272,62 @@ pub fn decode_beam_ngram(
                 continue;
             }
 
-            for kr in 1..=3.min(m - cand.pos) {
-                let r_key = roman_tokens[cand.pos..cand.pos + kr].join("");
-                if let Some(matching) = lm.vocab.roman_to_units.get(&r_key) {
-                    for &u in matching {
-                        let (_, ref b) = lm.vocab.id_to_unit[u as usize];
-                        let trans_log = lm.score_log(u, &cand.history);
-                        let mut new_hist = cand.history.clone();
-                        new_hist.push(u);
-                        let mut new_bn = cand.bengali.clone();
-                        new_bn.push_str(b);
+            for &(kr, matching) in &step_matches[cand.pos] {
+                for &u in matching {
+                    let (_, ref b) = lm.vocab.id_to_unit[u as usize];
+                    let trans_log = lm.score_log(u, &cand.history);
+                    let mut new_hist = cand.history.clone();
+                    new_hist.push(u);
+                    let mut new_bn = cand.bengali.clone();
+                    new_bn.push_str(b);
 
-                        next_beam.push(BeamCandidate {
-                            pos: cand.pos + kr,
-                            history: new_hist,
-                            bengali: new_bn,
-                            score: cand.score + trans_log,
-                            consecutive_eps: 0,
-                        });
-                    }
+                    next_beam.push(BeamCandidate {
+                        pos: cand.pos + kr,
+                        history: new_hist,
+                        bengali: new_bn,
+                        score: cand.score + trans_log,
+                        consecutive_eps: 0,
+                    });
                 }
             }
 
             if cand.consecutive_eps < 1 {
-                if let Some(empty_r_units) = lm.vocab.roman_to_units.get("") {
-                    for &u in empty_r_units {
-                        let (_, ref b) = lm.vocab.id_to_unit[u as usize];
-                        let trans_log = lm.score_log(u, &cand.history);
-                        let mut new_hist = cand.history.clone();
-                        new_hist.push(u);
-                        let mut new_bn = cand.bengali.clone();
-                        new_bn.push_str(b);
+                for &u in empty_r_units {
+                    let (_, ref b) = lm.vocab.id_to_unit[u as usize];
+                    let trans_log = lm.score_log(u, &cand.history);
+                    let mut new_hist = cand.history.clone();
+                    new_hist.push(u);
+                    let mut new_bn = cand.bengali.clone();
+                    new_bn.push_str(b);
 
-                        next_beam.push(BeamCandidate {
-                            pos: cand.pos,
-                            history: new_hist,
-                            bengali: new_bn,
-                            score: cand.score + trans_log,
-                            consecutive_eps: cand.consecutive_eps + 1,
-                        });
-                    }
+                    next_beam.push(BeamCandidate {
+                        pos: cand.pos,
+                        history: new_hist,
+                        bengali: new_bn,
+                        score: cand.score + trans_log,
+                        consecutive_eps: cand.consecutive_eps + 1,
+                    });
                 }
             }
         }
 
-        let mut dedup_map: HashMap<(usize, String), BeamCandidate> =
-            HashMap::with_capacity(next_beam.len());
-        for cand in next_beam {
-            let key = (cand.pos, cand.bengali.clone());
-            if let Some(existing) = dedup_map.get_mut(&key) {
-                if cand.score > existing.score {
-                    *existing = cand;
-                }
-            } else {
-                dedup_map.insert(key, cand);
-            }
-        }
-
-        let mut sorted_cands: Vec<BeamCandidate> = dedup_map.into_values().collect();
-        sorted_cands.sort_by(|a, b| {
+        next_beam.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.bengali.cmp(&b.bengali))
         });
-        sorted_cands.truncate(beam_width);
+
+        let mut dedup_seen = hashbrown::HashSet::with_capacity(beam_width);
+        let mut sorted_cands = Vec::with_capacity(beam_width);
+        for cand in next_beam {
+            if dedup_seen.insert((cand.pos, cand.bengali.clone())) {
+                sorted_cands.push(cand);
+                if sorted_cands.len() == beam_width {
+                    break;
+                }
+            }
+        }
         beam = sorted_cands;
 
         if beam.iter().all(|c| c.pos == m) {
@@ -469,7 +478,7 @@ pub struct PragyanConfig {
 impl Default for PragyanConfig {
     fn default() -> Self {
         Self {
-            beam_width: 16,
+            beam_width: 8,
             lambda_dict: 6.0,
             lambda_avro: 8.0,
             lambda_engine: 2.0,
@@ -513,6 +522,93 @@ impl PragyanEngine {
         let bytes = std::fs::read(model_path)?;
         let lm: JointUnitLM = bincode::deserialize(&bytes)?;
         Ok(Self::new(Arc::new(lm), dict_words, dict_keys))
+    }
+
+    /// Automatically probe standard search paths for a deployed Pragyan model binary and lexicon.
+    pub fn probe() -> Option<Arc<Self>> {
+        let mut candidate_dirs: Vec<std::path::PathBuf> = Vec::new();
+        if let Ok(env_dir) = std::env::var("LEKHANI_MODELS_DIR") {
+            candidate_dirs.push(std::path::PathBuf::from(env_dir));
+        }
+        candidate_dirs.extend([
+            std::path::PathBuf::from("data/dictionaries"),
+            std::path::PathBuf::from("../data/dictionaries"),
+            std::path::PathBuf::from("../../data/dictionaries"),
+            std::path::PathBuf::from("/usr/local/share/lekhani/dictionaries"),
+            std::path::PathBuf::from("/usr/share/lekhani/dictionaries"),
+        ]);
+
+        for dir in &candidate_dirs {
+            let p_model = dir.join("pragyan_unit_lm.bin");
+            if p_model.exists() {
+                if let Ok(bytes) = std::fs::read(&p_model) {
+                    if let Ok(lm) = bincode::deserialize::<JointUnitLM>(&bytes) {
+                        let mut dict_words = hashbrown::HashSet::new();
+                        let p_dict_bin = dir.join("dictionary.bin");
+                        let p_dict_json = dir.join("dictionary.json");
+                        if p_dict_bin.exists() {
+                            if let Ok(trie) = crate::trie::PrefixTrie::load_binary(&p_dict_bin) {
+                                for (w, _) in trie.iter() {
+                                    dict_words.insert(w.to_string());
+                                }
+                            }
+                        } else if p_dict_json.exists() {
+                            if let Ok(file) = std::fs::File::open(&p_dict_json) {
+                                let reader = std::io::BufReader::new(file);
+                                if let Ok(raw_map) = serde_json::from_reader::<_, hashbrown::HashMap<String, serde_json::Value>>(reader) {
+                                    for val in raw_map.values() {
+                                        if let Some(list) = val.as_array() {
+                                            for item in list {
+                                                if let Some(s) = item.as_str() {
+                                                    dict_words.insert(crate::chars::canonicalize(s));
+                                                } else if let Some(arr) = item.as_array() {
+                                                    if let Some(s) = arr.first().and_then(|v| v.as_str()) {
+                                                        dict_words.insert(crate::chars::canonicalize(s));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        for &(word, _) in crate::phonetic::database::CORE_BENGALI_FREQUENCIES {
+                            dict_words.insert(word.to_string());
+                        }
+                        let dict_keys: hashbrown::HashSet<String> = dict_words
+                            .iter()
+                            .map(|w| phonetic_equivalence_key(w))
+                            .collect();
+                        let engine = Self::new(
+                            Arc::new(lm),
+                            Arc::new(dict_words),
+                            Arc::new(dict_keys),
+                        );
+                        return Some(Arc::new(engine));
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Synchronizes the active dictionary and equivalence keys from the runtime PrefixTrie.
+    pub fn sync_dictionary(&mut self, trie: &crate::trie::PrefixTrie) {
+        if !trie.is_empty() {
+            let mut dict_words = hashbrown::HashSet::with_capacity(trie.len() + 100);
+            for (w, _) in trie.iter() {
+                dict_words.insert(w.to_string());
+            }
+            for &(word, _) in crate::phonetic::database::CORE_BENGALI_FREQUENCIES {
+                dict_words.insert(word.to_string());
+            }
+            let dict_keys: hashbrown::HashSet<String> = dict_words
+                .iter()
+                .map(|w| phonetic_equivalence_key(w))
+                .collect();
+            self.dict_words = Arc::new(dict_words);
+            self.dict_keys = Arc::new(dict_keys);
+        }
     }
 
     /// Transliterates typed Roman term into ranked Bengali candidates.
@@ -573,11 +669,18 @@ mod tests {
 
     #[test]
     fn test_pragyan_production_model_suggest() {
-        let model_path = Path::new("data/dictionaries/pragyan_unit_lm.bin");
-        if !model_path.exists() {
-            eprintln!("Skipping test_pragyan_production_model_suggest: pragyan_unit_lm.bin not generated yet");
-            return;
-        }
+        let model_candidates = [
+            Path::new("data/dictionaries/pragyan_unit_lm.bin"),
+            Path::new("../data/dictionaries/pragyan_unit_lm.bin"),
+            Path::new("../../data/dictionaries/pragyan_unit_lm.bin"),
+        ];
+        let model_path = match model_candidates.iter().find(|p| p.exists()) {
+            Some(p) => *p,
+            None => {
+                eprintln!("Skipping test_pragyan_production_model_suggest: pragyan_unit_lm.bin not found");
+                return;
+            }
+        };
 
         let dict_words = Arc::new(HashSet::new());
         let dict_keys = Arc::new(HashSet::new());
@@ -600,6 +703,10 @@ mod tests {
         let cands_shonge = engine.suggest("shonge", ShiftOrigin::AutoCapitalize);
         assert!(!cands_shonge.is_empty(), "shonge should produce candidates");
         assert!(cands_shonge.contains(&"সঙ্গে".to_string()), "shonge should contain সঙ্গে");
+
+        let cands_kosto = engine.suggest("kosto", ShiftOrigin::AutoCapitalize);
+        assert!(!cands_kosto.is_empty(), "kosto should produce candidates");
+        assert!(cands_kosto.contains(&"কষ্ট".to_string()), "kosto should contain কষ্ট");
     }
 
     #[test]

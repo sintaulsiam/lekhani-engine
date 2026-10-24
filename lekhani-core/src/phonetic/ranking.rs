@@ -323,6 +323,7 @@ pub fn extract_candidate_features(
         || cand.source == CandidateSource::Autocorrect
         || cand.source == CandidateSource::Loanword
         || cand.source == CandidateSource::PhoneticOverride
+        || cand.source == CandidateSource::SegmentedLattice
     {
         f.is_in_dict = 1.0;
     } else if cand.source == CandidateSource::DirectTransliteration
@@ -341,7 +342,8 @@ pub fn extract_candidate_features(
         let log_freq = (freq as f32).log2().clamp(0.0, 16.0);
         f.normalized_freq = log_freq / 16.0;
     } else if (cand.source == CandidateSource::PhoneticOverride
-        || cand.source == CandidateSource::Autocorrect)
+        || cand.source == CandidateSource::Autocorrect
+        || cand.source == CandidateSource::SegmentedLattice)
         && cand.text.contains(' ')
     {
         f.normalized_freq = 0.80;
@@ -356,7 +358,12 @@ pub fn extract_candidate_features(
 
     // 3. Phonetic Similarity & Length
     if cand.source != CandidateSource::EmojiKeyword {
-        let dist = grapheme_edit_distance(ctx.phonetic, &cand.text);
+        let dist = if cand.source == CandidateSource::SegmentedLattice {
+            let unspaced = cand.text.replace(' ', "");
+            grapheme_edit_distance(ctx.phonetic, &unspaced)
+        } else {
+            grapheme_edit_distance(ctx.phonetic, &cand.text)
+        };
         if cand.text == ctx.phonetic || cand.text == ctx.primary {
             let is_dict_equiv = is_in_dict
                 || cand.source == CandidateSource::MorphologicalInflection
@@ -375,6 +382,27 @@ pub fn extract_candidate_features(
                 f.intent_modifier_boost = 0.67;
             } else if ctx.is_short_token {
                 f.intent_modifier_boost = 0.27;
+            }
+        } else if cand.source == CandidateSource::SegmentedLattice {
+            f.source_weight = 0.6;
+            f.phonetic_similarity = -(dist.min(2) as f32);
+        } else if cand.source == CandidateSource::PragyanBeam {
+            let len_diff = (cand.text.chars().count() as isize
+                - ctx.phonetic.chars().count() as isize)
+                .abs() as f32;
+            f.length_penalty = -len_diff;
+            if dist == 0 {
+                f.source_weight = 1.0;
+                f.phonetic_similarity = 1.0;
+            } else if dist == 1 && len_diff <= 1.0 && !ctx.is_primary_in_dict && is_in_dict {
+                f.source_weight = 0.8;
+                f.phonetic_similarity = 0.8;
+            } else {
+                f.source_weight = -0.5;
+                f.phonetic_similarity = -(dist as f32);
+                if ctx.is_primary_in_dict {
+                    f.intent_modifier_boost = -2.0;
+                }
             }
         } else if cand.source == CandidateSource::TypoFallback {
             f.source_weight = -0.43;
