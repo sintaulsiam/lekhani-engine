@@ -1200,7 +1200,7 @@ impl PhoneticDatabase {
         }
 
         // Sort by frequency descending
-        scored_cands.sort_by(|a, b| b.1.cmp(&a.1));
+        scored_cands.sort_by_key(|a| std::cmp::Reverse(a.1));
 
         scored_cands.into_iter().take(limit).map(|(w, _)| w).collect()
     }
