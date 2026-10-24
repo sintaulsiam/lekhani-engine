@@ -936,6 +936,144 @@ impl PhoneticDatabase {
         false
     }
 
+    /// Suggests high-confidence phonetic equivalence candidates for unshifted/casual typing.
+    /// Generates phoneme cluster sound laws, retroflex alternations (t <-> T, d <-> D), flap r, reph,
+    /// and inherent vowel elisions, validated against the dictionary Trie and sorted by frequency.
+    pub fn suggest_phonetic_equivalences<F>(&self, input: &str, mut convert_fn: F, limit: usize) -> Vec<String>
+    where
+        F: FnMut(&str) -> String,
+    {
+        if input.is_empty() || !input.is_ascii() || input.len() > 30 {
+            return Vec::new();
+        }
+        let lower = input.to_ascii_lowercase();
+
+        // 1. Generate phonetic variant keys from sound laws and compact beams
+        let mut variant_keys = crate::phonetic::fuzzy::generate_phonetic_variants(&lower);
+
+        // 2. Add targeted retroflex stops & flap r if input is all-lowercase
+        let is_all_lower = input.chars().all(|c| c.is_ascii_lowercase());
+        if is_all_lower {
+            // Initial & medial t <-> T, d <-> D
+            if lower.contains('t') {
+                for (idx, ch) in lower.char_indices() {
+                    if ch == 't' {
+                        let mut v = lower.clone();
+                        v.replace_range(idx..idx + 1, "T");
+                        if !variant_keys.contains(&v) {
+                            variant_keys.push(v);
+                        }
+                    }
+                }
+            }
+            if lower.contains('d') {
+                for (idx, ch) in lower.char_indices() {
+                    if ch == 'd' {
+                        let mut v = lower.clone();
+                        v.replace_range(idx..idx + 1, "D");
+                        if !variant_keys.contains(&v) {
+                            variant_keys.push(v);
+                        }
+                    }
+                }
+            }
+            // Flap rhotic r <-> R
+            if lower.contains('r') {
+                for (idx, ch) in lower.char_indices() {
+                    if ch == 'r' {
+                        let mut v = lower.clone();
+                        v.replace_range(idx..idx + 1, "R");
+                        if !variant_keys.contains(&v) {
+                            variant_keys.push(v);
+                        }
+                    }
+                }
+            }
+            // Geminates and Ja-phola transliterations (e.g. bakkyo -> bakzo, babbostha -> babzostha)
+            const GEMINATE_PATTERNS: &[(&str, &[&str])] = &[
+                ("kky", &["kZ", "ky"]),
+                ("kkya", &["kZa", "kya"]),
+                ("bby", &["bZ", "by"]),
+                ("bbya", &["bZa", "bya"]),
+                ("ppy", &["pZ", "py"]),
+                ("ppya", &["pZa", "pya"]),
+                ("mmy", &["mZ", "my"]),
+                ("mmya", &["mZa", "mya"]),
+                ("lly", &["lZ", "ly"]),
+                ("llya", &["lZa", "lya"]),
+                ("ddy", &["dZ", "dy"]),
+                ("ddya", &["dZa", "dya"]),
+                ("zzy", &["zZ", "zy"]),
+                ("zzya", &["zZa", "zya"]),
+                ("jgy", &["gZ", "jNG"]),
+                ("nch", &["nc", "n`ch"]),
+            ];
+            for &(src, targets) in GEMINATE_PATTERNS {
+                if lower.contains(src) {
+                    for target in targets {
+                        let replaced = lower.replace(src, target);
+                        if !variant_keys.contains(&replaced) {
+                            variant_keys.push(replaced);
+                        }
+                    }
+                }
+            }
+            // Missing vowel 'o' between consonants for casual Banglish (e.g. bndhu -> bondhu)
+            if lower.len() >= 3 && !lower.contains('o') {
+                let consonants = "bcdgjklmnpqstvxz";
+                let bytes = lower.as_bytes();
+                for i in 0..bytes.len().saturating_sub(1) {
+                    let c1 = bytes[i] as char;
+                    let c2 = bytes[i + 1] as char;
+                    if c1 != c2 && consonants.contains(c1) && consonants.contains(c2) {
+                        let mut with_o = String::with_capacity(lower.len() + 1);
+                        with_o.push_str(&lower[..=i]);
+                        with_o.push('o');
+                        with_o.push_str(&lower[i + 1..]);
+                        if !variant_keys.contains(&with_o) {
+                            variant_keys.push(with_o);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Resolve candidates and score by frequency
+        let mut scored_cands: Vec<(String, u32)> = Vec::with_capacity(variant_keys.len());
+        let mut seen = hashbrown::HashSet::new();
+
+        for k in variant_keys {
+            if let Some(ac) = self.autocorrect.get(&k) {
+                if seen.insert(ac.clone()) {
+                    let freq = self.get_frequency(ac);
+                    scored_cands.push((ac.clone(), freq.max(500)));
+                }
+            }
+            if let Some(ov) = self.lookup_override(&k) {
+                for (w, _) in ov {
+                    let w_str = w.to_string();
+                    if seen.insert(w_str.clone()) {
+                        let freq = self.get_frequency(&w_str);
+                        scored_cands.push((w_str, freq.max(500)));
+                    }
+                }
+            }
+            let parsed = convert_fn(&k);
+            if !parsed.is_empty()
+                && (self.trie.contains_exact(&parsed) || self.is_exact_dictionary_word(&parsed))
+                && seen.insert(parsed.clone())
+            {
+                let freq = self.get_frequency(&parsed);
+                scored_cands.push((parsed, freq));
+            }
+        }
+
+        // Sort by frequency descending
+        scored_cands.sort_by(|a, b| b.1.cmp(&a.1));
+
+        scored_cands.into_iter().take(limit).map(|(w, _)| w).collect()
+    }
+
     /// Bilingual loanwords for natural code-mixing (English -> Transliteration, English Word)
     pub fn get_bilingual_loanword(term: &str) -> Option<(&'static str, &'static str)> {
         match term {
@@ -2111,5 +2249,19 @@ mod tests {
 
         // 5. Unknown word returns None
         assert!(db.lookup_override_inflected("unknownwordxyz").is_none());
+    }
+
+    #[test]
+    fn test_suggest_phonetic_equivalences() {
+        let db = PhoneticDatabase::new();
+        let convert = |k: &str| match k {
+            "Daktar" => "ডাক্তার".to_string(),
+            "daktar" => "দাক্তার".to_string(),
+            "Thik" => "ঠিক".to_string(),
+            _ => String::new(),
+        };
+
+        let equivs = db.suggest_phonetic_equivalences("daktar", convert, 5);
+        assert!(equivs.contains(&"ডাক্তার".to_string()));
     }
 }
