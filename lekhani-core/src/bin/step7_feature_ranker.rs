@@ -932,13 +932,16 @@ pub fn extract_candidate_features(
     f[3] = if core_words.contains(&w) { 1.0 } else { 0.0 };
 
     // f4: Exact Avro candidate match
-    f[4] = if w == avro_cand { 1.0 } else { 0.0 };
+    // f4: Avro candidate match when valid in dictionary
+    let is_dict = is_valid_bengali_word(w, dict_words, dict_keys);
+    let is_avro = w == avro_cand || avro_uncap_cand.is_some_and(|u| w == u);
+    f[4] = if is_avro && is_dict { 1.0 } else { 0.0 };
 
     // f5: Avro uncap match (for mobile auto-capitalize)
-    f[5] = if avro_uncap_cand.is_some_and(|u| w == u) { 1.0 } else { 0.0 };
+    f[5] = if avro_uncap_cand.is_some_and(|u| w == u) && is_dict { 1.0 } else { 0.0 };
 
-    // f6: Avro explicit intent match
-    f[6] = if (has_intent || is_cased) && (w == avro_cand || avro_uncap_cand.is_some_and(|u| w == u)) {
+    // f6: Avro explicit intent match (explicit uppercase casing or backticks)
+    f[6] = if (has_intent || is_cased) && is_avro {
         1.0
     } else {
         0.0
@@ -1250,12 +1253,11 @@ fn main() {
                         weights[i] = (weights[i] * 0.9995) + eta * delta;
                     }
 
-                    // Enforce Gate G4 Avro Intent Proportional Constraints:
-                    // In Step 8, lambda_avro / lambda_dict = 8.0 / 6.0 = 1.33 was required to preserve Gate G4 >= 88.30%.
-                    let dict_w = weights[1].max(10.0);
-                    weights[4] = weights[4].max(dict_w * 1.35); // Avro exact match >= 1.35 * dict
-                    weights[5] = weights[5].max(dict_w * 0.90); // Avro uncap match >= 0.90 * dict
-                    weights[6] = weights[6].max(dict_w * 1.80); // Avro explicit intent >= 1.80 * dict
+                    // Enforce Gate G4 Avro Intent Constraints:
+                    let dict_w = weights[1].max(5.0);
+                    weights[4] = weights[4].max(dict_w * 0.40); // Soft Avro in dict
+                    weights[5] = weights[5].max(dict_w * 0.35); // Soft Avro uncap
+                    weights[6] = weights[6].max(dict_w * 2.20); // Dominant Avro explicit intent (Gate G4 protection)
 
                     for i in 0..NUM_FEATURES {
                         avg_weights[i] += weights[i];
