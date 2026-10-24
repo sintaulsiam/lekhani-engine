@@ -7,7 +7,7 @@
 use std::fmt;
 
 /// LPS Warning Diagnostics as defined in Section 6.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum LpsWarning {
     /// W101: Token has no marked variant for lock '
     W101InvalidLock(String),

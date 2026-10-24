@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use lekhani_core::phonetic::PhoneticSuggestion;
+use lekhani_core::phonetic::{PhoneticGrammar, PhoneticSuggestion};
 
 #[test]
 fn test_dure_suggestions() {
@@ -906,3 +906,29 @@ fn test_cache_invalidated_on_database_reload() {
     // This confirms the cache was not served stale
     let _ = pre_load; // pre_load may or may not contain ভালো (no dict), that's fine
 }
+
+#[test]
+fn test_lps_grammar_integration() {
+    let mut sugg = PhoneticSuggestion::new();
+    sugg.config.phonetic_grammar = PhoneticGrammar::Lps;
+    let empty_memory = HashMap::new();
+
+    // 1. Suggest exact form k-l-m
+    let (cands, _) = sugg.suggest("k-l-m", false, true, &empty_memory);
+    assert!(cands.contains(&"কলম".to_string()), "LPS k-l-m must produce কলম, got {:?}", cands);
+
+    // 2. Suggest exact form b-i
+    let (cands, _) = sugg.suggest("b-i", false, true, &empty_memory);
+    assert!(cands.contains(&"বই".to_string()), "LPS b-i must produce বই, got {:?}", cands);
+
+    // 3. Exact form round-trip helper
+    assert_eq!(sugg.exact_form("কলম"), "k-l-m");
+    assert_eq!(sugg.exact_form("বই"), "b-i");
+
+    // 4. Letter chips inspection
+    let (cands, _) = sugg.suggest("bari", false, true, &empty_memory);
+    assert!(cands.iter().any(|c| c == "ব\u{09BE}\u{09DC}\u{09BF}" || c == "বারি"), "LPS bari must produce বাড়ি/বারি: {:?}", cands);
+    let chips = sugg.last_lps_chips();
+    assert!(!chips.is_empty(), "LPS bari must produce letter chips for ambiguous r variants");
+}
+

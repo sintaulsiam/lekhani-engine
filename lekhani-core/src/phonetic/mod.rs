@@ -19,4 +19,4 @@ pub use method::PhoneticMethod;
 pub use overrides::{OverrideCandidate, OverrideEntry, ZeroCopyOverrides};
 pub use pragyan::{JointUnitLM, PragyanConfig, PragyanEngine, UnitVocab};
 pub use ranking::{extract_candidate_features, CandidateContext, RankFeatures, RankWeights};
-pub use suggestion::{PhoneticSuggestion, PhoneticSuggestionConfig};
+pub use suggestion::{PhoneticGrammar, PhoneticSuggestion, PhoneticSuggestionConfig};

@@ -383,6 +383,13 @@ pub fn extract_candidate_features(
             } else if ctx.is_short_token {
                 f.intent_modifier_boost = 0.27;
             }
+        } else if cand.source == CandidateSource::LpsLattice {
+            f.source_weight = 1.0;
+            if dist == 0 {
+                f.phonetic_similarity = 1.0;
+            } else {
+                f.phonetic_similarity = -(dist.min(2) as f32);
+            }
         } else if cand.source == CandidateSource::SegmentedLattice {
             f.source_weight = 0.6;
             f.phonetic_similarity = -(dist.min(2) as f32);

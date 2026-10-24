@@ -7,7 +7,7 @@
 use super::stage1::{PronunciationUnit, Stage1Path};
 
 /// A realized candidate word with its rule cost and letter-level variant chips.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LpsCandidate {
     pub text: String,
     pub rule_cost: u32,
@@ -15,7 +15,7 @@ pub struct LpsCandidate {
 }
 
 /// Letter-level ambiguous chip group for UI presentation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LpsLetterChip {
     pub char_index: usize,
     pub active: String,

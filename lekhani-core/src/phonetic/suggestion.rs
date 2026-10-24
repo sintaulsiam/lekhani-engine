@@ -25,6 +25,15 @@ pub enum CandidateSource {
     CodeShield,
     SegmentedLattice,
     PragyanBeam,
+    LpsLattice,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PhoneticGrammar {
+    #[default]
+    AvroClassic,
+    Lps,
 }
 
 #[derive(Debug, Clone)]
@@ -59,6 +68,7 @@ pub struct PhoneticSuggestionConfig {
     pub enable_bilingual_clitic: bool,
     pub strict_avro_mode: bool,
     pub enable_pragyan: bool,
+    pub phonetic_grammar: PhoneticGrammar,
 }
 
 impl Default for PhoneticSuggestionConfig {
@@ -78,15 +88,22 @@ impl Default for PhoneticSuggestionConfig {
             enable_bilingual_clitic: false,
             strict_avro_mode: false,
             enable_pragyan: true,
+            phonetic_grammar: PhoneticGrammar::default(),
         }
     }
 }
+
+pub type CachedSuggestion = (
+    Vec<String>,
+    Vec<RankFeatures>,
+    Vec<lekhani_parser::lps::LpsLetterChip>,
+);
 
 #[derive(Clone)]
 pub struct PhoneticSuggestion {
     pub database: PhoneticDatabase,
     phonetic_parser: Option<Arc<LekhaniParser>>,
-    cache: HashMap<String, (Vec<String>, Vec<RankFeatures>)>,
+    cache: HashMap<String, CachedSuggestion>,
     pub ai_context: lekhani_ai::ContextScorer,
     pub ai_predictor: lekhani_ai::NextWordPredictor,
     pub ai_decoder: lekhani_ai::BeamSearchDecoder,
@@ -100,6 +117,8 @@ pub struct PhoneticSuggestion {
     last_computed_features: Vec<RankFeatures>,
     /// Candidates computed for the most recently ranked candidates
     last_computed_candidates: Vec<String>,
+    /// Letter chips computed from the most recent LPS parse
+    pub last_lps_chips: Vec<lekhani_parser::lps::LpsLetterChip>,
 }
 
 fn probe_neural_predictor() -> Option<Arc<lekhani_neural::NeuralContextPredictor>> {
@@ -245,6 +264,7 @@ impl PhoneticSuggestion {
             cache_generation: 0,
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
+            last_lps_chips: Vec::new(),
         };
         sugg.sync_pragyan_dictionary();
         sugg
@@ -323,6 +343,7 @@ impl PhoneticSuggestion {
             cache_generation: 0,
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
+            last_lps_chips: Vec::new(),
         };
         sugg.sync_pragyan_dictionary();
         sugg
@@ -366,6 +387,24 @@ impl PhoneticSuggestion {
         &self.last_computed_candidates
     }
 
+    /// Returns the letter-level disambiguation chips computed from the most recent LPS parse.
+    pub fn last_lps_chips(&self) -> &[lekhani_parser::lps::LpsLetterChip] {
+        &self.last_lps_chips
+    }
+
+    /// Generates canonical exact LPS Latin form for given Bengali text (Section 12 exactness guarantee).
+    pub fn exact_form(&self, text: &str) -> String {
+        lekhani_parser::lps::exact(text)
+    }
+
+    /// Parses text directly through the LPS v1.0 engine, returning candidates and diagnostics.
+    pub fn parse_lps(
+        &self,
+        text: &str,
+    ) -> (Vec<lekhani_parser::lps::LpsCandidate>, Vec<lekhani_parser::lps::LpsWarning>) {
+        lekhani_parser::lps::LpsEngine::new().parse(text)
+    }
+
     pub fn dictionary_path(&self) -> Option<&std::path::Path> {
         self.database.dictionary_path.as_deref()
     }
@@ -402,6 +441,13 @@ impl PhoneticSuggestion {
             return parts.join("-");
         }
 
+        if self.config.phonetic_grammar == PhoneticGrammar::Lps {
+            let (cands, _) = lekhani_parser::lps::LpsEngine::new().parse(text);
+            if let Some(first) = cands.first() {
+                return first.text.clone();
+            }
+        }
+
         if let Some(ref parser) = self.phonetic_parser {
             return parser.convert(text);
         }
@@ -420,6 +466,8 @@ impl PhoneticSuggestion {
         if term.is_empty() {
             return (Vec::new(), 0);
         }
+
+        self.last_lps_chips.clear();
 
         // Invalidate stale cache if the database was mutated since our last call.
         // One relaxed atomic load per keystroke — no mutex, no contention.
@@ -575,7 +623,8 @@ impl PhoneticSuggestion {
             | ((self.config.enable_colloquial_dialects as u32) << 2)
             | ((self.config.enable_banglish_shorthand as u32) << 3)
             | ((self.config.enable_dynamic_macros as u32) << 4)
-            | ((self.config.strict_avro_mode as u32) << 5);
+            | ((self.config.strict_avro_mode as u32) << 5)
+            | (((self.config.phonetic_grammar as u32) & 0x3) << 6);
 
         let cache_key = if context.is_empty() {
             format!(
@@ -592,9 +641,10 @@ impl PhoneticSuggestion {
                 cfg_mask
             )
         };
-        if let Some((cached_cands, cached_feats)) = self.cache.get(&cache_key) {
+        if let Some((cached_cands, cached_feats, cached_chips)) = self.cache.get(&cache_key) {
             self.last_computed_features = cached_feats.clone();
             self.last_computed_candidates = cached_cands.clone();
+            self.last_lps_chips = cached_chips.clone();
             let selected_index = if let Some(fav) = candidate_memory
                 .get(term)
                 .or_else(|| candidate_memory.get(&cache_key))
@@ -743,6 +793,24 @@ impl PhoneticSuggestion {
                         &mut seen,
                     );
                 }
+            }
+        }
+
+        // 3a-2. LPS Grammar Engine (Lekhani Phonetic Standard v1.0)
+        if self.config.phonetic_grammar == PhoneticGrammar::Lps && !is_code {
+            let (lps_cands, _) = lekhani_parser::lps::LpsEngine::new().parse(middle);
+            for (idx, cand) in lps_cands.into_iter().enumerate() {
+                if self.last_lps_chips.is_empty() && !cand.chips.is_empty() {
+                    self.last_lps_chips = cand.chips.clone();
+                }
+                let boost = 6000 - (cand.rule_cost as i32 * 500) - (idx as i32 * 150);
+                add_cand(
+                    cand.text,
+                    CandidateSource::LpsLattice,
+                    boost,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
             }
         }
 
@@ -2085,6 +2153,7 @@ impl PhoneticSuggestion {
             (
                 final_candidates.clone(),
                 self.last_computed_features.clone(),
+                self.last_lps_chips.clone(),
             ),
         );
 
