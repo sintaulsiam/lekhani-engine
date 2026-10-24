@@ -578,6 +578,10 @@ pub const PRODUCTIVE_COMPOUND_SUFFIXES: &[(&str, &str)] = &[
     ("shishto", "বিশিষ্ট"),
     ("biddaloy", "বিদ্যালয়"),
     ("porichalona", "পরিচালনা"),
+    ("rayon", "রায়ণ"),
+    ("ayon", "ায়ন"),
+    ("koron", "করণ"),
+    ("arshon", "র্শন"),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
