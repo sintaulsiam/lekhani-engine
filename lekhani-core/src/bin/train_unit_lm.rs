@@ -861,9 +861,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 7.1: EM Alignment & Viterbi Sequence Extraction
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n▶️  Training Step 4 M2M 1:1 Aligner on 94,546 Train Pairs (α = 50)...");
+    println!("\n▶️  Training Step 4 M2M 2:1 Aligner on 94,546 Train Pairs (α = 50)...");
     let t_em = Instant::now();
-    let aligner_model = train_m2m_aligner(&train_pairs, DEFAULT_EM_ITERATIONS, 50.0, 1, 1);
+    let aligner_model = train_m2m_aligner(&train_pairs, DEFAULT_EM_ITERATIONS, 50.0, 2, 1);
     println!("   ✓ Aligner training complete in {:.2?}", t_em.elapsed());
 
     println!("\n▶️  Extracting Viterbi Unit Sequences for TRAIN...");
@@ -885,7 +885,7 @@ fn main() {
         for path in &lattice_paths {
             let mut temp_pair = pair.clone();
             temp_pair.roman_tokens = path.clone();
-            let (score, a) = viterbi_forced_alignment(&temp_pair, &aligner_model, 1, 1);
+            let (score, a) = viterbi_forced_alignment(&temp_pair, &aligner_model, 2, 1);
             if score > best_score {
                 best_score = score;
                 align = a;
@@ -893,7 +893,7 @@ fn main() {
         }
 
         if best_score == f64::NEG_INFINITY {
-            let (score, a) = viterbi_forced_alignment(pair, &aligner_model, 1, 1);
+            let (score, a) = viterbi_forced_alignment(pair, &aligner_model, 2, 1);
             if score > best_score {
                 align = a;
             }

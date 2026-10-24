@@ -548,6 +548,14 @@ pub fn is_valid_translation_unit(
         return true;
     }
 
+    // 2 or 3 Roman consonant tokens mapping to a single Bengali conjunct token
+    // (e.g. [r, sh] -> র্ষ, [m, bh] -> ম্ভ, [r, th] -> র্থ, [k, kh] -> ক্ষ, [d, dh] -> দ্ধ, [s, t] -> স্ত/ষ্ট, [n, t, r] -> ন্ত্র)
+    if (r_len == 2 || r_len == 3) && b_len == 1 && bengali_tokens[0].is_conjunct() {
+        if roman_tokens.iter().all(|r| is_roman_consonant_token(r)) {
+            return true;
+        }
+    }
+
     let roman_joined = roman_tokens.join("");
     is_authorized_multi_token_unit(&roman_joined, bengali_tokens)
 }

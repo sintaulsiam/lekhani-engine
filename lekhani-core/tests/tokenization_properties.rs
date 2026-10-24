@@ -114,7 +114,17 @@ fn test_hard_constraints_on_translation_units() {
         "Arbitrary unwhitelisted 1:2 expansion must be rejected"
     );
 
-    // 7. Conjunct atomicity: a conjunct is a single token with hasanta, never fragmented
+    // 7. Valid multi-token consonant cluster to conjunct mapping
+    let t_conj_rsh = tokenize_bengali("র্ষ");
+    assert!(is_valid_translation_unit(&["r".to_string(), "sh".to_string()], &t_conj_rsh));
+    let t_conj_mbh = tokenize_bengali("ম্ভ");
+    assert!(is_valid_translation_unit(&["m".to_string(), "bh".to_string()], &t_conj_mbh));
+    let t_conj_rth = tokenize_bengali("র্থ");
+    assert!(is_valid_translation_unit(&["r".to_string(), "th".to_string()], &t_conj_rth));
+    let t_conj_ddh = tokenize_bengali("দ্ধ");
+    assert!(is_valid_translation_unit(&["d".to_string(), "dh".to_string()], &t_conj_ddh));
+
+    // 8. Conjunct atomicity: a conjunct is a single token with hasanta, never fragmented
     let t_conj = tokenize_bengali("ক্ষ");
     assert_eq!(t_conj.len(), 1);
     assert_eq!(t_conj[0].kind, BengaliTokenKind::Conjunct);
