@@ -463,6 +463,26 @@ impl PhoneticSuggestion {
         use_dictionary: bool,
         candidate_memory: &HashMap<String, String>,
     ) -> (Vec<String>, usize) {
+        self.suggest_with_multi_context_bidirectional(
+            term,
+            context,
+            None,
+            include_english,
+            use_dictionary,
+            candidate_memory,
+        )
+    }
+
+    /// Generate ranked candidates for typed term with bidirectional context (preceding + optional following word)
+    pub fn suggest_with_multi_context_bidirectional(
+        &mut self,
+        term: &str,
+        context: &[&str],
+        right_word: Option<&str>,
+        include_english: bool,
+        use_dictionary: bool,
+        candidate_memory: &HashMap<String, String>,
+    ) -> (Vec<String>, usize) {
         if term.is_empty() {
             return (Vec::new(), 0);
         }
@@ -1279,6 +1299,78 @@ impl PhoneticSuggestion {
                 &mut seen,
             );
             Some(verbal_word)
+        } else if let Some((dialect_hyp, compound_hyp)) = if self.config.enable_colloquial_dialects {
+            let resolve_stem = |stem: &str| -> Option<String> {
+                let conv = if let Some(ref p) = self.phonetic_parser {
+                    p.convert(stem)
+                } else {
+                    stem.to_string()
+                };
+                if !conv.is_empty()
+                    && (self.database.is_exact_dictionary_word(&conv)
+                        || self.database.trie.contains_exact(&conv)
+                        || self.database.lookup_override(stem).is_some()
+                        || self.database.get_frequency(&conv) > 0)
+                {
+                    Some(conv)
+                } else {
+                    None
+                }
+            };
+            let d = super::morphology::decompose_dialect_verbal_token(middle, resolve_stem);
+            let c = super::morphology::decompose_compound_token(middle, resolve_stem);
+            if d.is_some() || c.is_some() {
+                Some((d, c))
+            } else {
+                None
+            }
+        } else {
+            None
+        } {
+            let mut top = None;
+            if let Some(d) = dialect_hyp {
+                add_cand(
+                    d.dialect.clone(),
+                    CandidateSource::ExactDictionary,
+                    6500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+                if d.standard != d.dialect {
+                    add_cand(
+                        d.standard,
+                        CandidateSource::ExactDictionary,
+                        5500,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+                top = Some(d.dialect);
+            }
+            if let Some(c) = compound_hyp {
+                add_cand(
+                    c.unified.clone(),
+                    CandidateSource::ExactDictionary,
+                    6500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+                if let Some(hyphenated) = c.hyphenated {
+                    if hyphenated != c.unified {
+                        add_cand(
+                            hyphenated,
+                            CandidateSource::ExactDictionary,
+                            6000,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
+                    }
+                }
+                if top.is_none() {
+                    top = Some(c.unified);
+                }
+            }
+            top
         } else {
             let mut found_collapsed = None;
             for collapsed in super::fuzzy::collapse_elongated_runs(middle) {
@@ -2200,7 +2292,7 @@ impl PhoneticSuggestion {
             if top_texts.len() >= 2 {
                 self.ai_context.rank_candidates_in_place_bidirectional(
                     context,
-                    None,
+                    right_word,
                     &mut top_texts,
                 );
 
