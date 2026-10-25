@@ -26,7 +26,7 @@ fn test_massive_deep_simulation_suite() {
     ];
     for p in dict_candidates {
         if p.exists() {
-            let _ = sugg.database.load_from_dir(p);
+            let _ = sugg.load_from_dir(p);
             break;
         }
     }
@@ -481,7 +481,8 @@ fn test_massive_deep_simulation_suite() {
             test_cases.len()
         );
         for (inp, exp, got) in &failures {
-            eprintln!("{:<25} -> Expected: {:<20} | Got: {}", inp, exp, got);
+            let (cands, _) = sugg.suggest(inp, true, true, &empty_memory);
+            eprintln!("{:<25} -> Expected: {:<20} | Got: {:<10} | Candidates: {:?}", inp, exp, got, &cands[..cands.len().min(4)]);
         }
     }
 

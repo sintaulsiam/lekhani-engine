@@ -405,10 +405,15 @@ pub fn extract_candidate_features(
             } else if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
                 // Statistical M2M beam recovery: valid dictionary word predicted by data-driven LM
                 // when literal Avro produces an invalid non-dictionary string.
-                f.source_weight = if dist <= 1 { 0.85 } else { 0.75 };
-                f.phonetic_similarity = if dist <= 1 { 0.80 } else { 0.50 };
-                f.is_exact_phonetic = 0.85;
-            } else if dist == 1 && len_diff <= 1.0 && is_in_dict {
+                if dist <= 1 {
+                    f.source_weight = 0.85;
+                    f.phonetic_similarity = 0.80;
+                    f.is_exact_phonetic = 0.85;
+                } else {
+                    f.source_weight = 0.50;
+                    f.phonetic_similarity = -(dist as f32 * 0.5);
+                }
+            } else if dist == 1 && len_diff <= 1.0 && is_in_dict && !ctx.is_primary_in_dict {
                 f.source_weight = 0.60;
                 f.phonetic_similarity = 0.60;
             } else {
