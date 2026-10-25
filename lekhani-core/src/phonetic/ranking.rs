@@ -402,9 +402,15 @@ pub fn extract_candidate_features(
             if dist == 0 {
                 f.source_weight = 1.0;
                 f.phonetic_similarity = 1.0;
-            } else if dist == 1 && len_diff <= 1.0 && !ctx.is_primary_in_dict && is_in_dict {
-                f.source_weight = 0.8;
-                f.phonetic_similarity = 0.8;
+            } else if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
+                // Statistical M2M beam recovery: valid dictionary word predicted by data-driven LM
+                // when literal Avro produces an invalid non-dictionary string.
+                f.source_weight = if dist <= 1 { 0.85 } else { 0.75 };
+                f.phonetic_similarity = if dist <= 1 { 0.80 } else { 0.50 };
+                f.is_exact_phonetic = 0.85;
+            } else if dist == 1 && len_diff <= 1.0 && is_in_dict {
+                f.source_weight = 0.60;
+                f.phonetic_similarity = 0.60;
             } else {
                 f.source_weight = -0.5;
                 f.phonetic_similarity = -(dist as f32);
@@ -765,6 +771,25 @@ mod tests {
 
         assert_eq!(f_direct.intent_modifier_boost, 3.5);
         assert!(f_fuzzy.intent_modifier_boost <= -3.5);
+    }
+
+    #[test]
+    fn test_pragyan_beam_dictionary_recovery() {
+        let targets = Vec::new();
+        let mut ctx = make_ctx("anurodh", "আনুরোধ", &targets);
+        ctx.is_primary_in_dict = false;
+
+        let pragyan_cand = CandidateHypothesis {
+            text: "অনুরোধ".to_string(),
+            source: CandidateSource::PragyanBeam,
+            initial_boost: 5000,
+        };
+
+        let f = extract_candidate_features(&pragyan_cand, true, 4500, true, &ctx, false);
+        assert_eq!(f.is_in_dict, 1.0);
+        assert_eq!(f.is_exact_phonetic, 0.85);
+        assert!(f.source_weight >= 0.75);
+        assert!(f.phonetic_similarity >= 0.50);
     }
 
     #[test]

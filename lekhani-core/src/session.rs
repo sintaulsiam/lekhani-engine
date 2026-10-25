@@ -41,7 +41,7 @@ impl InputSession {
     }
 
     pub fn load_database<P: AsRef<std::path::Path>>(&mut self, dir: P) {
-        let _ = self.phonetic.suggestion_engine.database.load_from_dir(dir);
+        let _ = self.phonetic.suggestion_engine.load_from_dir(dir);
     }
 
     pub fn load_user_autocorrect<P: AsRef<std::path::Path>>(&mut self, path: P) {

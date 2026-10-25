@@ -306,6 +306,27 @@ impl PhoneticSuggestion {
         }
     }
 
+    pub fn load_from_dir<P: AsRef<std::path::Path>>(
+        &mut self,
+        dir: P,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let res = self.database.load_from_dir(dir);
+        self.sync_pragyan_dictionary();
+        self.cache.clear();
+        res
+    }
+
+    pub fn load_from_dir_with_dict<P: AsRef<std::path::Path>>(
+        &mut self,
+        dir: P,
+        dict_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let res = self.database.load_from_dir_with_dict(dir, dict_name);
+        self.sync_pragyan_dictionary();
+        self.cache.clear();
+        res
+    }
+
     /// Check if a layout JSON structure contains valid phonetic patterns
     pub fn is_valid_phonetic_layout(layout_json: &Value) -> bool {
         let layout_obj = if let Some(l) = layout_json.get("layout") {

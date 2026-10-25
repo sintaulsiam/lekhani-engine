@@ -391,7 +391,6 @@ fn test_bin_vs_json_dev_natural_hit_parity() {
         sugg_json.set_layout(l);
     }
     sugg_json
-        .database
         .load_from_dir_with_dict(&dict_dir, "dictionary.json")
         .expect("load dictionary.json");
 
@@ -400,7 +399,6 @@ fn test_bin_vs_json_dev_natural_hit_parity() {
         sugg_bin.set_layout(l);
     }
     sugg_bin
-        .database
         .load_from_dir_with_dict(&dict_dir, "dictionary.bin")
         .expect("load dictionary.bin");
 
