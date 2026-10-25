@@ -279,6 +279,194 @@ impl WordEmbeddings {
 
         false
     }
+
+    /// Computes a dense 32-D semantic topic vector from a sequence of words.
+    #[inline]
+    pub fn compute_topic_vector<'a, I>(&self, words: I) -> TopicVector
+    where
+        I: IntoIterator<Item = &'a str>,
+        I::IntoIter: DoubleEndedIterator,
+    {
+        TopicVector::from_context(words, self, 0.85, 20)
+    }
+
+    /// Computes a dense 32-D semantic topic vector from a slice of words.
+    #[inline]
+    pub fn compute_topic_vector_from_slice(&self, words: &[&str]) -> TopicVector {
+        TopicVector::from_slice(words, self)
+    }
+}
+
+/// A 32-dimensional dense semantic topic vector representing the running domain centroid
+/// of the conversational context.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TopicVector {
+    /// Normalized 32-D topic centroid coordinates (||v|| = 1.0 if magnitude > 0)
+    pub vector: [f32; EMBEDDING_DIM],
+    /// Accumulated unnormalized magnitude indicating topical confidence (0.0 = uninformative/neutral)
+    pub magnitude: f32,
+    /// Number of embedding-bearing tokens that contributed to this topic vector
+    pub active_tokens: usize,
+}
+
+impl Default for TopicVector {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
+impl TopicVector {
+    /// An empty, uninformative topic vector with zero magnitude.
+    #[inline]
+    pub const fn zero() -> Self {
+        Self {
+            vector: [0.0; EMBEDDING_DIM],
+            magnitude: 0.0,
+            active_tokens: 0,
+        }
+    }
+
+    /// Whether this topic vector contains non-trivial topical signal.
+    #[inline]
+    pub fn is_active(&self) -> bool {
+        self.magnitude >= 1e-4 && self.active_tokens > 0
+    }
+
+    /// Computes the exponential recency-decayed dense topic centroid over recent context words.
+    ///
+    /// - `words`: Token sequence in chronological order (earliest to most recent before cursor).
+    /// - `decay_rate`: Exponential discount $\gamma \in (0.0, 1.0]$ per token step from cursor (e.g. 0.85).
+    /// - `max_tokens`: Maximum number of trailing tokens to examine (e.g. 16 or 20).
+    ///
+    /// Zero heap allocations; operates purely on stack floats.
+    pub fn from_context<'a, I>(
+        words: I,
+        embeddings: &WordEmbeddings,
+        decay_rate: f32,
+        max_tokens: usize,
+    ) -> Self
+    where
+        I: IntoIterator<Item = &'a str>,
+        I::IntoIter: DoubleEndedIterator,
+    {
+        let mut accum = [0.0f32; EMBEDDING_DIM];
+        let mut current_weight = 1.0f32;
+        let mut active_tokens = 0usize;
+
+        // Iterate backward from most recent word toward older context
+        for word in words.into_iter().rev().take(max_tokens) {
+            let clean = word.trim_matches(is_punct);
+            if clean.is_empty() {
+                continue;
+            }
+            if let Some(vec) = embeddings.get_vector(clean) {
+                for i in 0..EMBEDDING_DIM {
+                    accum[i] += vec[i] * current_weight;
+                }
+                active_tokens += 1;
+                current_weight *= decay_rate;
+            }
+        }
+
+        if active_tokens == 0 {
+            return Self::zero();
+        }
+
+        let mut norm_sq = 0.0f32;
+        for &val in &accum {
+            norm_sq += val * val;
+        }
+        let magnitude = norm_sq.sqrt();
+
+        if magnitude > 1e-6 {
+            let inv_mag = 1.0 / magnitude;
+            for val in &mut accum {
+                *val *= inv_mag;
+            }
+            Self {
+                vector: accum,
+                magnitude,
+                active_tokens,
+            }
+        } else {
+            Self::zero()
+        }
+    }
+
+    /// Convenience constructor over a string slice with standard 0.85 decay and 20 token limit.
+    #[inline]
+    pub fn from_slice(words: &[&str], embeddings: &WordEmbeddings) -> Self {
+        Self::from_context(words.iter().copied(), embeddings, 0.85, 20)
+    }
+
+    /// Computes the cosine similarity between this normalized topic vector and a candidate's vector.
+    /// Returns a scalar in `[-1.0, 1.0]`. If this topic vector has zero magnitude, returns 0.0.
+    #[inline]
+    pub fn similarity(&self, candidate_vector: &[f32; EMBEDDING_DIM]) -> f32 {
+        if self.magnitude < 1e-6 {
+            return 0.0;
+        }
+        let mut dot = 0.0f32;
+        for (&a, &b) in self.vector.iter().zip(candidate_vector.iter()) {
+            dot += a * b;
+        }
+        dot.clamp(-1.0, 1.0)
+    }
+
+    /// Calculates a calibrated soft score boost for candidate ranking based on
+    /// dense topic alignment.
+    ///
+    /// - High positive alignment (> 0.18): boost up to +1.4 points.
+    /// - Strong negative incongruence (< -0.25): mild penalty down to -0.6 points to suppress out-of-domain distractors.
+    /// - Neutral/orthogonal range [-0.25, 0.18]: 0.0 (no distortion).
+    #[inline]
+    pub fn topic_boost(&self, candidate: &str, embeddings: &WordEmbeddings) -> f32 {
+        if self.magnitude < 1e-4 {
+            return 0.0;
+        }
+        let clean = candidate.trim_matches(is_punct);
+        if let Some(cand_vec) = embeddings.get_vector(clean) {
+            let sim = self.similarity(cand_vec);
+            if sim > 0.18 {
+                (sim - 0.18) * 1.6
+            } else if sim < -0.25 {
+                (sim + 0.25) * 0.8
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        }
+    }
+
+    /// Disambiguates between two competing homophone candidates `cand_a` and `cand_b`
+    /// by comparing their directional projection onto the topic vector.
+    ///
+    /// Returns `Some((winner, margin))` if one candidate has a clear topic advantage ($\Delta > 0.08$),
+    /// or `None` if topic alignment is ambiguous or neither word is in vocabulary.
+    pub fn disambiguate<'a>(
+        &self,
+        cand_a: &'a str,
+        cand_b: &'a str,
+        embeddings: &WordEmbeddings,
+    ) -> Option<(&'a str, f32)> {
+        if self.magnitude < 1e-4 {
+            return None;
+        }
+        let clean_a = cand_a.trim_matches(is_punct);
+        let clean_b = cand_b.trim_matches(is_punct);
+        let sim_a = embeddings.get_vector(clean_a).map(|v| self.similarity(v)).unwrap_or(0.0);
+        let sim_b = embeddings.get_vector(clean_b).map(|v| self.similarity(v)).unwrap_or(0.0);
+
+        let delta = sim_a - sim_b;
+        if delta > 0.08 {
+            Some((cand_a, delta))
+        } else if delta < -0.08 {
+            Some((cand_b, -delta))
+        } else {
+            None
+        }
+    }
 }
 
 #[inline]
@@ -1038,6 +1226,252 @@ pub const CORE_EMBEDDINGS: &[(&str, [f32; EMBEDDING_DIM])] = &[
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.82, 0.52
         ],
     ),
+    // ── Law, Justice & Court Cluster (Dimensions 28, 29) ──────────────────────
+    (
+        "কোর্ট",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.92, 0.65, 0.0, 0.0
+        ],
+    ),
+    (
+        "আদালত",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.90, 0.62, 0.0, 0.0
+        ],
+    ),
+    (
+        "আইন",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.88, 0.60, 0.0, 0.0
+        ],
+    ),
+    (
+        "বিচার",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.86, 0.58, 0.0, 0.0
+        ],
+    ),
+    (
+        "মামলা",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.85, 0.55, 0.0, 0.0
+        ],
+    ),
+    (
+        "উকিল",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.84, 0.52, 0.0, 0.0
+        ],
+    ),
+    (
+        "পুলিশ",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.80, 0.48, 0.0, 0.0
+        ],
+    ),
+    (
+        "শব",
+        vec32![
+            0.0, 0.0, 0.0, -0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.82, 0.50, 0.0, 0.0
+        ],
+    ),
+    (
+        "কুল",
+        vec32![
+            0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.85, 0.58, 0.0, 0.0
+        ],
+    ),
+    // ── Additional Clothing & Attire Anchors (Dimensions 18, 19) ──────────────
+    (
+        "কোট",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.90, 0.58, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "পোশাক",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.88, 0.56, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "শাড়ি",
+        vec32![
+            0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.85, 0.52, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    // ── Additional Education & Language Anchors (Dimensions 8, 9) ─────────────
+    (
+        "ভাষা",
+        vec32![
+            0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 0.92, 0.62, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "পরীক্ষা",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.88, 0.58, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "ক্লাস",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.86, 0.56, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "ছাত্র",
+        vec32![
+            0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.84, 0.54, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    // ── Additional Nature & Marine Anchors (Dimensions 16, 17 / 10, 11) ───────
+    (
+        "ভাসা",
+        vec32![
+            0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.90,
+            0.62, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "নদী",
+        vec32![
+            0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.4, 0.2, 0.0, 0.0, 0.0, 0.0, 0.88,
+            0.60, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "সাঁতার",
+        vec32![
+            0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.86,
+            0.56, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "নৌকা",
+        vec32![
+            0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.2, 0.0, 0.0, 0.0, 0.0, 0.84,
+            0.54, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "কূল",
+        vec32![
+            0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.86, 0.58, 0.0, 0.0, 0.0, 0.0, 0.40,
+            0.30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    // ── Additional Tech & Computing Anchors (Dimensions 14, 15) ───────────────
+    (
+        "কম্পিউটার",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.92, 0.68, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "কোড",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.90, 0.64, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "সফটওয়্যার",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.88, 0.62, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "সার্ভার",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.86, 0.60, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "ওয়েবসাইট",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.84, 0.58, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "বাগ",
+        vec32![
+            0.0, 0.0, 0.0, -0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.80, 0.52, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    // ── Additional Finance, Metals & Audio/Senses Anchors ─────────────────────
+    (
+        "সোনা",
+        vec32![
+            0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.2, 0.0, 0.88, 0.62, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "শোনা",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.90, 0.64
+        ],
+    ),
+    (
+        "গান",
+        vec32![
+            0.0, 0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.88, 0.60
+        ],
+    ),
+    // ── Day vs Poor Homophones ────────────────────────────────────────────────
+    (
+        "দিন",
+        vec32![
+            0.88, 0.32, 0.12, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "দীন",
+        vec32![
+            0.0, 0.0, 0.0, -0.60, -0.40, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.60, 0.30, 0.0, 0.0
+        ],
+    ),
+    // ── Blue vs Took Homophones ───────────────────────────────────────────────
+    (
+        "নীল",
+        vec32![
+            0.0, 0.0, 0.0, 0.70, 0.40, 0.20, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "নিল",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.85, 0.55, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
 ];
 
 #[cfg(test)]
@@ -1156,5 +1590,88 @@ mod tests {
             .expect("বাংলাদেশ should be indexed");
         let norm_sq: f32 = vec.iter().map(|v| v * v).sum();
         assert!((norm_sq - 1.0).abs() < 1e-3, "Vector should be unit norm");
+    }
+
+    #[test]
+    fn test_topic_vector_construction_and_disambiguation() {
+        let embeddings = WordEmbeddings::new();
+
+        // 1. Zero vector initialization
+        let zero_vec = TopicVector::zero();
+        assert!(!zero_vec.is_active());
+        assert_eq!(zero_vec.magnitude, 0.0);
+        assert_eq!(zero_vec.active_tokens, 0);
+
+        // 2. Reading / Study topic context
+        let reading_context = ["আমি", "বই", "পড়া", "খুব", "পছন্দ", "করি"];
+        let reading_topic = TopicVector::from_slice(&reading_context, &embeddings);
+        assert!(reading_topic.is_active());
+        assert!(reading_topic.active_tokens >= 2);
+
+        // Disambiguate পড়া (reading) vs পরা (wearing)
+        let (winner_reading, margin_reading) = reading_topic
+            .disambiguate("পড়া", "পরা", &embeddings)
+            .expect("Should disambiguate reading context");
+        assert_eq!(winner_reading, "পড়া");
+        assert!(margin_reading > 0.15);
+
+        // 3. Clothing / Attire topic context
+        let clothing_context = ["কাল", "একটি", "নতুন", "শার্ট", "প্যান্ট", "কিনলাম"];
+        let clothing_topic = TopicVector::from_slice(&clothing_context, &embeddings);
+        assert!(clothing_topic.is_active());
+
+        // Disambiguate পরা (wearing) vs পড়া (reading)
+        let (winner_clothing, margin_clothing) = clothing_topic
+            .disambiguate("পড়া", "পরা", &embeddings)
+            .expect("Should disambiguate clothing context");
+        assert_eq!(winner_clothing, "পরা");
+        assert!(margin_clothing > 0.15);
+
+        // 4. Law & Justice vs Clothing: কোর্ট (Court) vs কোট (Coat)
+        let legal_context = ["আদালতে", "বিচার", "ও", "মামলা", "চলছে"];
+        let legal_topic = TopicVector::from_slice(&legal_context, &embeddings);
+        let (winner_court, margin_court) = legal_topic
+            .disambiguate("কোর্ট", "কোট", &embeddings)
+            .expect("Should disambiguate court context");
+        assert_eq!(winner_court, "কোর্ট");
+        assert!(margin_court > 0.15);
+
+        let winter_clothing_context = ["শীতের", "পোশাক", "হিসেবে", "শার্ট", "প্যান্ট"];
+        let winter_topic = TopicVector::from_slice(&winter_clothing_context, &embeddings);
+        let (winner_coat, margin_coat) = winter_topic
+            .disambiguate("কোর্ট", "কোট", &embeddings)
+            .expect("Should disambiguate coat context");
+        assert_eq!(winner_coat, "কোট");
+        assert!(margin_coat > 0.15);
+
+        // 5. Language vs Floating: ভাষা (Language) vs ভাসা (Float)
+        let lang_context = ["বাংলা", "ভাষা", "শিক্ষা", "এবং", "বই"];
+        let lang_topic = TopicVector::from_slice(&lang_context, &embeddings);
+        let (winner_lang, _) = lang_topic
+            .disambiguate("ভাষা", "ভাসা", &embeddings)
+            .expect("Should disambiguate language");
+        assert_eq!(winner_lang, "ভাষা");
+
+        let marine_context = ["নদী", "পানি", "সাঁতার", "এবং", "নৌকা"];
+        let marine_topic = TopicVector::from_slice(&marine_context, &embeddings);
+        let (winner_float, _) = marine_topic
+            .disambiguate("ভাষা", "ভাসা", &embeddings)
+            .expect("Should disambiguate float");
+        assert_eq!(winner_float, "ভাসা");
+
+        // 6. Shore vs Clan: কূল (Shore) vs কুল (Clan)
+        let shore_context = ["নদী", "পানি", "সাঁতার", "ঘাট"];
+        let shore_topic = TopicVector::from_slice(&shore_context, &embeddings);
+        let (winner_shore, _) = shore_topic
+            .disambiguate("কূল", "কুল", &embeddings)
+            .expect("Should disambiguate shore");
+        assert_eq!(winner_shore, "কূল");
+
+        let clan_context = ["বংশ", "পরিবার", "সমাজ", "বাবা"];
+        let clan_topic = TopicVector::from_slice(&clan_context, &embeddings);
+        let (winner_clan, _) = clan_topic
+            .disambiguate("কূল", "কুল", &embeddings)
+            .expect("Should disambiguate clan");
+        assert_eq!(winner_clan, "কুল");
     }
 }

@@ -1,4 +1,4 @@
-use crate::embeddings::WordEmbeddings;
+use crate::embeddings::{TopicVector, WordEmbeddings};
 use crate::lm::LanguageModel;
 
 const OVERLAY_CAPACITY: usize = 4096;
@@ -219,6 +219,24 @@ impl ContextScorer {
         &mut self.embeddings
     }
 
+    /// Computes the dense 32-D semantic topic vector over the multi-sentence conversational context.
+    /// Unlike syntactic n-grams, semantic topics naturally transcend sentence boundaries.
+    #[inline]
+    pub fn compute_topic_vector(&self, context: &[&str]) -> TopicVector {
+        TopicVector::from_context(context.iter().copied(), &self.embeddings, 0.85, 20)
+    }
+
+    /// Disambiguates between homophone candidates using the dense semantic topic vector.
+    pub fn disambiguate_homophone_by_topic<'a>(
+        &self,
+        context: &[&str],
+        cand_a: &'a str,
+        cand_b: &'a str,
+    ) -> Option<(&'a str, f32)> {
+        let topic_vec = self.compute_topic_vector(context);
+        topic_vec.disambiguate(cand_a, cand_b, &self.embeddings)
+    }
+
     /// Record a committed word to personalize scoring
     pub fn record_commit(&mut self, word: &str) {
         self.personal_overlay.record_commit(word);
@@ -312,6 +330,7 @@ impl ContextScorer {
         });
 
         let anvaya_state = crate::anvaya::AnvayaAgreementEngine::extract_state(clean_context);
+        let topic_vector = self.compute_topic_vector(context);
 
         // Track initial primary candidate before reranking
         let initial_primary = candidates.first().cloned();
@@ -346,6 +365,7 @@ impl ContextScorer {
                 (None, Some(next)) => self.embeddings.semantic_boost(next, cand) * 0.5,
                 (None, None) => 0.0,
             };
+            let topic_boost = topic_vector.topic_boost(cand, &self.embeddings);
             let position_penalty = i as f32 * 0.05;
             scores[i] = lm_score
                 + personal_boost
@@ -354,6 +374,7 @@ impl ContextScorer {
                 + register_boost
                 + right_boost
                 + semantic_boost
+                + topic_boost
                 - position_penalty;
         }
 
@@ -373,13 +394,19 @@ impl ContextScorer {
         // Homophone Uncertainty Deadband:
         // If the original primary candidate (from rule-based parser or exact match) was displaced
         // by a phonetic homophone, but the score difference is within the uncertainty deadband (< 0.75),
-        // do not override the typist's explicit intent.
+        // do not override the typist's explicit intent unless the topic vector explicitly supports the winner.
         const HOMOPHONE_UNCERTAINTY_DELTA: f32 = 0.75;
         if let Some(ref primary) = initial_primary {
             if len >= 2 && &candidates[0] != primary {
                 let winner = &candidates[0];
                 let winner_score = scores[0];
+                let topic_supports_winner = topic_vector
+                    .disambiguate(winner, primary, &self.embeddings)
+                    .map(|(w, _)| w == winner)
+                    .unwrap_or(false);
+
                 if are_bengali_homophones(winner, primary)
+                    && !topic_supports_winner
                     && (winner_score - initial_primary_score) < HOMOPHONE_UNCERTAINTY_DELTA
                 {
                     if let Some(pos) = candidates[..len].iter().position(|c| c == primary) {
@@ -399,8 +426,11 @@ impl ContextScorer {
         let personal = self.personal_overlay.boost_for(candidate);
         let personal_boost = (personal * 200.0) as i32;
 
+        let topic_vector = self.compute_topic_vector(context);
+        let topic_boost_pts = (topic_vector.topic_boost(candidate, &self.embeddings) * 500.0) as i32;
+
         if clean_context.is_empty() {
-            return personal_boost;
+            return personal_boost + topic_boost_pts;
         }
 
         let prev1 = clean_context.last().copied();
@@ -424,13 +454,15 @@ impl ContextScorer {
         let score = self
             .lm
             .score_candidate_fourgram(prev3, prev2, prev1, candidate);
-        if score > -1.0 {
-            1000 + personal_boost + sem_boost
+        let base_score = if score > -1.0 {
+            1000
         } else if score > -2.0 {
-            500 + personal_boost + sem_boost
+            500
         } else {
-            personal_boost + sem_boost
-        }
+            0
+        };
+
+        base_score + personal_boost + sem_boost + topic_boost_pts
     }
 }
 
@@ -1036,5 +1068,70 @@ mod tests {
             book_cands[0], "পড়া",
             "Explicit context 'বই' must override to 'পড়া'"
         );
+    }
+
+    #[test]
+    fn test_semantic_topic_vector_long_distance_disambiguation() {
+        let scorer = ContextScorer::new();
+
+        // 1. Long-distance reading context across sentence boundary
+        // Sentence 1: "আমি একটি বই কিনলাম।" Sentence 2: "এখন এটা ..."
+        // Even though immediate preceding word is neutral "এটা", the multi-sentence topic vector
+        // contains "বই" -> "পড়া" must be prioritized over "পরা".
+        let mut reading_cands = vec!["পরা".to_string(), "পড়া".to_string()];
+        scorer.rank_candidates_in_place_bidirectional(
+            &["আমি", "একটি", "বই", "কিনলাম।", "এখন", "এটা"],
+            None,
+            &mut reading_cands,
+        );
+        assert_eq!(
+            reading_cands[0], "পড়া",
+            "Multi-sentence reading topic must prioritize 'পড়া' over 'পরা'"
+        );
+
+        // 2. Long-distance clothing context across sentence boundary
+        // Sentence 1: "নতুন শার্ট ও প্যান্ট কিনলাম।" Sentence 2: "এখন এটা ..."
+        let mut clothing_cands = vec!["পড়া".to_string(), "পরা".to_string()];
+        scorer.rank_candidates_in_place_bidirectional(
+            &["নতুন", "শার্ট", "ও", "প্যান্ট", "কিনলাম।", "এখন", "এটা"],
+            None,
+            &mut clothing_cands,
+        );
+        assert_eq!(
+            clothing_cands[0], "পরা",
+            "Multi-sentence clothing topic must prioritize 'পরা' over 'পড়া'"
+        );
+
+        // 3. Legal/Court topic disambiguation: কোর্ট vs কোট
+        let mut court_cands = vec!["কোট".to_string(), "কোর্ট".to_string()];
+        scorer.rank_candidates_in_place_bidirectional(
+            &["আদালতে", "বিচার", "ও", "মামলা", "চলছে।", "আজ"],
+            None,
+            &mut court_cands,
+        );
+        assert_eq!(
+            court_cands[0], "কোর্ট",
+            "Legal domain must prioritize 'কোর্ট' over 'কোট'"
+        );
+
+        // 4. Clothing domain disambiguation: কোট vs কোর্ট
+        let mut coat_cands = vec!["কোর্ট".to_string(), "কোট".to_string()];
+        scorer.rank_candidates_in_place_bidirectional(
+            &["শীতের", "পোশাক", "হিসেবে", "শার্ট", "প্যান্ট", "কিনলাম।", "নতুন"],
+            None,
+            &mut coat_cands,
+        );
+        assert_eq!(
+            coat_cands[0], "কোট",
+            "Attire domain must prioritize 'কোট' over 'কোর্ট'"
+        );
+
+        // 5. Dedicated disambiguate_homophone_by_topic helper
+        let disambiguated = scorer.disambiguate_homophone_by_topic(
+            &["আদালত", "মামলা", "আইন"],
+            "কোর্ট",
+            "কোট",
+        );
+        assert_eq!(disambiguated.map(|(w, _)| w), Some("কোর্ট"));
     }
 }

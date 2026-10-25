@@ -16,7 +16,7 @@ pub mod zero_copy;
 pub use anvaya::{AnvayaAgreementEngine, AnvayaState, HonorificRegister, VerbConjugationTier};
 pub use beam::BeamSearchDecoder;
 pub use context::{truncate_at_sentence_boundary, ContextScorer, PersonalScoreOverlay};
-pub use embeddings::WordEmbeddings;
+pub use embeddings::{TopicVector, WordEmbeddings};
 pub use lm::{LanguageModel, StringInterner};
 pub use prediction::NextWordPredictor;
 pub use trainer::{train_files_streaming, CorpusTrainer, TrainedLanguageModelData, TrainingConfig};
