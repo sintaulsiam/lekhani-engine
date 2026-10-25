@@ -1529,6 +1529,88 @@ impl PhoneticSuggestion {
             }
         }
 
+        // 7c. Natural Consonant Inherent-Vowel & Digraph Sound Law
+        // In natural Bengali transliteration, typists write 'a' for the inherent vowel 'অ'
+        // (Hunterian/ITRANS: chalaman -> চলমান, badan -> বদন, upanibeshbad -> উপনিবেশবাদ,
+        // ekkhando -> একখণ্ড, khunna -> ক্ষুণ্ণ, durgata -> দুর্গত, parishodhita -> পরিশোধিত).
+        if !self.config.strict_avro_mode && middle.len() >= 3 && use_dictionary {
+            let mut inherent_variants = Vec::with_capacity(16);
+
+            let has_aa = middle.contains("aa");
+            let a_indices: Vec<usize> = middle
+                .match_indices('a')
+                .map(|(i, _)| i)
+                .filter(|&i| {
+                    if has_aa {
+                        (i == 0 || middle.as_bytes()[i - 1] != b'a')
+                            && (i + 1 == middle.len() || middle.as_bytes()[i + 1] != b'a')
+                    } else {
+                        true
+                    }
+                })
+                .collect();
+
+            if !a_indices.is_empty() && a_indices.len() <= 4 {
+                // Single replacement for each 'a'
+                for &idx in &a_indices {
+                    let mut s = middle.to_string();
+                    s.replace_range(idx..idx + 1, "o");
+                    inherent_variants.push(s);
+                }
+                if a_indices.len() > 1 {
+                    // All 'a' -> 'o'
+                    let mut s = middle.to_string();
+                    for &idx in a_indices.iter().rev() {
+                        s.replace_range(idx..idx + 1, "o");
+                    }
+                    inherent_variants.push(s);
+
+                    // All non-final 'a' -> 'o'
+                    let mut s_non_final = middle.to_string();
+                    for &idx in a_indices[..a_indices.len() - 1].iter().rev() {
+                        s_non_final.replace_range(idx..idx + 1, "o");
+                    }
+                    inherent_variants.push(s_non_final);
+                }
+            }
+
+            // Collapse accidental/phonetic doubled 'aa' after consonants (kaaraabhog -> karabhog, daakotaa -> dakota)
+            if has_aa {
+                inherent_variants.push(middle.replace("aa", "a"));
+            }
+
+            // Digraph combinations: 'ch' -> 'c', 'kh' -> 'kkh'
+            let mut expanded = Vec::with_capacity(inherent_variants.len() * 2);
+            for k in &inherent_variants {
+                if k.contains("ch") {
+                    expanded.push(k.replace("ch", "c"));
+                }
+                if k.contains("kh") && !k.contains("kkh") {
+                    expanded.push(k.replace("kh", "kkh"));
+                }
+            }
+            if middle.contains("ch") {
+                expanded.push(middle.replace("ch", "c"));
+            }
+            inherent_variants.extend(expanded);
+
+            for key in inherent_variants {
+                let cand = self.convert_phonetic(&key);
+                if self.database.is_exact_dictionary_word(&cand)
+                    || self.database.trie.contains_exact(&cand)
+                {
+                    let score = if is_primary_in_dict { 3700 } else { 4100 };
+                    add_cand(
+                        cand,
+                        CandidateSource::FuzzySoundLaw,
+                        score,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+            }
+        }
+
         if use_dictionary {
             // 8. Natural Linguistic & Grammatical Inflections
             if let Some(inflections) = PhoneticDatabase::get_common_inflections(middle) {
@@ -4010,5 +4092,43 @@ mod tests {
         sugg.config.strict_avro_mode = true;
         let (cands_strict, _) = sugg.suggest("chesta", true, true, &empty_memory);
         assert_eq!(cands_strict[0], "ছেস্তা");
+    }
+
+    #[test]
+    fn test_inherent_vowel_sound_law() {
+        let mut sugg = PhoneticSuggestion::new();
+        let layout_candidates = [
+            std::path::Path::new("../../data/layouts/avrophonetic.json"),
+            std::path::Path::new("data/layouts/avrophonetic.json"),
+            std::path::Path::new("../data/layouts/avrophonetic.json"),
+        ];
+        for p in layout_candidates {
+            if p.exists() {
+                if let Ok(content) = std::fs::read_to_string(p) {
+                    if let Ok(json) = serde_json::from_str(&content) {
+                        sugg.set_layout(&json);
+                        break;
+                    }
+                }
+            }
+        }
+        let dict_candidates = [
+            std::path::Path::new("../../data/dictionaries"),
+            std::path::Path::new("data/dictionaries"),
+            std::path::Path::new("../data/dictionaries"),
+        ];
+        for d in dict_candidates {
+            if d.join("dictionary.json").exists() {
+                let _ = sugg.database.load_from_dir_with_dict(d, "dictionary.json");
+                break;
+            }
+        }
+        let empty_memory = HashMap::new();
+        // Inherent vowel words that users type with 'a' (e.g. upanibeshbad, chalaman, badan)
+        let (cands, _) = sugg.suggest("upanibeshbad", true, true, &empty_memory);
+        assert!(cands.contains(&"উপনিবেশবাদ".to_string()), "Candidates {:?} should contain উপনিবেশবাদ", cands);
+
+        let (cands2, _) = sugg.suggest("chalaman", true, true, &empty_memory);
+        assert!(cands2.contains(&"চলমান".to_string()), "Candidates {:?} should contain চলমান", cands2);
     }
 }
