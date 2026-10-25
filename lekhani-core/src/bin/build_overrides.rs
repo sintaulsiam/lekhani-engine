@@ -264,12 +264,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // 3. Read Dakshina TSVs (Strictly train split only — dev is for tuning, test is held out)
-    let tsv_candidates = [
-        PathBuf::from("data/eval/bn.translit.sampled.train.tsv"),
-        PathBuf::from("../data/eval/bn.translit.sampled.train.tsv"),
+    let tsv_paths = [
         PathBuf::from("/home/smsiam/.gemini/antigravity-ide/brain/6e8f5951-b148-4374-87c2-2e54e03df641/scratch/dakshina/dakshina_dataset_v1.0/bn/lexicons/bn.translit.sampled.train.tsv"),
     ];
-    let tsv_paths: Vec<PathBuf> = tsv_candidates.into_iter().filter(|p| p.exists()).take(1).collect();
 
     let mut latin_to_bn_counts: HashMap<String, HashMap<String, usize>> = HashMap::new();
     let mut total_tsv_lines = 0;
@@ -325,7 +322,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let total_count: usize = bn_counts.values().sum();
-        if total_count < 1 {
+        if total_count < 2 {
             continue;
         }
 
@@ -337,11 +334,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let top_bn = &sorted_cands[0].0;
         let top_agreement = top_count as f32 / total_count as f32;
 
-        // Require:
-        // A) at least 60% agreement and at least 2 attestations, OR
-        // B) verified canonical dictionary target with >= 50% agreement
-        let is_dict_verified = dict_words.contains(top_bn);
-        if !((top_count >= 2 && top_agreement >= 0.60) || (is_dict_verified && top_agreement >= 0.50)) {
+        // Require at least 60% agreement and at least 2 attestations
+        if top_count < 2 || top_agreement < 0.60 {
             continue;
         }
 
@@ -402,8 +396,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut cands = Vec::new();
         for (cand_bn, cnt) in sorted_cands.iter().take(2) {
             let agreement = *cnt as f32 / total_count as f32;
-            let cand_in_dict = dict_words.contains(cand_bn);
-            if (*cnt >= 2 && agreement >= 0.25) || (cand_in_dict && agreement >= 0.50) {
+            if *cnt >= 2 && agreement >= 0.25 {
                 let conf = compute_confidence(*cnt, total_count);
                 cands.push((cand_bn.clone(), conf));
             }
