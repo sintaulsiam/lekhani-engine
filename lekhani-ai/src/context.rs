@@ -237,6 +237,18 @@ impl ContextScorer {
         topic_vec.disambiguate(cand_a, cand_b, &self.embeddings)
     }
 
+    /// Disambiguates between homophone candidates using the dense semantic topic vector
+    /// and returns the winning candidate, confidence margin, and semantic domain hint.
+    pub fn disambiguate_homophone_with_domain_by_topic<'a>(
+        &self,
+        context: &[&str],
+        cand_a: &'a str,
+        cand_b: &'a str,
+    ) -> Option<(&'a str, f32, Option<&'static str>)> {
+        let topic_vec = self.compute_topic_vector(context);
+        topic_vec.disambiguate_with_domain(cand_a, cand_b, &self.embeddings)
+    }
+
     /// Record a committed word to personalize scoring
     pub fn record_commit(&mut self, word: &str) {
         self.personal_overlay.record_commit(word);

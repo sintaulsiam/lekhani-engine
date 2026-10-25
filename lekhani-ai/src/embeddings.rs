@@ -467,6 +467,58 @@ impl TopicVector {
             None
         }
     }
+
+    /// Disambiguates between two competing homophone candidates `cand_a` and `cand_b`
+    /// and returns the winning candidate, confidence margin, and inferred domain hint.
+    pub fn disambiguate_with_domain<'a>(
+        &self,
+        cand_a: &'a str,
+        cand_b: &'a str,
+        embeddings: &WordEmbeddings,
+    ) -> Option<(&'a str, f32, Option<&'static str>)> {
+        let (winner, margin) = self.disambiguate(cand_a, cand_b, embeddings)?;
+        let domain_hint = lookup_homophone_info(winner).map(|(_, hint)| hint);
+        Some((winner, margin, domain_hint))
+    }
+}
+
+/// Canonical Bengali homophone pairs with semantic contrast and domain hints
+pub const CANONICAL_HOMOPHONE_PAIRS: &[(&str, &str, &str, &str)] = &[
+    // (word_a, word_b, domain_hint_a, domain_hint_b)
+    ("পড়া", "পরা", "পড়ালেখা", "পোশাক"),
+    ("পড়ি", "পরি", "পড়ালেখা", "পোশাক"),
+    ("পড়ে", "পরে", "পড়ালেখা", "সময়/পরে"),
+    ("পড়ব", "পরব", "পড়ালেখা", "পোশাক/উৎসব"),
+    ("কোর্ট", "কোট", "আদালত", "পোশাক"),
+    ("ভাষা", "ভাসা", "ভাষা/কথা", "পানি/নদী"),
+    ("কূল", "কুল", "নদী/তীর", "বংশ/ফল"),
+    ("দিন", "দীন", "দিবস/সময়", "দরিদ্র"),
+    ("নীল", "নিল", "রং", "নেওয়া"),
+    ("কী", "কি", "বিশেষণ/দীর্ঘ", "প্রশ্ন/হ্রস্ব"),
+    ("ধনী", "ধ্বনি", "সম্পদ", "শব্দ/আওয়াজ"),
+    ("বাড়ি", "বারি", "বাসা/ঘর", "পানি/জল"),
+    ("গাড়ি", "গারি", "যানবাহন", "অন্য রূপ"),
+    ("সোনা", "শোনা", "স্বর্ণ", "শ্রবণ"),
+    ("বাঁধা", "বাধা", "বন্ধন", "প্রতিবন্ধকতা"),
+    ("কাঁচা", "কাচা", "অপরিপক্ক", "ধোয়া"),
+    ("হাঁস", "হাস", "পাখি", "হাসি"),
+    ("চাঁদ", "চাদ", "চন্দ্র", "ছাদ"),
+    ("কাঁটা", "কাটা", "কণ্টক", "ছেদন"),
+];
+
+/// Returns the contrasting homophone partner and domain hint for a word if known.
+#[inline]
+pub fn lookup_homophone_info(word: &str) -> Option<(&'static str, &'static str)> {
+    let clean = word.trim_matches(is_punct);
+    for &(w1, w2, hint1, hint2) in CANONICAL_HOMOPHONE_PAIRS {
+        if clean == w1 {
+            return Some((w2, hint1));
+        }
+        if clean == w2 {
+            return Some((w1, hint2));
+        }
+    }
+    None
 }
 
 #[inline]
@@ -726,6 +778,13 @@ pub const CORE_EMBEDDINGS: &[(&str, [f32; EMBEDDING_DIM])] = &[
         ],
     ),
     (
+        "পড়তে",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.88, 0.60, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
         "লেখা",
         vec32![
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.80, 0.50, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -973,6 +1032,13 @@ pub const CORE_EMBEDDINGS: &[(&str, [f32; EMBEDDING_DIM])] = &[
         vec32![
             0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
             0.0, 0.86, 0.62, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ],
+    ),
+    (
+        "পরতে",
+        vec32![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.88, 0.60, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         ],
     ),
     (
@@ -1673,5 +1739,15 @@ mod tests {
             .disambiguate("কূল", "কুল", &embeddings)
             .expect("Should disambiguate clan");
         assert_eq!(winner_clan, "কুল");
+
+        // 7. Domain hint assertions
+        let (winner_domain, _, hint) = reading_topic
+            .disambiguate_with_domain("পড়া", "পরা", &embeddings)
+            .expect("Should disambiguate with domain");
+        assert_eq!(winner_domain, "পড়া");
+        assert_eq!(hint, Some("পড়ালেখা"));
+
+        assert_eq!(lookup_homophone_info("কোর্ট"), Some(("কোট", "আদালত")));
+        assert_eq!(lookup_homophone_info("কোট"), Some(("কোর্ট", "পোশাক")));
     }
 }
