@@ -781,7 +781,7 @@ mod tests {
     #[test]
     fn test_pragyan_beam_dictionary_recovery() {
         let targets = Vec::new();
-        let mut ctx = make_ctx("anurodh", "আনুরোধ", &targets);
+        let mut ctx = make_ctx("আনুরোধ", "আনুরোধ", &targets);
         ctx.is_primary_in_dict = false;
 
         let pragyan_cand = CandidateHypothesis {
