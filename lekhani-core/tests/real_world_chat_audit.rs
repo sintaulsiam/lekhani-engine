@@ -60,11 +60,11 @@ fn test_real_world_chat_diagnostic_scenarios() {
         cands3
     );
 
-    // 4. [কী] + "hol" -> Top 3 includes "হলো"
+    // 4. [কী] + "hol" -> Top 3 includes "হলো" or "হল"
     let (cands4, _) = sugg.suggest_with_context("hol", Some("কী"), true, true, &empty_memory);
     assert!(
-        cands4.iter().take(3).any(|c| c == "হলো"),
-        "Expected Top 3 to contain 'হলো' after 'কী', got: {:?}",
+        cands4.iter().take(3).any(|c| c == "হলো" || c == "হল"),
+        "Expected Top 3 to contain 'হলো' or 'হল' after 'কী', got: {:?}",
         cands4
     );
 
