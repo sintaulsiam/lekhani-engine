@@ -608,8 +608,8 @@ pub fn generate_qwerty_typo_variants(input: &str) -> Vec<String> {
         }
     }
 
-    // 2. Single Key Physical Adjacency Slips (for words of length >= 4 to avoid over-generating short words)
-    if chars.len() >= 4 {
+    // 2. Single Key Physical Adjacency Slips (for words of length >= 3 to avoid over-generating short words)
+    if chars.len() >= 3 {
         for (i, &ch) in chars.iter().enumerate() {
             for &neighbor in qwerty_neighbors(ch) {
                 let mut replaced = chars.clone();

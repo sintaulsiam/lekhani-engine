@@ -761,9 +761,15 @@ impl PhoneticSuggestion {
             }
         };
 
-        // 3b. Developer Code-Mixing Shield (e.g. "onClick", "user_id", "--help", "const", "https://...")
-        let is_code = if self.config.enable_code_shield {
-            (super::code_shield::is_code_token(term) || super::code_shield::is_code_token(middle))
+        // 3b. Developer Code-Mixing Shield (e.g. "onClick", "user_id", "--help", "const", "https://...", "CCA")
+        let is_all_caps_acronym = term.len() >= 2
+            && term.chars().all(|c| c.is_ascii_uppercase())
+            && !lekhani_parser::has_explicit_avro_intent(term);
+
+        let is_code = if self.config.enable_code_shield || is_all_caps_acronym {
+            (super::code_shield::is_code_token(term)
+                || super::code_shield::is_code_token(middle)
+                || is_all_caps_acronym)
                 && !self.database.is_exact_dictionary_word(&phonetic)
                 && !is_atomic_cv_syllable(&phonetic)
         } else {
@@ -771,7 +777,7 @@ impl PhoneticSuggestion {
         };
         if is_code {
             add_cand(
-                middle.to_string(),
+                term.to_string(),
                 CandidateSource::CodeShield,
                 30000,
                 &mut raw_candidates,
@@ -869,6 +875,7 @@ impl PhoneticSuggestion {
 
         // 3d. Project "অন্বয়" (Anvaya) — Dynamic Concordant Verb Synthesis
         let anvaya_state = lekhani_ai::AnvayaAgreementEngine::extract_state(context);
+        let mut concordant_verb_str: Option<String> = None;
         if anvaya_state.honorific_tier != lekhani_ai::HonorificRegister::Neutral {
             if let Some(concordant_verb) =
                 lekhani_ai::AnvayaAgreementEngine::synthesize_concordant_verb(
@@ -876,6 +883,7 @@ impl PhoneticSuggestion {
                     anvaya_state.honorific_tier,
                 )
             {
+                concordant_verb_str = Some(concordant_verb.to_string());
                 add_cand(
                     concordant_verb.to_string(),
                     CandidateSource::ExactDictionary,
@@ -1309,10 +1317,28 @@ impl PhoneticSuggestion {
             || preferred_word.is_some();
 
         // 7. Direct Transliterations
-        if is_primary_in_dict {
+        let has_double_consonant = middle.contains("cc")
+            || middle.contains("kk")
+            || middle.contains("tt")
+            || middle.contains("dd")
+            || middle.contains("bb")
+            || middle.contains("pp")
+            || middle.contains("mm")
+            || middle.contains("nn")
+            || middle.contains("ll")
+            || middle.contains("ss")
+            || middle.contains("jj")
+            || middle.contains("gg");
+        let is_explicit_geminate = has_double_consonant && primary.contains('্');
+
+        if is_primary_in_dict || is_explicit_geminate {
             add_cand(
                 primary.to_string(),
-                CandidateSource::ExactDictionary,
+                if is_primary_in_dict {
+                    CandidateSource::ExactDictionary
+                } else {
+                    CandidateSource::DirectTransliteration
+                },
                 4200,
                 &mut raw_candidates,
                 &mut seen,
@@ -1474,6 +1500,24 @@ impl PhoneticSuggestion {
                 }
             }
 
+            // 10c. Curated Phonetic Equivalences & Sound Laws (Reph doubling, retroflex stops, geminates)
+            for eq_cand in self.database.suggest_phonetic_equivalences(
+                middle,
+                |k| self.convert_phonetic(k),
+                8,
+            ) {
+                if !valid_fuzzy_stems.contains(&eq_cand) {
+                    valid_fuzzy_stems.push(eq_cand.clone());
+                }
+                add_cand(
+                    eq_cand,
+                    CandidateSource::FuzzySoundLaw,
+                    3800,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+            }
+
             // 11. Sound-Law Aware Trie Prefix Autocompletion
             let mut prefix_search_roots = vec![primary.to_string()];
             for stem in valid_fuzzy_stems.iter().take(3) {
@@ -1502,17 +1546,38 @@ impl PhoneticSuggestion {
             let has_dict_cand = raw_candidates
                 .iter()
                 .any(|c| self.database.is_exact_dictionary_word(&c.text));
-            if !has_dict_cand && middle.chars().count() >= 4 {
+            if !has_dict_cand && middle.chars().count() >= 3 {
                 let mut typo_matches: Vec<String> = Vec::new();
 
                 // 12a. Physical QWERTY key adjacency slips and adjacent transpositions
                 let qwerty_variants = super::fuzzy::generate_qwerty_typo_variants(middle);
-                for qv in qwerty_variants.iter().take(12) {
-                    let conv = self.convert_phonetic(qv);
-                    if self.database.is_exact_dictionary_word(&conv)
-                        && !typo_matches.contains(&conv)
-                    {
-                        typo_matches.push(conv);
+                for qv in qwerty_variants.iter().take(16) {
+                    if let Some(ov) = self.database.lookup_override(qv) {
+                        for (w, _) in ov {
+                            let w_str = w.to_string();
+                            if !typo_matches.contains(&w_str) {
+                                typo_matches.push(w_str);
+                            }
+                        }
+                    } else if let Some(ac) = self.database.get_autocorrect_raw_filtered(
+                        qv,
+                        self.config.enable_banglish_shorthand,
+                    ) {
+                        let ac_str = if ac.chars().any(|c| c.is_bengali()) {
+                            ac
+                        } else {
+                            self.convert_phonetic(&ac)
+                        };
+                        if !typo_matches.contains(&ac_str) {
+                            typo_matches.push(ac_str);
+                        }
+                    } else {
+                        let conv = self.convert_phonetic(qv);
+                        if self.database.is_exact_dictionary_word(&conv)
+                            && !typo_matches.contains(&conv)
+                        {
+                            typo_matches.push(conv);
+                        }
                     }
                 }
 
@@ -2018,9 +2083,18 @@ impl PhoneticSuggestion {
         // Sort candidates by descending total score
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
 
-        // When explicit Avro syntax/casing is detected or strict_avro_mode is active,
+        // When explicit Avro syntax/casing is detected, strict_avro_mode is active,
+        // or an explicit geminate was collapsed by dictionary/fuzzy,
         // ensure the direct transliteration candidate (phonetic) is locked at Slot 0 and protected against LM demotion.
-        if has_explicit_intent || self.config.strict_avro_mode {
+        let should_lock_direct = has_explicit_intent
+            || self.config.strict_avro_mode
+            || (is_explicit_geminate
+                && scored_candidates
+                    .first()
+                    .map(|(t, _, _)| !t.contains('্'))
+                    .unwrap_or(false));
+
+        if should_lock_direct {
             if let Some(pos) = scored_candidates
                 .iter()
                 .position(|(t, _, _)| t == &phonetic)
@@ -2028,6 +2102,23 @@ impl PhoneticSuggestion {
                 if pos > 0 {
                     let direct = scored_candidates.remove(pos);
                     scored_candidates.insert(0, direct);
+                }
+            }
+        }
+
+        // Honorific Agreement Invariant: Concordant verbs sit at Slot 1 (index 1), NEVER overriding Slot 0
+        if let Some(ref conc) = concordant_verb_str {
+            let typed_verb = preferred_override.as_deref().unwrap_or(&phonetic);
+            if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == typed_verb) {
+                if pos != 0 {
+                    let item = scored_candidates.remove(pos);
+                    scored_candidates.insert(0, item);
+                }
+            }
+            if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == conc) {
+                if pos != 1 {
+                    let item = scored_candidates.remove(pos);
+                    scored_candidates.insert(1.min(scored_candidates.len()), item);
                 }
             }
         }
@@ -2042,10 +2133,12 @@ impl PhoneticSuggestion {
         // This re-sort is zero-allocation (in-place) and runs only when it can make
         // a meaningful difference: ≥2 non-trivial candidates with context available.
         //
-        // Note: Explicit Avro intent completely bypasses this pass to preserve deterministic user intent.
+        // Note: Explicit Avro intent and Anvaya-governed concordant pairs completely bypass this pass.
         if self.config.ai_profile != AiProfile::Off
             && !has_explicit_intent
             && !self.config.strict_avro_mode
+            && concordant_verb_str.is_none()
+            && !is_explicit_geminate
             && !context.is_empty()
             && scored_candidates.len() >= 2
         {

@@ -215,7 +215,7 @@ pub const CORE_AUTOCORRECT: &[(&str, &str)] = &[
     ("tini", "তিনি"),
     ("ashbo", "আসব"),
     ("asbo", "আসব"),
-    ("khabo", "খাব"),
+    ("haa", "হ্যাঁ"),
     ("shunbo", "শুনব"),
     ("sunbo", "শুনব"),
     ("bolbo", "বলব"),
