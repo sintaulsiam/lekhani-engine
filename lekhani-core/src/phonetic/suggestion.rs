@@ -752,9 +752,14 @@ impl PhoneticSuggestion {
                                     | CandidateSource::PragyanBeam
                             ),
                         };
-                        if can_upgrade && initial_boost > existing.initial_boost {
-                            existing.source = source;
-                            existing.initial_boost = initial_boost;
+                        if can_upgrade {
+                            if matches!(source, CandidateSource::Autocorrect | CandidateSource::PhoneticOverride) {
+                                existing.source = source;
+                                existing.initial_boost = existing.initial_boost.max(initial_boost);
+                            } else if initial_boost > existing.initial_boost {
+                                existing.source = source;
+                                existing.initial_boost = initial_boost;
+                            }
                         }
                     }
                 }
@@ -1293,18 +1298,35 @@ impl PhoneticSuggestion {
                         found_collapsed = Some(converted_ac);
                         break;
                     }
+                } else if let Some(ov) = self.database.lookup_override(&collapsed) {
+                    if let Some((top_ov, _)) = ov.first() {
+                        let top_ov_str = top_ov.to_string();
+                        add_cand(
+                            top_ov_str.clone(),
+                            CandidateSource::PhoneticOverride,
+                            6000,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
+                        found_collapsed = Some(top_ov_str);
+                        break;
+                    }
                 }
-                let direct_collapsed = self.convert_phonetic(&collapsed);
-                if self.database.is_exact_dictionary_word(&direct_collapsed) {
-                    add_cand(
-                        direct_collapsed.clone(),
-                        CandidateSource::ExactDictionary,
-                        3800,
-                        &mut raw_candidates,
-                        &mut seen,
-                    );
-                    found_collapsed = Some(direct_collapsed);
-                    break;
+            }
+            if found_collapsed.is_none() {
+                for collapsed in super::fuzzy::collapse_elongated_runs(middle) {
+                    let direct_collapsed = self.convert_phonetic(&collapsed);
+                    if self.database.is_exact_dictionary_word(&direct_collapsed) {
+                        add_cand(
+                            direct_collapsed.clone(),
+                            CandidateSource::ExactDictionary,
+                            3800,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
+                        found_collapsed = Some(direct_collapsed);
+                        break;
+                    }
                 }
             }
             found_collapsed
@@ -1543,10 +1565,9 @@ impl PhoneticSuggestion {
             }
 
             // 12. Physical QWERTY Typo & Transposition Fallback
-            let has_dict_cand = raw_candidates
-                .iter()
-                .any(|c| self.database.is_exact_dictionary_word(&c.text));
-            if !has_dict_cand && middle.chars().count() >= 3 {
+            let is_direct_dict = self.database.is_exact_dictionary_word(&phonetic)
+                && self.database.get_frequency(&phonetic) >= 1000;
+            if !is_direct_dict && middle.chars().count() >= 3 && middle.chars().count() <= 12 {
                 let mut typo_matches: Vec<String> = Vec::new();
 
                 // 12a. Physical QWERTY key adjacency slips and adjacent transpositions
@@ -1606,10 +1627,12 @@ impl PhoneticSuggestion {
                     })
                 });
                 for tm in typo_matches.into_iter().take(4) {
+                    let freq = self.database.get_frequency(&tm);
+                    let boost = if freq >= 1000 { 3800 } else { 2000 };
                     add_cand(
                         tm,
                         CandidateSource::TypoFallback,
-                        900,
+                        boost,
                         &mut raw_candidates,
                         &mut seen,
                     );
@@ -2082,7 +2105,6 @@ impl PhoneticSuggestion {
 
         // Sort candidates by descending total score
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
-
         // When explicit Avro syntax/casing is detected, strict_avro_mode is active,
         // or an explicit geminate was collapsed by dictionary/fuzzy,
         // ensure the direct transliteration candidate (phonetic) is locked at Slot 0 and protected against LM demotion.
@@ -2102,6 +2124,27 @@ impl PhoneticSuggestion {
                 if pos > 0 {
                     let direct = scored_candidates.remove(pos);
                     scored_candidates.insert(0, direct);
+                }
+            }
+        } else if let Some(ref pref) = preferred_word {
+            // Supervised override, autocorrect, or remembered candidate takes Slot 0
+            if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == pref) {
+                if pos > 0 {
+                    let fav = scored_candidates.remove(pos);
+                    scored_candidates.insert(0, fav);
+                }
+            }
+        } else {
+            // Explicit verbal inflection fidelity: If the user explicitly typed an inflection ending in 'bo' or 'cho',
+            // prioritize the 'ো'-inflected form over un-inflected dictionary stems (e.g. khabo -> খাবো, korcho -> করছো).
+            let is_explicit_o_inflection = (middle.ends_with("bo") || middle.ends_with("cho"))
+                && !middle.contains('`');
+            if is_explicit_o_inflection {
+                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t.ends_with('ো')) {
+                    if pos > 0 {
+                        let o_cand = scored_candidates.remove(pos);
+                        scored_candidates.insert(0, o_cand);
+                    }
                 }
             }
         }
@@ -2226,7 +2269,7 @@ impl PhoneticSuggestion {
 
         for (cand, feat) in candidates {
             let norm_cand = fix_chandra_bindu_position(&cand);
-            if pre.is_empty() && post.is_empty() {
+            if (pre.is_empty() && post.is_empty()) || norm_cand == term {
                 final_candidates.push(norm_cand);
             } else {
                 final_candidates.push(format!("{}{}{}", pre_converted, norm_cand, post_converted));
