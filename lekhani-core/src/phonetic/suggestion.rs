@@ -1487,6 +1487,48 @@ impl PhoneticSuggestion {
             }
         }
 
+        // 7b. Initial Vowel 'a' -> 'অ' Ambiguity Resolution (Natural Banglish Digraph Invariant)
+        // Natural romanization frequently uses 'a' for both 'আ' and 'অ' (e.g. anurodh -> অনুরোধ,
+        // anchale -> অঞ্চলে, akkhar -> অক্ষর, artho -> অর্থ).
+        let is_a_initial = middle.len() >= 2
+            && (middle.starts_with('a') || middle.starts_with('A'))
+            && !middle.starts_with("aa")
+            && !middle.starts_with("Aa")
+            && !middle.starts_with("aA")
+            && !middle.starts_with("AA");
+
+        if is_a_initial && !self.config.strict_avro_mode {
+            let o_latin = format!("o{}", &middle[1..]);
+            let o_phonetic = self.convert_phonetic(&o_latin);
+            let is_o_phon_dict = self.database.is_exact_dictionary_word(&o_phonetic)
+                || self.database.trie.contains_exact(&o_phonetic);
+            if is_o_phon_dict {
+                add_cand(
+                    o_phonetic.clone(),
+                    CandidateSource::ExactDictionary,
+                    3900,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+            }
+
+            if phonetic.starts_with('আ') {
+                let o_cand = format!("অ{}", &phonetic['আ'.len_utf8()..]);
+                if (self.database.is_exact_dictionary_word(&o_cand)
+                    || self.database.trie.contains_exact(&o_cand))
+                    && o_cand != o_phonetic
+                {
+                    add_cand(
+                        o_cand,
+                        CandidateSource::ExactDictionary,
+                        3900,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+            }
+        }
+
         if use_dictionary {
             // 8. Natural Linguistic & Grammatical Inflections
             if let Some(inflections) = PhoneticDatabase::get_common_inflections(middle) {
@@ -2258,6 +2300,91 @@ impl PhoneticSuggestion {
             }
         }
 
+        // Phase 1a: Initial Vowel Statistical Reranker (A2)
+        // When top candidate starts with 'আ' and user typed ambiguous single 'a',
+        // check whether an 'অ'-prefixed form exists in candidates or dictionary.
+        let is_a_ambiguous = middle.len() >= 2
+            && (middle.starts_with('a') || middle.starts_with('A'))
+            && !middle.starts_with("aa")
+            && !middle.starts_with("Aa")
+            && !middle.starts_with("aA")
+            && !middle.starts_with("AA")
+            && !should_lock_direct
+            && !self.config.strict_avro_mode
+            && preferred_override.is_none()
+            && !scored_candidates.is_empty();
+
+        if is_a_ambiguous && scored_candidates[0].0.starts_with('আ') {
+            let top_cand = scored_candidates[0].0.clone();
+            let tail = &top_cand['আ'.len_utf8()..];
+            let o_equivalent = format!("অ{}", tail);
+
+            let o_pos = scored_candidates.iter().position(|(t, _, _)| t == &o_equivalent);
+            let o_in_dict = self.database.is_exact_dictionary_word(&o_equivalent)
+                || self.database.trie.contains_exact(&o_equivalent);
+            let top_in_dict = self.database.is_exact_dictionary_word(&top_cand)
+                || self.database.trie.contains_exact(&top_cand);
+
+            let should_promote_o = if !top_in_dict && o_in_dict {
+                true
+            } else if top_in_dict && o_in_dict {
+                let prev1 = context.last().copied();
+                let prev2 = if context.len() >= 2 { Some(context[context.len() - 2]) } else { None };
+                let prev3 = if context.len() >= 3 { Some(context[context.len() - 3]) } else { None };
+
+                let score_top = self.ai_context.lm().score_candidate_fourgram(prev3, prev2, prev1, &top_cand);
+                let score_o = self.ai_context.lm().score_candidate_fourgram(prev3, prev2, prev1, &o_equivalent);
+
+                score_o > score_top
+            } else {
+                false
+            };
+
+            if should_promote_o {
+                if let Some(pos) = o_pos {
+                    if pos > 0 {
+                        let item = scored_candidates.remove(pos);
+                        scored_candidates.insert(0, item);
+                    }
+                } else if o_in_dict {
+                    let freq = self.database.get_frequency(&o_equivalent);
+                    let per_cand_ctx = CandidateContext {
+                        lm_score: None,
+                        user_bigram_boost: 0,
+                        is_user_favored: false,
+                        is_user_learned: false,
+                        context_lm_score: None,
+                        gru_log_prob: None,
+                        ..candidate_ctx
+                    };
+                    let features = extract_candidate_features(
+                        &CandidateHypothesis {
+                            text: o_equivalent.clone(),
+                            source: CandidateSource::ExactDictionary,
+                            initial_boost: 4200,
+                        },
+                        true,
+                        freq,
+                        true,
+                        &per_cand_ctx,
+                        false,
+                    );
+                    let score = 4200 + weights.compute_score(&features);
+                    scored_candidates.insert(0, (o_equivalent, score, features));
+                }
+            } else if !top_in_dict {
+                // If top candidate is unverified non-dictionary text, see if any candidate starting with 'অ' is in dict
+                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| {
+                    t.starts_with('অ') && (self.database.is_exact_dictionary_word(t) || self.database.trie.contains_exact(t))
+                }) {
+                    if pos > 0 {
+                        let item = scored_candidates.remove(pos);
+                        scored_candidates.insert(0, item);
+                    }
+                }
+            }
+        }
+
         // Phase 1: Context-Gated Bidirectional LM Re-sort Pass
         //
         // If we have preceding context AND there are ≥2 dictionary candidates competing
@@ -2665,8 +2792,44 @@ impl PhoneticSuggestion {
                     if is_base_dict {
                         has_verified_base = true;
                     }
+                    let is_base_aa = base_phonetic.starts_with('আ');
+                    let base_aa_tail = if is_base_aa {
+                        base_phonetic['আ'.len_utf8()..].to_string()
+                    } else {
+                        String::new()
+                    };
                     if !base_candidates.contains(&base_phonetic) {
                         base_candidates.push(base_phonetic);
+                    }
+
+                    // Initial 'a' -> 'o' stem support for suffixed words (e.g. "anchal" in "anchale" -> "অঞ্চল" -> "অঞ্চলে")
+                    let is_base_a_initial = base_key.len() >= 2
+                        && (base_key.starts_with('a') || base_key.starts_with('A'))
+                        && !base_key.starts_with("aa")
+                        && !base_key.starts_with("Aa")
+                        && !base_key.starts_with("aA")
+                        && !base_key.starts_with("AA");
+
+                    if is_base_a_initial {
+                        let base_o_latin = format!("o{}", &base_key[1..]);
+                        let conv_o = self.convert_phonetic(&base_o_latin);
+                        if (self.database.is_exact_dictionary_word(&conv_o)
+                            || self.database.trie.contains_exact(&conv_o))
+                            && !base_candidates.contains(&conv_o)
+                        {
+                            base_candidates.push(conv_o);
+                            has_verified_base = true;
+                        }
+                        if is_base_aa {
+                            let conv_o_cand = format!("অ{}", base_aa_tail);
+                            if (self.database.is_exact_dictionary_word(&conv_o_cand)
+                                || self.database.trie.contains_exact(&conv_o_cand))
+                                && !base_candidates.contains(&conv_o_cand)
+                            {
+                                base_candidates.push(conv_o_cand);
+                                has_verified_base = true;
+                            }
+                        }
                     }
 
                     // Supervised phonetic override stem support (e.g. "bristi" in "bristite" -> "বৃষ্টি")
