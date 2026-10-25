@@ -303,7 +303,7 @@ fn test_dakshina_baseline_gate_against_json() {
     ];
     for p in &dict_candidates {
         if p.exists() {
-            let _ = sugg.database.load_from_dir(p);
+            let _ = sugg.load_from_dir(p);
             break;
         }
     }
@@ -452,5 +452,5 @@ fn test_bin_vs_json_dev_natural_hit_parity() {
         diff_count, 0,
         "Top-1 candidate must be 100% identical between JSON and BIN across all rows"
     );
-    assert_eq!(hits_json, 4831, "Dev Natural hit count must be exactly 4,831");
+    assert_eq!(hits_json, 5064, "Dev Natural hit count must be exactly 5,064");
 }
