@@ -1579,8 +1579,8 @@ impl PhoneticSuggestion {
                 inherent_variants.push(middle.replace("aa", "a"));
             }
 
-            // Digraph combinations: 'ch' -> 'c', 'kh' -> 'kkh'
-            let mut expanded = Vec::with_capacity(inherent_variants.len() * 2);
+            // Digraph combinations: 'ch' -> 'c', 'kh' -> 'kkh', 'sh' -> 's', 'st' -> 'sT', 'rj' -> 'ry'
+            let mut expanded = Vec::with_capacity(inherent_variants.len() * 3 + 12);
             for k in &inherent_variants {
                 if k.contains("ch") {
                     expanded.push(k.replace("ch", "c"));
@@ -1588,9 +1588,46 @@ impl PhoneticSuggestion {
                 if k.contains("kh") && !k.contains("kkh") {
                     expanded.push(k.replace("kh", "kkh"));
                 }
+                if k.contains("sh") {
+                    expanded.push(k.replace("sh", "s"));
+                }
+                if k.contains("st") {
+                    expanded.push(k.replace("st", "sT"));
+                }
+                if k.contains("rj") {
+                    expanded.push(k.replace("rj", "ry"));
+                }
             }
             if middle.contains("ch") {
                 expanded.push(middle.replace("ch", "c"));
+            }
+            if middle.contains("kh") && !middle.contains("kkh") {
+                expanded.push(middle.replace("kh", "kkh"));
+            }
+            if middle.contains("sh") {
+                expanded.push(middle.replace("sh", "s"));
+            }
+            if middle.contains("st") {
+                expanded.push(middle.replace("st", "sT"));
+            }
+            if middle.contains("rj") {
+                expanded.push(middle.replace("rj", "ry"));
+            }
+            if is_a_initial {
+                let o_init = format!("o{}", &middle[1..]);
+                expanded.push(o_init.clone());
+                if o_init.contains("ch") {
+                    expanded.push(o_init.replace("ch", "c"));
+                }
+                if o_init.contains("kh") && !o_init.contains("kkh") {
+                    expanded.push(o_init.replace("kh", "kkh"));
+                }
+                if o_init.contains("sh") {
+                    expanded.push(o_init.replace("sh", "s"));
+                }
+                if o_init.contains("st") {
+                    expanded.push(o_init.replace("st", "sT"));
+                }
             }
             inherent_variants.extend(expanded);
 
@@ -4130,5 +4167,11 @@ mod tests {
 
         let (cands2, _) = sugg.suggest("chalaman", true, true, &empty_memory);
         assert!(cands2.contains(&"চলমান".to_string()), "Candidates {:?} should contain চলমান", cands2);
+
+        let (cands3, _) = sugg.suggest("anchale", true, true, &empty_memory);
+        assert!(cands3.contains(&"অঞ্চলে".to_string()), "Candidates {:?} should contain অঞ্চলে", cands3);
+
+        let (cands4, _) = sugg.suggest("shadharon", true, true, &empty_memory);
+        assert!(cands4.contains(&"সাধারণ".to_string()), "Candidates {:?} should contain সাধারণ", cands4);
     }
 }

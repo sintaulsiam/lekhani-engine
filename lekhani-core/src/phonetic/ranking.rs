@@ -324,6 +324,7 @@ pub fn extract_candidate_features(
         || cand.source == CandidateSource::Loanword
         || cand.source == CandidateSource::PhoneticOverride
         || cand.source == CandidateSource::SegmentedLattice
+        || cand.source == CandidateSource::FuzzySoundLaw
     {
         f.is_in_dict = 1.0;
     } else if cand.source == CandidateSource::DirectTransliteration
@@ -437,11 +438,11 @@ pub fn extract_candidate_features(
                 } else if ctx.middle.chars().count() <= 2 && dist > 0 {
                     f.intent_modifier_boost -= 0.67;
                 }
-                if ctx.lm_score.is_some_and(|s| s > -1.5)
+                if (ctx.lm_score.is_some_and(|s| s > -1.5) || !ctx.is_primary_in_dict)
                     && !ctx.has_explicit_casing
                     && !ctx.has_backtick
                 {
-                    f.is_exact_phonetic = 0.9;
+                    f.is_exact_phonetic = 0.85;
                 }
             }
             if cand.source == CandidateSource::Autocorrect {
