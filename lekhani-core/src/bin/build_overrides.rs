@@ -419,13 +419,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!("📦 Total compiled overrides: {}", merged_overrides.len());
 
-    // 5. Output JSON
+    // 5. Reverse-index score normalization
+    //    The same Bengali word can be reached via multiple English spellings
+    //    (e.g. "তুফানের" from "tufaner", "toofaner", "tuphaner"). Each key is
+    //    built independently, so their confidence scores may differ. Here we
+    //    collect the *maximum* score seen for each Bengali candidate across ALL
+    //    keys, then propagate that max back so every spelling gets equal weight.
+    {
+        // Build reverse index: bengali_word -> max_score seen across all keys
+        let mut bn_max_score: HashMap<String, f32> = HashMap::new();
+        for cands in merged_overrides.values() {
+            for (bn, score) in cands {
+                let entry = bn_max_score.entry(bn.clone()).or_insert(0.0_f32);
+                if *score > *entry {
+                    *entry = *score;
+                }
+            }
+        }
+
+        // Propagate max score back to every key that contains this Bengali word
+        let mut normalized_count = 0usize;
+        for cands in merged_overrides.values_mut() {
+            for (bn, score) in cands.iter_mut() {
+                if let Some(&max_s) = bn_max_score.get(bn.as_str()) {
+                    if max_s > *score + 1e-4 {
+                        *score = (max_s * 1000.0).round() / 1000.0;
+                        normalized_count += 1;
+                    }
+                }
+            }
+            // Re-sort by descending score after normalization so slot-0 is still the best
+            cands.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        }
+        println!(
+            "🔄 Normalized {} candidate scores via reverse Bengali index ({} unique Bengali targets).",
+            normalized_count,
+            bn_max_score.len()
+        );
+    }
+
+    // 6. Output JSON
     let json_path = Path::new("data/dictionaries/phonetic_overrides.json");
     let json_file = File::create(json_path)?;
     serde_json::to_writer_pretty(json_file, &merged_overrides)?;
     println!("💾 Wrote JSON to {:?}", json_path);
 
-    // 6. Compile packed binary POVR
+    // 7. Compile packed binary POVR
     let bin_path = Path::new("data/dictionaries/phonetic_overrides.bin");
     let bin_size = compile_binary_overrides(&merged_overrides, bin_path)?;
     println!(
@@ -435,7 +474,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         bin_size as f32 / 1024.0
     );
 
-    // 7. Sync to lekhani-android assets
+    // 8. Sync to lekhani-android assets
     let android_asset_json = Path::new("/mnt/data/lekhani-android/android/app/src/main/assets/dictionaries/phonetic_overrides.json");
     let android_asset_bin = Path::new(
         "/mnt/data/lekhani-android/android/app/src/main/assets/dictionaries/phonetic_overrides.bin",
