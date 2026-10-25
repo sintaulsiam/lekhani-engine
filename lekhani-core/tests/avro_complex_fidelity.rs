@@ -25,7 +25,7 @@ fn setup_engine() -> PhoneticSuggestion {
     ];
     for p in dict_candidates {
         if p.exists() {
-            let _ = sugg.database.load_from_dir(p);
+            let _ = sugg.load_from_dir(p);
             break;
         }
     }

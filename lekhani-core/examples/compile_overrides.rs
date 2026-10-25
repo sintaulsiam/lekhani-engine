@@ -4,7 +4,16 @@ use std::io::{BufReader, Write};
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let json_path = Path::new("/mnt/data/lekhani-android/data/dictionaries/phonetic_overrides.json");
+    let json_candidates = [
+        Path::new("/mnt/data/lekhani-engine/data/dictionaries/phonetic_overrides.json"),
+        Path::new("data/dictionaries/phonetic_overrides.json"),
+        Path::new("/mnt/data/lekhani-android/data/dictionaries/phonetic_overrides.json"),
+    ];
+    let json_path = json_candidates
+        .iter()
+        .find(|p| p.exists())
+        .copied()
+        .ok_or("Cannot find phonetic_overrides.json")?;
     let file = File::open(json_path)?;
     let map: HashMap<String, Vec<(String, f32)>> = serde_json::from_reader(BufReader::new(file))?;
     println!("Loaded {} overrides from {:?}", map.len(), json_path);
