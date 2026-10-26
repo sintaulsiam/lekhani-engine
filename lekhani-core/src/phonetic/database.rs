@@ -1045,7 +1045,7 @@ impl PhoneticDatabase {
         let is_explicit_common_base = self.lookup_override(input).is_some() || self.lookup_override(&lower).is_some();
         let parser_base = convert_fn(&lower);
         let is_exact_dict_base = !parser_base.is_empty() && (self.is_exact_dictionary_word(&parser_base) || is_explicit_common_base);
-        if !is_exact_dict_base && lower.contains('r') {
+        if (!is_exact_dict_base || lower.contains("khor") || lower.contains("khur")) && lower.contains('r') {
             let r_indices: Vec<usize> = lower
                 .char_indices()
                 .filter_map(|(idx, ch)| if ch == 'r' { Some(idx) } else { None })
@@ -1053,7 +1053,14 @@ impl PhoneticDatabase {
             for &idx in &r_indices {
                 let mut with_cap_r = lower.clone();
                 with_cap_r.replace_range(idx..idx + 1, "R");
-                variant_keys.push(with_cap_r);
+                variant_keys.push(with_cap_r.clone());
+                if with_cap_r.contains("oR") {
+                    variant_keys.push(with_cap_r.replace("oR", "O^R"));
+                }
+                if with_cap_r.contains("uR") {
+                    variant_keys.push(with_cap_r.replace("uR", "O^R"));
+                    variant_keys.push(with_cap_r.replace("uR", "u^R"));
+                }
             }
         }
 
@@ -1191,7 +1198,7 @@ impl PhoneticDatabase {
             }
             let parsed = convert_fn(&k);
             if !parsed.is_empty()
-                && (self.trie.contains_exact(&parsed) || self.is_exact_dictionary_word(&parsed))
+                && (self.trie.contains_exact(&parsed) || self.is_exact_dictionary_word(&parsed) || self.get_frequency(&parsed) > 0)
                 && seen.insert(parsed.clone())
             {
                 let freq = self.get_frequency(&parsed);
@@ -2306,6 +2313,11 @@ pub const CORE_BENGALI_FREQUENCIES: &[(&str, u32)] = &[
     ("পরিষ্কার", 9500),
     ("পুরস্কার", 9500),
     ("নমস্কার", 9500),
+    ("সোনা", 9200),
+    ("সোনার", 9400),
+    ("খাটা", 9200),
+    ("খোঁড়া", 9000),
+    ("ঘোরা", 8800),
 ];
 
 #[cfg(test)]
