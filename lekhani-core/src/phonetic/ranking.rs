@@ -24,6 +24,8 @@ pub struct RankFeatures {
     pub is_exact_phonetic: f32,
     /// Normalized Levenshtein similarity: 1.0 - (dist / max(len, 1)).min(1.0)
     pub phonetic_similarity: f32,
+    /// 1.0 if candidate is the exact raw Avro parser output, 0.0 otherwise
+    pub avro_native_anchor: f32,
     /// Normalized character length delta penalty: -abs(cand_len - phonetic_len) / max(phonetic_len, 1)
     pub length_penalty: f32,
     /// Source priority: Autocorrect/Loanword/Inflection=1.0, Direct=0.8, Fuzzy=0.5, Typo=-0.5
@@ -64,6 +66,7 @@ impl Default for RankFeatures {
             lm_score: 0.0,
             is_exact_phonetic: 0.0,
             phonetic_similarity: 0.0,
+            avro_native_anchor: 0.0,
             length_penalty: 0.0,
             source_weight: 0.0,
             clitic_alignment: 0.0,
@@ -93,6 +96,7 @@ pub struct RankWeights {
     pub lm_score: f32,
     pub is_exact_phonetic: f32,
     pub phonetic_similarity: f32,
+    pub avro_native_anchor: f32,
     pub length_penalty: f32,
     pub source_weight: f32,
     pub clitic_alignment: f32,
@@ -119,6 +123,7 @@ impl Default for RankWeights {
             lm_score: 4500.0,
             is_exact_phonetic: 6000.0,
             phonetic_similarity: 200.0,
+            avro_native_anchor: 0.0,   // zeroed until calibrated against dev set
             length_penalty: 400.0,
             source_weight: 3200.0,
             clitic_alignment: 3500.0,
@@ -148,6 +153,7 @@ impl RankWeights {
             + self.lm_score * f.lm_score
             + self.is_exact_phonetic * f.is_exact_phonetic
             + self.phonetic_similarity * f.phonetic_similarity
+            + self.avro_native_anchor * f.avro_native_anchor
             + self.length_penalty * f.length_penalty
             + self.source_weight * f.source_weight
             + self.clitic_alignment * f.clitic_alignment
@@ -372,7 +378,11 @@ pub fn extract_candidate_features(
                 || cand.source == CandidateSource::Loanword
                 || cand.source == CandidateSource::PhoneticOverride;
             f.is_exact_phonetic = if is_dict_equiv { 1.0 } else { 0.43 };
-
+            // Avro-native anchor: fires only when the Avro-native output is a real dict word.
+            // Without the dict guard, ambiguous outputs like শবাই would incorrectly beat সবাই.
+            if cand.text == ctx.phonetic && is_in_dict {
+                f.avro_native_anchor = 1.0;
+            }
             if ctx.has_explicit_intent {
                 f.intent_modifier_boost = 3.5;
             } else if ctx.has_backtick {
@@ -656,8 +666,8 @@ mod tests {
 
     #[test]
     fn test_features_stack_size_and_copy() {
-        // 20 f32 fields × 4 bytes = 80 bytes
-        assert_eq!(std::mem::size_of::<RankFeatures>(), 80);
+        // 21 f32 fields × 4 bytes = 84 bytes (avro_native_anchor added)
+        assert_eq!(std::mem::size_of::<RankFeatures>(), 84);
         let f1 = RankFeatures::default();
         let f2 = f1;
         assert_eq!(f1, f2);
@@ -669,11 +679,12 @@ mod tests {
         let features = RankFeatures {
             is_in_dict: 1.0,
             is_exact_phonetic: 1.0,
+            avro_native_anchor: 1.0,
             lm_score: 0.8,
             ..Default::default()
         };
         let score = weights.compute_score(&features);
-        // 2200 + 6000 + 0.8 * 4500 = 11800
+        // 2200 + 6000 + 0.0 (anchor zeroed) + 0.8 * 4500 = 11800
         assert_eq!(score, 11800);
     }
 
