@@ -15,3 +15,5 @@
 2026-10-25T18:51:11.632066747+00:00 | SHA: 2c3bf21b | Multi-persona test run; dict: data/dictionaries/dictionary.json
 2026-10-26T08:16:35Z | SHA: 58e7f7a | Seq2Seq 50-epoch high-capacity model (128 hidden) with SIMD dot product and conditional Top-1 promotion on bn.translit.sampled.test.tsv (N=9228); Natural Top-1 = 44.59% vs baseline 24.16% (+20.43%), p95 = 3362.6us (<= 3617.5us budget PASS), Dev Natural hits = 3999/9279 (+35 hits)
 2026-10-26T08:24:20Z | SHA: 52446fc | Unrestricted Seq2Seq OOV promotion on bn.translit.sampled.test.tsv (N=9228); Natural Top-1 = 45.04% vs baseline 24.16% (+20.88%, +91 hits), p95 = 2896.5us (<= 3617.5us budget PASS), Dev Natural hits = 4069/9279 (+105 hits)
+2026-10-26T09:10:00Z | SHA: d9fe80e | Initial 'a' ambiguity resolution extended to 'আ' and 'এ' prefixes on bn.translit.sampled.test.tsv (N=9228); Natural Top-1 = 45.04%, p95 = 2589.0us (<= 3617.5us budget PASS), Dev Natural hits = 4069/9279
+
