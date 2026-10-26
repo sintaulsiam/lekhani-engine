@@ -13,3 +13,4 @@
 2026-10-25T16:49:48.033124328+00:00 | SHA: 22f3b1fd | Multi-persona test run; dict: data/dictionaries/dictionary.json
 2026-10-25T18:48:51.782140964+00:00 | SHA: HEAD | Step 9 final test release gate on bn.translit.sampled.test.tsv (N=9228); config: 2:1 aligner + order 4 level 1 unit LM + deployable policy (ld=6.0, la=8.0, le=2.0); results: Natural Top-1 = 47.48% vs baseline 25.33% (+22.15%), Avro-Strict = 86.15% (Gate G4 FAIL), VDrop30 = 22.50% (Gate G5 PASS), ModelSize = 4.09 MB (Gate G6 FAIL)
 2026-10-25T18:51:11.632066747+00:00 | SHA: 2c3bf21b | Multi-persona test run; dict: data/dictionaries/dictionary.json
+2026-10-26T08:16:35Z | SHA: 58e7f7a | Seq2Seq 50-epoch high-capacity model (128 hidden) with SIMD dot product and conditional Top-1 promotion on bn.translit.sampled.test.tsv (N=9228); Natural Top-1 = 44.59% vs baseline 24.16% (+20.43%), p95 = 3362.6us (<= 3617.5us budget PASS), Dev Natural hits = 3999/9279 (+35 hits)
