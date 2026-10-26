@@ -11,3 +11,5 @@
 2026-10-25T16:05:43.989515019+00:00 | SHA: 92e095e6 | Multi-persona test run; dict: data/dictionaries/dictionary.json
 2026-10-25T16:22:32.104959969+00:00 | SHA: 25072a96 | Multi-persona test run; dict: data/dictionaries/dictionary.json
 2026-10-25T16:49:48.033124328+00:00 | SHA: 22f3b1fd | Multi-persona test run; dict: data/dictionaries/dictionary.json
+2026-10-25T18:48:51.782140964+00:00 | SHA: HEAD | Step 9 final test release gate on bn.translit.sampled.test.tsv (N=9228); config: 2:1 aligner + order 4 level 1 unit LM + deployable policy (ld=6.0, la=8.0, le=2.0); results: Natural Top-1 = 47.48% vs baseline 25.33% (+22.15%), Avro-Strict = 86.15% (Gate G4 FAIL), VDrop30 = 22.50% (Gate G5 PASS), ModelSize = 4.09 MB (Gate G6 FAIL)
+2026-10-25T18:51:11.632066747+00:00 | SHA: 2c3bf21b | Multi-persona test run; dict: data/dictionaries/dictionary.json
