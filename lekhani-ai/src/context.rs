@@ -417,8 +417,14 @@ impl ContextScorer {
                     .map(|(w, _)| w == winner)
                     .unwrap_or(false);
 
+                let has_curated_bigram = prev1
+                    .and_then(|p| crate::lm::get_curated_bigram(p, winner))
+                    .map(|prob| prob >= -1.0)
+                    .unwrap_or(false);
+
                 if are_bengali_homophones(winner, primary)
                     && !topic_supports_winner
+                    && !has_curated_bigram
                     && (winner_score - initial_primary_score) < HOMOPHONE_UNCERTAINTY_DELTA
                 {
                     if let Some(pos) = candidates[..len].iter().position(|c| c == primary) {

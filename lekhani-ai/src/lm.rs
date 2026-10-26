@@ -409,6 +409,21 @@ pub const UNIGRAM_LOG_PROBS: &[(&str, f32)] = &[
     ("বইটা", -2.9),
     ("মাতৃভূমি", -2.9),
     ("শহীদের", -2.9),
+    ("সোনা", -2.4),
+    ("সোনার", -2.3),
+    ("পাড়", -2.5),
+    ("পাড়ে", -2.6),
+    ("টানা", -2.5),
+    ("ঘোরা", -2.5),
+    ("ধোয়া", -2.5),
+    ("ঢালা", -2.6),
+    ("ডালা", -2.7),
+    ("রাঁধা", -2.6),
+    ("কাঁদা", -2.6),
+    ("আদর", -2.5),
+    ("উন্নয়ন", -2.3),
+    ("লেখ", -2.5),
+    ("পরছে", -2.4),
 ];
 
 /// Pre-computed high-frequency Bengali Bigram transition log probabilities: P(w2 | w1)
@@ -437,6 +452,46 @@ pub const BIGRAM_TRANSITIONS: &[((&str, &str), f32)] = &[
     (("আমরা", "সবাই"), -0.5),
     (("আমরা", "যাব"), -0.7),
     (("আমরা", "করব"), -0.8),
+    // Semantic collocations and homophone disambiguation
+    (("খাঁটি", "সোনা"), -0.15),
+    (("খাঁটি", "ঘি"), -0.2),
+    (("নদী", "পাড়"), -0.15),
+    (("নদীর", "পাড়"), -0.15),
+    (("নদীর", "কূল"), -0.15),
+    (("চোখ", "টানা"), -0.15),
+    (("সুর", "টানা"), -0.15),
+    (("মাথা", "ঘোরা"), -0.15),
+    (("হাত", "ধোয়া"), -0.15),
+    (("পানি", "ঢালা"), -0.15),
+    (("পথ", "চলা"), -0.15),
+    (("ভাত", "রাঁধা"), -0.15),
+    (("বাচ্চা", "কাঁদা"), -0.15),
+    (("মায়ের", "আদর"), -0.15),
+    (("দেশের", "উন্নয়ন"), -0.15),
+    (("জামা", "পরছে"), -0.15),
+    (("জামা", "পরবে"), -0.15),
+    (("বই", "পড়ছিস"), -0.15),
+    (("বই", "পড়ছে"), -0.15),
+    (("চিঠি", "লেখ"), -0.15),
+    (("চিঠি", "লেখা"), -0.15),
+    (("কথা", "বল"), -0.15),
+    (("দৌড়", "দে"), -0.15),
+    (("আগুন", "ধোঁয়া"), -0.15),
+    (("ধোঁয়া", "উড়ছে"), -0.15),
+    (("কাজে", "খাটা"), -0.15),
+    (("মাটি", "খোঁড়া"), -0.15),
+    (("পা", "খোঁড়া"), -0.15),
+    (("গাছ", "ডালা"), -0.15),
+    (("গাছের", "ডালা"), -0.15),
+    (("বই", "কেনা"), -0.15),
+    (("ও", "ধোঁয়া"), -0.15),
+    (("তুই", "পড়ছিস"), -0.15),
+    (("তুই", "বল"), -0.15),
+    (("তুই", "লেখ"), -0.15),
+    (("ঘর", "ছাড়া"), -0.15),
+    (("তুমি", "ছাড়া"), -0.15),
+    (("ঘরে", "যা"), -0.15),
+    (("তুই", "যা"), -0.15),
     // Everyday activities
     (("ভাত", "খাচ্ছি"), -0.3),
     (("ভাত", "খাব"), -0.4),
@@ -1077,6 +1132,36 @@ impl StringInterner {
     }
 }
 
+type CuratedBigramMap = HashMap<(Arc<str>, Arc<str>), f32>;
+type CuratedTrigramMap = HashMap<(Arc<str>, Arc<str>, Arc<str>), f32>;
+
+static CURATED_BIGRAMS: OnceLock<CuratedBigramMap> = OnceLock::new();
+static CURATED_TRIGRAMS: OnceLock<CuratedTrigramMap> = OnceLock::new();
+
+#[inline]
+pub fn get_curated_bigram(w1: &str, w2: &str) -> Option<f32> {
+    let map = CURATED_BIGRAMS.get_or_init(|| {
+        let mut m = HashMap::with_capacity(BIGRAM_TRANSITIONS.len());
+        for &((k1, k2), p) in BIGRAM_TRANSITIONS {
+            m.insert((Arc::from(k1), Arc::from(k2)), p);
+        }
+        m
+    });
+    map.get(&BigramKey(w1, w2)).copied()
+}
+
+#[inline]
+pub fn get_curated_trigram(w1: &str, w2: &str, w3: &str) -> Option<f32> {
+    let map = CURATED_TRIGRAMS.get_or_init(|| {
+        let mut m = HashMap::with_capacity(TRIGRAM_TRANSITIONS.len());
+        for &((k1, k2, k3), p) in TRIGRAM_TRANSITIONS {
+            m.insert((Arc::from(k1), Arc::from(k2), Arc::from(k3)), p);
+        }
+        m
+    });
+    map.get(&TrigramKey(w1, w2, w3)).copied()
+}
+
 #[derive(Debug, Clone)]
 pub struct LanguageModel {
     inner: Arc<LanguageModelInner>,
@@ -1532,9 +1617,6 @@ impl LanguageModelInner {
     }
 
     pub fn score_candidate(&self, prev2: Option<&str>, prev1: Option<&str>, word: &str) -> f32 {
-        if let Some(ref zc) = self.zero_copy {
-            return zc.score_candidate(prev2, prev1, word);
-        }
         let clean_word = word.trim_matches(|c: char| {
             c.is_ascii_punctuation()
                 || c == '।'
@@ -1576,6 +1658,25 @@ impl LanguageModelInner {
             })
         });
 
+        if let Some(ref zc) = self.zero_copy {
+            let base = zc.score_candidate(prev2, prev1, word);
+            let mut boost = None;
+            if let Some(w1) = clean_w1 {
+                if let Some(curated) = get_curated_bigram(w1, clean_word) {
+                    boost = Some(curated);
+                }
+                if let Some(w2) = clean_w2 {
+                    if let Some(curated_tri) = get_curated_trigram(w2, w1, clean_word) {
+                        boost = Some(boost.map(|b: f32| b.max(curated_tri)).unwrap_or(curated_tri));
+                    }
+                }
+            }
+            if let Some(b) = boost {
+                return base.max(b);
+            }
+            return base;
+        }
+
         let unigram_p = self
             .unigrams
             .get(clean_word)
@@ -1605,8 +1706,64 @@ impl LanguageModelInner {
         prev1: Option<&str>,
         word: &str,
     ) -> f32 {
+        let clean_word = word.trim_matches(|c: char| {
+            c.is_ascii_punctuation()
+                || c == '।'
+                || c == '—'
+                || c == '‘'
+                || c == '’'
+                || c == '“'
+                || c == '”'
+                || c == '\''
+                || c == '"'
+                || c == ','
+        });
+        let clean_w1 = prev1.map(|w| {
+            w.trim_matches(|c: char| {
+                c.is_ascii_punctuation()
+                    || c == '।'
+                    || c == '—'
+                    || c == '‘'
+                    || c == '’'
+                    || c == '“'
+                    || c == '”'
+                    || c == '\''
+                    || c == '"'
+                    || c == ','
+            })
+        });
+        let clean_w2 = prev2.map(|w| {
+            w.trim_matches(|c: char| {
+                c.is_ascii_punctuation()
+                    || c == '।'
+                    || c == '—'
+                    || c == '‘'
+                    || c == '’'
+                    || c == '“'
+                    || c == '”'
+                    || c == '\''
+                    || c == '"'
+                    || c == ','
+            })
+        });
+
         if let Some(ref zc) = self.zero_copy {
-            return zc.score_candidate_fourgram(prev3, prev2, prev1, word);
+            let base = zc.score_candidate_fourgram(prev3, prev2, prev1, word);
+            let mut boost = None;
+            if let Some(w1) = clean_w1 {
+                if let Some(curated) = get_curated_bigram(w1, clean_word) {
+                    boost = Some(curated);
+                }
+                if let Some(w2) = clean_w2 {
+                    if let Some(curated_tri) = get_curated_trigram(w2, w1, clean_word) {
+                        boost = Some(boost.map(|b: f32| b.max(curated_tri)).unwrap_or(curated_tri));
+                    }
+                }
+            }
+            if let Some(b) = boost {
+                return base.max(b);
+            }
+            return base;
         }
         self.score_candidate(prev2, prev1, word)
     }
