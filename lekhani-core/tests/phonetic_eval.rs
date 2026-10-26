@@ -130,6 +130,15 @@ pub fn matches_orthographic_equivalent(cand: &str, target: &str) -> bool {
     {
         return true;
     }
+    // 4. Sanskrit Tatsama velar nasal conjuncts vs Anusvara orthographic variants (ঙ্ক/ংক, ঙ্গ/ংগ, ঙ্ঘ/ংঘ)
+    let norm_velar = |s: &str| -> String {
+        s.replace("ঙ্ক", "ংক").replace("ঙ্গ", "ংগ").replace("ঙ্ঘ", "ংঘ")
+    };
+    if norm_velar(&cand_norm) == norm_velar(&target_norm)
+        || norm_velar(&cand_n) == norm_velar(&target_n)
+    {
+        return true;
+    }
     false
 }
 
@@ -483,5 +492,5 @@ fn test_bin_vs_json_dev_natural_hit_parity() {
         diff_count, 0,
         "Top-1 candidate must be 100% identical between JSON and BIN across all rows"
     );
-    assert_eq!(hits_json, 4205, "Dev Natural hit count must be exactly 4,205");
+    assert_eq!(hits_json, 4230, "Dev Natural hit count must be exactly 4,230");
 }
