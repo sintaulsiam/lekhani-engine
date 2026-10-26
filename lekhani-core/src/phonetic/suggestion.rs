@@ -1015,23 +1015,7 @@ impl PhoneticSuggestion {
         });
         if let Some((bn_loan, en_loan)) = loan_opt {
             is_tech_collocation = if let Some(&last_ctx) = context.last() {
-                let last_lower = last_ctx.to_lowercase();
-                let middle_lower = middle.to_lowercase();
-                matches!(
-                    (last_lower.as_str(), middle_lower.as_str()),
-                    ("link", "share")
-                        | ("file", "download")
-                        | ("api", "call")
-                        | ("server", "restart")
-                        | ("git", "push")
-                        | ("git", "pull")
-                        | ("git", "commit")
-                        | ("git", "merge")
-                        | ("code", "review")
-                        | ("pull", "request")
-                        | ("bug", "fix")
-                        | ("task", "complete")
-                )
+                crate::bilingual::is_english_tech_collocation(last_ctx, middle)
             } else {
                 false
             };
@@ -1058,17 +1042,7 @@ impl PhoneticSuggestion {
                 is_contextual_override = true;
             } else {
                 let is_bengali_tech_collocation = if let Some(&last_ctx) = context.last() {
-                    let last_lower = last_ctx.to_lowercase();
-                    let middle_lower = middle.to_lowercase();
-                    matches!(
-                        (last_lower.as_str(), middle_lower.as_str()),
-                        ("photo", "edit")
-                            | ("group", "chat")
-                            | ("screen", "share")
-                            | ("status", "update")
-                            | ("video", "call")
-                            | ("audio", "message")
-                    )
+                    crate::bilingual::is_bengali_tech_collocation(last_ctx, middle)
                 } else {
                     false
                 };

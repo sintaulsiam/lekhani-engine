@@ -369,6 +369,46 @@ pub fn resolve_unhyphenated_bilingual_clitic(input: &str) -> Option<(String, Vec
     None
 }
 
+/// Contextual Technical Collocations where the English form is preferred (e.g. "file download", "api call")
+pub const TECH_COLLOCATIONS_ENGLISH: &[(&str, &str)] = &[
+    ("link", "share"),
+    ("file", "download"),
+    ("api", "call"),
+    ("server", "restart"),
+    ("git", "push"),
+    ("git", "pull"),
+    ("git", "commit"),
+    ("git", "merge"),
+    ("code", "review"),
+    ("pull", "request"),
+    ("bug", "fix"),
+    ("task", "complete"),
+];
+
+/// Contextual Technical Collocations where naturalized Bengali loanword is preferred (e.g. "photo edit" -> "এডিট")
+pub const TECH_COLLOCATIONS_BENGALI: &[(&str, &str)] = &[
+    ("photo", "edit"),
+    ("group", "chat"),
+    ("screen", "share"),
+    ("status", "update"),
+    ("video", "call"),
+    ("audio", "message"),
+];
+
+#[inline]
+pub fn is_english_tech_collocation(prev: &str, curr: &str) -> bool {
+    let p = prev.to_ascii_lowercase();
+    let c = curr.to_ascii_lowercase();
+    TECH_COLLOCATIONS_ENGLISH.iter().any(|&(w1, w2)| w1 == p && w2 == c)
+}
+
+#[inline]
+pub fn is_bengali_tech_collocation(prev: &str, curr: &str) -> bool {
+    let p = prev.to_ascii_lowercase();
+    let c = curr.to_ascii_lowercase();
+    TECH_COLLOCATIONS_BENGALI.iter().any(|&(w1, w2)| w1 == p && w2 == c)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
