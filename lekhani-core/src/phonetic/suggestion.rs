@@ -2706,7 +2706,7 @@ impl PhoneticSuggestion {
             } else if !top_is_dict && middle.len() >= 5 {
                 let s2s_cands = s2s.transliterate(middle, 1, scratch);
                 if let Some(top_s2s) = s2s_cands.first() {
-                    if !top_s2s.is_empty() && self.database.trie.contains_exact(top_s2s) {
+                    if !top_s2s.is_empty() {
                         final_candidates.retain(|c| c != top_s2s);
                         final_candidates.insert(0, top_s2s.clone());
                     }
