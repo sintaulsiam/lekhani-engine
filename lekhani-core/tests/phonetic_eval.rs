@@ -495,4 +495,103 @@ fn test_bin_vs_json_dev_natural_hit_parity() {
     assert_eq!(hits_json, 4263, "Dev Natural hit count must be exactly 4,263");
 }
 
+#[derive(serde::Deserialize)]
+struct ContextualCase {
+    context: Vec<String>,
+    input: String,
+    expected: String,
+    #[allow(dead_code)]
+    category: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct ContextualEvalFile {
+    cases: Vec<ContextualCase>,
+}
+
+#[test]
+fn test_contextual_eval_suite() {
+    let eval_candidates = [
+        PathBuf::from("data/eval/contextual_eval_200.json"),
+        PathBuf::from("../data/eval/contextual_eval_200.json"),
+        PathBuf::from("../../data/eval/contextual_eval_200.json"),
+    ];
+    let eval_path = match eval_candidates.iter().find(|p| p.exists()) {
+        Some(p) => p.clone(),
+        None => return,
+    };
+    let dict_candidates = [
+        PathBuf::from("data/dictionaries"),
+        PathBuf::from("../data/dictionaries"),
+        PathBuf::from("../../data/dictionaries"),
+    ];
+    let dict_dir = match dict_candidates.iter().find(|p| p.join("dictionary.json").exists()) {
+        Some(p) => p.clone(),
+        None => return,
+    };
+    let layout_candidates = [
+        PathBuf::from("data/layouts/avrophonetic.json"),
+        PathBuf::from("../data/layouts/avrophonetic.json"),
+        PathBuf::from("../../data/layouts/avrophonetic.json"),
+    ];
+    let layout_json = layout_candidates.iter().find_map(|p| {
+        std::fs::read_to_string(p).ok().and_then(|c| serde_json::from_str(&c).ok())
+    });
+
+    let mut sugg = PhoneticSuggestion::new();
+    if let Some(ref l) = layout_json {
+        sugg.set_layout(l);
+    }
+    sugg.load_from_dir_with_dict(&dict_dir, "dictionary.bin")
+        .expect("load dictionary.bin");
+
+    let content = std::fs::read_to_string(&eval_path).expect("read contextual_eval_200.json");
+    let eval_file: ContextualEvalFile = serde_json::from_str(&content).expect("parse json");
+
+    let empty_mem = HashMap::new();
+    let mut hits = 0;
+    let mut failures = Vec::new();
+    let mut cat_stats: HashMap<String, (usize, usize)> = HashMap::new();
+
+    for case in &eval_file.cases {
+        let cat = case.category.clone().unwrap_or_else(|| "unknown".to_string());
+        let entry = cat_stats.entry(cat).or_insert((0, 0));
+        entry.1 += 1;
+
+        let ctx_refs: Vec<&str> = case.context.iter().map(|s| s.as_str()).collect();
+        let (cands, _) = sugg.suggest_with_multi_context(
+            &case.input,
+            &ctx_refs,
+            true,
+            true,
+            &empty_mem,
+        );
+        let top = cands.first().cloned().unwrap_or_default();
+        let hit = matches_orthographic_equivalent(&top, &case.expected) || top == case.expected;
+        if hit {
+            hits += 1;
+            entry.0 += 1;
+        } else {
+            failures.push((case.context.join(" "), case.input.clone(), case.expected.clone(), top, cands.iter().take(3).cloned().collect::<Vec<_>>()));
+        }
+    }
+
+    let total = eval_file.cases.len();
+    let accuracy = (hits as f64 / total as f64) * 100.0;
+    println!(
+        "\n=== Track C Contextual Evaluation Result ===\nTotal Cases: {}, Hits: {}, Accuracy: {:.2}%\nFailures ({}):",
+        total, hits, accuracy, failures.len()
+    );
+    for (cat, (c_hits, c_total)) in &cat_stats {
+        println!("  Category [{:<22}]: {} / {} ({:.2}%)", cat, c_hits, c_total, (*c_hits as f64 / *c_total as f64) * 100.0);
+    }
+    for (ctx, inp, exp, got, cands) in &failures {
+        println!("  Context: [{}] | Input: {:<12} -> Expected: {:<10} | Got: {:<10} | Top-3: {:?}", ctx, inp, exp, got, cands);
+    }
+
+    assert!(accuracy >= 62.0, "Contextual accuracy must be at least 62% (got {:.2}%)", accuracy);
+}
+
+
+
 
