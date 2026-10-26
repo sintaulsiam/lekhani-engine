@@ -531,6 +531,32 @@ impl CellGrad {
         self.w_in.fill(0.0); self.w_hn.fill(0.0); self.b_in.fill(0.0);
         self.b_hn.fill(0.0);
     }
+
+    pub fn add(&mut self, other: &Self) {
+        for (a, &b) in self.w_ir.iter_mut().zip(&other.w_ir) { *a += b; }
+        for (a, &b) in self.w_hr.iter_mut().zip(&other.w_hr) { *a += b; }
+        for (a, &b) in self.b_r.iter_mut().zip(&other.b_r) { *a += b; }
+        for (a, &b) in self.w_iz.iter_mut().zip(&other.w_iz) { *a += b; }
+        for (a, &b) in self.w_hz.iter_mut().zip(&other.w_hz) { *a += b; }
+        for (a, &b) in self.b_z.iter_mut().zip(&other.b_z) { *a += b; }
+        for (a, &b) in self.w_in.iter_mut().zip(&other.w_in) { *a += b; }
+        for (a, &b) in self.w_hn.iter_mut().zip(&other.w_hn) { *a += b; }
+        for (a, &b) in self.b_in.iter_mut().zip(&other.b_in) { *a += b; }
+        for (a, &b) in self.b_hn.iter_mut().zip(&other.b_hn) { *a += b; }
+    }
+
+    pub fn scale(&mut self, s: f32) {
+        for g in &mut self.w_ir { *g *= s; }
+        for g in &mut self.w_hr { *g *= s; }
+        for g in &mut self.b_r  { *g *= s; }
+        for g in &mut self.w_iz { *g *= s; }
+        for g in &mut self.w_hz { *g *= s; }
+        for g in &mut self.b_z  { *g *= s; }
+        for g in &mut self.w_in { *g *= s; }
+        for g in &mut self.w_hn { *g *= s; }
+        for g in &mut self.b_in { *g *= s; }
+        for g in &mut self.b_hn { *g *= s; }
+    }
 }
 
 impl Seq2SeqGrad {
@@ -556,6 +582,26 @@ impl Seq2SeqGrad {
         self.enc.zero(); self.dec.zero();
         self.attn_w.fill(0.0);
         self.out_w.fill(0.0); self.out_b.fill(0.0);
+    }
+
+    pub fn add(&mut self, other: &Self) {
+        for (a, &b) in self.enc_emb.iter_mut().zip(&other.enc_emb) { *a += b; }
+        for (a, &b) in self.dec_emb.iter_mut().zip(&other.dec_emb) { *a += b; }
+        self.enc.add(&other.enc);
+        self.dec.add(&other.dec);
+        for (a, &b) in self.attn_w.iter_mut().zip(&other.attn_w) { *a += b; }
+        for (a, &b) in self.out_w.iter_mut().zip(&other.out_w) { *a += b; }
+        for (a, &b) in self.out_b.iter_mut().zip(&other.out_b) { *a += b; }
+    }
+
+    pub fn scale(&mut self, s: f32) {
+        for g in &mut self.enc_emb { *g *= s; }
+        for g in &mut self.dec_emb { *g *= s; }
+        self.enc.scale(s);
+        self.dec.scale(s);
+        for g in &mut self.attn_w { *g *= s; }
+        for g in &mut self.out_w  { *g *= s; }
+        for g in &mut self.out_b  { *g *= s; }
     }
 }
 

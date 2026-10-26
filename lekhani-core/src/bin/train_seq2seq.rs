@@ -13,6 +13,7 @@ use lekhani_neural::seq2seq::{
     gru_backward, CharVocab, CellGrad, GateBuf, InferenceScratch, S2SGruCell,
     Seq2SeqGrad, Seq2SeqTransliterator, BOS_ID,
 };
+use rayon::prelude::*;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -582,31 +583,38 @@ fn main() {
 
         let mut total_loss = 0.0f32;
         let mut count = 0usize;
-        let mut grad = Seq2SeqGrad::new_for(&model);
-
-        let batch = 32usize;
+        let batch = 64usize;
         for chunk in order.chunks(batch) {
-            grad.zero();
-            let mut batch_loss = 0.0f32;
-            for &idx in chunk {
-                let (loss, enc, dec) = forward(&model, &src_seqs[idx], &tgt_seqs[idx]);
-                if loss.is_finite() {
-                    backward(&model, &src_seqs[idx], &tgt_seqs[idx], &enc, &dec, &mut grad);
-                    batch_loss += loss;
-                    count += 1;
-                }
-            }
+            let (batch_loss, batch_count, mut grad) = chunk
+                .par_iter()
+                .fold(
+                    || (0.0f32, 0usize, Seq2SeqGrad::new_for(&model)),
+                    |(mut loss_acc, mut count_acc, mut grad_acc), &idx| {
+                        let (loss, enc, dec) = forward(&model, &src_seqs[idx], &tgt_seqs[idx]);
+                        if loss.is_finite() {
+                            backward(&model, &src_seqs[idx], &tgt_seqs[idx], &enc, &dec, &mut grad_acc);
+                            loss_acc += loss;
+                            count_acc += 1;
+                        }
+                        (loss_acc, count_acc, grad_acc)
+                    },
+                )
+                .reduce(
+                    || (0.0f32, 0usize, Seq2SeqGrad::new_for(&model)),
+                    |(mut l1, c1, mut g1), (l2, c2, g2)| {
+                        l1 += l2;
+                        g1.add(&g2);
+                        (l1, c1 + c2, g1)
+                    },
+                );
+
             total_loss += batch_loss;
+            count += batch_count;
 
             // Scale gradients by batch size
             let bs = chunk.len().max(1) as f32;
-            for g in grad.enc_emb.iter_mut() { *g /= bs; }
-            for g in grad.dec_emb.iter_mut() { *g /= bs; }
-            for g in grad.attn_w.iter_mut()  { *g /= bs; }
-            for g in grad.out_w.iter_mut()   { *g /= bs; }
-            for g in grad.out_b.iter_mut()   { *g /= bs; }
-            for g in grad.enc.w_ir.iter_mut() { *g /= bs; }
-            // ... apply Adam per param group
+            grad.scale(1.0 / bs);
+            // apply Adam per param group
             scatter_grads(&mut model, &grad, &mut adam, lr);
         }
 
