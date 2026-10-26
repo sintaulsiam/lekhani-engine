@@ -1045,7 +1045,7 @@ impl PhoneticDatabase {
         let is_explicit_common_base = self.lookup_override(input).is_some() || self.lookup_override(&lower).is_some();
         let parser_base = convert_fn(&lower);
         let is_exact_dict_base = !parser_base.is_empty() && (self.is_exact_dictionary_word(&parser_base) || is_explicit_common_base);
-        if (!is_exact_dict_base || lower.contains("khor") || lower.contains("khur")) && lower.contains('r') {
+        if lower.contains('r') {
             let r_indices: Vec<usize> = lower
                 .char_indices()
                 .filter_map(|(idx, ch)| if ch == 'r' { Some(idx) } else { None })
