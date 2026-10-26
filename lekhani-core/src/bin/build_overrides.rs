@@ -5,7 +5,7 @@
 //! preserves golden curated benchmarks, and compiles directly to both JSON and
 //! packed binary table (POVR format).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -36,10 +36,12 @@ fn compute_confidence(count: usize, total: usize) -> f32 {
 }
 
 fn compile_binary_overrides(
-    overrides: &HashMap<String, Vec<(String, f32)>>,
+    overrides: &BTreeMap<String, Vec<(String, f32)>>,
     out_path: &Path,
 ) -> Result<usize, std::io::Error> {
-    let out = lekhani_core::phonetic::overrides::ZeroCopyOverrides::compile(overrides);
+    let out = lekhani_core::phonetic::overrides::ZeroCopyOverrides::compile_to_bytes(
+        overrides.iter().map(|(k, v)| (k.as_str(), v.as_slice())),
+    );
     let mut file = File::create(out_path)?;
     file.write_all(&out)?;
     Ok(out.len())
@@ -278,7 +280,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("antonio", &[("আন্তোনিও", 1.0)]),
     ];
 
-    let mut merged_overrides: HashMap<String, Vec<(String, f32)>> = HashMap::new();
+    let mut merged_overrides: BTreeMap<String, Vec<(String, f32)>> = BTreeMap::new();
     for &(key, cands) in golden_entries {
         let cand_vec = cands
             .iter()
@@ -293,21 +295,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Read Dakshina TSVs (Strictly train split only — dev is for tuning, test is held out)
     let tsv_paths = [
+        PathBuf::from("data/eval/bn.translit.sampled.train.tsv"),
+        PathBuf::from("../data/eval/bn.translit.sampled.train.tsv"),
         PathBuf::from("/home/smsiam/.gemini/antigravity-ide/brain/6e8f5951-b148-4374-87c2-2e54e03df641/scratch/dakshina/dakshina_dataset_v1.0/bn/lexicons/bn.translit.sampled.train.tsv"),
     ];
 
     let mut latin_to_bn_counts: HashMap<String, HashMap<String, usize>> = HashMap::new();
     let mut total_tsv_lines = 0;
 
-    for path in &tsv_paths {
-        if !path.exists() {
-            eprintln!("⚠️ Warning: {:?} not found, skipping.", path);
-            continue;
-        }
-        println!("📥 Reading {:?}...", path.file_name().unwrap());
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        for line in reader.lines() {
+    let train_path = tsv_paths
+        .iter()
+        .find(|p| p.exists())
+        .expect("train.tsv exists");
+    println!("📥 Reading {:?}...", train_path.file_name().unwrap());
+    let file = File::open(train_path)?;
+    let reader = BufReader::new(file);
+    for line in reader.lines() {
             let line = line?;
             let parts: Vec<&str> = line.split('\t').collect();
             if parts.len() != 3 {
@@ -332,7 +335,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .or_insert(0) += cnt;
             total_tsv_lines += 1;
         }
-    }
     println!(
         "📊 Processed {} TSV records across {} unique Latin keys.",
         total_tsv_lines,
