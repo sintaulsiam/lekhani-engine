@@ -2718,7 +2718,7 @@ impl PhoneticSuggestion {
                     final_candidates.push(sc);
                 }
                 final_candidates.truncate(8);
-            } else if !top_is_dict && middle.len() >= 5 {
+            } else if !top_is_dict && middle.len() >= 5 && !self.config.strict_avro_mode {
                 let s2s_cands = s2s.transliterate(middle, 1, scratch);
                 if let Some(top_s2s) = s2s_cands.first() {
                     if !top_s2s.is_empty() {
