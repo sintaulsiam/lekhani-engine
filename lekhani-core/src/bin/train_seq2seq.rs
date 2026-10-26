@@ -154,6 +154,7 @@ struct Adam {
     m: Vec<f32>, // first moment
     v: Vec<f32>, // second moment
     t: usize,
+    offset: usize,
     beta1: f32,
     beta2: f32,
     eps: f32,
@@ -165,51 +166,21 @@ impl Adam {
             m: vec![0.0; n],
             v: vec![0.0; n],
             t: 0,
+            offset: 0,
             beta1: 0.9,
             beta2: 0.999,
             eps: 1e-8,
         }
     }
 
-    fn step(&mut self, params: &mut [f32], grads: &[f32], lr: f32, clip: f32) {
+    fn begin_step(&mut self) {
         self.t += 1;
-        let bc1 = 1.0 - self.beta1.powi(self.t as i32);
-        let bc2 = 1.0 - self.beta2.powi(self.t as i32);
-        let lr_hat = lr * bc2.sqrt() / bc1;
-
-        for i in 0..params.len().min(grads.len()) {
-            let g = grads[i].clamp(-clip, clip);
-            self.m[i] = self.beta1 * self.m[i] + (1.0 - self.beta1) * g;
-            self.v[i] = self.beta2 * self.v[i] + (1.0 - self.beta2) * g * g;
-            params[i] -= lr_hat * self.m[i] / (self.v[i].sqrt() + self.eps);
-        }
+        self.offset = 0;
     }
 }
 
-// Flatten all model parameters into a single Vec (for Adam state)
-fn collect_params(m: &Seq2SeqTransliterator) -> Vec<f32> {
-    let mut p = Vec::with_capacity(m.param_count());
-    p.extend_from_slice(&m.enc_emb);
-    p.extend_from_slice(&m.dec_emb);
-    extend_cell(&mut p, &m.encoder);
-    extend_cell(&mut p, &m.decoder);
-    p.extend_from_slice(&m.attn_w);
-    p.extend_from_slice(&m.out_w);
-    p.extend_from_slice(&m.out_b);
-    p
-}
-
-fn extend_cell(p: &mut Vec<f32>, c: &S2SGruCell) {
-    p.extend_from_slice(&c.w_ir); p.extend_from_slice(&c.w_hz);
-    p.extend_from_slice(&c.w_hr); p.extend_from_slice(&c.b_r);
-    p.extend_from_slice(&c.w_iz); p.extend_from_slice(&c.w_hz);
-    p.extend_from_slice(&c.b_z);
-    p.extend_from_slice(&c.w_in); p.extend_from_slice(&c.w_hn);
-    p.extend_from_slice(&c.b_in); p.extend_from_slice(&c.b_hn);
-}
-
 fn scatter_grads(m: &mut Seq2SeqTransliterator, g: &Seq2SeqGrad, adam: &mut Adam, lr: f32) {
-    // Scatter updates directly from grad struct to model params using Adam
+    adam.begin_step();
     let clip = 5.0f32;
     apply_adam(&mut m.enc_emb, &g.enc_emb, adam, lr, clip);
     apply_adam(&mut m.dec_emb, &g.dec_emb, adam, lr, clip);
@@ -221,17 +192,22 @@ fn scatter_grads(m: &mut Seq2SeqTransliterator, g: &Seq2SeqGrad, adam: &mut Adam
 }
 
 fn apply_adam(params: &mut [f32], grads: &[f32], adam: &mut Adam, lr: f32, clip: f32) {
-    adam.t += 1;
     let bc1 = 1.0 - adam.beta1.powi(adam.t as i32);
     let bc2 = 1.0 - adam.beta2.powi(adam.t as i32);
     let lr_hat = lr * bc2.sqrt() / bc1;
-    let n = params.len().min(grads.len()).min(adam.m.len());
+    let n = params.len().min(grads.len());
+    let offset = adam.offset;
     for i in 0..n {
+        let p_idx = offset + i;
+        if p_idx >= adam.m.len() {
+            break;
+        }
         let g = grads[i].clamp(-clip, clip);
-        adam.m[i] = adam.beta1 * adam.m[i] + (1.0 - adam.beta1) * g;
-        adam.v[i] = adam.beta2 * adam.v[i] + (1.0 - adam.beta2) * g * g;
-        params[i] -= lr_hat * adam.m[i] / (adam.v[i].sqrt() + adam.eps);
+        adam.m[p_idx] = adam.beta1 * adam.m[p_idx] + (1.0 - adam.beta1) * g;
+        adam.v[p_idx] = adam.beta2 * adam.v[p_idx] + (1.0 - adam.beta2) * g * g;
+        params[i] -= lr_hat * adam.m[p_idx] / (adam.v[p_idx].sqrt() + adam.eps);
     }
+    adam.offset += n;
 }
 
 fn apply_cell_adam(cell: &mut S2SGruCell, cg: &CellGrad, adam: &mut Adam, lr: f32, clip: f32) {
