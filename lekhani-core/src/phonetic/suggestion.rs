@@ -2680,10 +2680,10 @@ impl PhoneticSuggestion {
         self.last_computed_features = final_features;
 
         // ── Seq2Seq Safety-Net ─────────────────────────────────────────────────
-        // When the beam decoder's top-1 candidate is not a known dictionary word
-        // (i.e., the correct form was unreachable by the phonetic trie), inject
-        // seq2seq candidates. Dict-word seq2seq candidates get promoted to top-1;
-        // others are appended for user visibility. Maximum 8 total candidates.
+        // Append-only mode: seq2seq candidates are added at the end of the list
+        // and NEVER promoted to top-1 until the model achieves ≥30% top-1 accuracy.
+        // Length gate (≥5 chars): avoids latency cost on short common words where
+        // the beam decoder is almost always correct.
         if let (Some(s2s), Some(scratch)) = (
             self.seq2seq.as_ref().map(Arc::clone),
             self.seq2seq_scratch.as_mut(),
@@ -2693,23 +2693,19 @@ impl PhoneticSuggestion {
                 .first()
                 .map(|f| f.is_in_dict > 0.5)
                 .unwrap_or(false);
-            let s2s_cands = s2s.transliterate(middle, 3, scratch);
-            for sc in s2s_cands {
-                if sc.is_empty() || final_candidates.contains(&sc) {
-                    continue;
-                }
-                let sc_in_dict = self.database.trie.contains_exact(&sc);
-                if !top_is_dict && sc_in_dict {
-                    // Promote to top: beam decoder failed to find a dict word
-                    final_candidates.insert(0, sc);
-                } else {
-                    // Append as additional candidate
+            if !top_is_dict && middle.len() >= 5 {
+                let s2s_cands = s2s.transliterate(middle, 2, scratch);
+                for sc in s2s_cands {
+                    if sc.is_empty() || final_candidates.contains(&sc) {
+                        continue;
+                    }
                     final_candidates.push(sc);
                 }
+                final_candidates.truncate(8);
             }
-            final_candidates.truncate(8);
         }
         // ──────────────────────────────────────────────────────────────────────
+
 
         self.last_computed_candidates = final_candidates.clone();
 
