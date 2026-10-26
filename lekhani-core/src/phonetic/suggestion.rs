@@ -2688,12 +2688,7 @@ impl PhoneticSuggestion {
             self.seq2seq.as_ref().map(Arc::clone),
             self.seq2seq_scratch.as_mut(),
         ) {
-            let top_is_dict = self
-                .last_computed_features
-                .first()
-                .map(|f| f.is_in_dict > 0.5)
-                .unwrap_or(false);
-            if !top_is_dict && middle.len() >= 5 {
+            if final_candidates.is_empty() && middle.len() >= 4 {
                 let s2s_cands = s2s.transliterate(middle, 2, scratch);
                 for sc in s2s_cands {
                     if sc.is_empty() || final_candidates.contains(&sc) {
