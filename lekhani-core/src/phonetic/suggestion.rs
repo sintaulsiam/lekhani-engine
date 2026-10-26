@@ -1197,48 +1197,34 @@ impl PhoneticSuggestion {
             }
         }
 
-        // 4b. Code-Switching Contextual Verb & State Agreement
+        // 4b. Generalized Bilingual Light-Verb & State Agreement (LVC Syntax: Foreign Noun + Light Verb)
         if let Some(&last_ctx) = context.last() {
-            let last_lower = last_ctx.to_lowercase();
-            if matches!(last_lower.as_str(), "post" | "login" | "submit" | "send" | "click")
-                && middle.eq_ignore_ascii_case("koro")
-            {
-                add_cand(
-                    "করো".to_string(),
-                    CandidateSource::ExactDictionary,
-                    9500,
-                    &mut raw_candidates,
-                    &mut seen,
-                );
-                // Force করো as preferred override so it beats autocorrect and unigram LM demotion
-                preferred_override = Some("করো".to_string());
-                is_contextual_override = true;
-            } else if last_lower == "email" && (middle.eq_ignore_ascii_case("pathaw") || middle.eq_ignore_ascii_case("pathao")) {
-                add_cand(
-                    "পাঠাও".to_string(),
-                    CandidateSource::ExactDictionary,
-                    9500,
-                    &mut raw_candidates,
-                    &mut seen,
-                );
-                preferred_override = Some("পাঠাও".to_string());
-                is_contextual_override = true;
-            } else if last_lower == "wifi" && middle.eq_ignore_ascii_case("on") {
-                add_cand(
-                    "অন".to_string(),
-                    CandidateSource::ExactDictionary,
-                    9200,
-                    &mut raw_candidates,
-                    &mut seen,
-                );
-            } else if last_lower == "bluetooth" && middle.eq_ignore_ascii_case("off") {
-                add_cand(
-                    "অফ".to_string(),
-                    CandidateSource::ExactDictionary,
-                    9200,
-                    &mut raw_candidates,
-                    &mut seen,
-                );
+            let is_foreign_or_loan = (last_ctx.len() >= 2 && last_ctx.chars().all(|c| c.is_ascii_alphabetic()))
+                || PhoneticDatabase::get_bilingual_loanword(last_ctx).is_some();
+            if is_foreign_or_loan {
+                let middle_lower = middle.to_lowercase();
+                if let Some(light_verb) = match middle_lower.as_str() {
+                    "koro" => Some("করো"),
+                    "koren" => Some("করেন"),
+                    "koris" => Some("করিস"),
+                    "pathaw" | "pathao" => Some("পাঠাও"),
+                    "dao" => Some("দাও"),
+                    "den" => Some("দেন"),
+                    "nen" => Some("নেন"),
+                    "on" => Some("অন"),
+                    "off" => Some("অফ"),
+                    _ => None,
+                } {
+                    add_cand(
+                        light_verb.to_string(),
+                        CandidateSource::ExactDictionary,
+                        9500,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                    preferred_override = Some(light_verb.to_string());
+                    is_contextual_override = true;
+                }
             }
         }
         if middle.eq_ignore_ascii_case("pathaw") {
