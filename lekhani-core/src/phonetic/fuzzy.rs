@@ -627,6 +627,20 @@ pub fn generate_qwerty_typo_variants(input: &str) -> Vec<String> {
         }
     }
 
+    // 3. Repeated Consonant Deduplication (e.g. "ammi" -> "ami")
+    // Preserve vowel digraphs ('a', 'e', 'i', 'o', 'u') which represent phonological long vowels in Avro (ee, oo, aa, ii, uu)
+    for i in 0..chars.len() - 1 {
+        let c = chars[i];
+        if c == chars[i + 1] && !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'A' | 'E' | 'I' | 'O' | 'U') {
+            let mut deduped = chars.clone();
+            deduped.remove(i);
+            let s: String = deduped.into_iter().collect();
+            if s != input {
+                variants.insert(s);
+            }
+        }
+    }
+
     let mut result: Vec<String> = variants.into_iter().collect();
     result.sort();
     result
