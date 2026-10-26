@@ -1574,8 +1574,14 @@ impl PhoneticSuggestion {
                 );
             }
 
-            if phonetic.starts_with('আ') {
-                let o_cand = format!("অ{}", &phonetic['আ'.len_utf8()..]);
+            let has_a_or_e = phonetic.starts_with('আ') || phonetic.starts_with('এ');
+            if has_a_or_e {
+                let p_len = if phonetic.starts_with('আ') {
+                    'আ'.len_utf8()
+                } else {
+                    'এ'.len_utf8()
+                };
+                let o_cand = format!("অ{}", &phonetic[p_len..]);
                 if (self.database.is_exact_dictionary_word(&o_cand)
                     || self.database.trie.contains_exact(&o_cand))
                     && o_cand != o_phonetic
@@ -2495,9 +2501,18 @@ impl PhoneticSuggestion {
             && preferred_override.is_none()
             && !scored_candidates.is_empty();
 
-        if is_a_ambiguous && scored_candidates[0].0.starts_with('আ') {
+        let top_cand_vowel_prefix = if scored_candidates[0].0.starts_with('আ') {
+            Some('আ'.len_utf8())
+        } else if scored_candidates[0].0.starts_with('এ') {
+            Some('এ'.len_utf8())
+        } else {
+            None
+        };
+
+        if is_a_ambiguous && top_cand_vowel_prefix.is_some() {
+            let prefix_len = top_cand_vowel_prefix.unwrap();
             let top_cand = scored_candidates[0].0.clone();
-            let tail = &top_cand['আ'.len_utf8()..];
+            let tail = &top_cand[prefix_len..];
             let o_equivalent = format!("অ{}", tail);
 
             let o_pos = scored_candidates.iter().position(|(t, _, _)| t == &o_equivalent);
