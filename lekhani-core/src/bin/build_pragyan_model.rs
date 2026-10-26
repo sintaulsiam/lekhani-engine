@@ -489,8 +489,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let vocab = UnitVocab::build(&type_level_seqs);
     println!("   └─ Unit Vocabulary Size: {} units", vocab.id_to_unit.len());
 
-    println!("\n5. Training Compact Joint Unit LM (Order 4, Min Count = 2.0)...");
-    let lm = JointUnitLM::train(&type_level_seqs, vocab, 4, 2.0);
+    println!("\n5. Training Compact Joint Unit LM (Order 4, Min Count = 3.0)...");
+    let lm = JointUnitLM::train(&type_level_seqs, vocab, 4, 3.0);
 
     let serialized = bincode::serialize(&lm)?;
     let size_mb = serialized.len() as f64 / 1024.0 / 1024.0;
