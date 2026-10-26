@@ -20,3 +20,4 @@
 2026-10-26T15:50:00Z | SHA: 88b39ae | Sanskrit velar nasal conjunct equivalence (ঙ্ক/ংক, ঙ্গ/ংগ, ঙ্ঘ/ংঘ) on bn.translit.sampled.test.tsv (N=9228); Natural Top-1 = 46.67% vs baseline 24.16% (+22.51%, +21 test hits), p95 = 2554.2us (<= 3617.5us budget PASS), Dev Natural hits = 4230/9279 (+25 hits)
 
 
+2026-10-26T16:21:58.930525661+00:00 | SHA: ea54135f | Multi-persona test run; dict: data/dictionaries/dictionary.json

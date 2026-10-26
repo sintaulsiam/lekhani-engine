@@ -1597,6 +1597,72 @@ impl PhoneticSuggestion {
             }
         }
 
+        // 7b-ii. Initial Vowel 'o' -> 'অ' Ambiguity Resolution (Natural Banglish Romanization)
+        // Natural romanization overwhelmingly uses 'o' for 'অ' (e.g. onek -> অনেক, onno -> অন্য,
+        // okhondo -> অখণ্ড, onurodh -> অনুরোধ, otithi -> অতিথি, odbhut -> অদ্ভুত, ongkush -> অঙ্কুশ).
+        let is_o_initial = middle.len() >= 2
+            && (middle.starts_with('o') || middle.starts_with('O'))
+            && !middle.starts_with("oo")
+            && !middle.starts_with("Oo")
+            && !middle.starts_with("oO")
+            && !middle.starts_with("OO")
+            && !middle.starts_with("oi")
+            && !middle.starts_with("ou");
+
+        if is_o_initial && !self.config.strict_avro_mode {
+            let a_latin = format!("a{}", &middle[1..]);
+            let a_phonetic = self.convert_phonetic(&a_latin);
+            let is_a_phon_dict = self.database.is_exact_dictionary_word(&a_phonetic)
+                || self.database.trie.contains_exact(&a_phonetic);
+            if is_a_phon_dict {
+                add_cand(
+                    a_phonetic.clone(),
+                    CandidateSource::ExactDictionary,
+                    3900,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+            }
+
+            if phonetic.starts_with('ও') {
+                let o_tail = &phonetic['ও'.len_utf8()..];
+                let o_to_a_cand = format!("অ{}", o_tail);
+                if (self.database.is_exact_dictionary_word(&o_to_a_cand)
+                    || self.database.trie.contains_exact(&o_to_a_cand))
+                    && o_to_a_cand != a_phonetic
+                {
+                    add_cand(
+                        o_to_a_cand,
+                        CandidateSource::ExactDictionary,
+                        3900,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+            }
+            if a_phonetic.starts_with('আ') || a_phonetic.starts_with('এ') {
+                let p_len = if a_phonetic.starts_with('আ') {
+                    'আ'.len_utf8()
+                } else {
+                    'এ'.len_utf8()
+                };
+                let a_tail = &a_phonetic[p_len..];
+                let a_to_o_cand = format!("অ{}", a_tail);
+                if (self.database.is_exact_dictionary_word(&a_to_o_cand)
+                    || self.database.trie.contains_exact(&a_to_o_cand))
+                    && a_to_o_cand != a_phonetic
+                {
+                    add_cand(
+                        a_to_o_cand,
+                        CandidateSource::ExactDictionary,
+                        3900,
+                        &mut raw_candidates,
+                        &mut seen,
+                    );
+                }
+            }
+        }
+
         // 7c. Natural Consonant Inherent-Vowel & Digraph Sound Law
         // In natural Bengali transliteration, typists write 'a' for the inherent vowel 'অ'
         // (Hunterian/ITRANS: chalaman -> চলমান, badan -> বদন, upanibeshbad -> উপনিবেশবাদ,
@@ -2302,7 +2368,9 @@ impl PhoneticSuggestion {
                 } else {
                     cand.initial_boost + 6000
                 };
-                scored_candidates.push((cand.text.clone(), boost, RankFeatures::default()));
+                let mut feats = RankFeatures::default();
+                feats.is_in_dict = 1.0;
+                scored_candidates.push((cand.text.clone(), boost, feats));
                 continue;
             }
 
@@ -2703,11 +2771,11 @@ impl PhoneticSuggestion {
             self.seq2seq.as_ref().map(Arc::clone),
             self.seq2seq_scratch.as_mut(),
         ) {
-            let top_is_dict = self
+            let top_has_dict = self
                 .last_computed_features
-                .first()
-                .map(|f| f.is_in_dict > 0.5)
-                .unwrap_or(false);
+                .iter()
+                .take(2)
+                .any(|f| f.is_in_dict > 0.5);
 
             if final_candidates.is_empty() && middle.len() >= 4 {
                 let s2s_cands = s2s.transliterate(middle, 2, scratch);
@@ -2718,7 +2786,7 @@ impl PhoneticSuggestion {
                     final_candidates.push(sc);
                 }
                 final_candidates.truncate(8);
-            } else if !top_is_dict && middle.len() >= 5 && !self.config.strict_avro_mode {
+            } else if !top_has_dict && !is_code && middle.len() >= 5 && !self.config.strict_avro_mode {
                 let s2s_cands = s2s.transliterate(middle, 1, scratch);
                 if let Some(top_s2s) = s2s_cands.first() {
                     if !top_s2s.is_empty() {
@@ -3034,8 +3102,14 @@ impl PhoneticSuggestion {
                         has_verified_base = true;
                     }
                     let is_base_aa = base_phonetic.starts_with('আ');
+                    let is_base_oo = base_phonetic.starts_with('ও');
                     let base_aa_tail = if is_base_aa {
                         base_phonetic['আ'.len_utf8()..].to_string()
+                    } else {
+                        String::new()
+                    };
+                    let base_oo_tail = if is_base_oo {
+                        base_phonetic['ও'.len_utf8()..].to_string()
                     } else {
                         String::new()
                     };
@@ -3068,6 +3142,53 @@ impl PhoneticSuggestion {
                                 && !base_candidates.contains(&conv_o_cand)
                             {
                                 base_candidates.push(conv_o_cand);
+                                has_verified_base = true;
+                            }
+                        }
+                    }
+
+                    // Initial 'o' -> 'অ' stem support for suffixed words (e.g. "onchol" in "oncholke" -> "অঞ্চল" -> "অঞ্চলকে", "okkhorke" -> "অক্ষরকে")
+                    let is_base_o_initial = base_key.len() >= 2
+                        && (base_key.starts_with('o') || base_key.starts_with('O'))
+                        && !base_key.starts_with("oo")
+                        && !base_key.starts_with("Oo")
+                        && !base_key.starts_with("oO")
+                        && !base_key.starts_with("OO")
+                        && !base_key.starts_with("oi")
+                        && !base_key.starts_with("ou");
+
+                    if is_base_o_initial {
+                        let base_a_latin = format!("a{}", &base_key[1..]);
+                        let conv_a = self.convert_phonetic(&base_a_latin);
+                        if (self.database.is_exact_dictionary_word(&conv_a)
+                            || self.database.trie.contains_exact(&conv_a))
+                            && !base_candidates.contains(&conv_a)
+                        {
+                            base_candidates.push(conv_a.clone());
+                            has_verified_base = true;
+                        }
+                        if conv_a.starts_with('আ') || conv_a.starts_with('এ') {
+                            let p_len = if conv_a.starts_with('আ') {
+                                'আ'.len_utf8()
+                            } else {
+                                'এ'.len_utf8()
+                            };
+                            let conv_a_o_cand = format!("অ{}", &conv_a[p_len..]);
+                            if (self.database.is_exact_dictionary_word(&conv_a_o_cand)
+                                || self.database.trie.contains_exact(&conv_a_o_cand))
+                                && !base_candidates.contains(&conv_a_o_cand)
+                            {
+                                base_candidates.push(conv_a_o_cand);
+                                has_verified_base = true;
+                            }
+                        }
+                        if is_base_oo {
+                            let conv_o_to_a = format!("অ{}", base_oo_tail);
+                            if (self.database.is_exact_dictionary_word(&conv_o_to_a)
+                                || self.database.trie.contains_exact(&conv_o_to_a))
+                                && !base_candidates.contains(&conv_o_to_a)
+                            {
+                                base_candidates.push(conv_o_to_a);
                                 has_verified_base = true;
                             }
                         }

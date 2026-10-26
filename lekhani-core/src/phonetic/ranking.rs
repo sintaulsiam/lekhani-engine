@@ -325,12 +325,14 @@ pub fn extract_candidate_features(
 
     // 1. Dictionary & Trie Presence
     if is_in_dict
+        || cand.source == CandidateSource::ExactDictionary
         || cand.source == CandidateSource::MorphologicalInflection
         || cand.source == CandidateSource::Autocorrect
         || cand.source == CandidateSource::Loanword
         || cand.source == CandidateSource::PhoneticOverride
         || cand.source == CandidateSource::SegmentedLattice
         || cand.source == CandidateSource::FuzzySoundLaw
+        || cand.source == CandidateSource::CodeShield
     {
         f.is_in_dict = 1.0;
     } else if cand.source == CandidateSource::DirectTransliteration
