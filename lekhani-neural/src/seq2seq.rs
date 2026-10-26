@@ -123,6 +123,26 @@ pub struct S2SGruCell {
     pub b_hn: Vec<f32>,
 }
 
+/// SIMD-friendly 8-wide chunked dot product
+#[inline(always)]
+pub fn dot(a: &[f32], b: &[f32]) -> f32 {
+    let chunks_a = a.chunks_exact(8);
+    let chunks_b = b.chunks_exact(8);
+    let rem_a = chunks_a.remainder();
+    let rem_b = chunks_b.remainder();
+    let mut acc = [0.0f32; 8];
+    for (ca, cb) in chunks_a.zip(chunks_b) {
+        for k in 0..8 {
+            acc[k] += ca[k] * cb[k];
+        }
+    }
+    let mut sum = acc[0] + acc[1] + acc[2] + acc[3] + acc[4] + acc[5] + acc[6] + acc[7];
+    for (&x, &y) in rem_a.iter().zip(rem_b.iter()) {
+        sum += x * y;
+    }
+    sum
+}
+
 impl S2SGruCell {
     pub fn new_zeros(input_dim: usize, hidden_dim: usize) -> Self {
         let ih = hidden_dim * input_dim;
@@ -144,20 +164,18 @@ impl S2SGruCell {
         let in_d = self.input_dim;
         for i in 0..h {
             // Reset gate
-            let mut rv = self.b_r[i];
-            for (j, &xv) in x.iter().enumerate() { rv += self.w_ir[i * in_d + j] * xv; }
-            for (j, &hv) in h_prev.iter().enumerate() { rv += self.w_hr[i * h + j] * hv; }
+            let rv = self.b_r[i]
+                + dot(&self.w_ir[i * in_d..(i + 1) * in_d], x)
+                + dot(&self.w_hr[i * h..(i + 1) * h], h_prev);
             let r = sigmoid(rv);
             // Update gate
-            let mut zv = self.b_z[i];
-            for (j, &xv) in x.iter().enumerate() { zv += self.w_iz[i * in_d + j] * xv; }
-            for (j, &hv) in h_prev.iter().enumerate() { zv += self.w_hz[i * h + j] * hv; }
+            let zv = self.b_z[i]
+                + dot(&self.w_iz[i * in_d..(i + 1) * in_d], x)
+                + dot(&self.w_hz[i * h..(i + 1) * h], h_prev);
             let z = sigmoid(zv);
             // Candidate
-            let mut nin = self.b_in[i];
-            for (j, &xv) in x.iter().enumerate() { nin += self.w_in[i * in_d + j] * xv; }
-            let mut nhn = self.b_hn[i];
-            for (j, &hv) in h_prev.iter().enumerate() { nhn += self.w_hn[i * h + j] * hv; }
+            let nin = self.b_in[i] + dot(&self.w_in[i * in_d..(i + 1) * in_d], x);
+            let nhn = self.b_hn[i] + dot(&self.w_hn[i * h..(i + 1) * h], h_prev);
             let n = fast_tanh(nin + r * nhn);
             h_out[i] = (1.0 - z) * n + z * h_prev[i];
             if let Some(ref mut gb) = gate_buf.as_deref_mut() {
@@ -299,19 +317,15 @@ impl Seq2SeqTransliterator {
     /// Uses dot-product attention with W_a projection on encoder states.
     fn attend(&self, dec_h: &[f32], enc_states: &[Vec<f32>], ctx_out: &mut [f32]) {
         let h = self.hidden_dim;
-        // Transform dec_h: q = attn_w^T · dec_h  (h × h) · h → h
+        // Transform dec_h: q = attn_w · dec_h
         let mut q = vec![0.0f32; h];
         for i in 0..h {
-            let mut v = 0.0f32;
-            for j in 0..h {
-                v += self.attn_w[i * h + j] * dec_h[j];
-            }
-            q[i] = v;
+            q[i] = dot(&self.attn_w[i * h..(i + 1) * h], dec_h);
         }
-        // Scores: dot(q, enc_i) for each encoder step
+        // Scores: dot(enc_i, q) for each encoder step
         let mut scores = vec![0.0f32; enc_states.len()];
         for (t, enc_h) in enc_states.iter().enumerate() {
-            scores[t] = enc_h.iter().zip(q.iter()).map(|(&a, &b)| a * b).sum();
+            scores[t] = dot(enc_h, &q);
         }
         // Softmax
         let max_s = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
@@ -338,11 +352,7 @@ impl Seq2SeqTransliterator {
         let tv = self.tgt_vocab.size();
         let h = self.hidden_dim;
         for v in 0..tv {
-            let mut s = self.out_b[v];
-            for j in 0..h {
-                s += self.out_w[v * h + j] * dec_h[j];
-            }
-            logits[v] = s;
+            logits[v] = self.out_b[v] + dot(&self.out_w[v * h..(v + 1) * h], dec_h);
         }
     }
 
