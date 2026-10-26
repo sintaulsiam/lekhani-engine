@@ -2380,17 +2380,13 @@ impl PhoneticSuggestion {
             let trie_contains = self.database.trie.contains_exact(&cand.text);
             let is_clitic_o = is_clitic_o_word(&cand.text);
 
-            let decomp = if cand.source == CandidateSource::MorphologicalInflection {
-                morph_analyzer.decompose(&cand.text)
-            } else {
-                None
-            };
+            let decomp = morph_analyzer.decompose(&cand.text);
 
-            if !is_in_dict && freq == 0 {
+            if freq == 0 {
                 if let Some(ref d) = decomp {
                     let root_freq = self.database.get_frequency(d.root);
                     if root_freq > 0 {
-                        freq = (root_freq / 10).min(50);
+                        freq = (root_freq * 3 / 4).max(50);
                     }
                 }
             }
@@ -2490,6 +2486,8 @@ impl PhoneticSuggestion {
             let score = cand.initial_boost + weights.compute_score(&features);
 
             scored_candidates.push((cand.text.clone(), score, features));
+
+
         }
 
         // Sort candidates by descending total score
@@ -3218,13 +3216,22 @@ impl PhoneticSuggestion {
                         }
                     }
 
+                    let mut suffixes_to_try = vec![suffix];
+                    if suffix_key == "ta" {
+                        suffixes_to_try.push("তা");
+                    } else if suffix_key == "ti" {
+                        suffixes_to_try.push("তি");
+                    }
+
                     for base in &base_candidates {
-                        let word = super::morphology::apply_sandhi_join(base, suffix);
-                        if (self.database.is_exact_dictionary_word(&word)
-                            || self.database.is_exact_dictionary_word(base))
-                            && !list.iter().any(|item| item == &word)
-                        {
-                            list.push(word);
+                        for sfx in &suffixes_to_try {
+                            let word = super::morphology::apply_sandhi_join(base, sfx);
+                            if (self.database.is_exact_dictionary_word(&word)
+                                || self.database.is_exact_dictionary_word(base))
+                                && !list.iter().any(|item| item == &word)
+                            {
+                                list.push(word);
+                            }
                         }
                     }
                 }
