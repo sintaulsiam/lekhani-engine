@@ -110,6 +110,10 @@ pub struct PhoneticSuggestion {
     pub config: PhoneticSuggestionConfig,
     pub neural_predictor: Option<Arc<lekhani_neural::NeuralContextPredictor>>,
     pub pragyan_engine: Option<Arc<crate::phonetic::pragyan::PragyanEngine>>,
+    /// Seq2Seq character-level transliterator safety net
+    pub seq2seq: Option<Arc<lekhani_neural::Seq2SeqTransliterator>>,
+    /// Pre-allocated inference buffers for seq2seq (avoids per-call heap allocation)
+    seq2seq_scratch: Option<lekhani_neural::InferenceScratch>,
     /// Generation number mirroring database.generation. When they diverge the
     /// local cache is stale and must be cleared before the next lookup.
     cache_generation: u64,
@@ -158,6 +162,30 @@ fn probe_neural_predictor() -> Option<Arc<lekhani_neural::NeuralContextPredictor
 
 fn probe_pragyan_engine() -> Option<Arc<crate::phonetic::pragyan::PragyanEngine>> {
     crate::phonetic::pragyan::PragyanEngine::probe()
+}
+
+fn probe_seq2seq() -> Option<(Arc<lekhani_neural::Seq2SeqTransliterator>, lekhani_neural::InferenceScratch)> {
+    let mut candidate_dirs: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(env_dir) = std::env::var("LEKHANI_MODELS_DIR") {
+        candidate_dirs.push(std::path::PathBuf::from(env_dir));
+    }
+    candidate_dirs.extend([
+        std::path::PathBuf::from("data/dictionaries"),
+        std::path::PathBuf::from("../data/dictionaries"),
+        std::path::PathBuf::from("../../data/dictionaries"),
+        std::path::PathBuf::from("/usr/local/share/lekhani/dictionaries"),
+        std::path::PathBuf::from("/usr/share/lekhani/dictionaries"),
+    ]);
+    for dir in &candidate_dirs {
+        let p = dir.join("seq2seq_transliterator.bin");
+        if p.exists() {
+            if let Ok(model) = lekhani_neural::Seq2SeqTransliterator::load(&p) {
+                let scratch = lekhani_neural::InferenceScratch::for_model(&model);
+                return Some((Arc::new(model), scratch));
+            }
+        }
+    }
+    None
 }
 
 impl std::fmt::Debug for PhoneticSuggestion {
@@ -261,11 +289,18 @@ impl PhoneticSuggestion {
             config: PhoneticSuggestionConfig::default(),
             neural_predictor: probe_neural_predictor(),
             pragyan_engine: probe_pragyan_engine(),
+            seq2seq: None,
+            seq2seq_scratch: None,
             cache_generation: 0,
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
             last_lps_chips: Vec::new(),
         };
+        // Lazy-probe seq2seq after struct is built (avoids startup cost if model absent)
+        if let Some((s2s, scratch)) = probe_seq2seq() {
+            sugg.seq2seq = Some(s2s);
+            sugg.seq2seq_scratch = Some(scratch);
+        }
         sugg.sync_pragyan_dictionary();
         sugg
     }
@@ -361,11 +396,17 @@ impl PhoneticSuggestion {
             config: PhoneticSuggestionConfig::default(),
             neural_predictor: probe_neural_predictor(),
             pragyan_engine: probe_pragyan_engine(),
+            seq2seq: None,
+            seq2seq_scratch: None,
             cache_generation: 0,
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
             last_lps_chips: Vec::new(),
         };
+        if let Some((s2s, scratch)) = probe_seq2seq() {
+            sugg.seq2seq = Some(s2s);
+            sugg.seq2seq_scratch = Some(scratch);
+        }
         sugg.sync_pragyan_dictionary();
         sugg
     }
@@ -2637,6 +2678,39 @@ impl PhoneticSuggestion {
         }
 
         self.last_computed_features = final_features;
+
+        // ── Seq2Seq Safety-Net ─────────────────────────────────────────────────
+        // When the beam decoder's top-1 candidate is not a known dictionary word
+        // (i.e., the correct form was unreachable by the phonetic trie), inject
+        // seq2seq candidates. Dict-word seq2seq candidates get promoted to top-1;
+        // others are appended for user visibility. Maximum 8 total candidates.
+        if let (Some(s2s), Some(scratch)) = (
+            self.seq2seq.as_ref().map(Arc::clone),
+            self.seq2seq_scratch.as_mut(),
+        ) {
+            let top_is_dict = self
+                .last_computed_features
+                .first()
+                .map(|f| f.is_in_dict > 0.5)
+                .unwrap_or(false);
+            let s2s_cands = s2s.transliterate(middle, 3, scratch);
+            for sc in s2s_cands {
+                if sc.is_empty() || final_candidates.contains(&sc) {
+                    continue;
+                }
+                let sc_in_dict = self.database.trie.contains_exact(&sc);
+                if !top_is_dict && sc_in_dict {
+                    // Promote to top: beam decoder failed to find a dict word
+                    final_candidates.insert(0, sc);
+                } else {
+                    // Append as additional candidate
+                    final_candidates.push(sc);
+                }
+            }
+            final_candidates.truncate(8);
+        }
+        // ──────────────────────────────────────────────────────────────────────
+
         self.last_computed_candidates = final_candidates.clone();
 
         // Cache the computed candidates for instant sub-millisecond retrieval (bounded to 128 entries)
