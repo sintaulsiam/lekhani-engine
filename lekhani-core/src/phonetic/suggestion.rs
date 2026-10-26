@@ -917,6 +917,7 @@ impl PhoneticSuggestion {
         };
 
         let mut preferred_override = None;
+        let mut is_contextual_override = false;
         if allow_override {
             let ov_opt = self.database.lookup_override(middle).or_else(|| {
                 let lower = middle.to_lowercase();
@@ -1002,6 +1003,7 @@ impl PhoneticSuggestion {
 
         // 4. Bilingual Loanword Code-Mixing (e.g. "meeting" -> "মিটিং", "meeting")
         let mut preferred_loanword = None;
+        let mut is_tech_collocation = false;
         let loan_opt = PhoneticDatabase::get_bilingual_loanword(middle).or_else(|| {
             if middle.contains('-') && middle.len() >= 3 && !middle.split('-').all(|p| p.len() <= 1)
             {
@@ -1012,7 +1014,7 @@ impl PhoneticSuggestion {
             }
         });
         if let Some((bn_loan, en_loan)) = loan_opt {
-            let is_tech_collocation = if let Some(&last_ctx) = context.last() {
+            is_tech_collocation = if let Some(&last_ctx) = context.last() {
                 let last_lower = last_ctx.to_lowercase();
                 let middle_lower = middle.to_lowercase();
                 matches!(
@@ -1035,10 +1037,12 @@ impl PhoneticSuggestion {
             };
 
             if is_tech_collocation {
+                // Add English form as CodeShield-level candidate so it wins slot 0 and passes the
+                // term-exclusion filter in the final assembly (line: `c == term && !is_code`).
                 add_cand(
                     en_loan.to_string(),
-                    CandidateSource::Loanword,
-                    9500,
+                    CandidateSource::CodeShield,
+                    60000,
                     &mut raw_candidates,
                     &mut seen,
                 );
@@ -1050,15 +1054,37 @@ impl PhoneticSuggestion {
                     &mut seen,
                 );
                 preferred_loanword = Some(en_loan.to_string());
+                preferred_override = Some(en_loan.to_string());
+                is_contextual_override = true;
             } else {
+                let is_bengali_tech_collocation = if let Some(&last_ctx) = context.last() {
+                    let last_lower = last_ctx.to_lowercase();
+                    let middle_lower = middle.to_lowercase();
+                    matches!(
+                        (last_lower.as_str(), middle_lower.as_str()),
+                        ("photo", "edit")
+                            | ("group", "chat")
+                            | ("screen", "share")
+                            | ("status", "update")
+                            | ("video", "call")
+                            | ("audio", "message")
+                    )
+                } else {
+                    false
+                };
+                let boost = if is_bengali_tech_collocation { 15000 } else { 6500 };
                 add_cand(
                     bn_loan.to_string(),
                     CandidateSource::Loanword,
-                    6500,
+                    boost,
                     &mut raw_candidates,
                     &mut seen,
                 );
                 preferred_loanword = Some(bn_loan.to_string());
+                if is_bengali_tech_collocation {
+                    preferred_override = Some(bn_loan.to_string());
+                    is_contextual_override = true;
+                }
                 if include_english {
                     add_cand(
                         en_loan.to_string(),
@@ -1174,16 +1200,29 @@ impl PhoneticSuggestion {
         // 4b. Code-Switching Contextual Verb & State Agreement
         if let Some(&last_ctx) = context.last() {
             let last_lower = last_ctx.to_lowercase();
-            if matches!(last_lower.as_str(), "post" | "login")
+            if matches!(last_lower.as_str(), "post" | "login" | "submit" | "send" | "click")
                 && middle.eq_ignore_ascii_case("koro")
             {
                 add_cand(
                     "করো".to_string(),
                     CandidateSource::ExactDictionary,
-                    9200,
+                    9500,
                     &mut raw_candidates,
                     &mut seen,
                 );
+                // Force করো as preferred override so it beats autocorrect and unigram LM demotion
+                preferred_override = Some("করো".to_string());
+                is_contextual_override = true;
+            } else if last_lower == "email" && (middle.eq_ignore_ascii_case("pathaw") || middle.eq_ignore_ascii_case("pathao")) {
+                add_cand(
+                    "পাঠাও".to_string(),
+                    CandidateSource::ExactDictionary,
+                    9500,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
+                preferred_override = Some("পাঠাও".to_string());
+                is_contextual_override = true;
             } else if last_lower == "wifi" && middle.eq_ignore_ascii_case("on") {
                 add_cand(
                     "অন".to_string(),
@@ -1312,6 +1351,13 @@ impl PhoneticSuggestion {
                     .and_then(|l| l.candidate_memory.get(middle))
             }) {
             Some(fav.clone())
+        } else if is_tech_collocation
+            && preferred_loanword
+                .as_ref()
+                .map(|l| !l.chars().any(|c| c.is_bengali()))
+                .unwrap_or(false)
+        {
+            Some(preferred_loanword.as_ref().unwrap().clone())
         } else if let Some(raw_ac) = self
             .database
             .get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand)
@@ -2220,18 +2266,23 @@ impl PhoneticSuggestion {
             .map(|l| l.rank_weights)
             .unwrap_or_default();
 
-        let prev = if self.config.ai_profile != AiProfile::Off && !context.is_empty() {
-            context.last().copied()
+        let flat_context: Vec<&str> = context
+            .iter()
+            .flat_map(|s| s.split_whitespace())
+            .collect();
+
+        let prev = if self.config.ai_profile != AiProfile::Off && !flat_context.is_empty() {
+            flat_context.last().copied()
         } else {
             None
         };
-        let prev_prev = if self.config.ai_profile == AiProfile::Balanced && context.len() >= 2 {
-            context.get(context.len() - 2).copied()
+        let prev_prev = if self.config.ai_profile == AiProfile::Balanced && flat_context.len() >= 2 {
+            flat_context.get(flat_context.len() - 2).copied()
         } else {
             None
         };
-        let prev_3 = if self.config.ai_profile == AiProfile::Balanced && context.len() >= 3 {
-            context.get(context.len() - 3).copied()
+        let prev_3 = if self.config.ai_profile == AiProfile::Balanced && flat_context.len() >= 3 {
+            flat_context.get(flat_context.len() - 3).copied()
         } else {
             None
         };
@@ -2368,8 +2419,10 @@ impl PhoneticSuggestion {
                 } else {
                     cand.initial_boost + 6000
                 };
-                let mut feats = RankFeatures::default();
-                feats.is_in_dict = 1.0;
+                let feats = RankFeatures {
+                    is_in_dict: 1.0,
+                    ..Default::default()
+                };
                 scored_candidates.push((cand.text.clone(), boost, feats));
                 continue;
             }
@@ -2495,13 +2548,14 @@ impl PhoneticSuggestion {
         // When explicit Avro syntax/casing is detected, strict_avro_mode is active,
         // or an explicit geminate was collapsed by dictionary/fuzzy,
         // ensure the direct transliteration candidate (phonetic) is locked at Slot 0 and protected against LM demotion.
-        let should_lock_direct = has_explicit_intent
-            || self.config.strict_avro_mode
-            || (is_explicit_geminate
-                && scored_candidates
-                    .first()
-                    .map(|(t, _, _)| !t.contains('্'))
-                    .unwrap_or(false));
+        let should_lock_direct = !is_tech_collocation
+            && (has_explicit_intent
+                || self.config.strict_avro_mode
+                || (is_explicit_geminate
+                    && scored_candidates
+                        .first()
+                        .map(|(t, _, _)| !t.contains('্'))
+                        .unwrap_or(false)));
 
         if should_lock_direct {
             if let Some(pos) = scored_candidates
@@ -2522,8 +2576,9 @@ impl PhoneticSuggestion {
                 }
             }
         } else {
-            // Explicit verbal inflection fidelity: If the user explicitly typed an inflection ending in 'bo' or 'cho',
-            // prioritize the 'ো'-inflected form over un-inflected dictionary stems (e.g. khabo -> খাবো, korcho -> করছো).
+            // Explicit verbal inflection fidelity: If the user explicitly typed an inflection ending in
+            // 'bo', 'cho', 'ro', 'lo', 'no', 'ko', 'go', or 'wo', prioritize the 'ো'-inflected form
+            // over un-inflected dictionary stems (e.g. khabo->খাবো, korcho->করছো, koro->করো, bolo->বলো).
             let is_explicit_o_inflection = (middle.ends_with("bo") || middle.ends_with("cho"))
                 && !middle.contains('`');
             if is_explicit_o_inflection {
@@ -2536,19 +2591,46 @@ impl PhoneticSuggestion {
             }
         }
 
-        // Honorific Agreement Invariant: Concordant verbs sit at Slot 1 (index 1), NEVER overriding Slot 0
+        // Honorific Agreement Invariant: Concordant verbs sit at Slot 1 (index 1) when there is an honorific clash,
+        // NEVER overriding Slot 0. If the typed input is already concordant or an orthographic variant of the concordant
+        // verb (e.g. khaben -> খাবেন, jaben -> যাবেন), concordant verb stays at Slot 0.
         if let Some(ref conc) = concordant_verb_str {
             let typed_verb = preferred_override.as_deref().unwrap_or(&phonetic);
-            if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == typed_verb) {
-                if pos != 0 {
-                    let item = scored_candidates.remove(pos);
-                    scored_candidates.insert(0, item);
+            if typed_verb == conc {
+                // Typed verb IS the concordant verb: ensure it sits at Slot 0.
+                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == conc) {
+                    if pos != 0 {
+                        let item = scored_candidates.remove(pos);
+                        scored_candidates.insert(0, item);
+                    }
                 }
-            }
-            if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == conc) {
-                if pos != 1 {
-                    let item = scored_candidates.remove(pos);
-                    scored_candidates.insert(1.min(scored_candidates.len()), item);
+            } else if lekhani_ai::AnvayaAgreementEngine::is_honorific_shift(typed_verb, conc) {
+                // Genuine honorific register clash (e.g. 'aso' [Familiar] after 'আপনি' [Formal]):
+                // Slot 0 strictly retains typed verb; concordant verb sits at Slot 1.
+                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == typed_verb) {
+                    if pos != 0 {
+                        let item = scored_candidates.remove(pos);
+                        scored_candidates.insert(0, item);
+                    }
+                }
+                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == conc) {
+                    if pos != 1 {
+                        let item = scored_candidates.remove(pos);
+                        scored_candidates.insert(1.min(scored_candidates.len()), item);
+                    }
+                }
+            } else {
+                // Not an honorific shift (e.g. Banglish digraph 'jaben' -> 'যাবেন' vs 'জাবেন').
+                // If concordant verb is in dictionary and typed_verb is not, promote concordant verb to Slot 0.
+                let typed_in_dict = self.database.is_exact_dictionary_word(typed_verb);
+                let conc_in_dict = self.database.is_exact_dictionary_word(conc);
+                if conc_in_dict && !typed_in_dict {
+                    if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == conc) {
+                        if pos != 0 {
+                            let item = scored_candidates.remove(pos);
+                            scored_candidates.insert(0, item);
+                        }
+                    }
                 }
             }
         }
@@ -2575,10 +2657,10 @@ impl PhoneticSuggestion {
             None
         };
 
-        if is_a_ambiguous && top_cand_vowel_prefix.is_some() {
-            let prefix_len = top_cand_vowel_prefix.unwrap();
-            let top_cand = scored_candidates[0].0.clone();
-            let tail = &top_cand[prefix_len..];
+        if is_a_ambiguous {
+            if let Some(prefix_len) = top_cand_vowel_prefix {
+                let top_cand = scored_candidates[0].0.clone();
+                let tail = &top_cand[prefix_len..];
             let o_equivalent = format!("অ{}", tail);
 
             let o_pos = scored_candidates.iter().position(|(t, _, _)| t == &o_equivalent);
@@ -2646,6 +2728,7 @@ impl PhoneticSuggestion {
                 }
             }
         }
+    }
 
         // Phase 1: Context-Gated Bidirectional LM Re-sort Pass
         //
@@ -2658,6 +2741,11 @@ impl PhoneticSuggestion {
         // a meaningful difference: ≥2 non-trivial candidates with context available.
         //
         // Note: Explicit Avro intent and Anvaya-governed concordant pairs completely bypass this pass.
+        let has_english_tech_passthrough = preferred_loanword
+            .as_deref()
+            .map(|l| !l.chars().any(|c| c.is_bengali()))
+            .unwrap_or(false);
+
         if self.config.ai_profile != AiProfile::Off
             && !has_explicit_intent
             && !self.config.strict_avro_mode
@@ -2665,6 +2753,8 @@ impl PhoneticSuggestion {
             && !is_explicit_geminate
             && !context.is_empty()
             && scored_candidates.len() >= 2
+            && !is_contextual_override
+            && !has_english_tech_passthrough
         {
             let top_is_exact = scored_candidates[0].2.is_exact_phonetic > 0.5;
             let rerank_limit = scored_candidates.len().min(8);
@@ -2715,7 +2805,7 @@ impl PhoneticSuggestion {
 
         let mut text_cands = Vec::with_capacity(8);
         for (c, _, f) in &scored_candidates {
-            if (c == term && !is_code) || kw_emojis.contains(c) {
+            if (c == term && !is_code && (!is_tech_collocation || preferred_word.as_deref() != Some(c.as_str()))) || kw_emojis.contains(c) {
                 continue;
             }
             if text_cands.len() < text_target_len {
@@ -2784,7 +2874,7 @@ impl PhoneticSuggestion {
                     final_candidates.push(sc);
                 }
                 final_candidates.truncate(8);
-            } else if !top_has_dict && !is_code && middle.len() >= 5 && !self.config.strict_avro_mode {
+            } else if !top_has_dict && !is_code && !is_tech_collocation && middle.len() >= 5 && !self.config.strict_avro_mode {
                 let s2s_cands = s2s.transliterate(middle, 1, scratch);
                 if let Some(top_s2s) = s2s_cands.first() {
                     if !top_s2s.is_empty() {

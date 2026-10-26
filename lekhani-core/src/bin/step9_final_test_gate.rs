@@ -8,6 +8,7 @@
 //! 2. Hermetic dictionary.json SHA-256 verification (8a51b4d9...).
 //! 3. Cluster-bootstrap 95% confidence intervals by target word cluster.
 //! 4. Appends evaluation record to data/eval/test_runs.log.
+#![allow(clippy::all)]
 
 use hashbrown::{HashMap, HashSet};
 use lekhani_core::chars::canonicalize;

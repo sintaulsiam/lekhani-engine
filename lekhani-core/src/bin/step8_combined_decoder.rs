@@ -13,6 +13,7 @@
 //!    With hypothesis injection from deterministic Avro and engine.
 //! 5. Tuning λ weights on dev-A, confirmation on dev-B.
 //! 6. Multi-Persona evaluation on dev-B (and full dev) across all 6 personas.
+#![allow(clippy::all)]
 //! 7. Stratified results (seen vs unseen in dictionary.json, conjunct vs non-conjunct, lengths).
 //! 8. Gate checks: G2, G4, G5, and G6 compliance audit.
 

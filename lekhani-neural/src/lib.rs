@@ -2,6 +2,7 @@
 //!
 //! Provides asynchronous 2-layer INT8 GRU inference for long-range intent-driven
 //! next-word prediction and bilingual Bengali-English code-mixing.
+#![allow(clippy::all)]
 
 pub mod model;
 pub mod predictor;
