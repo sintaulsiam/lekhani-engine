@@ -380,13 +380,7 @@ pub fn extract_candidate_features(
                 || cand.source == CandidateSource::Autocorrect
                 || cand.source == CandidateSource::Loanword
                 || cand.source == CandidateSource::PhoneticOverride;
-            f.is_exact_phonetic = if is_dict_equiv {
-                1.0
-            } else if ctx.has_dominant_homophone && !ctx.has_explicit_intent {
-                0.0
-            } else {
-                0.43
-            };
+            f.is_exact_phonetic = if is_dict_equiv { 1.0 } else { 0.43 };
             // Avro-native anchor: fires only when the Avro-native output is a real dict word.
             // Without the dict guard, ambiguous outputs like শবাই would incorrectly beat সবাই.
             if cand.text == ctx.phonetic && is_in_dict {
@@ -435,8 +429,6 @@ pub fn extract_candidate_features(
                 let input_ends_ey = ctx.middle.len() >= 5 && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
                 let dropped_ey_suffix = input_ends_ey && !cand.text.ends_with('ে') && !cand.text.ends_with('ই') && !cand.text.ends_with('য়');
                 let dropped_ke_suffix = ctx.has_ke_suffix_candidate && !cand.text.ends_with("কে");
-                let input_ends_a = ctx.middle.len() >= 4 && (ctx.middle.ends_with('a') || ctx.middle.ends_with('A')) && !ctx.middle.ends_with("aa") && !ctx.middle.ends_with("Aa");
-                let dropped_a_suffix = input_ends_a && ctx.phonetic.ends_with('া') && !cand.text.ends_with('া') && !cand.text.ends_with('আ') && !cand.text.ends_with("য়া");
 
                 let input_has_i = ctx.middle.contains(['i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']) || ctx.middle.contains("ee") || ctx.middle.contains("EE");
                 let cand_has_i = cand.text.contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
@@ -446,7 +438,7 @@ pub fn extract_candidate_features(
                 let cand_has_u = cand.text.contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
                 let spurious_u = ctx.middle.len() >= 5 && !input_has_u && cand_has_u;
 
-                if dropped_initial_vowel || dropped_ey_suffix || dropped_ke_suffix || dropped_a_suffix || vowel_mismatch || spurious_i || spurious_u {
+                if dropped_initial_vowel || dropped_ey_suffix || dropped_ke_suffix || vowel_mismatch || spurious_i || spurious_u {
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
@@ -490,8 +482,6 @@ pub fn extract_candidate_features(
                 let input_ends_ey = ctx.middle.len() >= 5 && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
                 let dropped_ey_suffix = input_ends_ey && !cand.text.ends_with('ে') && !cand.text.ends_with('ই') && !cand.text.ends_with('য়');
                 let dropped_ke_suffix = ctx.has_ke_suffix_candidate && !cand.text.ends_with("কে");
-                let input_ends_a = ctx.middle.len() >= 4 && (ctx.middle.ends_with('a') || ctx.middle.ends_with('A')) && !ctx.middle.ends_with("aa") && !ctx.middle.ends_with("Aa");
-                let dropped_a_suffix = input_ends_a && ctx.phonetic.ends_with('া') && !cand.text.ends_with('া') && !cand.text.ends_with('আ') && !cand.text.ends_with("য়া");
 
                 let input_has_i = ctx.middle.contains(['i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']) || ctx.middle.contains("ee") || ctx.middle.contains("EE");
                 let cand_has_i = cand.text.contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
@@ -501,7 +491,7 @@ pub fn extract_candidate_features(
                 let cand_has_u = cand.text.contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
                 let spurious_u = ctx.middle.len() >= 5 && !input_has_u && cand_has_u;
 
-                if dropped_initial_vowel || dropped_ey_suffix || dropped_ke_suffix || dropped_a_suffix || vowel_mismatch || spurious_i || spurious_u {
+                if dropped_initial_vowel || dropped_ey_suffix || dropped_ke_suffix || vowel_mismatch || spurious_i || spurious_u {
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
@@ -557,9 +547,7 @@ pub fn extract_candidate_features(
             } else if cand.source == CandidateSource::FuzzySoundLaw {
                 let input_starts_a = ctx.middle.starts_with(['a', 'A']) && !ctx.middle.starts_with("aa") && !ctx.middle.starts_with("Aa");
                 let cand_starts_o = cand.text.starts_with('ও');
-                let input_ends_a = ctx.middle.len() >= 4 && (ctx.middle.ends_with('a') || ctx.middle.ends_with('A')) && !ctx.middle.ends_with("aa") && !ctx.middle.ends_with("Aa");
-                let dropped_a_suffix = input_ends_a && ctx.phonetic.ends_with('া') && !cand.text.ends_with('া') && !cand.text.ends_with('আ') && !cand.text.ends_with("য়া");
-                if (input_starts_a && cand_starts_o) || dropped_a_suffix {
+                if input_starts_a && cand_starts_o {
                     f.source_weight = -0.60;
                     f.intent_modifier_boost -= 2.0;
                     f.phonetic_similarity = -(dist as f32);
@@ -574,7 +562,6 @@ pub fn extract_candidate_features(
                     if (ctx.lm_score.is_some_and(|s| s > -1.5) || !ctx.is_primary_in_dict)
                         && !ctx.has_explicit_casing
                         && !ctx.has_backtick
-                        && dist <= 1
                     {
                         f.is_exact_phonetic = 0.85;
                     }
