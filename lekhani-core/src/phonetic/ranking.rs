@@ -686,8 +686,8 @@ mod tests {
             ..Default::default()
         };
         let score = weights.compute_score(&features);
-        // 2200 + 6000 + 0.0 (anchor zeroed) + 0.8 * 4500 = 11800
-        assert_eq!(score, 11800);
+        // 2200 + 6000 + 2200 (anchor) + 0.8 * 4500 = 14000
+        assert_eq!(score, 14000);
     }
 
     #[test]

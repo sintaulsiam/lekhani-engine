@@ -184,6 +184,23 @@ impl PrefixTrie {
             .is_ok()
     }
 
+    /// Check if any word in dictionary starts with prefix in O(log N)
+    #[inline]
+    pub fn has_prefix(&self, prefix: &str) -> bool {
+        if prefix.is_empty() {
+            return true;
+        }
+        let start_idx = match self.entries.binary_search_by(|e| self.word_at(e).cmp(prefix)) {
+            Ok(_) => return true,
+            Err(idx) => idx,
+        };
+        if let Some(entry) = self.entries.get(start_idx) {
+            self.word_at(entry).starts_with(prefix)
+        } else {
+            false
+        }
+    }
+
     /// Zero-allocation lookup returning borrowed string slices and frequency weights
     pub fn find_prefix_entries<'a>(&'a self, prefix: &str, limit: usize) -> Vec<(&'a str, u32)> {
         if prefix.is_empty() || self.entries.is_empty() {
