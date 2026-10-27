@@ -20,18 +20,19 @@ All numbers are from locked test set (`bn.translit.sampled.test.tsv`, N=9,228).
 
 ---
 
-### 1.2 Where the Failures Are Right Now
+### 1.2 Where the Failures Are Right Now (Full Census: N=9,279 Dev, 5,193 Misses)
 
-From `data/eval/failures_100_stratified.json` (100 sampled failures, measured Oct 25):
+From full diagnostic census (`lekhani-core/src/bin/diagnose_dev.rs`):
 
-| Failure Mode | Count | Example | Root Cause |
-|:---|:---:|:---|:---|
-| **In dictionary, parser can't reach target** | 40 | `upanibeshbad` → gets `উপানিবেশবাদ`, wants `উপনিবেশবাদ` | Avro rule ambiguity / missing POVR override |
-| **Not in dictionary at all (OOV/loanword)** | 47 | `andamaner` → `আন্দামানে` not in dict | Dictionary coverage gap |
-| **Target reachable but ranked too low** | 11 | `aakil` → `আকিল` at rank 1, not rank 0 | Ranker miscalibration |
-| **Vowel-initial `a` → অ ambiguity** | 5 | `anchale` → wants `অঞ্চলে`, gets `আঞ্ছালে` | `a`=আ by default; অ needs explicit override |
+| Failure Category | Misses | % of Misses | % of Dev | Root Cause & Action |
+|:---|:---:|:---:|:---:|:---|
+| **Target in Dict, Ranked at Rank 2–7** | **1,406** | **27.1%** | **15.2%** | **Highest ROI**: Direct Avro monopoly & unigram frequency bias demote valid candidates. Fix via ranker scoring. |
+| **Target OOV, Ranked at Rank 2–7** | **1,125** | **21.7%** | **12.1%** | Valid OOV forms (e.g. `অঙ্কিতা`, `অঞ্চলসহ`) suppressed by non-word direct Avro output (`আঞ্ছালসাহা`). Fix via ranker scoring. |
+| **Target in Dict, NOT Generated** | **1,397** | **26.9%** | **15.1%** | Sanskrit Tatsama agglutinated compounds (`অকৃতকার্য`). Fix via 2-stem lattice segmentation. |
+| **Target OOV, NOT Generated** | **1,265** | **24.4%** | **13.6%** | Pure OOV named entities & crowdsource noise. Hard lexicon ceiling (74.2%). |
+| **Candidate Generation Deficit (`fuzzy.rs`)** | **272** | **5.2%** | **2.9%** | Saturated. **DO NOT micro-tune `fuzzy.rs`**. |
 
-> **Key insight**: 40 failures (40%) are words already in our dictionary. The parser just routes them wrong. These are the highest-ROI fixes because no new data is needed.
+> **Key insight**: 2,531 misses (48.7% of all failures, 27.3% of Dev) **were already generated in the candidate strip**. The engine fails because of candidate ranking, NOT candidate generation. All future work must target `ranking.rs` and compound lattice splitting.
 
 ---
 
