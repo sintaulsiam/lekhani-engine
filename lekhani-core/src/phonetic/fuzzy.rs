@@ -456,8 +456,7 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     let base_len = input.len();
 
     let compute_score = |s: &str| -> (isize, usize, isize, usize) {
-        let exp = (s.contains("rri") as usize)
-            + (s.contains("rrz") as usize)
+        let exp = ((!lower.contains("rr") && s.contains("rr")) as usize)
             + (s.contains("kkh") as usize)
             + (s.contains("cch") as usize)
             + (s.contains("koT") as usize)
@@ -999,6 +998,7 @@ mod tests {
             assert_eq!(cands.0[0], "অঞ্চলগুলোতে");
             let cands_tee = sugg.suggest("ancholtee", false, true, &empty_mem);
             assert_eq!(cands_tee.0[0], "অঞ্চলটি");
+            assert_eq!(sugg.suggest("atorkite", false, true, &empty_mem).0[0], "অতর্কিতে");
         }
     }
 
