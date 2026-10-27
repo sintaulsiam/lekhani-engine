@@ -887,7 +887,7 @@ impl PhoneticSuggestion {
                 let pragyan_cands = engine.suggest(middle, crate::session::ShiftOrigin::AutoCapitalize);
                 for (idx, cand) in pragyan_cands.into_iter().take(4).enumerate() {
                     let boost = 5500 - (idx as i32 * 300);
-                    if cand.ends_with('ও') && cand.chars().count() >= 4 {
+                    if cand.ends_with('ও') && cand.chars().count() >= 4 && !middle.ends_with(['o', 'O']) {
                         let stripped = &cand[..cand.len() - 'ও'.len_utf8()];
                         if self.database.is_exact_dictionary_word(stripped) {
                             add_cand(
@@ -938,7 +938,7 @@ impl PhoneticSuggestion {
                     );
                     for (idx, cand) in s2s_cands.into_iter().enumerate() {
                         let boost = 5500 - (idx as i32 * 250);
-                        if cand.ends_with('ও') && cand.chars().count() >= 4 {
+                        if cand.ends_with('ও') && cand.chars().count() >= 4 && !middle.ends_with(['o', 'O']) {
                             let stripped = &cand[..cand.len() - 'ও'.len_utf8()];
                             if self.database.is_exact_dictionary_word(stripped) {
                                 add_cand(
@@ -2236,7 +2236,7 @@ impl PhoneticSuggestion {
 
         let has_dominant_homophone = raw_candidates.iter().any(|c| {
             c.source != CandidateSource::DirectTransliteration
-                && c.source != CandidateSource::SegmentedLattice
+                && (c.source != CandidateSource::SegmentedLattice || !c.text.contains(' '))
                 && c.source != CandidateSource::TypoFallback
                 && c.source != CandidateSource::TriePrefixAutocomplete
                 && c.text != phonetic
@@ -2508,7 +2508,7 @@ impl PhoneticSuggestion {
                 scored_candidates.push((cand.text.clone(), 60000, RankFeatures::default()));
                 continue;
             }
-            if cand.source == CandidateSource::SegmentedLattice {
+            if cand.source == CandidateSource::SegmentedLattice && cand.text.contains(' ') {
                 let boost = if has_exact_single_word
                     || has_dominant_homophone
                     || preferred_loanword.is_some()
