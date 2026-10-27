@@ -123,7 +123,7 @@ impl Default for RankWeights {
             lm_score: 4500.0,
             is_exact_phonetic: 6000.0,
             phonetic_similarity: 200.0,
-            avro_native_anchor: 0.0,   // zeroed until calibrated against dev set
+            avro_native_anchor: 2200.0,
             length_penalty: 400.0,
             source_weight: 3200.0,
             clitic_alignment: 3500.0,

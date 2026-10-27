@@ -2639,7 +2639,13 @@ impl PhoneticSuggestion {
                 let score_top = self.ai_context.lm().score_candidate_fourgram(prev3, prev2, prev1, &top_cand);
                 let score_o = self.ai_context.lm().score_candidate_fourgram(prev3, prev2, prev1, &o_equivalent);
 
-                score_o > score_top
+                if (score_o - score_top).abs() < 1e-4 {
+                    let freq_o = self.database.get_frequency(&o_equivalent);
+                    let freq_top = self.database.get_frequency(&top_cand);
+                    freq_o >= (freq_top as f32 * 1.5) as u32 || (freq_top == 0 && freq_o > 0)
+                } else {
+                    score_o > score_top
+                }
             } else {
                 false
             };
@@ -2834,7 +2840,7 @@ impl PhoneticSuggestion {
                     final_candidates.push(sc);
                 }
                 final_candidates.truncate(8);
-            } else if !top_has_dict && !is_code && !is_tech_collocation && middle.len() >= 5 && !self.config.strict_avro_mode {
+            } else if !top_has_dict && !is_code && !is_tech_collocation && middle.len() >= 4 && !self.config.strict_avro_mode {
                 let s2s_cands = s2s.transliterate(middle, 1, scratch);
                 if let Some(top_s2s) = s2s_cands.first() {
                     if !top_s2s.is_empty() {
