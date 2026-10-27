@@ -25,3 +25,17 @@ Instructions and architectural constraints for AI agents developing `lekhani-eng
 - **Strict Memory Discipline**: Zero runtime heap allocations inside the fast-path token scanning hot path. Bounded, pre-sized allocations for candidate ranking.
 - **Privacy**: 100% on-device. Zero network telemetry.
 - **Script Integrity**: All text committed to the input connection must be canonical NFC Unicode. Never corrupt conjuncts or diacritics.
+
+## 4. Anti-Circular Engineering Directives (STRICTLY ENFORCED)
+1. **Absolute Ban on Micro-Tuning `fuzzy.rs`**:
+   - Candidate generation in `fuzzy.rs` is saturated (producing candidates for 94.8% of in-dictionary targets).
+   - Adding more hand-crafted regex rules, digraph mappings, or character tweaks in `fuzzy.rs` or `sound_laws.json` is strictly forbidden. It is a local hill-climbing trap that produces trivial +2 gains while distracting from real architecture.
+2. **Empirical Census of the 5,193 Misses (N=9,279 Dev)**:
+   - **Target is ALREADY generated in candidates (Rank 2–7)**: **2,531 words (48.7% of all misses / 27.3% of Dev)**. This is where the real gains live.
+   - **Target is NOT in dictionary.json (OOV names/loanwords)**: **2,390 words (46.0% of misses / 25.8% of Dev)**. Pure dictionary-bound ceiling is 74.2%.
+   - **Target was not generated at all**: **272 words (5.2% of misses / 2.9% of Dev)**.
+3. **Mandatory Focus: Candidate Strip Ranker & Feature Scorer (`ranking.rs` & `suggestion.rs`)**:
+   - **Rule A (Direct Avro Monopoly Prohibition)**: Non-words (`freq: 0`, `!is_in_dict`, e.g. `আঞ্ছালসাহা`) must never receive an automatic +10,000 pt advantage over valid dictionary or compound candidates (`অঞ্চলসহ`). Strip unearned `is_exact_phonetic` bonuses when direct Avro parse is not a dictionary word.
+   - **Rule B (Preserve Typed Endings / Anti-Root Truncation)**: High unigram frequency of bare roots must not strip user-typed terminal vowels or suffixes (e.g. typing `ankita` or `oncholo` must not truncate the ending to pick base `অঙ্কিত` or `অঞ্চল`).
+   - **Rule C (Compound Splitting via Lattice)**: Agglutinative Sanskrit compounds (`akritakarja` -> `অকৃতকার্য`) must be resolved by 2-stem lattice segmentation (`অকৃত` + `কার্য`), not monolithic single-pass Avro parsing.
+
