@@ -111,7 +111,7 @@ pub const COLLOQUIAL_VERBAL_PATTERNS: &[(&str, &[&str])] = &[
     ("si", &["ছি", "েছি"]),
     // Spoken Future & Dialectal (-mu, -ba)
     ("mu", &["ব"]),
-    ("ba", &["বে", "বা"]),
+    ("ba", &["বা"]),
 ];
 
 pub const BENGALI_VERB_ROOTS: &[(&str, &str)] = &[
@@ -220,7 +220,7 @@ pub const BENGALI_VERBAL_CONJUGATIONS: &[(&str, &str)] = &[
     ("lei", "লেই"),
     ("leo", "লেও"),
     ("mu", "ব"),
-    ("ba", "বে"),
+    ("ba", "বা"),
     ("lam", "লাম"),
     ("len", "লেন"),
     ("lo", "ল"),

@@ -835,12 +835,15 @@ impl PhoneticSuggestion {
                                     | CandidateSource::TypoFallback
                                     | CandidateSource::PragyanBeam
                                     | CandidateSource::NeuralTransducer
+                                    | CandidateSource::FuzzySoundLaw
                             ),
                         };
                         if can_upgrade {
                             if matches!(source, CandidateSource::Autocorrect | CandidateSource::PhoneticOverride)
                                 || (source == CandidateSource::MorphologicalInflection
-                                    && (existing.source == CandidateSource::PragyanBeam || existing.source == CandidateSource::NeuralTransducer))
+                                    && (existing.source == CandidateSource::PragyanBeam
+                                        || existing.source == CandidateSource::NeuralTransducer
+                                        || existing.source == CandidateSource::FuzzySoundLaw))
                             {
                                 existing.source = source;
                                 existing.initial_boost = existing.initial_boost.max(initial_boost);
@@ -909,8 +912,13 @@ impl PhoneticSuggestion {
 
         // 3a-3. Lexicon-Constrained Neural Transducer (Seq2Seq)
         let primary_in_dict = self.database.is_exact_dictionary_word(&phonetic);
+        let is_vowelless_shorthand =
+            !middle.contains(['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U', 'y', 'Y']);
+        let allow_s2s = self.config.enable_banglish_shorthand || !is_vowelless_shorthand;
+
         if !self.config.strict_avro_mode
             && !is_code
+            && allow_s2s
             && !self.database.trie.is_empty()
             && !primary_in_dict
             && middle.len() >= 4
@@ -1401,7 +1409,12 @@ impl PhoneticSuggestion {
                 None
             }
         } else if let Some(ref ov_pref) = preferred_override {
-            if !self.database.is_exact_dictionary_word(&phonetic) {
+            let ov_conf = self
+                .database
+                .lookup_override(middle)
+                .and_then(|ovs| ovs.first().map(|(_, c)| c))
+                .unwrap_or(0.0);
+            if ov_conf >= 0.95 || !self.database.is_exact_dictionary_word(&phonetic) {
                 Some(ov_pref.clone())
             } else {
                 None
@@ -1889,9 +1902,17 @@ impl PhoneticSuggestion {
             let suffixed_matches = self.add_suffixes(middle, primary);
             for item in suffixed_matches {
                 let boost = if item.ends_with('ও') {
-                    2800
+                    if middle.ends_with('o') || middle.ends_with('O') {
+                        5300
+                    } else {
+                        2800
+                    }
                 } else if self.database.is_exact_dictionary_word(&item) {
-                    5300
+                    if middle.ends_with('o') || middle.ends_with('O') {
+                        3500
+                    } else {
+                        5300
+                    }
                 } else {
                     3500
                 };
@@ -2657,9 +2678,11 @@ impl PhoneticSuggestion {
                         || self
                             .database
                             .get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand)
-                            .is_some();
+                            .is_some()
+                        || preferred_override.as_ref().is_some_and(|o| o == pref);
                     if is_memory_or_ac || pref_score + 1000 >= top_score {
-                        let fav = scored_candidates.remove(pos);
+                        let mut fav = scored_candidates.remove(pos);
+                        fav.2.is_exact_phonetic = 1.0;
                         scored_candidates.insert(0, fav);
                     }
                 }
@@ -2756,7 +2779,11 @@ impl PhoneticSuggestion {
             let o_in_dict = self.database.is_exact_dictionary_word(&o_equivalent)
                 || self.database.trie.contains_exact(&o_equivalent);
             let top_in_dict = self.database.is_exact_dictionary_word(&top_cand)
-                || self.database.trie.contains_exact(&top_cand);
+                || self.database.trie.contains_exact(&top_cand)
+                || (top_cand.ends_with('ও')
+                    && self
+                        .database
+                        .is_exact_dictionary_word(&top_cand[..top_cand.len() - 'ও'.len_utf8()]));
 
             let should_promote_o = if !top_in_dict && o_in_dict {
                 true
@@ -2841,10 +2868,15 @@ impl PhoneticSuggestion {
             .map(|l| !l.chars().any(|c| c.is_bengali()))
             .unwrap_or(false);
 
+        let top_is_override = preferred_override
+            .as_ref()
+            .is_some_and(|ov| scored_candidates.first().map(|(t, _, _)| t == ov).unwrap_or(false));
+
         if self.config.ai_profile != AiProfile::Off
             && !has_explicit_intent
             && !self.config.strict_avro_mode
             && concordant_verb_str.is_none()
+            && !top_is_override
             && !is_explicit_geminate
             && !context.is_empty()
             && scored_candidates.len() >= 2
@@ -2858,7 +2890,9 @@ impl PhoneticSuggestion {
                 .filter(|(_, _, f)| {
                     !top_is_exact
                         || f.is_exact_phonetic > 0.5
-                        || (f.is_in_dict > 0.5 && f.phonetic_similarity >= -1.0)
+                        || (f.is_in_dict > 0.5
+                            && f.source_weight >= 0.0
+                            && f.phonetic_similarity >= -1.0)
                 })
                 .map(|(t, _, _)| t.clone())
                 .collect();
@@ -3396,7 +3430,7 @@ impl PhoneticSuggestion {
                     let mut suffixes_to_try = vec![suffix];
                     if suffix_key == "ta" {
                         suffixes_to_try.push("তা");
-                    } else if suffix_key == "ti" {
+                    } else if suffix_key == "ti" || suffix_key == "tee" || suffix_key == "Tee" {
                         suffixes_to_try.push("তি");
                     } else if suffix_key == "ey" {
                         if suffix == "ে" {

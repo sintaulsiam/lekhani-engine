@@ -685,9 +685,18 @@ pub fn extract_candidate_features(
 #[inline]
 fn count_suffix_depth(text: &str) -> usize {
     const SUFFIX_MARKERS: &[&str] = &[
+        "গুলোতেই",
+        "গুলাতেই",
+        "গুলোতেও",
+        "গুলাতেও",
+        "গুলোতে",
+        "গুলাতে",
         "গুলোর",
+        "গুলার",
         "গুলোকে",
+        "গুলাকে",
         "গুলো",
+        "গুলা",
         "দেরকে",
         "দের",
         "টিকে",
@@ -750,6 +759,7 @@ pub fn is_colloquial_verbal_form(text: &str) -> bool {
         "সে",
         "মু",
         "ম্নে",
+        "বা",
         "তেসি",
         "তেসো",
         "তেসে",

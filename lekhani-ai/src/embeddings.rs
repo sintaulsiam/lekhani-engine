@@ -428,9 +428,9 @@ impl TopicVector {
         if let Some(cand_vec) = embeddings.get_vector(clean) {
             let sim = self.similarity(cand_vec);
             if sim > 0.18 {
-                (sim - 0.18) * 1.6
+                (sim - 0.18) * 3.5
             } else if sim < -0.25 {
-                (sim + 0.25) * 0.8
+                (sim + 0.25) * 1.5
             } else {
                 0.0
             }

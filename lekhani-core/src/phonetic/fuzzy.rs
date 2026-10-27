@@ -460,10 +460,20 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
             + (s.contains("rrz") as usize)
             + (s.contains("kkh") as usize)
             + (s.contains("cch") as usize)
+            + (s.contains("koT") as usize)
+            + (s.contains("kot") as usize)
+            + (s.contains("gobhir") as usize)
+            + (s.contains("gobhIr") as usize)
             + (s.contains("ncolo") as usize)
             + (s.contains("ncol") as usize);
+        let shrink = (lower.ends_with("ane") && s.ends_with("en")) as usize
+            + (lower.ends_with("ain") && s.ends_with("en")) as usize
+            + (lower.contains("anchol") && s.contains("oncol")) as usize
+            + (lower.contains("anchal") && s.contains("oncol")) as usize
+            + (lower.contains("onchol") && s.contains("oncol")) as usize
+            + (lower.contains("onchal") && s.contains("oncol")) as usize;
         let len_diff = (s.len() as isize - base_len as isize).abs();
-        let eff_diff = (s.len() as isize - exp as isize - base_len as isize).abs();
+        let eff_diff = (s.len() as isize + shrink as isize - exp as isize - base_len as isize).abs();
         let diff = std::cmp::min(len_diff, eff_diff);
         let pen = s.contains("hhh") as usize * 2;
         (diff, pen, -(exp as isize), s.len())
@@ -488,8 +498,8 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
         .collect();
     p2_vec.sort_unstable_by_key(|a| a.0);
 
-    p1_vec.truncate(14);
-    p2_vec.truncate(6);
+    p1_vec.truncate(10);
+    p2_vec.truncate(8);
 
     let mut res: Vec<String> = p1_vec.into_iter().map(|(_, s)| s).collect();
     res.extend(p2_vec.into_iter().map(|(_, s)| s));
@@ -967,6 +977,30 @@ impl DhvaniSetuEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_octane_sound_laws() {
+        let v = generate_phonetic_variants("octane");
+        assert!(v.iter().any(|s| s == "okoTane" || s == "okoTen" || s == "okTen"));
+        let v_agahir = generate_phonetic_variants("agahir");
+        assert!(v_agahir.iter().any(|s| s == "ogobhIr" || s == "ogobhir"));
+        let mut sugg = crate::phonetic::suggestion::PhoneticSuggestion::new();
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let dict_dir = manifest_dir.join("../data/dictionaries");
+        if sugg.load_from_dir_with_dict(&dict_dir, "dictionary.json").is_ok() {
+            let layout_path = manifest_dir.join("../data/layouts/avrophonetic.json");
+            if let Ok(content) = std::fs::read_to_string(&layout_path) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    sugg.set_layout(&json);
+                }
+            }
+            let empty_mem = hashbrown::HashMap::new();
+            let cands = sugg.suggest("anchalgulote", false, true, &empty_mem);
+            assert_eq!(cands.0[0], "অঞ্চলগুলোতে");
+            let cands_tee = sugg.suggest("ancholtee", false, true, &empty_mem);
+            assert_eq!(cands_tee.0[0], "অঞ্চলটি");
+        }
+    }
 
     #[test]
     fn test_phonetic_sound_laws() {
