@@ -1336,7 +1336,11 @@ impl PhoneticSuggestion {
                 None
             }
         } else if let Some(ref ov_pref) = preferred_override {
-            Some(ov_pref.clone())
+            if !self.database.is_exact_dictionary_word(&phonetic) {
+                Some(ov_pref.clone())
+            } else {
+                None
+            }
         } else if let Some(ref loan_pref) = preferred_loanword {
             Some(loan_pref.clone())
         } else if let Some(morph_pref) =
@@ -1769,6 +1773,20 @@ impl PhoneticSuggestion {
                     expanded.push(o_init.replace("st", "sT"));
                 }
             }
+
+            // Trailing inherent vowel peeling (Hunterian/ITRANS inherent 'o' or Tatsama '-ita'/'-ta'/'-pto')
+            if middle.len() >= 4 && (middle.ends_with('o') || middle.ends_with('O')) {
+                let peeled = &middle[..middle.len() - 1];
+                expanded.push(peeled.to_string());
+                if is_o_initial {
+                    expanded.push(format!("a{}", &peeled[1..]));
+                }
+            }
+            if middle.len() >= 5 && (middle.ends_with("ita") || middle.ends_with("pta") || middle.ends_with("kta") || middle.ends_with("dha")) {
+                let peeled = &middle[..middle.len() - 1];
+                expanded.push(peeled.to_string());
+            }
+
             inherent_variants.extend(expanded);
 
             for key in inherent_variants {

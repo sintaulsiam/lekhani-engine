@@ -492,7 +492,7 @@ fn test_bin_vs_json_dev_natural_hit_parity() {
         diff_count, 0,
         "Top-1 candidate must be 100% identical between JSON and BIN across all rows"
     );
-    assert_eq!(hits_json, 4265, "Dev Natural hit count must be exactly 4,265");
+    assert_eq!(hits_json, 4288, "Dev Natural hit count must be exactly 4,288");
 }
 
 #[derive(serde::Deserialize)]
