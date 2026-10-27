@@ -1887,7 +1887,7 @@ impl PhoneticSuggestion {
             // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
             let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
             let mut valid_fuzzy_stems = Vec::new();
-            let variant_limit = if is_primary_in_dict { 16 } else { 32 };
+            let variant_limit = if is_primary_in_dict { 32 } else { 64 };
             let is_init_a = middle.starts_with('a') || middle.starts_with('A');
             let is_init_o = middle.starts_with('o') || middle.starts_with('O');
 
@@ -2600,8 +2600,21 @@ impl PhoneticSuggestion {
             // Supervised override, autocorrect, or remembered candidate takes Slot 0
             if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == pref) {
                 if pos > 0 {
-                    let fav = scored_candidates.remove(pos);
-                    scored_candidates.insert(0, fav);
+                    let top_score = scored_candidates[0].1;
+                    let pref_score = scored_candidates[pos].1;
+                    let is_memory_or_ac = candidate_memory.get(term).is_some()
+                        || candidate_memory.get(middle).is_some()
+                        || learner_guard.as_ref().map_or(false, |l| {
+                            l.candidate_memory.contains_key(term) || l.candidate_memory.contains_key(middle)
+                        })
+                        || self
+                            .database
+                            .get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand)
+                            .is_some();
+                    if is_memory_or_ac || pref_score + 1000 >= top_score {
+                        let fav = scored_candidates.remove(pos);
+                        scored_candidates.insert(0, fav);
+                    }
                 }
             }
         } else {

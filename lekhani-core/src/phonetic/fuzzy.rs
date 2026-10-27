@@ -188,6 +188,7 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("kkhn", &["kShN", "kkhn"]),
     ("kkhm", &["kShm", "kkhm"]),
     ("kkh", &["kSh", "x", "ks", "kh", "kZ"]),
+    ("khh", &["kkh", "kSh", "kh"]),
     ("khok", &["kShok", "khok"]),
     ("khi", &["kShi", "khee"]),
     ("khe", &["kShe", "khe"]),
@@ -453,7 +454,7 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     });
 
     p1_vec.extend(p2_vec);
-    p1_vec.truncate(64);
+    p1_vec.truncate(128);
     p1_vec
 }
 
