@@ -19,6 +19,7 @@ __pycache__/
 *.bz2
 data/corpus/*.txt
 data/corpus/*.raw
+data/corpus/*.tsv
 data/eval/train_alignments.tsv
 data/eval/*.bin
 
