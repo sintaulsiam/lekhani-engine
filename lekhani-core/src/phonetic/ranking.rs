@@ -283,6 +283,7 @@ pub struct CandidateContext<'a> {
     pub is_short_token: bool,
     pub has_clitic_o_candidate: bool,
     pub has_clitic_i_candidate: bool,
+    pub has_ke_suffix_candidate: bool,
     pub clitic_o_targets: &'a [String],
     pub clitic_i_targets: &'a [String],
     pub lm_score: Option<f32>,
@@ -421,12 +422,23 @@ pub fn extract_candidate_features(
 
                 let input_starts_a_o = ctx.middle.starts_with(['a', 'A', 'o', 'O']);
                 let cand_starts_e = cand.text.starts_with('এ');
-                let vowel_mismatch = input_starts_a_o && cand_starts_e;
+                let input_starts_a = ctx.middle.starts_with(['a', 'A']) && !ctx.middle.starts_with("aa") && !ctx.middle.starts_with("Aa");
+                let cand_starts_o = cand.text.starts_with('ও');
+                let vowel_mismatch = (input_starts_a_o && cand_starts_e) || (input_starts_a && cand_starts_o);
 
                 let input_ends_ey = ctx.middle.len() >= 5 && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
                 let dropped_ey_suffix = input_ends_ey && !cand.text.ends_with('ে') && !cand.text.ends_with('ই') && !cand.text.ends_with('য়');
+                let dropped_ke_suffix = ctx.has_ke_suffix_candidate && !cand.text.ends_with("কে");
 
-                if dropped_initial_vowel || dropped_ey_suffix || vowel_mismatch {
+                let input_has_i = ctx.middle.contains(['i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']) || ctx.middle.contains("ee") || ctx.middle.contains("EE");
+                let cand_has_i = cand.text.contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
+                let spurious_i = ctx.middle.len() >= 5 && !input_has_i && cand_has_i;
+
+                let input_has_u = ctx.middle.contains(['u', 'U', 'w', 'W', '\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']) || ctx.middle.contains("oo") || ctx.middle.contains("OO");
+                let cand_has_u = cand.text.contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
+                let spurious_u = ctx.middle.len() >= 5 && !input_has_u && cand_has_u;
+
+                if dropped_initial_vowel || dropped_ey_suffix || dropped_ke_suffix || vowel_mismatch || spurious_i || spurious_u {
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
@@ -463,12 +475,23 @@ pub fn extract_candidate_features(
 
                 let input_starts_a_o = ctx.middle.starts_with(['a', 'A', 'o', 'O']);
                 let cand_starts_e = cand.text.starts_with('এ');
-                let vowel_mismatch = input_starts_a_o && cand_starts_e;
+                let input_starts_a = ctx.middle.starts_with(['a', 'A']) && !ctx.middle.starts_with("aa") && !ctx.middle.starts_with("Aa");
+                let cand_starts_o = cand.text.starts_with('ও');
+                let vowel_mismatch = (input_starts_a_o && cand_starts_e) || (input_starts_a && cand_starts_o);
 
                 let input_ends_ey = ctx.middle.len() >= 5 && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
                 let dropped_ey_suffix = input_ends_ey && !cand.text.ends_with('ে') && !cand.text.ends_with('ই') && !cand.text.ends_with('য়');
+                let dropped_ke_suffix = ctx.has_ke_suffix_candidate && !cand.text.ends_with("কে");
 
-                if dropped_initial_vowel || dropped_ey_suffix || vowel_mismatch {
+                let input_has_i = ctx.middle.contains(['i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']) || ctx.middle.contains("ee") || ctx.middle.contains("EE");
+                let cand_has_i = cand.text.contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
+                let spurious_i = ctx.middle.len() >= 5 && !input_has_i && cand_has_i;
+
+                let input_has_u = ctx.middle.contains(['u', 'U', 'w', 'W', '\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']) || ctx.middle.contains("oo") || ctx.middle.contains("OO");
+                let cand_has_u = cand.text.contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
+                let spurious_u = ctx.middle.len() >= 5 && !input_has_u && cand_has_u;
+
+                if dropped_initial_vowel || dropped_ey_suffix || dropped_ke_suffix || vowel_mismatch || spurious_i || spurious_u {
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
@@ -493,6 +516,19 @@ pub fn extract_candidate_features(
         } else if cand.source == CandidateSource::TypoFallback {
             f.source_weight = -0.43;
             f.phonetic_similarity = -((dist.min(3)) as f32);
+        } else if cand.source == CandidateSource::MorphologicalInflection {
+            let len_diff = (cand.text.chars().count() as isize
+                - ctx.phonetic.chars().count() as isize)
+                .abs() as f32;
+            f.length_penalty = -len_diff;
+            if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
+                f.source_weight = 0.85;
+                f.phonetic_similarity = 0.80;
+                f.is_exact_phonetic = 0.85;
+            } else {
+                f.source_weight = 0.40;
+                f.phonetic_similarity = -(dist as f32 * 0.5);
+            }
         } else {
             f.phonetic_similarity = -(dist as f32);
             let len_diff = (cand.text.chars().count() as isize
@@ -509,18 +545,26 @@ pub fn extract_candidate_features(
             if ctx.has_explicit_intent {
                 f.intent_modifier_boost -= 3.5;
             } else if cand.source == CandidateSource::FuzzySoundLaw {
-                if ctx.has_backtick {
-                    f.intent_modifier_boost -= 0.89;
-                } else if ctx.has_explicit_casing {
-                    f.intent_modifier_boost -= 0.56;
-                } else if ctx.middle.chars().count() <= 2 && dist > 0 {
-                    f.intent_modifier_boost -= 0.67;
-                }
-                if (ctx.lm_score.is_some_and(|s| s > -1.5) || !ctx.is_primary_in_dict)
-                    && !ctx.has_explicit_casing
-                    && !ctx.has_backtick
-                {
-                    f.is_exact_phonetic = 0.85;
+                let input_starts_a = ctx.middle.starts_with(['a', 'A']) && !ctx.middle.starts_with("aa") && !ctx.middle.starts_with("Aa");
+                let cand_starts_o = cand.text.starts_with('ও');
+                if input_starts_a && cand_starts_o {
+                    f.source_weight = -0.60;
+                    f.intent_modifier_boost -= 2.0;
+                    f.phonetic_similarity = -(dist as f32);
+                } else {
+                    if ctx.has_backtick {
+                        f.intent_modifier_boost -= 0.89;
+                    } else if ctx.has_explicit_casing {
+                        f.intent_modifier_boost -= 0.56;
+                    } else if ctx.middle.chars().count() <= 2 && dist > 0 {
+                        f.intent_modifier_boost -= 0.67;
+                    }
+                    if (ctx.lm_score.is_some_and(|s| s > -1.5) || !ctx.is_primary_in_dict)
+                        && !ctx.has_explicit_casing
+                        && !ctx.has_backtick
+                    {
+                        f.is_exact_phonetic = 0.85;
+                    }
                 }
             }
             if cand.source == CandidateSource::Autocorrect {
@@ -788,6 +832,7 @@ mod tests {
             is_short_token: false,
             has_clitic_o_candidate: false,
             has_clitic_i_candidate: false,
+            has_ke_suffix_candidate: false,
             clitic_o_targets: targets,
             clitic_i_targets: targets,
             lm_score: Some(-0.5),
@@ -851,6 +896,7 @@ mod tests {
     fn test_pragyan_beam_dictionary_recovery() {
         let targets = Vec::new();
         let mut ctx = make_ctx("আনুরোধ", "আনুরোধ", &targets);
+        ctx.middle = "anurodh";
         ctx.is_primary_in_dict = false;
 
         let pragyan_cand = CandidateHypothesis {
@@ -893,6 +939,7 @@ mod tests {
             is_short_token: false,
             has_clitic_o_candidate: false,
             has_clitic_i_candidate: false,
+            has_ke_suffix_candidate: false,
             clitic_o_targets: &targets,
             clitic_i_targets: &targets,
             lm_score: None,

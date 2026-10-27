@@ -838,7 +838,10 @@ impl PhoneticSuggestion {
                             ),
                         };
                         if can_upgrade {
-                            if matches!(source, CandidateSource::Autocorrect | CandidateSource::PhoneticOverride) {
+                            if matches!(source, CandidateSource::Autocorrect | CandidateSource::PhoneticOverride)
+                                || (source == CandidateSource::MorphologicalInflection
+                                    && (existing.source == CandidateSource::PragyanBeam || existing.source == CandidateSource::NeuralTransducer))
+                            {
                                 existing.source = source;
                                 existing.initial_boost = existing.initial_boost.max(initial_boost);
                             } else if initial_boost > existing.initial_boost {
@@ -1885,7 +1888,13 @@ impl PhoneticSuggestion {
             // 9. Suffix-decomposed forms (when Latin string contains stem + suffix)
             let suffixed_matches = self.add_suffixes(middle, primary);
             for item in suffixed_matches {
-                let boost = if item.ends_with('ও') { 2800 } else { 3500 };
+                let boost = if item.ends_with('ও') {
+                    2800
+                } else if self.database.is_exact_dictionary_word(&item) {
+                    5300
+                } else {
+                    3500
+                };
                 add_cand(
                     item,
                     CandidateSource::MorphologicalInflection,
@@ -2258,6 +2267,15 @@ impl PhoneticSuggestion {
                     && c.source != CandidateSource::TypoFallback
             });
 
+        let has_ke_suffix_candidate = middle.len() >= 5
+            && (middle.ends_with("ke") || middle.ends_with("Ke"))
+            && raw_candidates.iter().any(|c| {
+                c.text.ends_with("কে")
+                    && self.database.is_exact_dictionary_word(&c.text)
+                    && c.source != CandidateSource::TriePrefixAutocomplete
+                    && c.source != CandidateSource::TypoFallback
+            });
+
         let clitic_o_targets: Vec<String> = if has_clitic_o_candidate {
             raw_candidates
                 .iter()
@@ -2441,6 +2459,7 @@ impl PhoneticSuggestion {
             is_short_token,
             has_clitic_o_candidate,
             has_clitic_i_candidate,
+            has_ke_suffix_candidate,
             clitic_o_targets: &clitic_o_targets,
             clitic_i_targets: &clitic_i_targets,
             lm_score: None,
