@@ -102,15 +102,43 @@ fn main() {
     println!("Acceptable Top-3 Accuracy:   {:.2}% ({}/{})", acceptable_top3 as f64 / n * 100.0, acceptable_top3, pairs.len());
     println!("Total Real Misses:           {}", real_misses.len());
 
-    println!("\n=== TOP 30 REAL MISSES (Target NOT matched at Top-1 even with orthographic rules) ===");
-    for (i, (input, target, top1, in_top3, cands)) in real_misses.iter().take(30).enumerate() {
+    let mut miss_in_dict = 0usize;
+    let mut miss_not_in_dict = 0usize;
+    let mut miss_target_in_cands = 0usize;
+    let mut miss_stem_in_dict = 0usize;
+
+    let suffixes = ["এর", "র", "ে", "তে", "ও", "সহ", "গুলো", "গুলি", "সমূহের", "সমূহ", "দের", "টি", "টা", "কে"];
+
+    for (_input, target, _top1, _in_top3, cands) in &real_misses {
         let in_dict = sugg.database.is_exact_dictionary_word(target);
-        let target_freq = sugg.database.get_frequency(target);
-        let top1_freq = sugg.database.get_frequency(top1);
-        let top3_preview: Vec<&str> = cands.iter().take(3).map(|s| s.as_str()).collect();
-        println!(
-            "{:2}. Input: {:14} | Target: {:10} (in_dict:{}, freq:{}) | Top-1: {:10} (freq:{}) | in_top3: {} | Generated: {:?}",
-            i + 1, input, target, in_dict, target_freq, top1, top1_freq, in_top3, top3_preview
-        );
+        if in_dict {
+            miss_in_dict += 1;
+        } else {
+            miss_not_in_dict += 1;
+            let mut stem_found = false;
+            for suf in &suffixes {
+                if target.ends_with(suf) && target.len() > suf.len() {
+                    let stem = &target[..target.len() - suf.len()];
+                    if sugg.database.is_exact_dictionary_word(stem) {
+                        stem_found = true;
+                        break;
+                    }
+                }
+            }
+            if stem_found {
+                miss_stem_in_dict += 1;
+            }
+        }
+        if cands.iter().any(|c| is_acceptable_match(c, target)) {
+            miss_target_in_cands += 1;
+        }
     }
+
+    println!("\n=== COMPREHENSIVE BREAKDOWN OF THE {} MISSES ===", real_misses.len());
+    println!("1. Target IS in Dictionary (Ranking / Model Misses):   {} ({:.1}%)", miss_in_dict, miss_in_dict as f64 / real_misses.len() as f64 * 100.0);
+    println!("   - Target was generated in candidates (Rank 2+):    {} ({:.1}%)", miss_target_in_cands, miss_target_in_cands as f64 / real_misses.len() as f64 * 100.0);
+    println!("   - Target was NOT generated at all:                 {} ({:.1}%)", miss_in_dict.saturating_sub(miss_target_in_cands), miss_in_dict.saturating_sub(miss_target_in_cands) as f64 / real_misses.len() as f64 * 100.0);
+    println!("2. Target is NOT in Dictionary (Lexicon Ceiling):     {} ({:.1}%)", miss_not_in_dict, miss_not_in_dict as f64 / real_misses.len() as f64 * 100.0);
+    println!("   - Out-of-dict targets with stem in dictionary:     {} ({:.1}%)", miss_stem_in_dict, miss_stem_in_dict as f64 / real_misses.len() as f64 * 100.0);
+    println!("   - Completely unknown vocabulary (names, noise):    {} ({:.1}%)", miss_not_in_dict - miss_stem_in_dict, (miss_not_in_dict - miss_stem_in_dict) as f64 / real_misses.len() as f64 * 100.0);
 }
