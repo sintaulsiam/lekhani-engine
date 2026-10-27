@@ -435,6 +435,33 @@ pub fn extract_candidate_features(
                     f.intent_modifier_boost = -2.0;
                 }
             }
+        } else if cand.source == CandidateSource::NeuralTransducer {
+            let len_diff = (cand.text.chars().count() as isize
+                - ctx.phonetic.chars().count() as isize)
+                .abs() as f32;
+            f.length_penalty = -len_diff;
+            if dist == 0 {
+                f.source_weight = 1.0;
+                f.phonetic_similarity = 1.0;
+            } else if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
+                if dist <= 1 {
+                    f.source_weight = 0.90;
+                    f.phonetic_similarity = 0.85;
+                    f.is_exact_phonetic = 0.90;
+                } else {
+                    f.source_weight = 0.65;
+                    f.phonetic_similarity = -(dist as f32 * 0.4);
+                }
+            } else if dist == 1 && len_diff <= 1.0 && is_in_dict && !ctx.is_primary_in_dict {
+                f.source_weight = 0.70;
+                f.phonetic_similarity = 0.70;
+            } else {
+                f.source_weight = -0.5;
+                f.phonetic_similarity = -(dist as f32);
+                if ctx.is_primary_in_dict {
+                    f.intent_modifier_boost = -2.0;
+                }
+            }
         } else if cand.source == CandidateSource::TypoFallback {
             f.source_weight = -0.43;
             f.phonetic_similarity = -((dist.min(3)) as f32);

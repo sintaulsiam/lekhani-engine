@@ -26,6 +26,7 @@ pub enum CandidateSource {
     SegmentedLattice,
     PragyanBeam,
     LpsLattice,
+    NeuralTransducer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -823,6 +824,7 @@ impl PhoneticSuggestion {
                     || source == CandidateSource::MorphologicalInflection
                     || source == CandidateSource::ExactDictionary
                     || source == CandidateSource::PragyanBeam
+                    || source == CandidateSource::NeuralTransducer
                 {
                     if let Some(existing) = raw_candidates.iter_mut().find(|c| c.text == text) {
                         let can_upgrade = match source {
@@ -832,6 +834,7 @@ impl PhoneticSuggestion {
                                 CandidateSource::DirectTransliteration
                                     | CandidateSource::TypoFallback
                                     | CandidateSource::PragyanBeam
+                                    | CandidateSource::NeuralTransducer
                             ),
                         };
                         if can_upgrade {
@@ -885,6 +888,41 @@ impl PhoneticSuggestion {
                         &mut raw_candidates,
                         &mut seen,
                     );
+                }
+            }
+        }
+
+        // 3a-3. Lexicon-Constrained Neural Transducer (Seq2Seq)
+        let primary_in_dict = self.database.is_exact_dictionary_word(&phonetic);
+        if !self.config.strict_avro_mode
+            && !is_code
+            && !self.database.trie.is_empty()
+            && !primary_in_dict
+            && middle.len() >= 4
+            && middle.len() <= 14
+        {
+            if let Some(ref s2s) = self.seq2seq {
+                if let Some(ref mut scratch) = self.seq2seq_scratch {
+                    let trie = &self.database.trie;
+                    let prefix_filter = |p: &str| trie.has_prefix(p);
+                    let word_filter = |w: &str| trie.contains_exact(w);
+                    let s2s_cands = s2s.transliterate_constrained(
+                        middle,
+                        2,
+                        scratch,
+                        Some(&prefix_filter),
+                        Some(&word_filter),
+                    );
+                    for (idx, cand) in s2s_cands.into_iter().enumerate() {
+                        let boost = 5500 - (idx as i32 * 250);
+                        add_cand(
+                            cand,
+                            CandidateSource::NeuralTransducer,
+                            boost,
+                            &mut raw_candidates,
+                            &mut seen,
+                        );
+                    }
                 }
             }
         }
@@ -2834,45 +2872,18 @@ impl PhoneticSuggestion {
 
         self.last_computed_features = final_features;
 
-        // ── Seq2Seq Safety-Net ─────────────────────────────────────────────────
-        // Append-only mode: seq2seq candidates are added at the end of the list
-        // and NEVER promoted to top-1 until the model achieves ≥30% top-1 accuracy.
-        // Length gate (≥5 chars): avoids latency cost on short common words where
-        // the beam decoder is almost always correct.
-        if let (Some(s2s), Some(scratch)) = (
-            self.seq2seq.as_ref().map(Arc::clone),
-            self.seq2seq_scratch.as_mut(),
-        ) {
-            let top_has_dict = self
-                .last_computed_features
-                .iter()
-                .take(2)
-                .any(|f| f.is_in_dict > 0.5);
-
-            if final_candidates.is_empty() && middle.len() >= 4 {
+        // ── Seq2Seq Safety-Net Fallback ─────────────────────────────────────────
+        if final_candidates.is_empty() && middle.len() >= 3 {
+            if let (Some(s2s), Some(scratch)) = (
+                self.seq2seq.as_ref().map(Arc::clone),
+                self.seq2seq_scratch.as_mut(),
+            ) {
                 let s2s_cands = s2s.transliterate(middle, 2, scratch);
                 for sc in s2s_cands {
-                    if sc.is_empty() || final_candidates.contains(&sc) {
-                        continue;
-                    }
-                    final_candidates.push(sc);
-                }
-                final_candidates.truncate(8);
-            } else if !top_has_dict && !is_code && !is_tech_collocation && middle.len() >= 4 && !self.config.strict_avro_mode {
-                let s2s_cands = s2s.transliterate(middle, 1, scratch);
-                if let Some(top_s2s) = s2s_cands.first() {
-                    if !top_s2s.is_empty() {
-                        final_candidates.retain(|c| c != top_s2s);
-                        final_candidates.insert(0, top_s2s.clone());
+                    if !sc.is_empty() && !final_candidates.contains(&sc) {
+                        final_candidates.push(sc);
                     }
                 }
-                for sc in s2s_cands {
-                    if sc.is_empty() || final_candidates.contains(&sc) {
-                        continue;
-                    }
-                    final_candidates.push(sc);
-                }
-                final_candidates.truncate(8);
             }
         }
         // ──────────────────────────────────────────────────────────────────────

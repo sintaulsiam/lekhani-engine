@@ -315,34 +315,34 @@ impl Seq2SeqTransliterator {
 
     /// Compute attention context vector from decoder hidden state and encoder states.
     /// Uses dot-product attention with W_a projection on encoder states.
-    fn attend(&self, dec_h: &[f32], enc_states: &[Vec<f32>], ctx_out: &mut [f32]) {
+    fn attend(&self, dec_h: &[f32], enc_states: &[Vec<f32>], scratch: &mut InferenceScratch) {
         let h = self.hidden_dim;
         // Transform dec_h: q = attn_w · dec_h
-        let mut q = vec![0.0f32; h];
         for i in 0..h {
-            q[i] = dot(&self.attn_w[i * h..(i + 1) * h], dec_h);
+            scratch.attn_q[i] = dot(&self.attn_w[i * h..(i + 1) * h], dec_h);
         }
         // Scores: dot(enc_i, q) for each encoder step
-        let mut scores = vec![0.0f32; enc_states.len()];
-        for (t, enc_h) in enc_states.iter().enumerate() {
-            scores[t] = dot(enc_h, &q);
+        scratch.attn_scores.clear();
+        for enc_h in enc_states.iter() {
+            scratch.attn_scores.push(dot(enc_h, &scratch.attn_q));
         }
         // Softmax
-        let max_s = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max_s = scratch.attn_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
         let mut sum_exp = 0.0f32;
-        for s in scores.iter_mut() {
+        for s in scratch.attn_scores.iter_mut() {
             *s = (*s - max_s).exp();
             sum_exp += *s;
         }
-        for s in scores.iter_mut() {
-            *s /= sum_exp.max(1e-9);
+        let inv_sum = 1.0 / sum_exp.max(1e-9);
+        for s in scratch.attn_scores.iter_mut() {
+            *s *= inv_sum;
         }
         // Context = weighted sum of encoder states
-        ctx_out.fill(0.0);
+        scratch.ctx_buf.fill(0.0);
         for (t, enc_h) in enc_states.iter().enumerate() {
-            let a = scores[t];
+            let a = scratch.attn_scores[t];
             for j in 0..h {
-                ctx_out[j] += a * enc_h[j];
+                scratch.ctx_buf[j] += a * enc_h[j];
             }
         }
     }
@@ -371,11 +371,12 @@ impl Seq2SeqTransliterator {
     ) -> Vec<(f32, Vec<u32>)> {
         let tv = self.tgt_vocab.size();
 
-        // BeamHyp: (cum_log_prob, dec_h, token_ids)
+        // BeamHyp: (cum_log_prob, dec_h, token_ids, decoded_str)
         struct Hyp {
             score: f32,
             h: Vec<f32>,
             ids: Vec<u32>,
+            decoded: String,
             done: bool,
         }
 
@@ -383,6 +384,7 @@ impl Seq2SeqTransliterator {
             score: 0.0,
             h: enc_final.to_vec(),
             ids: vec![BOS_ID],
+            decoded: String::with_capacity(max_len * 3),
             done: false,
         }];
 
@@ -390,6 +392,13 @@ impl Seq2SeqTransliterator {
 
         for _ in 0..max_len {
             if active.is_empty() { break; }
+            if completed.len() >= beam {
+                let best_active = active.iter().map(|h| h.score).fold(f32::NEG_INFINITY, f32::max);
+                let worst_completed = completed.iter().map(|c| c.0).fold(f32::INFINITY, f32::min);
+                if best_active <= worst_completed {
+                    break;
+                }
+            }
             let mut candidates: Vec<Hyp> = Vec::with_capacity(active.len() * beam * 2);
 
             for hyp in active.drain(..) {
@@ -400,13 +409,12 @@ impl Seq2SeqTransliterator {
                 let last_id = *hyp.ids.last().unwrap_or(&BOS_ID);
                 // Decoder step
                 self.tgt_embed(last_id, &mut scratch.emb_buf);
-                self.attend(&hyp.h, enc_states, &mut scratch.ctx_buf);
+                self.attend(&hyp.h, enc_states, scratch);
                 // Concat emb + context
                 scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
                 scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
-                let mut h_next = vec![0.0f32; self.hidden_dim];
-                self.decoder.step(&scratch.dec_in, &hyp.h, &mut h_next, None);
-                self.project(&h_next, &mut scratch.logits_buf);
+                self.decoder.step(&scratch.dec_in, &hyp.h, &mut scratch.h_next, None);
+                self.project(&scratch.h_next, &mut scratch.logits_buf);
 
                 // Log-softmax
                 let max_l = scratch.logits_buf.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
@@ -421,35 +429,52 @@ impl Seq2SeqTransliterator {
                 scratch.scored_buf.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
                 let explore_count = if prefix_filter.is_some() || word_filter.is_some() {
-                    (beam * 4).min(scratch.scored_buf.len())
+                    (beam * 2).min(scratch.scored_buf.len())
                 } else {
                     beam.min(scratch.scored_buf.len())
                 };
 
+                let mut valid_pushed = 0;
                 for &(tok_id, log_p) in scratch.scored_buf.iter().take(explore_count) {
-                    let mut new_ids = hyp.ids.clone();
-                    new_ids.push(tok_id);
                     let done = tok_id == EOS_ID;
 
+                    let mut new_decoded = hyp.decoded.clone();
+                    if let Some(c) = self.tgt_vocab.decode(tok_id) {
+                        new_decoded.push(c);
+                    }
+
                     let mut penalty = 0.0f32;
-                    if done {
+                    let matches_lexicon = if done {
                         if let Some(wf) = word_filter {
-                            let word = self.tgt_vocab.decode_str(&hyp.ids);
-                            if !wf(&word) {
-                                penalty = -30.0;
-                            }
+                            wf(&new_decoded)
+                        } else {
+                            true
                         }
                     } else if let Some(pf) = prefix_filter {
-                        let partial = self.tgt_vocab.decode_str(&new_ids);
-                        if !pf(&partial) {
-                            penalty = -30.0;
-                        }
+                        pf(&new_decoded)
+                    } else {
+                        true
+                    };
+
+                    if !matches_lexicon {
+                        penalty = -30.0;
+                    } else {
+                        valid_pushed += 1;
                     }
+
+                    // Prune invalid branches if we already found at least 1 valid lexicon prefix
+                    if !matches_lexicon && valid_pushed > 0 {
+                        continue;
+                    }
+
+                    let mut new_ids = hyp.ids.clone();
+                    new_ids.push(tok_id);
 
                     candidates.push(Hyp {
                         score: hyp.score + log_p + penalty,
-                        h: h_next.clone(),
+                        h: scratch.h_next.clone(),
                         ids: new_ids,
+                        decoded: new_decoded,
                         done,
                     });
                 }
@@ -502,11 +527,12 @@ impl Seq2SeqTransliterator {
         let src_ids = self.src_vocab.encode_str(latin.to_ascii_lowercase().trim());
         let enc_states = self.encode(&src_ids, scratch);
         let enc_final = scratch.enc_final.clone();
+        let max_len = (latin.chars().count() + 1).min(14);
         let hyps = self.beam_decode_constrained(
             &enc_states,
             &enc_final,
             beam,
-            (latin.len() * 3 + 4).min(32),
+            max_len,
             scratch,
             prefix_filter,
             word_filter,
@@ -541,6 +567,9 @@ pub struct InferenceScratch {
     pub logits_buf: Vec<f32>,
     pub scored_buf: Vec<(u32, f32)>,
     pub enc_final: Vec<f32>,
+    pub attn_q: Vec<f32>,
+    pub attn_scores: Vec<f32>,
+    pub h_next: Vec<f32>,
 }
 
 impl InferenceScratch {
@@ -552,6 +581,9 @@ impl InferenceScratch {
             logits_buf: vec![0.0; vocab_size],
             scored_buf: Vec::with_capacity(vocab_size),
             enc_final: vec![0.0; hidden_dim],
+            attn_q: vec![0.0; hidden_dim],
+            attn_scores: Vec::with_capacity(64),
+            h_next: vec![0.0; hidden_dim],
         }
     }
 
