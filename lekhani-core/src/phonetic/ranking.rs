@@ -444,7 +444,18 @@ pub fn extract_candidate_features(
                 f.source_weight = 1.0;
                 f.phonetic_similarity = 1.0;
             } else if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
-                if dist <= 1 {
+                let input_starts_vowel = ctx.middle.starts_with(|c: char| matches!(c, 'a' | 'A' | 'e' | 'E' | 'i' | 'I' | 'o' | 'O' | 'u' | 'U'));
+                let cand_starts_vowel = cand.text.chars().next().map_or(false, |c| matches!(c, '\u{0985}'..='\u{0994}'));
+                let dropped_initial_vowel = input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
+
+                let input_ends_ey = ctx.middle.len() >= 5 && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
+                let dropped_ey_suffix = input_ends_ey && !cand.text.ends_with('ে') && !cand.text.ends_with('ই') && !cand.text.ends_with('য়');
+
+                if dropped_initial_vowel || dropped_ey_suffix {
+                    f.source_weight = -0.60;
+                    f.phonetic_similarity = -(dist as f32);
+                    f.intent_modifier_boost -= 2.0;
+                } else if dist <= 1 {
                     f.source_weight = 0.90;
                     f.phonetic_similarity = 0.85;
                     f.is_exact_phonetic = 0.90;

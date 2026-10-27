@@ -1887,7 +1887,7 @@ impl PhoneticSuggestion {
             // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
             let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
             let mut valid_fuzzy_stems = Vec::new();
-            let variant_limit = if is_primary_in_dict { 32 } else { 64 };
+            let variant_limit = if is_primary_in_dict { 16 } else { 32 };
             let is_init_a = middle.starts_with('a') || middle.starts_with('A');
             let is_init_o = middle.starts_with('o') || middle.starts_with('O');
 
@@ -1896,10 +1896,12 @@ impl PhoneticSuggestion {
                 let mut cands_to_test = Vec::with_capacity(2);
                 cands_to_test.push(var_phonetic.clone());
 
-                if is_init_a && var_phonetic.starts_with('আ') {
-                    cands_to_test.push(format!("অ{}", &var_phonetic['আ'.len_utf8()..]));
-                } else if is_init_o && var_phonetic.starts_with('ও') {
-                    cands_to_test.push(format!("অ{}", &var_phonetic['ও'.len_utf8()..]));
+                if is_init_a || is_init_o {
+                    if var_phonetic.starts_with('আ') {
+                        cands_to_test.push(format!("অ{}", &var_phonetic['আ'.len_utf8()..]));
+                    } else if var_phonetic.starts_with('ও') {
+                        cands_to_test.push(format!("অ{}", &var_phonetic['ও'.len_utf8()..]));
+                    }
                 }
 
                 for cand_text in cands_to_test {
@@ -3326,19 +3328,21 @@ impl PhoneticSuggestion {
                             {
                                 base_candidates.push(conv.clone());
                             }
-                            if is_bk_a && conv.starts_with('আ') {
-                                let o_cand = format!("অ{}", &conv['আ'.len_utf8()..]);
-                                if self.database.is_exact_dictionary_word(&o_cand)
-                                    && !base_candidates.contains(&o_cand)
-                                {
-                                    base_candidates.push(o_cand);
-                                }
-                            } else if is_bk_o && conv.starts_with('ও') {
-                                let o_cand = format!("অ{}", &conv['ও'.len_utf8()..]);
-                                if self.database.is_exact_dictionary_word(&o_cand)
-                                    && !base_candidates.contains(&o_cand)
-                                {
-                                    base_candidates.push(o_cand);
+                            if is_bk_a || is_bk_o {
+                                if conv.starts_with('আ') {
+                                    let o_cand = format!("অ{}", &conv['আ'.len_utf8()..]);
+                                    if self.database.is_exact_dictionary_word(&o_cand)
+                                        && !base_candidates.contains(&o_cand)
+                                    {
+                                        base_candidates.push(o_cand);
+                                    }
+                                } else if conv.starts_with('ও') {
+                                    let o_cand = format!("অ{}", &conv['ও'.len_utf8()..]);
+                                    if self.database.is_exact_dictionary_word(&o_cand)
+                                        && !base_candidates.contains(&o_cand)
+                                    {
+                                        base_candidates.push(o_cand);
+                                    }
                                 }
                             }
                         }

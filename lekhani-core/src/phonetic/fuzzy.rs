@@ -98,6 +98,8 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("t", &["T", "th", "t``"]),
     ("T", &["t", "Th"]),
     ("kt", &["kT", "kt``", "kth"]),
+    ("ct", &["kT", "kt", "kth"]),
+    ("ck", &["k", "kh"]),
     ("dh", &["Dh", "d", "dhw"]),
     ("Dh", &["dh", "D"]),
     ("d", &["dw", "D", "dh"]),
@@ -201,6 +203,7 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("g", &["gh"]),
     ("chh", &["ch", "c"]),
     ("ch", &["c", "cch"]),
+    ("nch", &["nc", "nch"]),
     ("c", &["ch", "k"]),
     ("cch", &["cc", "ch", "c"]),
     ("cchw", &["cchv", "cchw"]),
@@ -270,7 +273,7 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("sy", &["sZ", "s"]),
     ("shy", &["shZ", "sh"]),
     // Geminates representing Ja-fala in Bengali phonology (অন্য, জন্য, কল্যাণ, বাক্য, নাব্য, রম্য, সত্য, তথ্য)
-    ("nn", &["nZ", "ny", "n"]),
+    ("nn", &["NN", "nZ", "ny", "n"]),
     ("mm", &["mZ", "my", "m"]),
     ("ll", &["lZ", "ly", "l"]),
     ("kk", &["kZ", "ky", "k"]),
@@ -454,7 +457,7 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     });
 
     p1_vec.extend(p2_vec);
-    p1_vec.truncate(128);
+    p1_vec.truncate(64);
     p1_vec
 }
 
