@@ -65,6 +65,13 @@ Welcome to **Lekhani Engine** (`lekhani-engine`). This document defines the engi
    Maintain exactly one canonical implementation of any tool or binary in `lekhani-core/src/bin/`. Never duplicate tools across directories. Explicitly state every file deletion.
 6. **Atomic Commits**:
    One commit per step formatted as `<type>(<scope>): <description>`.
+7. **Living AGENTS.md Invariant (Continuous Documentation Update)**:
+   Every agent and contributor MUST automatically update `AGENTS.md` whenever:
+   - A new empirical baseline or gate is reached (update baseline figures and commit SHA).
+   - A structural limit or ceiling is discovered (update the census data).
+   - An experiment fails or regresses (immediately document the mechanism in the Graveyard of Negative Results so it is never repeated).
+   - An architectural invariant is added or refined.
+   Never leave findings buried in conversation history or ephemeral logs.
 
 ---
 
@@ -97,6 +104,13 @@ Welcome to **Lekhani Engine** (`lekhani-engine`). This document defines the engi
    - A generic `dropped_e_suffix` penalty erroneously forces the locative form `অগাস্টিনে` over the base unigram `অগাস্টিন`.
 3. **Sound Law Symmetries (`th` -> `t`)**:
    - Adding `th` $\to$ `t` globally in `fuzzy.rs:96` caused a collision on authentic aspirated `থ` words (-1 net hit: 4072 down to 4071).
+4. **Blanket Suppression of Direct Avro via `has_dominant_homophone` (Commit `9f7407a`)**:
+   - Stripping `is_exact_phonetic` from DirectTransliteration whenever `has_dominant_homophone` is true caused a -192 regression (4086 down to 3894).
+   - Reason: `has_dominant_homophone` is triggered by ANY candidate with unigram frequency $\ge 30$. Stripping the Avro exact bonus causes valid transliterations of OOV words, proper nouns, and inflections to be overtaken by unrelated dictionary words (e.g. typing `ankita` produced `নাকিতা` instead of `অঙ্কিতা`).
+5. **Grapheme Edit Distance (`dist <= 1`) Guard on FuzzySoundLaw (Commit `9f7407a`)**:
+   - Restricting `is_exact_phonetic = 0.85` in `FuzzySoundLaw` to `dist <= 1` starves legitimate Dakshina transliterations (e.g. where vowel and consonant variations yield grapheme distance $\ge 2$ from raw Avro) of their ranking score, leaving phonetic noise at Rank 1.
+6. **Unsegmented Single-Pass Compound Dumping into Perceptron (Commit `9f7407a`)**:
+   - Bypassing the 2,500-pt cap on `SegmentedLattice` compound words without compound-specific feature extraction damages the single-word ranking balance. Compounds require dedicated segmentation features before ranker scoring.
 
 ---
 
