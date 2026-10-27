@@ -81,7 +81,7 @@ pub const CORE_SUFFIXES: &[(&str, &str)] = &[
     ("e", "ে"),
     ("eo", "েও"),
     ("ei", "েই"),
-    ("ey", "েই"),
+    ("ey", "ে"),
     ("er", "ের"),
     ("ero", "েরও"),
     ("eri", "েরই"),
@@ -907,6 +907,13 @@ impl PhoneticDatabase {
         if let Ok(l) = self.learner.try_read() {
             if l.learned_words.contains(word) {
                 return 9500;
+            }
+        }
+        // Morphology-aware frequency inheritance: inflected form inherits base stem frequency
+        for stem in crate::phonetic::morphology::extract_all_candidate_stems(word) {
+            let stem_freq = self.trie.get_frequency(&stem);
+            if stem_freq > 0 {
+                return (stem_freq * 9) / 10;
             }
         }
         0

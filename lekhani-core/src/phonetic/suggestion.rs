@@ -1148,14 +1148,14 @@ impl PhoneticSuggestion {
                 ("rei", "রেই"),
                 ("ta", "টা"),
                 ("ti", "টি"),
-                ("te", "ে"),
+                ("te", "তে"),
                 ("er", "ের"),
                 ("re", "রে"),
                 ("ke", "কে"),
                 ("ra", "রা"),
                 ("ei", "েই"),
                 ("eo", "েও"),
-                ("ey", "েই"),
+                ("ey", "ে"),
                 ("ye", "য়ে"),
                 ("ay", "ায়"),
                 ("e", "ে"),
@@ -1888,36 +1888,49 @@ impl PhoneticSuggestion {
             let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
             let mut valid_fuzzy_stems = Vec::new();
             let variant_limit = if is_primary_in_dict { 16 } else { 32 };
+            let is_init_a = middle.starts_with('a') || middle.starts_with('A');
+            let is_init_o = middle.starts_with('o') || middle.starts_with('O');
 
             for variant in fuzzy_variants.iter().take(variant_limit) {
                 let var_phonetic = self.convert_phonetic(variant);
-                if self.database.is_exact_dictionary_word(&var_phonetic) {
-                    let len_diff = (var_phonetic.chars().count() as isize
-                        - phonetic.chars().count() as isize)
-                        .abs();
-                    if len_diff <= 3 {
-                        if !valid_fuzzy_stems.contains(&var_phonetic) {
-                            valid_fuzzy_stems.push(var_phonetic.clone());
+                let mut cands_to_test = Vec::with_capacity(2);
+                cands_to_test.push(var_phonetic.clone());
+
+                if is_init_a && var_phonetic.starts_with('আ') {
+                    cands_to_test.push(format!("অ{}", &var_phonetic['আ'.len_utf8()..]));
+                } else if is_init_o && var_phonetic.starts_with('ও') {
+                    cands_to_test.push(format!("অ{}", &var_phonetic['ও'.len_utf8()..]));
+                }
+
+                for cand_text in cands_to_test {
+                    if self.database.is_exact_dictionary_word(&cand_text) {
+                        let len_diff = (cand_text.chars().count() as isize
+                            - phonetic.chars().count() as isize)
+                            .abs();
+                        if len_diff <= 3 {
+                            if !valid_fuzzy_stems.contains(&cand_text) {
+                                valid_fuzzy_stems.push(cand_text.clone());
+                            }
+                            add_cand(
+                                cand_text,
+                                CandidateSource::FuzzySoundLaw,
+                                3200,
+                                &mut raw_candidates,
+                                &mut seen,
+                            );
                         }
+                    } else if middle.chars().count() <= 3
+                        && !cand_text.is_empty()
+                        && cand_text.chars().all(|c| c.is_bengali())
+                    {
                         add_cand(
-                            var_phonetic,
+                            cand_text,
                             CandidateSource::FuzzySoundLaw,
-                            3200,
+                            1800,
                             &mut raw_candidates,
                             &mut seen,
                         );
                     }
-                } else if middle.chars().count() <= 3
-                    && !var_phonetic.is_empty()
-                    && var_phonetic.chars().all(|c| c.is_bengali())
-                {
-                    add_cand(
-                        var_phonetic,
-                        CandidateSource::FuzzySoundLaw,
-                        1800,
-                        &mut raw_candidates,
-                        &mut seen,
-                    );
                 }
             }
 
@@ -3291,12 +3304,29 @@ impl PhoneticSuggestion {
                     // Permit fuzzy expansion if base is verified or >= 4 chars (covers common
                     // 4-letter Bengali stems: valo, bhai, maro, gelo, dhoro, etc.)
                     if has_verified_base || base_key.chars().count() >= 4 {
+                        let is_bk_a = base_key.starts_with('a') || base_key.starts_with('A');
+                        let is_bk_o = base_key.starts_with('o') || base_key.starts_with('O');
                         for fz in super::fuzzy::generate_phonetic_variants(base_key) {
                             let conv = self.convert_phonetic(&fz);
                             if self.database.is_exact_dictionary_word(&conv)
                                 && !base_candidates.contains(&conv)
                             {
-                                base_candidates.push(conv);
+                                base_candidates.push(conv.clone());
+                            }
+                            if is_bk_a && conv.starts_with('আ') {
+                                let o_cand = format!("অ{}", &conv['আ'.len_utf8()..]);
+                                if self.database.is_exact_dictionary_word(&o_cand)
+                                    && !base_candidates.contains(&o_cand)
+                                {
+                                    base_candidates.push(o_cand);
+                                }
+                            } else if is_bk_o && conv.starts_with('ও') {
+                                let o_cand = format!("অ{}", &conv['ও'.len_utf8()..]);
+                                if self.database.is_exact_dictionary_word(&o_cand)
+                                    && !base_candidates.contains(&o_cand)
+                                {
+                                    base_candidates.push(o_cand);
+                                }
                             }
                         }
                     }
@@ -3306,6 +3336,12 @@ impl PhoneticSuggestion {
                         suffixes_to_try.push("তা");
                     } else if suffix_key == "ti" {
                         suffixes_to_try.push("তি");
+                    } else if suffix_key == "ey" {
+                        if suffix == "ে" {
+                            suffixes_to_try.push("েই");
+                        } else {
+                            suffixes_to_try.push("ে");
+                        }
                     }
 
                     for base in &base_candidates {
