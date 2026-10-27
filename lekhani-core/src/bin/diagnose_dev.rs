@@ -104,41 +104,49 @@ fn main() {
 
     let mut miss_in_dict = 0usize;
     let mut miss_not_in_dict = 0usize;
-    let mut miss_target_in_cands = 0usize;
-    let mut miss_stem_in_dict = 0usize;
-
-    let suffixes = ["এর", "র", "ে", "তে", "ও", "সহ", "গুলো", "গুলি", "সমূহের", "সমূহ", "দের", "টি", "টা", "কে"];
+    let mut miss_in_dict_in_cands = 0usize;
+    let mut miss_not_in_dict_in_cands = 0usize;
 
     for (_input, target, _top1, _in_top3, cands) in &real_misses {
         let in_dict = sugg.database.is_exact_dictionary_word(target);
+        let in_cands = cands.iter().any(|c| is_acceptable_match(c, target));
         if in_dict {
             miss_in_dict += 1;
+            if in_cands {
+                miss_in_dict_in_cands += 1;
+            }
         } else {
             miss_not_in_dict += 1;
-            let mut stem_found = false;
-            for suf in &suffixes {
-                if target.ends_with(suf) && target.len() > suf.len() {
-                    let stem = &target[..target.len() - suf.len()];
-                    if sugg.database.is_exact_dictionary_word(stem) {
-                        stem_found = true;
-                        break;
-                    }
-                }
+            if in_cands {
+                miss_not_in_dict_in_cands += 1;
             }
-            if stem_found {
-                miss_stem_in_dict += 1;
-            }
-        }
-        if cands.iter().any(|c| is_acceptable_match(c, target)) {
-            miss_target_in_cands += 1;
         }
     }
 
     println!("\n=== COMPREHENSIVE BREAKDOWN OF THE {} MISSES ===", real_misses.len());
-    println!("1. Target IS in Dictionary (Ranking / Model Misses):   {} ({:.1}%)", miss_in_dict, miss_in_dict as f64 / real_misses.len() as f64 * 100.0);
-    println!("   - Target was generated in candidates (Rank 2+):    {} ({:.1}%)", miss_target_in_cands, miss_target_in_cands as f64 / real_misses.len() as f64 * 100.0);
-    println!("   - Target was NOT generated at all:                 {} ({:.1}%)", miss_in_dict.saturating_sub(miss_target_in_cands), miss_in_dict.saturating_sub(miss_target_in_cands) as f64 / real_misses.len() as f64 * 100.0);
-    println!("2. Target is NOT in Dictionary (Lexicon Ceiling):     {} ({:.1}%)", miss_not_in_dict, miss_not_in_dict as f64 / real_misses.len() as f64 * 100.0);
-    println!("   - Out-of-dict targets with stem in dictionary:     {} ({:.1}%)", miss_stem_in_dict, miss_stem_in_dict as f64 / real_misses.len() as f64 * 100.0);
-    println!("   - Completely unknown vocabulary (names, noise):    {} ({:.1}%)", miss_not_in_dict - miss_stem_in_dict, (miss_not_in_dict - miss_stem_in_dict) as f64 / real_misses.len() as f64 * 100.0);
+    println!("1. Target IS in Dictionary:                        {} ({:.1}%)", miss_in_dict, miss_in_dict as f64 / real_misses.len() as f64 * 100.0);
+    println!("   - Target IN candidates (Rank 2+):               {} ({:.1}%)", miss_in_dict_in_cands, miss_in_dict_in_cands as f64 / real_misses.len() as f64 * 100.0);
+    println!("   - Target NOT in candidates at all:              {} ({:.1}%)", miss_in_dict - miss_in_dict_in_cands, (miss_in_dict - miss_in_dict_in_cands) as f64 / real_misses.len() as f64 * 100.0);
+    println!("2. Target is NOT in Dictionary (OOV):              {} ({:.1}%)", miss_not_in_dict, miss_not_in_dict as f64 / real_misses.len() as f64 * 100.0);
+    println!("   - Target IN candidates (Rank 2+):               {} ({:.1}%)", miss_not_in_dict_in_cands, miss_not_in_dict_in_cands as f64 / real_misses.len() as f64 * 100.0);
+    println!("   - Target NOT in candidates:                     {} ({:.1}%)", miss_not_in_dict - miss_not_in_dict_in_cands, (miss_not_in_dict - miss_not_in_dict_in_cands) as f64 / real_misses.len() as f64 * 100.0);
+    println!("\n=== TOP 8 EXAMPLES WHERE TARGET WAS GENERATED BUT RANKED AT RANK 2+ ===");
+    let mut printed = 0;
+    for (input, target, top1, _in_top3, cands) in &real_misses {
+        if let Some(pos) = cands.iter().position(|c| is_acceptable_match(c, target)) {
+            let target_in_dict = sugg.database.is_exact_dictionary_word(target);
+            let target_freq = sugg.database.get_frequency(target);
+            let top1_in_dict = sugg.database.is_exact_dictionary_word(top1);
+            let top1_freq = sugg.database.get_frequency(top1);
+            println!(
+                "{}. Input: {:14} | Target: {:12} (Rank: {}, in_dict: {}, freq: {}) | Top-1: {:12} (in_dict: {}, freq: {})",
+                printed + 1, input, target, pos + 1, target_in_dict, target_freq, top1, top1_in_dict, top1_freq
+            );
+            println!("   Candidate strip: {:?}", cands.iter().take(5).collect::<Vec<_>>());
+            printed += 1;
+            if printed >= 8 {
+                break;
+            }
+        }
+    }
 }
