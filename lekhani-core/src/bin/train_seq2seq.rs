@@ -30,6 +30,7 @@ struct Config {
     epochs: usize,
     lr: f32,
     lr_decay: f32,
+    batch: usize,
     beam: usize,
     eval_n: usize,
 }
@@ -44,6 +45,7 @@ impl Default for Config {
             epochs: 30,
             lr: 3e-3,
             lr_decay: 0.92,
+            batch: 128,
             beam: 5,
             eval_n: 200,
         }
@@ -62,6 +64,7 @@ fn parse_args() -> Config {
             "--hidden" => { c.hidden_dim = args[i + 1].parse().unwrap_or(c.hidden_dim); i += 2; }
             "--epochs" => { c.epochs = args[i + 1].parse().unwrap_or(c.epochs); i += 2; }
             "--lr"    => { c.lr = args[i + 1].parse().unwrap_or(c.lr); i += 2; }
+            "--batch" => { c.batch = args[i + 1].parse().unwrap_or(c.batch); i += 2; }
             "--beam"  => { c.beam = args[i + 1].parse().unwrap_or(c.beam); i += 2; }
             _ => { i += 1; }
         }
@@ -583,7 +586,7 @@ fn main() {
 
         let mut total_loss = 0.0f32;
         let mut count = 0usize;
-        let batch = 64usize;
+        let batch = cfg.batch;
         for chunk in order.chunks(batch) {
             let (batch_loss, batch_count, mut grad) = chunk
                 .par_iter()
