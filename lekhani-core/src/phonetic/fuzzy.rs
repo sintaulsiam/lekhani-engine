@@ -446,11 +446,7 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
         apply_sound_laws(var, &mut pass2);
     }
 
-    let base_len = if let Some(first_collapsed) = collapsed_variants.first() {
-        first_collapsed.len()
-    } else {
-        input.len()
-    };
+    let base_len = input.len();
 
     let compute_score = |s: &str| -> (isize, usize, isize, usize) {
         let exp = (s.contains("rri") as usize)
@@ -459,8 +455,9 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
             + (s.contains("cch") as usize)
             + (s.contains("ncolo") as usize)
             + (s.contains("ncol") as usize);
-        let eff = (s.len() - exp) as isize;
-        let diff = (eff - base_len as isize).abs();
+        let len_diff = (s.len() as isize - base_len as isize).abs();
+        let eff_diff = (s.len() as isize - exp as isize - base_len as isize).abs();
+        let diff = std::cmp::min(len_diff, eff_diff);
         let pen = (s.contains('^') as usize * 2) + (s.contains("hhh") as usize * 2);
         (diff, pen, -(exp as isize), s.len())
     };

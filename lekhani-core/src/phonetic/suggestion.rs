@@ -2213,6 +2213,7 @@ impl PhoneticSuggestion {
                 && (c.source == CandidateSource::Autocorrect
                     || c.source == CandidateSource::Loanword
                     || c.source == CandidateSource::PhoneticOverride
+                    || (!is_primary_in_dict && self.database.is_exact_dictionary_word(&c.text))
                     || self.database.get_frequency(&c.text) >= 1000)
         });
 
