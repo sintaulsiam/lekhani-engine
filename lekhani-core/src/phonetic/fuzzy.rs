@@ -203,6 +203,8 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("khe", &["kShe", "khe"]),
     ("x", &["kkh", "kSh"]),
     ("ks", &["kkh", "x"]),
+    ("akshar", &["okkhor", "akhor"]),
+    ("ksh", &["kkh", "kSh"]),
     // 5. Aspirated vs Unaspirated Stops (ক/খ, গ/ঘ, চ/ছ, প/ফ, ব/ভ)
     ("kh", &["kSh", "k"]),
     ("k", &["kh"]),
@@ -222,6 +224,9 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("agahir", &["ogobhIr", "ogobhir", "agobhir"]),
     ("gahir", &["gobhIr", "gobhir", "gabhIr", "gabhir"]),
     ("gohir", &["gobhIr", "gobhir"]),
+    ("agovir", &["ogobhIr", "ogobhir"]),
+    ("govir", &["gobhIr", "gobhir"]),
+    ("ngk", &["nk"]),
     ("c", &["ch", "k"]),
     ("cch", &["cc", "ch", "c"]),
     ("cchw", &["cchv", "cchw"]),
@@ -433,9 +438,11 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
     // 2. Bengali Glide Verbs (e.g. khawa -> khaoya, dewa -> deoya, jawa -> jaoya)
     if lower.ends_with("awa") && lower.len() >= 4 {
         let glide = format!("{}aoya", &lower[..lower.len() - 3]);
+        apply_sound_laws(&glide, &mut pass1);
         pass1.insert(glide);
     } else if lower.ends_with("ewa") && lower.len() >= 4 {
         let glide = format!("{}eoya", &lower[..lower.len() - 3]);
+        apply_sound_laws(&glide, &mut pass1);
         pass1.insert(glide);
     }
 
@@ -444,13 +451,6 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
         let initial_o = format!("o{}", &lower[1..]);
         pass1.insert(initial_o.clone());
         apply_sound_laws(&initial_o, &mut pass1);
-    }
-
-    // 3. Second pass for compounding sound laws (e.g. sri -> srri AND st -> ShT => srriShTi)
-    let pass1_list: Vec<String> = pass1.iter().cloned().collect();
-    let mut pass2 = HashSet::with_capacity(128);
-    for var in &pass1_list {
-        apply_sound_laws(var, &mut pass2);
     }
 
     let base_len = input.len();
@@ -465,7 +465,7 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
         let len_diff = (s.len() as isize - base_len as isize).abs();
         let eff_diff = (s.len() as isize - exp as isize - base_len as isize).abs();
         let diff = std::cmp::min(len_diff, eff_diff);
-        let pen = (s.contains('^') as usize * 2) + (s.contains("hhh") as usize * 2);
+        let pen = s.contains("hhh") as usize * 2;
         (diff, pen, -(exp as isize), s.len())
     };
 
@@ -475,19 +475,25 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
         .collect();
     p1_vec.sort_unstable_by_key(|a| a.0);
 
+    // 3. Second pass for compounding sound laws on top sorted candidates
+    let mut pass2 = HashSet::with_capacity(64);
+    for (_, var) in p1_vec.iter().take(8) {
+        apply_sound_laws(var, &mut pass2);
+    }
+
     let mut p2_vec: Vec<((isize, usize, isize, usize), String)> = pass2
         .into_iter()
-        .filter(|v| !pass1_list.contains(v))
+        .filter(|v| !p1_vec.iter().any(|(_, s)| s == v))
         .map(|s| (compute_score(&s), s))
         .collect();
     p2_vec.sort_unstable_by_key(|a| a.0);
 
-    p1_vec.truncate(12);
-    p2_vec.truncate(10);
+    p1_vec.truncate(14);
+    p2_vec.truncate(6);
 
     let mut res: Vec<String> = p1_vec.into_iter().map(|(_, s)| s).collect();
     res.extend(p2_vec.into_iter().map(|(_, s)| s));
-    res.truncate(22);
+    res.truncate(18);
     res
 }
 

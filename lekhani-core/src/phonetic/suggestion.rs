@@ -1921,7 +1921,7 @@ impl PhoneticSuggestion {
             // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
             let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
             let mut valid_fuzzy_stems = Vec::new();
-            let variant_limit = if is_primary_in_dict { 10 } else { 20 };
+            let variant_limit = if is_primary_in_dict { 8 } else { 16 };
             let is_init_a = middle.starts_with('a') || middle.starts_with('A');
             let is_init_o = middle.starts_with('o') || middle.starts_with('O');
 
