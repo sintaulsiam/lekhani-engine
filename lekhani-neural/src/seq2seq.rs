@@ -357,14 +357,17 @@ impl Seq2SeqTransliterator {
     }
 
     /// Beam-search decode from encoder states.
+    /// Beam-search decode from encoder states with optional lexicon constraints.
     /// Returns top-`beam` candidates as (score, id_sequence) sorted best-first.
-    pub fn beam_decode(
+    pub fn beam_decode_constrained(
         &self,
         enc_states: &[Vec<f32>],
         enc_final: &[f32],
         beam: usize,
         max_len: usize,
         scratch: &mut InferenceScratch,
+        prefix_filter: Option<&dyn Fn(&str) -> bool>,
+        word_filter: Option<&dyn Fn(&str) -> bool>,
     ) -> Vec<(f32, Vec<u32>)> {
         let tv = self.tgt_vocab.size();
 
@@ -387,7 +390,7 @@ impl Seq2SeqTransliterator {
 
         for _ in 0..max_len {
             if active.is_empty() { break; }
-            let mut candidates: Vec<Hyp> = Vec::with_capacity(active.len() * beam);
+            let mut candidates: Vec<Hyp> = Vec::with_capacity(active.len() * beam * 2);
 
             for hyp in active.drain(..) {
                 if hyp.done {
@@ -410,19 +413,41 @@ impl Seq2SeqTransliterator {
                 let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
                 let log_sum = max_l + sum_e.ln();
 
-                // Top-beam tokens
+                // Top candidates (explore wider than beam when filtering)
                 scratch.scored_buf.clear();
                 for (idx, &l) in scratch.logits_buf.iter().enumerate().take(tv) {
                     scratch.scored_buf.push((idx as u32, l - log_sum));
                 }
                 scratch.scored_buf.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-                for &(tok_id, log_p) in scratch.scored_buf.iter().take(beam) {
+                let explore_count = if prefix_filter.is_some() || word_filter.is_some() {
+                    (beam * 4).min(scratch.scored_buf.len())
+                } else {
+                    beam.min(scratch.scored_buf.len())
+                };
+
+                for &(tok_id, log_p) in scratch.scored_buf.iter().take(explore_count) {
                     let mut new_ids = hyp.ids.clone();
                     new_ids.push(tok_id);
                     let done = tok_id == EOS_ID;
+
+                    let mut penalty = 0.0f32;
+                    if done {
+                        if let Some(wf) = word_filter {
+                            let word = self.tgt_vocab.decode_str(&hyp.ids);
+                            if !wf(&word) {
+                                penalty = -30.0;
+                            }
+                        }
+                    } else if let Some(pf) = prefix_filter {
+                        let partial = self.tgt_vocab.decode_str(&new_ids);
+                        if !pf(&partial) {
+                            penalty = -30.0;
+                        }
+                    }
+
                     candidates.push(Hyp {
-                        score: hyp.score + log_p,
+                        score: hyp.score + log_p + penalty,
                         h: h_next.clone(),
                         ids: new_ids,
                         done,
@@ -447,12 +472,45 @@ impl Seq2SeqTransliterator {
         completed
     }
 
+    /// Beam-search decode from encoder states.
+    /// Returns top-`beam` candidates as (score, id_sequence) sorted best-first.
+    pub fn beam_decode(
+        &self,
+        enc_states: &[Vec<f32>],
+        enc_final: &[f32],
+        beam: usize,
+        max_len: usize,
+        scratch: &mut InferenceScratch,
+    ) -> Vec<(f32, Vec<u32>)> {
+        self.beam_decode_constrained(enc_states, enc_final, beam, max_len, scratch, None, None)
+    }
+
     /// Transliterate a Latin string to up to `beam` Bengali candidates.
     pub fn transliterate(&self, latin: &str, beam: usize, scratch: &mut InferenceScratch) -> Vec<String> {
+        self.transliterate_constrained(latin, beam, scratch, None, None)
+    }
+
+    /// Transliterate a Latin string to up to `beam` Bengali candidates with lexicon constraints.
+    pub fn transliterate_constrained(
+        &self,
+        latin: &str,
+        beam: usize,
+        scratch: &mut InferenceScratch,
+        prefix_filter: Option<&dyn Fn(&str) -> bool>,
+        word_filter: Option<&dyn Fn(&str) -> bool>,
+    ) -> Vec<String> {
         let src_ids = self.src_vocab.encode_str(latin.to_ascii_lowercase().trim());
         let enc_states = self.encode(&src_ids, scratch);
         let enc_final = scratch.enc_final.clone();
-        let hyps = self.beam_decode(&enc_states, &enc_final, beam, (latin.len() * 3 + 4).min(32), scratch);
+        let hyps = self.beam_decode_constrained(
+            &enc_states,
+            &enc_final,
+            beam,
+            (latin.len() * 3 + 4).min(32),
+            scratch,
+            prefix_filter,
+            word_filter,
+        );
         hyps.iter()
             .map(|(_, ids)| self.tgt_vocab.decode_str(ids))
             .filter(|s| !s.is_empty())
@@ -729,5 +787,20 @@ mod tests {
         let params = m.param_count();
         // Should be < 200K parameters → < 800 KB
         assert!(params < 250_000, "Too many params: {}", params);
+    }
+
+    #[test]
+    fn test_constrained_inference() {
+        let sv = CharVocab::from_strings(["abcde"].iter().copied());
+        let tv = CharVocab::from_strings(["অআইউ"].iter().copied());
+        let m = Seq2SeqTransliterator::new(sv, tv, 8, 16);
+        let mut scratch = InferenceScratch::for_model(&m);
+        // Constraint: only allow prefixes starting with 'অ'
+        let prefix_filter = |p: &str| p.starts_with('অ');
+        let word_filter = |w: &str| w == "অ";
+        let result = m.transliterate_constrained("a", 3, &mut scratch, Some(&prefix_filter), Some(&word_filter));
+        for cand in &result {
+            assert!(cand.starts_with('অ'));
+        }
     }
 }
