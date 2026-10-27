@@ -415,11 +415,11 @@ pub fn extract_candidate_features(
                 f.source_weight = 1.0;
                 f.phonetic_similarity = 1.0;
             } else if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
-                let input_starts_vowel = ctx.middle.starts_with(|c: char| matches!(c, 'a' | 'A' | 'e' | 'E' | 'i' | 'I' | 'o' | 'O' | 'u' | 'U'));
-                let cand_starts_vowel = cand.text.chars().next().map_or(false, |c| matches!(c, '\u{0985}'..='\u{0994}'));
+                let input_starts_vowel = ctx.middle.starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
+                let cand_starts_vowel = cand.text.chars().next().is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
                 let dropped_initial_vowel = input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
 
-                let input_starts_a_o = ctx.middle.starts_with(|c: char| matches!(c, 'a' | 'A' | 'o' | 'O'));
+                let input_starts_a_o = ctx.middle.starts_with(['a', 'A', 'o', 'O']);
                 let cand_starts_e = cand.text.starts_with('এ');
                 let vowel_mismatch = input_starts_a_o && cand_starts_e;
 
@@ -457,11 +457,11 @@ pub fn extract_candidate_features(
                 f.source_weight = 1.0;
                 f.phonetic_similarity = 1.0;
             } else if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
-                let input_starts_vowel = ctx.middle.starts_with(|c: char| matches!(c, 'a' | 'A' | 'e' | 'E' | 'i' | 'I' | 'o' | 'O' | 'u' | 'U'));
-                let cand_starts_vowel = cand.text.chars().next().map_or(false, |c| matches!(c, '\u{0985}'..='\u{0994}'));
+                let input_starts_vowel = ctx.middle.starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
+                let cand_starts_vowel = cand.text.chars().next().is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
                 let dropped_initial_vowel = input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
 
-                let input_starts_a_o = ctx.middle.starts_with(|c: char| matches!(c, 'a' | 'A' | 'o' | 'O'));
+                let input_starts_a_o = ctx.middle.starts_with(['a', 'A', 'o', 'O']);
                 let cand_starts_e = cand.text.starts_with('এ');
                 let vowel_mismatch = input_starts_a_o && cand_starts_e;
 
@@ -538,6 +538,7 @@ pub fn extract_candidate_features(
         if is_clitic_o {
             f.clitic_alignment = 1.0;
         } else if !cand.text.ends_with("্য")
+            && !cand.text.ends_with('য')
             && ctx.clitic_o_targets.iter().any(|t| {
                 t.strip_prefix(&cand.text).is_some_and(|s| {
                     s == "ও"

@@ -47,8 +47,7 @@ fn main() {
     let dev_path = PathBuf::from("data/eval/bn.translit.sampled.dev.tsv");
     let mut sugg = PhoneticSuggestion::new();
     let dict_dir = PathBuf::from("data/dictionaries");
-    sugg.database
-        .load_from_dir_with_dict(&dict_dir, "dictionary.json")
+    sugg.load_from_dir_with_dict(&dict_dir, "dictionary.json")
         .expect("load dict");
 
     let layout_path = PathBuf::from("data/layouts/avrophonetic.json");

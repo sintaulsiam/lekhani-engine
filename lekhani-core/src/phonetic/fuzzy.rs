@@ -134,6 +134,12 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("sree", &["srri", "sree", "sri"]),
     ("bri", &["brri", "bri"]),
     ("bree", &["brri", "bree", "bri"]),
+    ("krita", &["krrito", "krito", "krrita"]),
+    ("krito", &["krrito", "krito"]),
+    ("kreeta", &["krrito", "kreeto", "kreeta"]),
+    ("kreeto", &["krrito", "kreeto"]),
+    ("karjo", &["karrzo", "karzo", "karjo"]),
+    ("karja", &["karrzo", "karza", "karja"]),
     ("kri", &["krri", "kri"]),
     ("kree", &["krri", "kree", "kri"]),
     ("pri", &["prri", "pri"]),
@@ -156,9 +162,9 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("ortho", &["orrth", "rrth", "orth"]),
     ("orth", &["orrth", "rrth"]),
     ("rtho", &["rrth", "rrTh", "rth"]),
-    ("rj", &["rz", "rZ", "rrz", "rrj"]),
-    ("rjo", &["rz", "rzo", "rZo", "rrz", "rjo"]),
-    ("rja", &["rz", "rzo", "rza", "rZo", "rja"]),
+    ("rj", &["rrz", "rrzo", "rz", "rrj"]),
+    ("rjo", &["rrzo", "rrz", "rzo", "rjo"]),
+    ("rja", &["rrzo", "rrza", "rza", "rja"]),
     ("rsh", &["rrsh", "rrSh"]),
     ("rn", &["rrN", "rrn"]),
     ("rb", &["rrb", "rrv"]),
@@ -204,6 +210,10 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("g", &["gh"]),
     ("chh", &["ch", "c"]),
     ("ch", &["c", "cch"]),
+    ("nchal", &["ncol", "ncolo", "nchol"]),
+    ("nchol", &["ncol", "ncolo", "nchol"]),
+    ("ncha", &["nco", "nca"]),
+    ("ncho", &["nco", "ncho"]),
     ("nch", &["nc", "nch"]),
     ("c", &["ch", "k"]),
     ("cch", &["cc", "ch", "c"]),
@@ -240,8 +250,8 @@ pub const PHONEME_SOUND_LAWS: &[(&str, &[&str])] = &[
     ("ayo", &["oy", "ayo"]),
     ("ou", &["OU", "ow"]),
     ("ow", &["O", "o", "ou", "OU"]),
-    ("o", &["O", "a", "u"]),
-    ("O", &["o", "u"]),
+    ("o", &["a", "O"]),
+    ("O", &["o"]),
     ("noiti", &["nOIti", "noyti"]),
     ("noit", &["nOIt", "noyt"]),
     ("noik", &["nOIk", "noyk"]),
@@ -442,26 +452,39 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
         input.len()
     };
 
-    let mut p1_vec: Vec<String> = pass1.into_iter().collect();
-    p1_vec.sort_unstable_by(|a, b| {
-        let diff_a = (a.len() as isize - base_len as isize).abs();
-        let diff_b = (b.len() as isize - base_len as isize).abs();
-        diff_a.cmp(&diff_b).then_with(|| a.len().cmp(&b.len()))
-    });
+    let compute_score = |s: &str| -> (isize, usize, isize, usize) {
+        let exp = (s.contains("rri") as usize)
+            + (s.contains("rrz") as usize)
+            + (s.contains("kkh") as usize)
+            + (s.contains("cch") as usize)
+            + (s.contains("ncolo") as usize)
+            + (s.contains("ncol") as usize);
+        let eff = (s.len() - exp) as isize;
+        let diff = (eff - base_len as isize).abs();
+        let pen = (s.contains('^') as usize * 2) + (s.contains("hhh") as usize * 2);
+        (diff, pen, -(exp as isize), s.len())
+    };
 
-    let mut p2_vec: Vec<String> = pass2
+    let mut p1_vec: Vec<((isize, usize, isize, usize), String)> = pass1
+        .into_iter()
+        .map(|s| (compute_score(&s), s))
+        .collect();
+    p1_vec.sort_unstable_by_key(|a| a.0);
+
+    let mut p2_vec: Vec<((isize, usize, isize, usize), String)> = pass2
         .into_iter()
         .filter(|v| !pass1_list.contains(v))
+        .map(|s| (compute_score(&s), s))
         .collect();
-    p2_vec.sort_unstable_by(|a, b| {
-        let diff_a = (a.len() as isize - base_len as isize).abs();
-        let diff_b = (b.len() as isize - base_len as isize).abs();
-        diff_a.cmp(&diff_b).then_with(|| a.len().cmp(&b.len()))
-    });
+    p2_vec.sort_unstable_by_key(|a| a.0);
 
-    p1_vec.extend(p2_vec);
-    p1_vec.truncate(64);
-    p1_vec
+    p1_vec.truncate(12);
+    p2_vec.truncate(10);
+
+    let mut res: Vec<String> = p1_vec.into_iter().map(|(_, s)| s).collect();
+    res.extend(p2_vec.into_iter().map(|(_, s)| s));
+    res.truncate(22);
+    res
 }
 
 /// Compute a canonical Bengali phonetic soundex key

@@ -881,6 +881,18 @@ impl PhoneticSuggestion {
                 let pragyan_cands = engine.suggest(middle, crate::session::ShiftOrigin::AutoCapitalize);
                 for (idx, cand) in pragyan_cands.into_iter().take(4).enumerate() {
                     let boost = 5500 - (idx as i32 * 300);
+                    if cand.ends_with('ও') && cand.chars().count() >= 4 {
+                        let stripped = &cand[..cand.len() - 'ও'.len_utf8()];
+                        if self.database.is_exact_dictionary_word(stripped) {
+                            add_cand(
+                                stripped.to_string(),
+                                CandidateSource::PragyanBeam,
+                                boost + 200,
+                                &mut raw_candidates,
+                                &mut seen,
+                            );
+                        }
+                    }
                     add_cand(
                         cand,
                         CandidateSource::PragyanBeam,
@@ -915,6 +927,18 @@ impl PhoneticSuggestion {
                     );
                     for (idx, cand) in s2s_cands.into_iter().enumerate() {
                         let boost = 5500 - (idx as i32 * 250);
+                        if cand.ends_with('ও') && cand.chars().count() >= 4 {
+                            let stripped = &cand[..cand.len() - 'ও'.len_utf8()];
+                            if self.database.is_exact_dictionary_word(stripped) {
+                                add_cand(
+                                    stripped.to_string(),
+                                    CandidateSource::NeuralTransducer,
+                                    boost + 100,
+                                    &mut raw_candidates,
+                                    &mut seen,
+                                );
+                            }
+                        }
                         add_cand(
                             cand,
                             CandidateSource::NeuralTransducer,
@@ -1861,10 +1885,11 @@ impl PhoneticSuggestion {
             // 9. Suffix-decomposed forms (when Latin string contains stem + suffix)
             let suffixed_matches = self.add_suffixes(middle, primary);
             for item in suffixed_matches {
+                let boost = if item.ends_with('ও') { 2800 } else { 3500 };
                 add_cand(
                     item,
                     CandidateSource::MorphologicalInflection,
-                    3500,
+                    boost,
                     &mut raw_candidates,
                     &mut seen,
                 );
@@ -1887,7 +1912,7 @@ impl PhoneticSuggestion {
             // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
             let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
             let mut valid_fuzzy_stems = Vec::new();
-            let variant_limit = if is_primary_in_dict { 16 } else { 32 };
+            let variant_limit = if is_primary_in_dict { 10 } else { 20 };
             let is_init_a = middle.starts_with('a') || middle.starts_with('A');
             let is_init_o = middle.starts_with('o') || middle.starts_with('O');
 
@@ -2212,6 +2237,7 @@ impl PhoneticSuggestion {
 
         let has_clitic_o_candidate = middle.ends_with('o')
             && !(middle.ends_with("yo") && raw_candidates.iter().any(|c| c.text.ends_with("্য")))
+            && !(middle.ends_with("rjo") || middle.ends_with("rzo") || middle.ends_with("jo"))
             && raw_candidates.iter().any(|c| {
                 is_clitic_o_word(&c.text)
                     && self.database.is_exact_dictionary_word(&c.text)
@@ -2574,7 +2600,6 @@ impl PhoneticSuggestion {
 
         }
 
-        // Sort candidates by descending total score
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
         // When explicit Avro syntax/casing is detected, strict_avro_mode is active,
         // or an explicit geminate was collapsed by dictionary/fuzzy,
@@ -2606,7 +2631,7 @@ impl PhoneticSuggestion {
                     let pref_score = scored_candidates[pos].1;
                     let is_memory_or_ac = candidate_memory.get(term).is_some()
                         || candidate_memory.get(middle).is_some()
-                        || learner_guard.as_ref().map_or(false, |l| {
+                        || learner_guard.as_ref().is_some_and(|l| {
                             l.candidate_memory.contains_key(term) || l.candidate_memory.contains_key(middle)
                         })
                         || self
@@ -3369,6 +3394,16 @@ impl PhoneticSuggestion {
                                 && !list.iter().any(|item| item == &word)
                             {
                                 list.push(word);
+                            }
+                        }
+                    }
+
+                    if suffix_key == "o" {
+                        for base in &base_candidates {
+                            if self.database.is_exact_dictionary_word(base)
+                                && !list.iter().any(|item| item == base)
+                            {
+                                list.push(base.clone());
                             }
                         }
                     }
