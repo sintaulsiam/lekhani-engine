@@ -130,22 +130,24 @@ fn main() {
     println!("2. Target is NOT in Dictionary (OOV):              {} ({:.1}%)", miss_not_in_dict, miss_not_in_dict as f64 / real_misses.len() as f64 * 100.0);
     println!("   - Target IN candidates (Rank 2+):               {} ({:.1}%)", miss_not_in_dict_in_cands, miss_not_in_dict_in_cands as f64 / real_misses.len() as f64 * 100.0);
     println!("   - Target NOT in candidates:                     {} ({:.1}%)", miss_not_in_dict - miss_not_in_dict_in_cands, (miss_not_in_dict - miss_not_in_dict_in_cands) as f64 / real_misses.len() as f64 * 100.0);
-    println!("\n=== TOP 8 EXAMPLES WHERE TARGET WAS GENERATED BUT RANKED AT RANK 2+ ===");
-    let mut printed = 0;
+    println!("\n=== TOP 10 EXAMPLES WHERE TARGET IS IN DICT AND GENERATED AT RANK 2+ ===");
+    let mut printed_in_dict = 0;
     for (input, target, top1, _in_top3, cands) in &real_misses {
-        if let Some(pos) = cands.iter().position(|c| is_acceptable_match(c, target)) {
-            let target_in_dict = sugg.database.is_exact_dictionary_word(target);
-            let target_freq = sugg.database.get_frequency(target);
-            let top1_in_dict = sugg.database.is_exact_dictionary_word(top1);
-            let top1_freq = sugg.database.get_frequency(top1);
-            println!(
-                "{}. Input: {:14} | Target: {:12} (Rank: {}, in_dict: {}, freq: {}) | Top-1: {:12} (in_dict: {}, freq: {})",
-                printed + 1, input, target, pos + 1, target_in_dict, target_freq, top1, top1_in_dict, top1_freq
-            );
-            println!("   Candidate strip: {:?}", cands.iter().take(5).collect::<Vec<_>>());
-            printed += 1;
-            if printed >= 8 {
-                break;
+        let target_in_dict = sugg.database.is_exact_dictionary_word(target);
+        if target_in_dict {
+            if let Some(pos) = cands.iter().position(|c| is_acceptable_match(c, target)) {
+                let target_freq = sugg.database.get_frequency(target);
+                let top1_in_dict = sugg.database.is_exact_dictionary_word(top1);
+                let top1_freq = sugg.database.get_frequency(top1);
+                println!(
+                    "{}. Input: {:14} | Target: {:12} (Rank: {}, freq: {}) | Top-1: {:12} (in_dict: {}, freq: {})",
+                    printed_in_dict + 1, input, target, pos + 1, target_freq, top1, top1_in_dict, top1_freq
+                );
+                println!("   Candidate strip: {:?}", cands.iter().take(5).collect::<Vec<_>>());
+                printed_in_dict += 1;
+                if printed_in_dict >= 10 {
+                    break;
+                }
             }
         }
     }
