@@ -731,6 +731,14 @@ pub fn extract_root_stem(word: &str) -> Option<String> {
         if word.ends_with(suffix) && word.len() > suffix.len() {
             let base = &word[..word.len() - suffix.len()];
             if base.chars().count() >= 2 {
+                // In Bengali phonotactics, the genitive marker -র and glide -য় strictly attach to vowel/kar-ending stems
+                if suffix == "র" || suffix == "য়" {
+                    if let Some(last) = base.chars().last() {
+                        if !last.is_kar() && !last.is_vowel() {
+                            continue;
+                        }
+                    }
+                }
                 let mut clean_base = base.to_string();
                 // Handle Sandhi reversals:
                 // Strip inserted glide 'য়' when suffix was a vowel inflection
@@ -758,6 +766,14 @@ pub fn extract_all_candidate_stems(word: &str) -> Vec<String> {
         if word.ends_with(suffix) && word.len() > suffix.len() {
             let base = &word[..word.len() - suffix.len()];
             if base.chars().count() >= 2 {
+                // In Bengali phonotactics, the genitive marker -র and glide -য় strictly attach to vowel/kar-ending stems
+                if suffix == "র" || suffix == "য়" {
+                    if let Some(last) = base.chars().last() {
+                        if !last.is_kar() && !last.is_vowel() {
+                            continue;
+                        }
+                    }
+                }
                 let mut clean_base = base.to_string();
                 if clean_base.ends_with('য়') && clean_base.chars().count() >= 3 {
                     clean_base.pop();
