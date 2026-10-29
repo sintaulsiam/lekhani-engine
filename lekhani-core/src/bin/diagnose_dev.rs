@@ -132,23 +132,65 @@ fn main() {
     println!("   - Target NOT in candidates:                     {} ({:.1}%)", miss_not_in_dict - miss_not_in_dict_in_cands, (miss_not_in_dict - miss_not_in_dict_in_cands) as f64 / real_misses.len() as f64 * 100.0);
     println!("\n=== TOP 10 EXAMPLES WHERE TARGET IS IN DICT AND GENERATED AT RANK 2+ ===");
     let mut printed_in_dict = 0;
+    let mut higher_freq_top1 = 0usize;
+    let mut oov_suppressed = 0usize;
+    let mut initial_vowel_mismatch = 0usize;
+    let mut dropped_terminal_e = 0usize;
+    let mut explicit_ii_mismatch = 0usize;
+    let mut explicit_ee_mismatch = 0usize;
+
     for (input, target, top1, _in_top3, cands) in &real_misses {
-        let target_in_dict = sugg.database.is_exact_dictionary_word(target);
-        if target_in_dict {
-            if let Some(pos) = cands.iter().position(|c| is_acceptable_match(c, target)) {
-                let target_freq = sugg.database.get_frequency(target);
-                let top1_in_dict = sugg.database.is_exact_dictionary_word(top1);
-                let top1_freq = sugg.database.get_frequency(top1);
+        if let Some(pos) = cands.iter().position(|c| is_acceptable_match(c, target)) {
+            let target_in_dict = sugg.database.is_exact_dictionary_word(target);
+            let target_freq = sugg.database.get_frequency(target);
+            let top1_in_dict = sugg.database.is_exact_dictionary_word(top1);
+            let top1_freq = sugg.database.get_frequency(top1);
+
+            if top1_freq > target_freq {
+                higher_freq_top1 += 1;
+            }
+            if !target_in_dict && top1_in_dict {
+                oov_suppressed += 1;
+            }
+            // Initial 'a' distortion to 'এ'
+            let input_starts_a = (input.starts_with('a') || input.starts_with('A')) && !input.starts_with("aa") && !input.starts_with("Aa");
+            let target_starts_a = target.starts_with('অ') || target.starts_with('আ');
+            let top1_starts_e = top1.starts_with('এ');
+            if input_starts_a && target_starts_a && top1_starts_e {
+                initial_vowel_mismatch += 1;
+            }
+            // Dropped terminal 'e'
+            let input_ends_e = input.len() >= 5 && (input.ends_with('e') || input.ends_with('E')) && !input.ends_with("ee") && !input.ends_with("Ee");
+            let target_ends_e = target.ends_with('ে');
+            let top1_ends_e = top1.ends_with('ে');
+            if input_ends_e && target_ends_e && !top1_ends_e {
+                dropped_terminal_e += 1;
+            }
+            // Explicit ii / ee -> ী
+            if input.contains("ii") && target.contains('ী') && !top1.contains('ী') && top1.contains('ি') {
+                explicit_ii_mismatch += 1;
+            }
+            if input.contains("ee") && target.contains('ী') && !top1.contains('ী') && top1.contains('ি') {
+                explicit_ee_mismatch += 1;
+            }
+
+            if target_in_dict && printed_in_dict < 10 {
                 println!(
                     "{}. Input: {:14} | Target: {:12} (Rank: {}, freq: {}) | Top-1: {:12} (in_dict: {}, freq: {})",
                     printed_in_dict + 1, input, target, pos + 1, target_freq, top1, top1_in_dict, top1_freq
                 );
                 println!("   Candidate strip: {:?}", cands.iter().take(5).collect::<Vec<_>>());
                 printed_in_dict += 1;
-                if printed_in_dict >= 10 {
-                    break;
-                }
             }
         }
     }
+
+    let total_in_cands = miss_in_dict_in_cands + miss_not_in_dict_in_cands;
+    println!("\n=== SYSTEMIC CAUSES OF THE {} CANDIDATE MISRANKINGS ===", total_in_cands);
+    println!("1. Top-1 frequency > Target frequency (Frequency Trap):       {} ({:.1}%)", higher_freq_top1, higher_freq_top1 as f64 / total_in_cands as f64 * 100.0);
+    println!("2. Target is OOV suppressed by in-dict Top-1:                 {} ({:.1}%)", oov_suppressed, oov_suppressed as f64 / total_in_cands as f64 * 100.0);
+    println!("3. Initial 'a' distorted to 'এ' (e.g. atiteo -> এটিতেও):       {} ({:.1}%)", initial_vowel_mismatch, initial_vowel_mismatch as f64 / total_in_cands as f64 * 100.0);
+    println!("4. Dropped terminal 'e' (Anti-root truncation failure):         {} ({:.1}%)", dropped_terminal_e, dropped_terminal_e as f64 / total_in_cands as f64 * 100.0);
+    println!("5. Explicit digraph 'ii' neglected for short 'ি':              {} ({:.1}%)", explicit_ii_mismatch, explicit_ii_mismatch as f64 / total_in_cands as f64 * 100.0);
+    println!("6. Explicit digraph 'ee' neglected for short 'ি':              {} ({:.1}%)", explicit_ee_mismatch, explicit_ee_mismatch as f64 / total_in_cands as f64 * 100.0);
 }
