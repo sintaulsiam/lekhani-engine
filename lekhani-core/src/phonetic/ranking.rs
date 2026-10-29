@@ -318,7 +318,7 @@ pub fn extract_candidate_features(
     cand: &CandidateHypothesis,
     is_in_dict: bool,
     freq: u32,
-    trie_contains: bool,
+    _trie_contains: bool,
     ctx: &CandidateContext,
     is_clitic_o: bool,
 ) -> RankFeatures {
@@ -361,9 +361,6 @@ pub fn extract_candidate_features(
     }
     if freq >= 8000 {
         f.is_high_freq += 1.0;
-    }
-    if trie_contains {
-        f.is_high_freq += 0.5;
     }
 
     // 3. Phonetic Similarity & Length

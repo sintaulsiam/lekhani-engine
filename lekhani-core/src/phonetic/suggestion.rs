@@ -2635,10 +2635,7 @@ impl PhoneticSuggestion {
                 is_clitic_o,
             );
             let score = cand.initial_boost + weights.compute_score(&features);
-
             scored_candidates.push((cand.text.clone(), score, features));
-
-
         }
 
         scored_candidates.sort_by_key(|a| std::cmp::Reverse(a.1));
