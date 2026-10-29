@@ -81,12 +81,15 @@ Welcome to **Lekhani Engine** (`lekhani-engine`). This document defines the engi
 - Candidate generation in `fuzzy.rs` is saturated (producing candidates for 94.8% of in-dictionary targets).
 - Adding more hand-crafted regex rules, digraph mappings, or character tweaks in `fuzzy.rs` or `sound_laws.json` is **strictly forbidden**. It is a local hill-climbing trap that produces trivial +2 gains while distracting from real architecture.
 
-### B. Empirical Census of the 5,193 Misses (N=9,279 Dev)
-- **Target is ALREADY generated in candidates (Rank 2–7)**: **2,531 words (48.7% of all misses / 27.3% of Dev)**. This is where all gains live.
-- **Target is NOT in dictionary.json (OOV names/loanwords)**: **2,390 words (46.0% of misses / 25.8% of Dev)**. Pure dictionary-bound ceiling is 74.2%.
-- **Target was not generated at all**: **272 words (5.2% of misses / 2.9% of Dev)**.
+### B. Empirical Census of the 5,165 Misses (N=9,279 Dev, Commit `8f5bdd2`, 4,114 Hits / 44.34%)
+- **Target is ALREADY generated in candidates (Rank 2–7)**: **2,523 words (48.8% of all misses / 27.2% of Dev)**. This is where all gains live.
+- **Target is NOT in dictionary.json (OOV names/loanwords)**: **2,390 words (46.3% of misses / 25.8% of Dev)**. Pure dictionary-bound ceiling is 74.2%.
+- **Target was not generated at all**: **252 words (4.9% of misses / 2.7% of Dev)**.
 
-### C. Mandatory Focus: Candidate Strip Ranker & Feature Scorer (`ranking.rs` & `suggestion.rs`)
+### C. Morphological & Phonotactic Rules Established
+1. **Consonant Stem Protection against Genitive -র / Glide -য়**: In Bengali grammar, genitive `-র` and glide `-য়` strictly attach to vowel/kar-ending stems (`বাবা` $\to$ `বাবার`, `বাড়ি` $\to$ `বাড়ির`). Consonant stems take `-এর`/`-ে` (`অত্যাচার` $\to$ `অত্যাচারের`). Peeling or attaching `-র` to consonant stems generates illegitimate doubled consonant words (`অত্যাচারর` $\to$ `অত্যাচাররের`). Restricting `-র` and `-য়` to vowel stems advanced Dev natural hits from 4,086 to **4,114** (+28 net gain, Commit `8f5bdd2`).
+
+### D. Mandatory Focus: Candidate Strip Ranker & Feature Scorer (`ranking.rs` & `suggestion.rs`)
 1. **Direct Avro Monopoly Prohibition**: Non-words (`freq: 0`, `!is_in_dict`, e.g. `আঞ্ছালসাহা`) must never receive an automatic +10,000 pt advantage over valid dictionary or compound candidates (`অঞ্চলসহ`). Strip unearned `is_exact_phonetic` bonuses when direct Avro parse is not a dictionary word.
 2. **Preserve Typed Endings (Anti-Root Truncation)**: High unigram frequency of bare roots must not strip user-typed terminal vowels or suffixes (e.g. typing `ankita` or `oncholo` must not truncate the ending to pick base `অঙ্কিত` or `অঞ্চল`).
 3. **Compound Splitting via Lattice**: Agglutinative Sanskrit compounds (`akritakarja` -> `অকৃতকার্য`) must be resolved by 2-stem lattice segmentation (`অকৃত` + `কার্য`), not monolithic single-pass Avro parsing.
