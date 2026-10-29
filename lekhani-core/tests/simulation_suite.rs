@@ -932,3 +932,43 @@ fn test_lps_grammar_integration() {
     assert!(!chips.is_empty(), "LPS bari must produce letter chips for ambiguous r variants");
 }
 
+#[test]
+fn test_soccho_produces_swoccho() {
+    let mut sugg = PhoneticSuggestion::new();
+    let layout_candidates = [
+        std::path::Path::new("../../data/layouts/avrophonetic.json"),
+        std::path::Path::new("data/layouts/avrophonetic.json"),
+        std::path::Path::new("../data/layouts/avrophonetic.json"),
+    ];
+    for p in layout_candidates {
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(p) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    sugg.set_layout(&json);
+                    break;
+                }
+            }
+        }
+    }
+    let dict_candidates = [
+        std::path::Path::new("../../data/dictionaries"),
+        std::path::Path::new("data/dictionaries"),
+        std::path::Path::new("../data/dictionaries"),
+    ];
+    for p in dict_candidates {
+        if p.exists() {
+            let _ = sugg.database.load_from_dir(p);
+            break;
+        }
+    }
+    let empty_memory = HashMap::new();
+    let (cands, _) = sugg.suggest("soccho", true, true, &empty_memory);
+    assert_eq!(cands[0], "স্বচ্ছ", "Expected 'স্বচ্ছ' at Rank 1 for 'soccho', got {:?}", cands);
+
+    let (cands_korcho, _) = sugg.suggest("korcho", true, true, &empty_memory);
+    assert_eq!(cands_korcho[0], "করছো", "Expected 'করছো' at Rank 1 for 'korcho', got {:?}", cands_korcho);
+
+    let (cands_khabo, _) = sugg.suggest("khabo", true, true, &empty_memory);
+    assert_eq!(cands_khabo[0], "খাবো", "Expected 'খাবো' at Rank 1 for 'khabo', got {:?}", cands_khabo);
+}
+

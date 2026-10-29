@@ -2686,12 +2686,15 @@ impl PhoneticSuggestion {
             }
         } else {
             // Explicit verbal inflection fidelity: If the user explicitly typed an inflection ending in
-            // 'bo', 'cho', 'ro', 'lo', 'no', 'ko', 'go', or 'wo', prioritize the 'ো'-inflected form
-            // over un-inflected dictionary stems (e.g. khabo->খাবো, korcho->করছো, koro->করো, bolo->বলো).
+            // 'bo' or 'cho', prioritize the 'ো'-inflected form over un-inflected dictionary stems
+            // (e.g. khabo->খাবো, korcho->করছো), but NEVER promote an OOV non-word over a valid candidate.
             let is_explicit_o_inflection = (middle.ends_with("bo") || middle.ends_with("cho"))
                 && !middle.contains('`');
             if is_explicit_o_inflection {
-                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t.ends_with('ো')) {
+                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| {
+                    t.ends_with('ো')
+                        && (self.database.is_exact_dictionary_word(t) || self.database.trie.contains_exact(t))
+                }) {
                     if pos > 0 {
                         let o_cand = scored_candidates.remove(pos);
                         scored_candidates.insert(0, o_cand);
