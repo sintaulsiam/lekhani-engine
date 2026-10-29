@@ -81,13 +81,14 @@ Welcome to **Lekhani Engine** (`lekhani-engine`). This document defines the engi
 - Candidate generation in `fuzzy.rs` is saturated (producing candidates for 94.8% of in-dictionary targets).
 - Adding more hand-crafted regex rules, digraph mappings, or character tweaks in `fuzzy.rs` or `sound_laws.json` is **strictly forbidden**. It is a local hill-climbing trap that produces trivial +2 gains while distracting from real architecture.
 
-### B. Empirical Census of the 5,165 Misses (N=9,279 Dev, Commit `8f5bdd2`, 4,114 Hits / 44.34%)
-- **Target is ALREADY generated in candidates (Rank 2–7)**: **2,523 words (48.8% of all misses / 27.2% of Dev)**. This is where all gains live.
-- **Target is NOT in dictionary.json (OOV names/loanwords)**: **2,390 words (46.3% of misses / 25.8% of Dev)**. Pure dictionary-bound ceiling is 74.2%.
-- **Target was not generated at all**: **252 words (4.9% of misses / 2.7% of Dev)**.
+### B. Empirical Census of the 5,128 Misses (N=9,279 Dev, Commit `6398c79`, 4,151 Hits / 44.74%)
+- **Target is ALREADY generated in candidates (Rank 2–7)**: **2,488 words (48.5% of all misses / 26.8% of Dev)**. This is where all future gains live.
+- **Target is NOT in dictionary.json (OOV names/loanwords)**: **2,389 words (46.6% of misses / 25.7% of Dev)**. Pure dictionary-bound ceiling is 74.25%.
+- **Target was not generated at all**: **251 words (4.9% of misses / 2.7% of Dev)**.
 
 ### C. Morphological & Phonotactic Rules Established
 1. **Consonant Stem Protection against Genitive -র / Glide -য়**: In Bengali grammar, genitive `-র` and glide `-য়` strictly attach to vowel/kar-ending stems (`বাবা` $\to$ `বাবার`, `বাড়ি` $\to$ `বাড়ির`). Consonant stems take `-এর`/`-ে` (`অত্যাচার` $\to$ `অত্যাচারের`). Peeling or attaching `-র` to consonant stems generates illegitimate doubled consonant words (`অত্যাচারর` $\to$ `অত্যাচাররের`). Restricting `-র` and `-য়` to vowel stems advanced Dev natural hits from 4,086 to **4,114** (+28 net gain, Commit `8f5bdd2`).
+2. **Elimination of Artificial `trie_contains` Boost on Bare Roots**: Awarding `is_high_freq += 0.5` (+1,000 pts) solely to words in `trie.contains_exact()` gave base roots an unearned advantage over their own legitimate morphological inflections. Removing this artificial boost advanced Dev natural hits from 4,114 to **4,151** (+37 net gain, Commit `6398c79`), resolved 108 frequency-trap errors, and cut dropped terminal 'e' root truncations in half (from 67 to 34).
 
 ### D. Mandatory Focus: Candidate Strip Ranker & Feature Scorer (`ranking.rs` & `suggestion.rs`)
 1. **Direct Avro Monopoly Prohibition**: Non-words (`freq: 0`, `!is_in_dict`, e.g. `আঞ্ছালসাহা`) must never receive an automatic +10,000 pt advantage over valid dictionary or compound candidates (`অঞ্চলসহ`). Strip unearned `is_exact_phonetic` bonuses when direct Avro parse is not a dictionary word.
@@ -114,6 +115,12 @@ Welcome to **Lekhani Engine** (`lekhani-engine`). This document defines the engi
    - Restricting `is_exact_phonetic = 0.85` in `FuzzySoundLaw` to `dist <= 1` starves legitimate Dakshina transliterations (e.g. where vowel and consonant variations yield grapheme distance $\ge 2$ from raw Avro) of their ranking score, leaving phonetic noise at Rank 1.
 6. **Unsegmented Single-Pass Compound Dumping into Perceptron (Commit `9f7407a`)**:
    - Bypassing the 2,500-pt cap on `SegmentedLattice` compound words without compound-specific feature extraction damages the single-word ranking balance. Compounds require dedicated segmentation features before ranker scoring.
+7. **Scaling `dist == 0` on `MorphologicalInflection` without clitic-O protection**:
+   - Boosting `dist == 0` over `dist == 1` causes candidates with clitic `-ও` (`অক্ষুণ্ণও`) that have `dist == 0` from raw Avro transliteration (`akhhunno`) to defeat true bare consonant schwa targets (`অক্ষুণ্ণ`) (-91 hits: 4151 down to 4060).
+8. **Naive `dropped_conjunct` Guard on `NeuralTransducer`/`PragyanBeam`**:
+   - Penalizing candidates lacking `্` whenever raw Avro contains `্` heavily regresses (-91 hits) because Avro creates spurious conjuncts for common Latin digraphs (`sh`, `th`, `ch`) and loanwords where Bengali maps to a single consonant.
+9. **Increasing `phonetic_similarity` weight in linear ranker**:
+   - Increasing `phonetic_similarity` weight from 200.0 to 400.0 degrades accuracy (-13 hits) due to asymmetric negative penalties on edit distances.
 
 ---
 
