@@ -2677,7 +2677,8 @@ impl PhoneticSuggestion {
                             .database
                             .get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand)
                             .is_some()
-                        || preferred_override.as_ref().is_some_and(|o| o == pref);
+                        || preferred_override.as_ref().is_some_and(|o| o == pref)
+                        || preferred_loanword.as_ref().is_some_and(|l| l == pref);
                     if is_memory_or_ac || pref_score + 1000 >= top_score {
                         let mut fav = scored_candidates.remove(pos);
                         fav.2.is_exact_phonetic = 1.0;
