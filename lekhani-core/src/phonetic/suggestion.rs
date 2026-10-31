@@ -858,15 +858,16 @@ impl PhoneticSuggestion {
         };
 
         // 3b. Developer Code-Mixing Shield (e.g. "onClick", "user_id", "--help", "const", "https://...", "CCA")
-        let is_all_caps_acronym = term.len() >= 2
-            && term.chars().all(|c| c.is_ascii_uppercase())
-            && !lekhani_parser::has_explicit_avro_intent(term);
+        let is_tech_acronym = crate::bilingual::is_common_tech_acronym(term);
 
-        let is_code = if self.config.enable_code_shield || is_all_caps_acronym {
+        let is_code = if self.config.enable_code_shield {
             (super::code_shield::is_code_token(term)
                 || super::code_shield::is_code_token(middle)
-                || is_all_caps_acronym)
+                || is_tech_acronym)
                 && !self.database.is_exact_dictionary_word(&phonetic)
+                && !is_atomic_cv_syllable(&phonetic)
+        } else if is_tech_acronym {
+            !self.database.is_exact_dictionary_word(&phonetic)
                 && !is_atomic_cv_syllable(&phonetic)
         } else {
             false
