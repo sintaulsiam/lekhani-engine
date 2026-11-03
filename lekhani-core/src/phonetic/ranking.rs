@@ -866,7 +866,7 @@ mod tests {
         };
         let f = extract_candidate_features(&cand, true, 10000, true, &ctx, false);
         assert_eq!(f.is_in_dict, 1.0);
-        assert_eq!(f.is_high_freq, 1.5);
+        assert_eq!(f.is_high_freq, 1.0);
         assert_eq!(f.is_exact_phonetic, 1.0);
         assert!(f.lm_score > 0.8);
         assert!(f.context_lm_score > 0.0);
