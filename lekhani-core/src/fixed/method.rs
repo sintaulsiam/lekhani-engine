@@ -116,11 +116,35 @@ impl FixedMethod {
         }
 
         if let Some(first_char) = value.chars().next() {
-            // 3. Kar insertion & Automatic Vowel Forming
+            // 3. Kar insertion, Compounding & Automatic Vowel Forming
             if first_char.is_kar() {
-                if self.auto_vowel
-                    && (self.buffer.is_empty() || rmc.is_vowel() || MARKS.contains(rmc))
-                {
+                // অ + া -> আ and অ + ৌ -> ঔ compounding
+                if rmc == 'অ' {
+                    if first_char == B_AA_KAR {
+                        self.buffer.pop();
+                        self.buffer.push(B_AA);
+                        return;
+                    } else if first_char == B_OU_KAR {
+                        self.buffer.pop();
+                        self.buffer.push(B_OU);
+                        return;
+                    }
+                }
+                // এ + ৈ -> ঐ compounding
+                if rmc == 'এ' && first_char == B_OI_KAR {
+                    self.buffer.pop();
+                    self.buffer.push(B_OI);
+                    return;
+                }
+
+                let is_word_break = self.buffer.is_empty()
+                    || rmc.is_whitespace()
+                    || rmc == '।'
+                    || rmc == '॥'
+                    || MARKS.contains(rmc)
+                    || rmc.is_ascii_punctuation();
+
+                if self.auto_vowel && (is_word_break || !rmc.is_pure_consonant()) && rmc != B_HASANTA && rmc != B_CHANDRA {
                     match first_char {
                         B_AA_KAR => self.buffer.push(B_AA),
                         B_I_KAR => self.buffer.push(B_I),
@@ -300,6 +324,59 @@ fn is_ligature_kar(c: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_auto_vowel_compounding_and_initial_promotion() {
+        let mut method = FixedMethod::new();
+
+        // 1. Initial Kar promotes to independent vowel
+        method.process_value("া");
+        assert_eq!(method.get_buffer(), "আ");
+        method.reset();
+
+        method.process_value("ি");
+        assert_eq!(method.get_buffer(), "ই");
+        method.reset();
+
+        method.process_value("ে");
+        assert_eq!(method.get_buffer(), "এ");
+        method.reset();
+
+        method.process_value("ৌ");
+        assert_eq!(method.get_buffer(), "ঔ");
+        method.reset();
+
+        // 2. Kar after space promotes to independent vowel
+        method.process_value("ক");
+        method.process_value(" ");
+        method.process_value("া");
+        assert_eq!(method.get_buffer(), "ক আ");
+        method.reset();
+
+        // 3. Compounding: অ + া -> আ
+        method.process_value("অ");
+        method.process_value("া");
+        assert_eq!(method.get_buffer(), "আ");
+        method.reset();
+
+        // 4. Compounding: অ + ৌ -> ঔ
+        method.process_value("অ");
+        method.process_value("ৌ");
+        assert_eq!(method.get_buffer(), "ঔ");
+        method.reset();
+
+        // 5. Compounding: এ + ৈ -> ঐ
+        method.process_value("এ");
+        method.process_value("ৈ");
+        assert_eq!(method.get_buffer(), "ঐ");
+        method.reset();
+
+        // 6. Consonant attachment
+        method.process_value("ক");
+        method.process_value("া");
+        assert_eq!(method.get_buffer(), "কা");
+        method.reset();
+    }
 
     #[test]
     fn test_reph_insertion() {
