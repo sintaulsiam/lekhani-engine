@@ -388,7 +388,7 @@ pub fn extract_candidate_features(
             } else if ctx.has_backtick {
                 f.intent_modifier_boost = 1.11;
             } else if ctx.has_explicit_casing || ctx.has_explicit_rri_digraph {
-                f.intent_modifier_boost = 0.78;
+                f.intent_modifier_boost = 1.5;
             } else if ctx.is_atomic_syllable && ctx.is_primary_in_dict {
                 f.intent_modifier_boost = 0.67;
             } else if ctx.is_short_token {
@@ -439,6 +439,8 @@ pub fn extract_candidate_features(
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
+                    f.is_high_freq = 0.0;
+                    f.normalized_freq *= 0.5;
                 } else if dist <= 1 {
                     f.source_weight = 0.85;
                     f.phonetic_similarity = 0.80;
@@ -492,6 +494,8 @@ pub fn extract_candidate_features(
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
+                    f.is_high_freq = 0.0;
+                    f.normalized_freq *= 0.5;
                 } else if dist <= 1 {
                     f.source_weight = 0.90;
                     f.phonetic_similarity = 0.85;
