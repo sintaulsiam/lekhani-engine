@@ -54,7 +54,7 @@ impl ConjunctCatalog {
             ConjunctInfo::new("চ্ছ্ব", "চ + ্ + ছ + ্ + ব", "cchw", "উচ্ছ্বাস, উচ্ছ্বল"),
             ConjunctInfo::new("চ্ঞ", "চ + ্ + ঞ", "cn", "যাচঞা"),
             // J-series
-            ConjunctInfo::new("জ্ঞ", "জ + ্ + ঞ", "ggy / jn", "জ্ঞান, বিজ্ঞান, অজ্ঞ, প্রজ্ঞা"),
+            ConjunctInfo::new("জ্ঞ", "জ + ্ + ঞ", "ggy / jn / gn / gy", "জ্ঞান, বিজ্ঞান, অজ্ঞ, প্রজ্ঞা"),
             ConjunctInfo::new("জ্জ", "জ + ্ + জ", "jj", "লজ্জা, সজ্জা, মজ্জা"),
             ConjunctInfo::new("জ্ঝ", "জ + ্ + ঝ", "jjh", "ঝঞ্ঝা, উজ্ঝট"),
             ConjunctInfo::new("জ্ব", "জ + ্ + ব", "jw", "জ্বর, জ্বালা, উজ্জ্বল"),
@@ -193,20 +193,56 @@ impl ConjunctCatalog {
         ]
     }
 
-    /// Live case-insensitive search filtering across conjunct glyph, breakdown, phonetic keys, and examples
+    /// Live case-insensitive search filtering across conjunct glyph, breakdown, phonetic keys, examples,
+    /// and phonetic Roman transliteration (e.g. searching "kkh", "gn", "shikkha", "gyan").
     pub fn search(query: &str) -> Vec<ConjunctInfo> {
         let q = query.trim().to_lowercase();
         if q.is_empty() {
             return Self::all();
         }
 
+        // Transliterate English/Roman query to Bengali if it contains Latin characters
+        let bn_transliterated = if q.chars().any(|c| c.is_ascii_alphabetic()) {
+            let parser = lekhani_parser::default_avro_parser();
+            let parsed = parser.convert(&q);
+            if parsed != q {
+                Some(parsed)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         Self::all()
             .into_iter()
             .filter(|info| {
-                info.conjunct.contains(&q)
-                    || info.breakdown.to_lowercase().contains(&q)
-                    || info.phonetic.to_lowercase().contains(&q)
-                    || info.examples.to_lowercase().contains(&q)
+                let conjunct_lower = info.conjunct.to_lowercase();
+                let breakdown_lower = info.breakdown.to_lowercase();
+                let phonetic_lower = info.phonetic.to_lowercase();
+                let examples_lower = info.examples.to_lowercase();
+
+                // Direct match against glyph, breakdown, phonetic string, or examples
+                if conjunct_lower.contains(&q)
+                    || breakdown_lower.contains(&q)
+                    || phonetic_lower.contains(&q)
+                    || examples_lower.contains(&q)
+                {
+                    return true;
+                }
+
+                // If query is Romanized, match against transliterated Bengali glyph or examples
+                if let Some(ref bn) = bn_transliterated {
+                    let bn_lower = bn.to_lowercase();
+                    if conjunct_lower.contains(&bn_lower)
+                        || breakdown_lower.contains(&bn_lower)
+                        || examples_lower.contains(&bn_lower)
+                    {
+                        return true;
+                    }
+                }
+
+                false
             })
             .collect()
     }
@@ -229,6 +265,13 @@ mod tests {
         // Search by phonetic key
         let res_phonetic = ConjunctCatalog::search("kkh");
         assert!(!res_phonetic.is_empty());
+        assert_eq!(res_phonetic[0].conjunct, "ক্ষ");
+
+        let res_gn = ConjunctCatalog::search("gn");
+        assert!(res_gn.iter().any(|c| c.conjunct == "জ্ঞ"));
+
+        let res_word = ConjunctCatalog::search("shikkha");
+        assert!(res_word.iter().any(|c| c.conjunct == "ক্ষ"));
 
         // Search by breakdown
         let res_breakdown = ConjunctCatalog::search("হ + ্ + ম");
