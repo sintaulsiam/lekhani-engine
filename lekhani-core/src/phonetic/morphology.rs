@@ -700,6 +700,19 @@ where
         if lower.ends_with(suf) && lower.len() > suf.len() {
             let stem = &lower[..lower.len() - suf.len()];
             if !stem.is_empty() {
+                // Suffix "mu" (first-person future dialect) only attaches to authentic verbal roots (dhātus).
+                // Prevents non-verbs like "ammu" (stem "am" = আম) from being decomposed into "আমমু" / "আমব".
+                if suf == "mu" {
+                    const VALID_MU_VERB_STEMS: &[&str] = &[
+                        "kor", "za", "ja", "kha", "dekh", "dhor", "bol", "shun", "likh", "por",
+                        "chol", "ho", "pa", "de", "ne", "uth", "thak", "as", "ash", "jan", "bujh",
+                        "an", "mar", "par", "bos",
+                    ];
+                    if !VALID_MU_VERB_STEMS.contains(&stem) {
+                        continue;
+                    }
+                }
+
                 // If stem starts with 'j' in dialect (e.g. jaitachi, jamu), allow mapping to 'z' (যা)
                 let stem_effective = if stem.starts_with('j') && !stem.starts_with("jj") {
                     format!("z{}", &stem[1..])

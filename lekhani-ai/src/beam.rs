@@ -54,7 +54,7 @@ impl BeamSearchDecoder {
             let mut layer0: Vec<BeamNode<'_>> = Vec::with_capacity(self.beam_width);
             for (cand_idx, cand) in first_cands.iter().take(self.beam_width).enumerate() {
                 let score = self.lm.score_candidate(None, None, cand);
-                let rank_penalty = cand_idx as f32 * 0.1;
+                let rank_penalty = (cand_idx as f32) * 1.25;
                 layer0.push(BeamNode {
                     cand: cand.as_str(),
                     parent_idx: None,
@@ -85,7 +85,7 @@ impl BeamSearchDecoder {
 
                 for (cand_idx, cand) in token_cands.iter().enumerate() {
                     let trans_score = self.lm.score_candidate(prev2, prev1, cand);
-                    let rank_penalty = cand_idx as f32 * 0.1;
+                    let rank_penalty = (cand_idx as f32) * 1.25;
                     let total_score = parent_node.score + trans_score - rank_penalty;
 
                     next_layer.push(BeamNode {

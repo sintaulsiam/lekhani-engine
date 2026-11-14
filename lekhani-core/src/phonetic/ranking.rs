@@ -325,7 +325,14 @@ pub fn extract_candidate_features(
     let mut f = RankFeatures::default();
 
     // 1. Dictionary & Trie Presence
-    if is_in_dict
+    // TriePrefixAutocomplete: word is in dict but it's a *completion* beyond what user typed.
+    // Give it a reduced dict credit (0.4) so the exact-typed word ALWAYS outranks it.
+    if cand.source == CandidateSource::TriePrefixAutocomplete {
+        if is_in_dict {
+            f.is_in_dict = 0.4; // dampened — exact word still dominates
+        }
+        // normalized_freq still applies below (prefix words have genuine frequency)
+    } else if is_in_dict
         || cand.source == CandidateSource::ExactDictionary
         || cand.source == CandidateSource::MorphologicalInflection
         || cand.source == CandidateSource::Autocorrect
@@ -514,6 +521,16 @@ pub fn extract_candidate_features(
                     f.intent_modifier_boost = -2.0;
                 }
             }
+        } else if cand.source == CandidateSource::TriePrefixAutocomplete {
+            // Prefix autocompletions (e.g. স্বাধীনতা when user typed স্বাধীন):
+            // Apply a length penalty proportional to extra characters and dampened source weight
+            // so the exact completed word ALWAYS dominates prefix extensions at Slot 0, while
+            // allowing prefix extensions to appear gracefully in subsequent candidate slots.
+            let cand_chars = cand.text.chars().count() as isize;
+            let phonetic_chars = ctx.phonetic.chars().count() as isize;
+            let extra_chars = (cand_chars - phonetic_chars).max(0) as f32;
+            f.length_penalty = -(extra_chars * 1.5);
+            f.source_weight = -0.50;
         } else if cand.source == CandidateSource::TypoFallback {
             f.source_weight = -0.43;
             f.phonetic_similarity = -((dist.min(3)) as f32);

@@ -124,6 +124,8 @@ pub struct PhoneticSuggestion {
     last_computed_candidates: Vec<String>,
     /// Letter chips computed from the most recent LPS parse
     pub last_lps_chips: Vec<lekhani_parser::lps::LpsLetterChip>,
+    /// Prevents recursion during internal calls from compound splitter or reranker
+    pub is_reranking: bool,
 }
 
 fn probe_neural_predictor() -> Option<Arc<lekhani_neural::NeuralContextPredictor>> {
@@ -296,6 +298,7 @@ impl PhoneticSuggestion {
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
             last_lps_chips: Vec::new(),
+            is_reranking: false,
         };
         // Lazy-probe seq2seq after struct is built (avoids startup cost if model absent)
         if let Some((s2s, scratch)) = probe_seq2seq() {
@@ -403,6 +406,7 @@ impl PhoneticSuggestion {
             last_computed_features: Vec::new(),
             last_computed_candidates: Vec::new(),
             last_lps_chips: Vec::new(),
+            is_reranking: false,
         };
         if let Some((s2s, scratch)) = probe_seq2seq() {
             sugg.seq2seq = Some(s2s);
@@ -724,22 +728,24 @@ impl PhoneticSuggestion {
                 cfg_mask
             )
         };
-        if let Some((cached_cands, cached_feats, cached_chips)) = self.cache.get(&cache_key) {
-            self.last_computed_features = cached_feats.clone();
-            self.last_computed_candidates = cached_cands.clone();
-            self.last_lps_chips = cached_chips.clone();
-            let selected_index = if let Some(fav) = candidate_memory
-                .get(term)
-                .or_else(|| candidate_memory.get(&cache_key))
-            {
-                cached_cands
-                    .iter()
-                    .position(|c| c == fav || c.contains(fav))
-                    .unwrap_or(0)
-            } else {
-                0
-            };
-            return (cached_cands.clone(), selected_index);
+        if !self.is_reranking {
+            if let Some((cached_cands, cached_feats, cached_chips)) = self.cache.get(&cache_key) {
+                self.last_computed_features = cached_feats.clone();
+                self.last_computed_candidates = cached_cands.clone();
+                self.last_lps_chips = cached_chips.clone();
+                let selected_index = if let Some(fav) = candidate_memory
+                    .get(term)
+                    .or_else(|| candidate_memory.get(&cache_key))
+                {
+                    cached_cands
+                        .iter()
+                        .position(|c| c == fav || c.contains(fav))
+                        .unwrap_or(0)
+                } else {
+                    0
+                };
+                return (cached_cands.clone(), selected_index);
+            }
         }
 
         // 2. Direct whole-term special matches (Math `=125*8`, Currency `#usd50`, Snippets `!shubhechha`, Exact Emojis `:smile:`, `:)`, `$$`, `*taka*`)
@@ -1370,20 +1376,14 @@ impl PhoneticSuggestion {
             }
         };
 
-        let learner_guard = self.database.learner.try_read().ok();
+        let learner_fav = self.database.learner.try_read().ok().and_then(|l| {
+            l.candidate_memory.get(term).cloned()
+                .or_else(|| l.candidate_memory.get(middle).cloned())
+        });
         let preferred_word = if let Some(fav) = candidate_memory
             .get(term)
             .or_else(|| candidate_memory.get(middle))
-            .or_else(|| {
-                learner_guard
-                    .as_ref()
-                    .and_then(|l| l.candidate_memory.get(term))
-            })
-            .or_else(|| {
-                learner_guard
-                    .as_ref()
-                    .and_then(|l| l.candidate_memory.get(middle))
-            }) {
+            .or_else(|| learner_fav.as_ref()) {
             Some(fav.clone())
         } else if is_tech_collocation
             && preferred_loanword
@@ -2686,13 +2686,17 @@ impl PhoneticSuggestion {
                     }
                 }
             }
-        } else {
-            // Explicit verbal inflection fidelity: If the user explicitly typed an inflection ending in
-            // 'bo' or 'cho', prioritize the 'ো'-inflected form over un-inflected dictionary stems
-            // (e.g. khabo->খাবো, korcho->করছো), but NEVER promote an OOV non-word over a valid candidate.
-            let is_explicit_o_inflection = (middle.ends_with("bo") || middle.ends_with("cho"))
-                && !middle.contains('`');
-            if is_explicit_o_inflection {
+        }
+        drop(learner_guard);
+
+        // Explicit verbal inflection fidelity: If the user explicitly typed an inflection ending in
+        // 'cho', prioritize the 'ো'-inflected form over un-inflected dictionary stems
+        // (e.g. korcho->করছো), and purge nonsensical trailing 'বও' / 'ছও' artifacts.
+        let is_explicit_o_ending = (middle.ends_with("bo") || (middle.ends_with("cho") && middle != "accho"))
+            && !middle.contains('`');
+        if is_explicit_o_ending {
+            scored_candidates.retain(|(t, _, _)| !t.ends_with("বও") && !t.ends_with("ছও"));
+            if middle.ends_with("cho") && preferred_override.is_none() {
                 if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| {
                     t.ends_with('ো')
                         && (self.database.is_exact_dictionary_word(t) || self.database.trie.contains_exact(t))
@@ -2997,21 +3001,82 @@ impl PhoneticSuggestion {
         }
         // ──────────────────────────────────────────────────────────────────────
 
+        // ── BangalUni Intelligent Compound Lattice & Reranker Engine ───────────
+        if !self.config.strict_avro_mode
+            && !self.is_reranking
+            && pre.is_empty()
+            && post.is_empty()
+            && !final_candidates.is_empty()
+        {
+            self.is_reranking = true;
+            let lower_term = middle.to_ascii_lowercase();
+
+            // 1. Exact dictionary match lockout:
+            // If the current top candidate is already an exact dictionary or trie word,
+            // never allow compound splitting to prepend a longer word ahead of it!
+            let top_is_dict_word = final_candidates
+                .first()
+                .map(|w| {
+                    self.database.is_exact_dictionary_word(w)
+                        || self.database.trie.contains_exact(w)
+                })
+                .unwrap_or(false);
+
+            // 2. Unspaced 2-stem compound candidates (avoid overriding explicit supervised overrides or exact dictionary words)
+            let has_override = self.database.lookup_override(&lower_term).is_some();
+            if !has_override {
+                let compounds = super::compound::CompoundSplitter::split_compound(&lower_term, self);
+                if !compounds.is_empty() {
+                    for comp in compounds.into_iter().rev() {
+                        final_candidates.retain(|c| c != &comp.word);
+                        if !top_is_dict_word {
+                            final_candidates.insert(0, comp.word);
+                        } else {
+                            let insert_pos = 1.min(final_candidates.len());
+                            final_candidates.insert(insert_pos, comp.word);
+                        }
+                    }
+                }
+            }
+
+            // 3. English Loanword Initial 'au' -> 'o' resolution (auxfordey -> oxfordey -> অক্সফোর্ডে)
+            if lower_term.starts_with("au") && lower_term.len() >= 4 {
+                let o_form = lower_term.replacen("au", "o", 1);
+                let empty_mem = hashbrown::HashMap::new();
+                let (o_cands, _) = self.suggest(&o_form, false, true, &empty_mem);
+                if let Some(first_o) = o_cands.first() {
+                    if self.database.is_exact_dictionary_word(first_o) || self.database.trie.contains_exact(first_o) {
+                        final_candidates.retain(|c| c != first_o);
+                        final_candidates.insert(0, first_o.clone());
+                    }
+                }
+            }
+
+            // 4. Intelligent Contextual Reranker
+            super::reranker::CandidateReranker::rerank(&lower_term, &mut final_candidates, self);
+
+            self.is_reranking = false;
+        }
+        // ──────────────────────────────────────────────────────────────────────
+
 
         self.last_computed_candidates = final_candidates.clone();
 
         // Cache the computed candidates for instant sub-millisecond retrieval (bounded to 128 entries)
-        if self.cache.len() >= 128 {
-            self.cache.clear();
+        // Only cache final top-level suggestions, never internal probe queries during reranking
+        if !self.is_reranking {
+            if self.cache.len() >= 128 {
+                self.cache.clear();
+            }
+            self.cache.insert(
+                cache_key,
+                (
+                    final_candidates.clone(),
+                    self.last_computed_features.clone(),
+                    self.last_lps_chips.clone(),
+                ),
+            );
         }
-        self.cache.insert(
-            cache_key,
-            (
-                final_candidates.clone(),
-                self.last_computed_features.clone(),
-                self.last_lps_chips.clone(),
-            ),
-        );
 
         // Determine previously selected candidate index
         let selected_index = if let Some(fav) = candidate_memory
@@ -3219,15 +3284,20 @@ impl PhoneticSuggestion {
         let empty_memory = HashMap::new();
         let mut word_cands: Vec<Vec<String>> = Vec::new();
         let mut word_indices: Vec<usize> = Vec::new();
+        let mut prev_words: Vec<String> = Vec::new();
 
         for (idx, (is_word, tok)) in tokens.iter().enumerate() {
             if *is_word {
+                let ctx_refs: Vec<&str> = prev_words.iter().map(|s| s.as_str()).collect();
                 let (cands, _) =
-                    self.suggest_with_multi_context(tok, &[], false, true, &empty_memory);
+                    self.suggest_with_multi_context(tok, &ctx_refs, false, true, &empty_memory);
                 if !cands.is_empty() {
+                    prev_words.push(cands[0].clone());
                     word_cands.push(cands);
                 } else {
-                    word_cands.push(vec![self.convert_phonetic(tok)]);
+                    let conv = self.convert_phonetic(tok);
+                    prev_words.push(conv.clone());
+                    word_cands.push(vec![conv]);
                 }
                 word_indices.push(idx);
             }
