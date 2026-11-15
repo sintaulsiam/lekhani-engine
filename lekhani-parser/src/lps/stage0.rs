@@ -90,7 +90,7 @@ impl Stage0Token {
 /// Known multi-letter tokens sorted strictly longest-match first.
 pub const MULTI_LETTER_TOKENS: &[&str] = &[
     "chh", "ksh", // 3 letters
-    "kh", "gh", "ng", "ch", "jh", "ny", "th", "dh", "ph", "bh", "sh", "rh", "ri", "oi", "ou", "ae",
+    "kh", "gh", "ng", "ch", "jh", "ny", "th", "dh", "ph", "bh", "vh", "sh", "rh", "ri", "oi", "ou", "ae",
     "ii", "uu", "oo", "gg", // 2 letters
 ];
 
@@ -380,6 +380,7 @@ fn generate_alternative_segmentations(tokens: &[Stage0Token]) -> Vec<Vec<Stage0T
                 "dh" => Some(("d", "h")),
                 "ph" => Some(("p", "h")),
                 "bh" => Some(("b", "h")),
+                "vh" => Some(("v", "h")),
                 "kh" => Some(("k", "h")),
                 "gh" => Some(("g", "h")),
                 "jh" => Some(("j", "h")),

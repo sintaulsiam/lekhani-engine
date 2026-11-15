@@ -2291,6 +2291,12 @@
                 ]
             },
             {
+                "find": "vh",
+                "replace": "ভ",
+                "rules": [
+                ]
+            },
+            {
                 "find": "v",
                 "replace": "ভ",
                 "rules": [
