@@ -2925,10 +2925,16 @@ impl PhoneticSuggestion {
             .unwrap_or(false);
 
         let top_is_override = preferred_override.as_ref().is_some_and(|ov| {
-            scored_candidates
+            let matches_top = scored_candidates
                 .first()
                 .map(|(t, _, _)| t == ov)
-                .unwrap_or(false)
+                .unwrap_or(false);
+            let has_homophone_competitor = scored_candidates
+                .iter()
+                .take(3)
+                .skip(1)
+                .any(|(t, _, _)| lekhani_ai::are_bengali_homophones(ov, t));
+            matches_top && !has_homophone_competitor
         });
 
         if self.config.ai_profile != AiProfile::Off
@@ -3060,6 +3066,7 @@ impl PhoneticSuggestion {
 
         // ── BangalUni Intelligent Compound Lattice & Reranker Engine ───────────
         if !self.config.strict_avro_mode
+            && !has_explicit_intent
             && !self.is_reranking
             && pre.is_empty()
             && post.is_empty()

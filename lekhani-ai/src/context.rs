@@ -760,6 +760,13 @@ pub fn compute_honorific_agreement_boost(
                 boost -= 3.0;
             }
         }
+
+        // ── 4b. Locative Interrogative Motion Concordance: কোথায় + যাবা / যাবে / যাচ্ছ ──
+        if p1 == "কোথায়"
+            && (cand.starts_with("যা") || cand.starts_with("যে") || cand.starts_with("য"))
+        {
+            boost += 3.5;
+        }
     }
 
     // ── 5. Subject-Verb Person Concordance ──────────────────────────────────

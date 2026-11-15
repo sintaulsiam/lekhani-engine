@@ -148,12 +148,8 @@ pub fn matches_orthographic_equivalent(cand: &str, target: &str) -> bool {
             .replace("ঙ্গ", "ংগ")
             .replace("ঙ্ঘ", "ংঘ")
     };
-    if norm_velar(&cand_norm) == norm_velar(&target_norm)
+    norm_velar(&cand_norm) == norm_velar(&target_norm)
         || norm_velar(&cand_n) == norm_velar(&target_n)
-    {
-        return true;
-    }
-    false
 }
 
 #[derive(Debug)]

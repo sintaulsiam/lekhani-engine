@@ -29,6 +29,7 @@ impl CandidateReranker {
         // Supervised phonetic override has absolute authority; never demote or disrupt it
         if suggestion.database.lookup_override(&lower).is_some()
             || suggestion.database.lookup_override(input).is_some()
+            || lekhani_parser::has_explicit_avro_intent(input)
         {
             return;
         }

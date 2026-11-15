@@ -15,7 +15,9 @@ pub mod zero_copy;
 
 pub use anvaya::{AnvayaAgreementEngine, AnvayaState, HonorificRegister, VerbConjugationTier};
 pub use beam::BeamSearchDecoder;
-pub use context::{truncate_at_sentence_boundary, ContextScorer, PersonalScoreOverlay};
+pub use context::{
+    are_bengali_homophones, truncate_at_sentence_boundary, ContextScorer, PersonalScoreOverlay,
+};
 pub use embeddings::{
     lookup_homophone_info, TopicVector, WordEmbeddings, CANONICAL_HOMOPHONE_PAIRS,
 };

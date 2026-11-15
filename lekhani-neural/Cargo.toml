@@ -10,8 +10,6 @@ description = "Micro-Neural Recurrent Predictor for Lekhani Bengali IME"
 serde.workspace = true
 serde_json.workspace = true
 hashbrown.workspace = true
-thiserror.workspace = true
-memmap2.workspace = true
 unicode-segmentation.workspace = true
 bincode.workspace = true
 
