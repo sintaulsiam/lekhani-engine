@@ -292,11 +292,7 @@ pub fn is_code_token(token: &str) -> bool {
 
     // 8. Reserved programming keywords (binary search)
     let lower = trimmed.to_ascii_lowercase();
-    if CODE_KEYWORDS.binary_search(&lower.as_str()).is_ok() {
-        return true;
-    }
-
-    false
+    CODE_KEYWORDS.binary_search(&lower.as_str()).is_ok()
 }
 
 #[cfg(test)]
