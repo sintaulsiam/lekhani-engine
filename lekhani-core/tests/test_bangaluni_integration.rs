@@ -3,37 +3,33 @@ use lekhani_core::PhoneticSuggestion;
 
 #[test]
 fn test_all_fixed_words_upstream() {
-    std::env::set_var(
-        "LEKHANI_MODELS_DIR",
-        "/mnt/data/lekhani-engine/data/dictionaries",
-    );
-
     let mut suggestion = PhoneticSuggestion::new();
 
-    let dict_dir = std::path::PathBuf::from("/mnt/data/lekhani-engine/data/dictionaries");
-    if dict_dir.exists() {
-        let dict_bin = dict_dir.join("dictionary.bin");
-        if dict_bin.exists() {
-            let _ = suggestion.load_from_dir_with_dict(&dict_dir, "dictionary.bin");
-        } else {
-            let _ = suggestion.load_from_dir_with_dict(&dict_dir, "dictionary.json");
-        }
-    }
-
-    if suggestion.pragyan_engine.is_none() {
-        if let Some(engine) = lekhani_core::phonetic::PragyanEngine::probe() {
-            suggestion.set_pragyan_engine(engine);
-        }
-    }
-
-    // Set layout
-    let layout_path =
-        std::path::PathBuf::from("/mnt/data/lekhani-engine/data/layouts/avrophonetic.json");
-    if layout_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&layout_path) {
-            if let Ok(json) = serde_json::from_str(&content) {
-                suggestion.set_layout(&json);
+    let layout_candidates = [
+        std::path::Path::new("../../data/layouts/avrophonetic.json"),
+        std::path::Path::new("data/layouts/avrophonetic.json"),
+        std::path::Path::new("../data/layouts/avrophonetic.json"),
+    ];
+    for p in layout_candidates {
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(p) {
+                if let Ok(json) = serde_json::from_str(&content) {
+                    suggestion.set_layout(&json);
+                    break;
+                }
             }
+        }
+    }
+
+    let dict_candidates = [
+        std::path::Path::new("../../data/dictionaries"),
+        std::path::Path::new("data/dictionaries"),
+        std::path::Path::new("../data/dictionaries"),
+    ];
+    for p in dict_candidates {
+        if p.exists() {
+            let _ = suggestion.load_from_dir(p);
+            break;
         }
     }
 
