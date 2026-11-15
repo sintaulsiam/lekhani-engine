@@ -90,8 +90,8 @@ impl Stage0Token {
 /// Known multi-letter tokens sorted strictly longest-match first.
 pub const MULTI_LETTER_TOKENS: &[&str] = &[
     "chh", "ksh", // 3 letters
-    "kh", "gh", "ng", "ch", "jh", "ny", "th", "dh", "ph", "bh", "vh", "sh", "rh", "ri", "oi", "ou", "ae",
-    "ii", "uu", "oo", "gg", // 2 letters
+    "kh", "gh", "ng", "ch", "jh", "ny", "th", "dh", "ph", "bh", "vh", "sh", "rh", "ri", "oi", "ou",
+    "ae", "ii", "uu", "oo", "gg", // 2 letters
 ];
 
 /// Stage 0 Tokenizer and Segmentation Result.
