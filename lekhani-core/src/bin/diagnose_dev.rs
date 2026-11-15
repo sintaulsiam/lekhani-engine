@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use hashbrown::HashMap;
 use lekhani_core::chars::canonicalize;
 use lekhani_core::phonetic::PhoneticSuggestion;
@@ -18,22 +19,36 @@ fn is_acceptable_match(cand: &str, target: &str) -> bool {
         return true;
     }
     // 2. Chalita verb terminal ব vs বো
-    if (cand_norm.ends_with("বো") && target_norm.ends_with('ব') && cand_norm.strip_suffix("বো") == target_norm.strip_suffix('ব'))
-        || (cand_norm.ends_with('ব') && target_norm.ends_with("বো") && cand_norm.strip_suffix('ব') == target_norm.strip_suffix("বো"))
+    if (cand_norm.ends_with("বো")
+        && target_norm.ends_with('ব')
+        && cand_norm.strip_suffix("বো") == target_norm.strip_suffix('ব'))
+        || (cand_norm.ends_with('ব')
+            && target_norm.ends_with("বো")
+            && cand_norm.strip_suffix('ব') == target_norm.strip_suffix("বো"))
     {
         return true;
     }
     // 3. Spoken / Sadhu O-kar variations (লো/ল, নো/ন)
-    if (cand_norm.ends_with("লো") && target_norm.ends_with('ল') && cand_norm.strip_suffix("লো") == target_norm.strip_suffix('ল'))
-        || (cand_norm.ends_with('ল') && target_norm.ends_with("লো") && cand_norm.strip_suffix('ল') == target_norm.strip_suffix("লো"))
-        || (cand_norm.ends_with("নো") && target_norm.ends_with('ন') && cand_norm.strip_suffix("নো") == target_norm.strip_suffix('ন'))
-        || (cand_norm.ends_with('ন') && target_norm.ends_with("নো") && cand_norm.strip_suffix('ন') == target_norm.strip_suffix("নো"))
+    if (cand_norm.ends_with("লো")
+        && target_norm.ends_with('ল')
+        && cand_norm.strip_suffix("লো") == target_norm.strip_suffix('ল'))
+        || (cand_norm.ends_with('ল')
+            && target_norm.ends_with("লো")
+            && cand_norm.strip_suffix('ল') == target_norm.strip_suffix("লো"))
+        || (cand_norm.ends_with("নো")
+            && target_norm.ends_with('ন')
+            && cand_norm.strip_suffix("নো") == target_norm.strip_suffix('ন'))
+        || (cand_norm.ends_with('ন')
+            && target_norm.ends_with("নো")
+            && cand_norm.strip_suffix('ন') == target_norm.strip_suffix("নো"))
     {
         return true;
     }
     // 4. Sanskrit Tatsama velar nasal conjuncts vs Anusvara orthographic variants (ঙ্ক/ংক, ঙ্গ/ংগ, ঙ্ঘ/ংঘ)
     let norm_velar = |s: &str| -> String {
-        s.replace("ঙ্ক", "ংক").replace("ঙ্গ", "ংগ").replace("ঙ্ঘ", "ংঘ")
+        s.replace("ঙ্ক", "ংক")
+            .replace("ঙ্গ", "ংগ")
+            .replace("ঙ্ঘ", "ংঘ")
     };
     if norm_velar(&cand_norm) == norm_velar(&target_norm)
         || norm_velar(&cand_n) == norm_velar(&target_n)
@@ -87,7 +102,10 @@ fn main() {
             acceptable_top1 += 1;
             acceptable_top3 += 1;
         } else {
-            let in_top3 = cands.iter().take(3).any(|c| is_acceptable_match(c, &target));
+            let in_top3 = cands
+                .iter()
+                .take(3)
+                .any(|c| is_acceptable_match(c, &target));
             if in_top3 {
                 acceptable_top3 += 1;
             }
@@ -97,9 +115,24 @@ fn main() {
 
     let n = pairs.len() as f64;
     println!("Total Dev Samples: {}", pairs.len());
-    println!("Strict Top-1 Accuracy:       {:.2}% ({}/{})", exact_top1 as f64 / n * 100.0, exact_top1, pairs.len());
-    println!("Acceptable Top-1 Accuracy:   {:.2}% ({}/{})", acceptable_top1 as f64 / n * 100.0, acceptable_top1, pairs.len());
-    println!("Acceptable Top-3 Accuracy:   {:.2}% ({}/{})", acceptable_top3 as f64 / n * 100.0, acceptable_top3, pairs.len());
+    println!(
+        "Strict Top-1 Accuracy:       {:.2}% ({}/{})",
+        exact_top1 as f64 / n * 100.0,
+        exact_top1,
+        pairs.len()
+    );
+    println!(
+        "Acceptable Top-1 Accuracy:   {:.2}% ({}/{})",
+        acceptable_top1 as f64 / n * 100.0,
+        acceptable_top1,
+        pairs.len()
+    );
+    println!(
+        "Acceptable Top-3 Accuracy:   {:.2}% ({}/{})",
+        acceptable_top3 as f64 / n * 100.0,
+        acceptable_top3,
+        pairs.len()
+    );
     println!("Total Real Misses:           {}", real_misses.len());
 
     let mut miss_in_dict = 0usize;
@@ -123,13 +156,40 @@ fn main() {
         }
     }
 
-    println!("\n=== COMPREHENSIVE BREAKDOWN OF THE {} MISSES ===", real_misses.len());
-    println!("1. Target IS in Dictionary:                        {} ({:.1}%)", miss_in_dict, miss_in_dict as f64 / real_misses.len() as f64 * 100.0);
-    println!("   - Target IN candidates (Rank 2+):               {} ({:.1}%)", miss_in_dict_in_cands, miss_in_dict_in_cands as f64 / real_misses.len() as f64 * 100.0);
-    println!("   - Target NOT in candidates at all:              {} ({:.1}%)", miss_in_dict - miss_in_dict_in_cands, (miss_in_dict - miss_in_dict_in_cands) as f64 / real_misses.len() as f64 * 100.0);
-    println!("2. Target is NOT in Dictionary (OOV):              {} ({:.1}%)", miss_not_in_dict, miss_not_in_dict as f64 / real_misses.len() as f64 * 100.0);
-    println!("   - Target IN candidates (Rank 2+):               {} ({:.1}%)", miss_not_in_dict_in_cands, miss_not_in_dict_in_cands as f64 / real_misses.len() as f64 * 100.0);
-    println!("   - Target NOT in candidates:                     {} ({:.1}%)", miss_not_in_dict - miss_not_in_dict_in_cands, (miss_not_in_dict - miss_not_in_dict_in_cands) as f64 / real_misses.len() as f64 * 100.0);
+    println!(
+        "\n=== COMPREHENSIVE BREAKDOWN OF THE {} MISSES ===",
+        real_misses.len()
+    );
+    println!(
+        "1. Target IS in Dictionary:                        {} ({:.1}%)",
+        miss_in_dict,
+        miss_in_dict as f64 / real_misses.len() as f64 * 100.0
+    );
+    println!(
+        "   - Target IN candidates (Rank 2+):               {} ({:.1}%)",
+        miss_in_dict_in_cands,
+        miss_in_dict_in_cands as f64 / real_misses.len() as f64 * 100.0
+    );
+    println!(
+        "   - Target NOT in candidates at all:              {} ({:.1}%)",
+        miss_in_dict - miss_in_dict_in_cands,
+        (miss_in_dict - miss_in_dict_in_cands) as f64 / real_misses.len() as f64 * 100.0
+    );
+    println!(
+        "2. Target is NOT in Dictionary (OOV):              {} ({:.1}%)",
+        miss_not_in_dict,
+        miss_not_in_dict as f64 / real_misses.len() as f64 * 100.0
+    );
+    println!(
+        "   - Target IN candidates (Rank 2+):               {} ({:.1}%)",
+        miss_not_in_dict_in_cands,
+        miss_not_in_dict_in_cands as f64 / real_misses.len() as f64 * 100.0
+    );
+    println!(
+        "   - Target NOT in candidates:                     {} ({:.1}%)",
+        miss_not_in_dict - miss_not_in_dict_in_cands,
+        (miss_not_in_dict - miss_not_in_dict_in_cands) as f64 / real_misses.len() as f64 * 100.0
+    );
     println!("\n=== TOP 10 EXAMPLES WHERE TARGET IS IN DICT AND GENERATED AT RANK 2+ ===");
     let mut printed_in_dict = 0;
     let mut higher_freq_top1 = 0usize;
@@ -153,24 +213,37 @@ fn main() {
                 oov_suppressed += 1;
             }
             // Initial 'a' distortion to 'এ'
-            let input_starts_a = (input.starts_with('a') || input.starts_with('A')) && !input.starts_with("aa") && !input.starts_with("Aa");
+            let input_starts_a = (input.starts_with('a') || input.starts_with('A'))
+                && !input.starts_with("aa")
+                && !input.starts_with("Aa");
             let target_starts_a = target.starts_with('অ') || target.starts_with('আ');
             let top1_starts_e = top1.starts_with('এ');
             if input_starts_a && target_starts_a && top1_starts_e {
                 initial_vowel_mismatch += 1;
             }
             // Dropped terminal 'e'
-            let input_ends_e = input.len() >= 5 && (input.ends_with('e') || input.ends_with('E')) && !input.ends_with("ee") && !input.ends_with("Ee");
+            let input_ends_e = input.len() >= 5
+                && (input.ends_with('e') || input.ends_with('E'))
+                && !input.ends_with("ee")
+                && !input.ends_with("Ee");
             let target_ends_e = target.ends_with('ে');
             let top1_ends_e = top1.ends_with('ে');
             if input_ends_e && target_ends_e && !top1_ends_e {
                 dropped_terminal_e += 1;
             }
             // Explicit ii / ee -> ী
-            if input.contains("ii") && target.contains('ী') && !top1.contains('ী') && top1.contains('ি') {
+            if input.contains("ii")
+                && target.contains('ী')
+                && !top1.contains('ী')
+                && top1.contains('ি')
+            {
                 explicit_ii_mismatch += 1;
             }
-            if input.contains("ee") && target.contains('ী') && !top1.contains('ী') && top1.contains('ি') {
+            if input.contains("ee")
+                && target.contains('ী')
+                && !top1.contains('ী')
+                && top1.contains('ি')
+            {
                 explicit_ee_mismatch += 1;
             }
 
@@ -179,18 +252,48 @@ fn main() {
                     "{}. Input: {:14} | Target: {:12} (Rank: {}, freq: {}) | Top-1: {:12} (in_dict: {}, freq: {})",
                     printed_in_dict + 1, input, target, pos + 1, target_freq, top1, top1_in_dict, top1_freq
                 );
-                println!("   Candidate strip: {:?}", cands.iter().take(5).collect::<Vec<_>>());
+                println!(
+                    "   Candidate strip: {:?}",
+                    cands.iter().take(5).collect::<Vec<_>>()
+                );
                 printed_in_dict += 1;
             }
         }
     }
 
     let total_in_cands = miss_in_dict_in_cands + miss_not_in_dict_in_cands;
-    println!("\n=== SYSTEMIC CAUSES OF THE {} CANDIDATE MISRANKINGS ===", total_in_cands);
-    println!("1. Top-1 frequency > Target frequency (Frequency Trap):       {} ({:.1}%)", higher_freq_top1, higher_freq_top1 as f64 / total_in_cands as f64 * 100.0);
-    println!("2. Target is OOV suppressed by in-dict Top-1:                 {} ({:.1}%)", oov_suppressed, oov_suppressed as f64 / total_in_cands as f64 * 100.0);
-    println!("3. Initial 'a' distorted to 'এ' (e.g. atiteo -> এটিতেও):       {} ({:.1}%)", initial_vowel_mismatch, initial_vowel_mismatch as f64 / total_in_cands as f64 * 100.0);
-    println!("4. Dropped terminal 'e' (Anti-root truncation failure):         {} ({:.1}%)", dropped_terminal_e, dropped_terminal_e as f64 / total_in_cands as f64 * 100.0);
-    println!("5. Explicit digraph 'ii' neglected for short 'ি':              {} ({:.1}%)", explicit_ii_mismatch, explicit_ii_mismatch as f64 / total_in_cands as f64 * 100.0);
-    println!("6. Explicit digraph 'ee' neglected for short 'ি':              {} ({:.1}%)", explicit_ee_mismatch, explicit_ee_mismatch as f64 / total_in_cands as f64 * 100.0);
+    println!(
+        "\n=== SYSTEMIC CAUSES OF THE {} CANDIDATE MISRANKINGS ===",
+        total_in_cands
+    );
+    println!(
+        "1. Top-1 frequency > Target frequency (Frequency Trap):       {} ({:.1}%)",
+        higher_freq_top1,
+        higher_freq_top1 as f64 / total_in_cands as f64 * 100.0
+    );
+    println!(
+        "2. Target is OOV suppressed by in-dict Top-1:                 {} ({:.1}%)",
+        oov_suppressed,
+        oov_suppressed as f64 / total_in_cands as f64 * 100.0
+    );
+    println!(
+        "3. Initial 'a' distorted to 'এ' (e.g. atiteo -> এটিতেও):       {} ({:.1}%)",
+        initial_vowel_mismatch,
+        initial_vowel_mismatch as f64 / total_in_cands as f64 * 100.0
+    );
+    println!(
+        "4. Dropped terminal 'e' (Anti-root truncation failure):         {} ({:.1}%)",
+        dropped_terminal_e,
+        dropped_terminal_e as f64 / total_in_cands as f64 * 100.0
+    );
+    println!(
+        "5. Explicit digraph 'ii' neglected for short 'ি':              {} ({:.1}%)",
+        explicit_ii_mismatch,
+        explicit_ii_mismatch as f64 / total_in_cands as f64 * 100.0
+    );
+    println!(
+        "6. Explicit digraph 'ee' neglected for short 'ি':              {} ({:.1}%)",
+        explicit_ee_mismatch,
+        explicit_ee_mismatch as f64 / total_in_cands as f64 * 100.0
+    );
 }

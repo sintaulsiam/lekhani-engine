@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Tool: check_avro_lowercased
 //! Measures the impact of lowercasing Avro-strict inputs on raw Avro parsing and the baseline engine.
 
@@ -57,14 +58,27 @@ fn main() {
 
     let n_targets = unique_targets.len() as f64;
     println!("\nUnique targets: {}", unique_targets.len());
-    println!("Targets whose Avro-strict has uppercase letters: {} ({:.1}%)",
-        uppercase_count, uppercase_count as f64 / n_targets * 100.0);
-    println!("Raw Avro parser on exact Avro-strict:      {}/{} ({:.2}%)",
-        raw_avro_strict_hits, unique_targets.len(), raw_avro_strict_hits as f64 / n_targets * 100.0);
-    println!("Raw Avro parser on LOWERCASED Avro-strict:  {}/{} ({:.2}%)",
-        raw_avro_strict_lower_hits, unique_targets.len(), raw_avro_strict_lower_hits as f64 / n_targets * 100.0);
-    println!("Drop due to lowercasing alone in raw Avro: -{:.2}% points!",
-        (raw_avro_strict_hits - raw_avro_strict_lower_hits) as f64 / n_targets * 100.0);
+    println!(
+        "Targets whose Avro-strict has uppercase letters: {} ({:.1}%)",
+        uppercase_count,
+        uppercase_count as f64 / n_targets * 100.0
+    );
+    println!(
+        "Raw Avro parser on exact Avro-strict:      {}/{} ({:.2}%)",
+        raw_avro_strict_hits,
+        unique_targets.len(),
+        raw_avro_strict_hits as f64 / n_targets * 100.0
+    );
+    println!(
+        "Raw Avro parser on LOWERCASED Avro-strict:  {}/{} ({:.2}%)",
+        raw_avro_strict_lower_hits,
+        unique_targets.len(),
+        raw_avro_strict_lower_hits as f64 / n_targets * 100.0
+    );
+    println!(
+        "Drop due to lowercasing alone in raw Avro: -{:.2}% points!",
+        (raw_avro_strict_hits - raw_avro_strict_lower_hits) as f64 / n_targets * 100.0
+    );
 
     // Per-row evaluation across all 9,279 rows
     let mut row_strict_hits = 0;
@@ -80,10 +94,20 @@ fn main() {
     }
     let n_rows = dev_pairs.len() as f64;
     println!("\nPer-Row Evaluation (N = 9,279):");
-    println!("Raw Avro parser on exact Avro-strict:      {}/{} ({:.2}%)",
-        row_strict_hits, dev_pairs.len(), row_strict_hits as f64 / n_rows * 100.0);
-    println!("Raw Avro parser on LOWERCASED Avro-strict:  {}/{} ({:.2}%)",
-        row_lower_hits, dev_pairs.len(), row_lower_hits as f64 / n_rows * 100.0);
-    println!("Drop due to lowercasing alone per-row:     -{:.2}% points!",
-        (row_strict_hits - row_lower_hits) as f64 / n_rows * 100.0);
+    println!(
+        "Raw Avro parser on exact Avro-strict:      {}/{} ({:.2}%)",
+        row_strict_hits,
+        dev_pairs.len(),
+        row_strict_hits as f64 / n_rows * 100.0
+    );
+    println!(
+        "Raw Avro parser on LOWERCASED Avro-strict:  {}/{} ({:.2}%)",
+        row_lower_hits,
+        dev_pairs.len(),
+        row_lower_hits as f64 / n_rows * 100.0
+    );
+    println!(
+        "Drop due to lowercasing alone per-row:     -{:.2}% points!",
+        (row_strict_hits - row_lower_hits) as f64 / n_rows * 100.0
+    );
 }

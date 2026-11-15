@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Pragyan Phase 1 Step 4: Many-to-Many (M2M) Alignment & Failure Classification Engine
 //!
 //! Architectural Directives & Rigorous Failure Classification:
@@ -106,34 +107,116 @@ pub fn seed_avro_prior(counts: &mut HashMap<(String, String), f64>, alpha: f64) 
 
     let priors: &[(&str, &str)] = &[
         // Single Consonants
-        ("k", "ক"), ("kh", "খ"), ("g", "গ"), ("gh", "ঘ"), ("ng", "ঙ"),
-        ("c", "চ"), ("ch", "ছ"), ("j", "জ"), ("jh", "ঝ"),
-        ("t", "ত"), ("t", "ট"), ("th", "থ"), ("th", "ঠ"),
-        ("d", "দ"), ("d", "ড"), ("dh", "ধ"), ("dh", "ঢ"),
-        ("n", "ন"), ("n", "ণ"),
-        ("p", "প"), ("ph", "ফ"), ("f", "ফ"), ("b", "ব"), ("bh", "ভ"), ("v", "ভ"), ("m", "ম"),
-        ("z", "য"), ("r", "র"), ("l", "ল"),
-        ("sh", "শ"), ("sh", "ষ"), ("s", "স"), ("s", "শ"), ("h", "হ"),
-        ("y", "য়"), ("w", "ও"), ("q", "ক"), ("x", "ক্স"),
+        ("k", "ক"),
+        ("kh", "খ"),
+        ("g", "গ"),
+        ("gh", "ঘ"),
+        ("ng", "ঙ"),
+        ("c", "চ"),
+        ("ch", "ছ"),
+        ("j", "জ"),
+        ("jh", "ঝ"),
+        ("t", "ত"),
+        ("t", "ট"),
+        ("th", "থ"),
+        ("th", "ঠ"),
+        ("d", "দ"),
+        ("d", "ড"),
+        ("dh", "ধ"),
+        ("dh", "ঢ"),
+        ("n", "ন"),
+        ("n", "ণ"),
+        ("p", "প"),
+        ("ph", "ফ"),
+        ("f", "ফ"),
+        ("b", "ব"),
+        ("bh", "ভ"),
+        ("v", "ভ"),
+        ("m", "ম"),
+        ("z", "য"),
+        ("r", "র"),
+        ("l", "ল"),
+        ("sh", "শ"),
+        ("sh", "ষ"),
+        ("s", "স"),
+        ("s", "শ"),
+        ("h", "হ"),
+        ("y", "য়"),
+        ("w", "ও"),
+        ("q", "ক"),
+        ("x", "ক্স"),
         // Vowels & Kars
-        ("a", "া"), ("a", "আ"), ("a", "অ"), ("aa", "আ"), ("aa", "া"),
-        ("i", "ি"), ("i", "ই"), ("ee", "ী"), ("ee", "ি"),
-        ("u", "ু"), ("u", "উ"), ("oo", "ূ"), ("oo", "ু"),
-        ("e", "ে"), ("e", "এ"), ("oi", "ঐ"), ("ou", "ঔ"),
-        ("o", "ও"), ("o", "ো"), ("o", "অ"),
+        ("a", "া"),
+        ("a", "আ"),
+        ("a", "অ"),
+        ("aa", "আ"),
+        ("aa", "া"),
+        ("i", "ি"),
+        ("i", "ই"),
+        ("ee", "ী"),
+        ("ee", "ি"),
+        ("u", "ু"),
+        ("u", "উ"),
+        ("oo", "ূ"),
+        ("oo", "ু"),
+        ("e", "ে"),
+        ("e", "এ"),
+        ("oi", "ঐ"),
+        ("ou", "ঔ"),
+        ("o", "ও"),
+        ("o", "ো"),
+        ("o", "অ"),
         // Rule-Based Conjuncts
-        ("kkh", "ক্ষ"), ("ngk", "ঙ্ক"), ("ngkh", "ঙ্খ"), ("ngg", "ঙ্গ"), ("nggh", "ঙ্ঘ"),
-        ("cch", "চ্ছ"), ("jj", "জ্জ"), ("jjh", "জ্ঝ"), ("nc", "ঞ্চ"), ("nch", "ঞ্ছ"), ("nj", "ঞ্জ"),
-        ("tt", "ট্ট"), ("nth", "ণ্ঠ"), ("nd", "ণ্ড"), ("kt", "ক্ত"), ("pt", "প্ত"), ("bd", "ব্দ"),
-        ("st", "স্ত"), ("sth", "স্থ"), ("sn", "স্ন"), ("sp", "স্প"), ("sph", "স্ফ"),
-        ("nt", "ন্ত"), ("nth", "ন্থ"), ("nd", "ন্দ"), ("ndh", "ন্ধ"),
-        ("mp", "ম্প"), ("mb", "ম্ব"), ("mbh", "ম্ভ"),
-        ("rk", "র্ক"), ("rg", "র্গ"), ("rt", "র্ত"), ("rt", "র্ড"), ("rd", "র্দ"),
-        ("rn", "র্ণ"), ("rp", "র্প"), ("rb", "র্ব"), ("rm", "র্ম"), ("rsh", "র্ষ"), ("rs", "র্স"),
+        ("kkh", "ক্ষ"),
+        ("ngk", "ঙ্ক"),
+        ("ngkh", "ঙ্খ"),
+        ("ngg", "ঙ্গ"),
+        ("nggh", "ঙ্ঘ"),
+        ("cch", "চ্ছ"),
+        ("jj", "জ্জ"),
+        ("jjh", "জ্ঝ"),
+        ("nc", "ঞ্চ"),
+        ("nch", "ঞ্ছ"),
+        ("nj", "ঞ্জ"),
+        ("tt", "ট্ট"),
+        ("nth", "ণ্ঠ"),
+        ("nd", "ণ্ড"),
+        ("kt", "ক্ত"),
+        ("pt", "প্ত"),
+        ("bd", "ব্দ"),
+        ("st", "স্ত"),
+        ("sth", "স্থ"),
+        ("sn", "স্ন"),
+        ("sp", "স্প"),
+        ("sph", "স্ফ"),
+        ("nt", "ন্ত"),
+        ("nth", "ন্থ"),
+        ("nd", "ন্দ"),
+        ("ndh", "ন্ধ"),
+        ("mp", "ম্প"),
+        ("mb", "ম্ব"),
+        ("mbh", "ম্ভ"),
+        ("rk", "র্ক"),
+        ("rg", "র্গ"),
+        ("rt", "র্ত"),
+        ("rt", "র্ড"),
+        ("rd", "র্দ"),
+        ("rn", "র্ণ"),
+        ("rp", "র্প"),
+        ("rb", "র্ব"),
+        ("rm", "র্ম"),
+        ("rsh", "র্ষ"),
+        ("rs", "র্স"),
         // Common Affixes & Morphological Suffixes
-        ("er", "ের"), ("ar", "ার"), ("te", "তে"), ("ke", "কে"), ("der", "দের"),
+        ("er", "ের"),
+        ("ar", "ার"),
+        ("te", "তে"),
+        ("ke", "কে"),
+        ("der", "দের"),
         // Deletion / Inherent Vowel Syncope
-        ("a", ""), ("o", ""), ("e", ""),
+        ("a", ""),
+        ("o", ""),
+        ("e", ""),
     ];
 
     for &(r, b) in priors {
@@ -243,8 +326,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -288,8 +379,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i - kr..i] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j - kb..j] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i - kr..i]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j - kb..j]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -329,8 +428,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -406,8 +513,16 @@ pub fn compute_heldout_log_likelihood(
                             continue;
                         }
 
-                        let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                        let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                        let r_slice = if kr == 0 {
+                            &[]
+                        } else {
+                            &pair.roman_tokens[i..i + kr]
+                        };
+                        let b_slice = if kb == 0 {
+                            &[]
+                        } else {
+                            &pair.bengali_tokens[j..j + kb]
+                        };
 
                         if !is_valid_translation_unit(r_slice, b_slice) {
                             continue;
@@ -466,8 +581,16 @@ pub fn viterbi_forced_alignment_score(
                         continue;
                     }
 
-                    let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                    let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                    let r_slice = if kr == 0 {
+                        &[]
+                    } else {
+                        &pair.roman_tokens[i..i + kr]
+                    };
+                    let b_slice = if kb == 0 {
+                        &[]
+                    } else {
+                        &pair.bengali_tokens[j..j + kb]
+                    };
 
                     if !is_valid_translation_unit(r_slice, b_slice) {
                         continue;
@@ -683,7 +806,9 @@ pub fn evaluate_real_segmentation_disagreement(
         }
 
         // Real conflict: does a Viterbi cut fall inside an indivisible multi-char greedy token?
-        let has_real_disagreement = interior_indices.iter().any(|idx| viterbi_cut_indices.contains(idx));
+        let has_real_disagreement = interior_indices
+            .iter()
+            .any(|idx| viterbi_cut_indices.contains(idx));
         total_pairs += 1;
 
         if has_real_disagreement {
@@ -734,13 +859,26 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 4.1: Training 1:1 Token Model vs 2:2 Token Model
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
-    println!("   🔬 EXPERIMENT: 1:1 vs 2:2 Token Models on TRAIN (α = {})", alpha);
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
+    println!(
+        "   🔬 EXPERIMENT: 1:1 vs 2:2 Token Models on TRAIN (α = {})",
+        alpha
+    );
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
     let configs = [
-        (1, 1, "1:1 Token Model (Max 1 Roman Token, Max 1 Bengali Token)"),
-        (2, 2, "2:2 Token Model (Max 2 Roman Tokens, Max 2 Bengali Tokens)"),
+        (
+            1,
+            1,
+            "1:1 Token Model (Max 1 Roman Token, Max 1 Bengali Token)",
+        ),
+        (
+            2,
+            2,
+            "2:2 Token Model (Max 2 Roman Tokens, Max 2 Bengali Tokens)",
+        ),
     ];
 
     let mut trained_models = Vec::new();
@@ -750,13 +888,17 @@ fn main() {
         let t0 = Instant::now();
         let mut model = initialize_model(&train_pairs, max_r, max_b, alpha);
         let pre_prune_inventory_size = model.len();
-        println!("   Pre-Pruning Candidate Unit Inventory: {} units.", pre_prune_inventory_size);
+        println!(
+            "   Pre-Pruning Candidate Unit Inventory: {} units.",
+            pre_prune_inventory_size
+        );
 
         for iter in 1..=iterations {
             let iter_start = Instant::now();
             let (new_model, train_ll) = em_iteration(&train_pairs, &model, max_r, max_b);
             model = new_model;
-            let (dev_ll, dev_reach, dev_total) = compute_heldout_log_likelihood(&dev_pairs, &model, max_r, max_b);
+            let (dev_ll, dev_reach, dev_total) =
+                compute_heldout_log_likelihood(&dev_pairs, &model, max_r, max_b);
             println!(
                 "   [Iter {}/{}] Train LL: {:.3e} | DEV LL: {:.3e} | Forced Reach: {}/{} ({:.2}%) | Elapsed: {:.2}s",
                 iter,
@@ -769,31 +911,54 @@ fn main() {
                 iter_start.elapsed().as_secs_f64()
             );
         }
-        let (_final_dev_ll, final_reach, total_dev) = compute_heldout_log_likelihood(&dev_pairs, &model, max_r, max_b);
+        let (_final_dev_ll, final_reach, total_dev) =
+            compute_heldout_log_likelihood(&dev_pairs, &model, max_r, max_b);
         let forced_reach_pct = (final_reach as f64 / total_dev as f64) * 100.0;
         println!(
             "   ✓ [{}] Complete in {:.2}s | Final DEV Forced Reachability: {}/{} ({:.2}%)",
-            label, t0.elapsed().as_secs_f64(), final_reach, total_dev, forced_reach_pct
+            label,
+            t0.elapsed().as_secs_f64(),
+            final_reach,
+            total_dev,
+            forced_reach_pct
         );
 
-        trained_models.push((max_r, max_b, label, model, forced_reach_pct, pre_prune_inventory_size));
+        trained_models.push((
+            max_r,
+            max_b,
+            label,
+            model,
+            forced_reach_pct,
+            pre_prune_inventory_size,
+        ));
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 4.2: Failure Classification at K = 16, 64, 256 for Both Profiles
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   📊 FAILURE CLASSIFICATION & DECODE ACCURACY AT K = 16, 64, 256");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
     let beam_widths = [16, 64, 256];
 
     for (max_r, _max_b, label, model, forced_reach, _pre_prune) in &trained_models {
-        println!("\n══════════════════════════════════════════════════════════════════════════════════");
-        println!(" Profile: {} | Forced Reachability: {:.2}%", label, forced_reach);
-        println!("══════════════════════════════════════════════════════════════════════════════════");
+        println!(
+            "\n══════════════════════════════════════════════════════════════════════════════════"
+        );
+        println!(
+            " Profile: {} | Forced Reachability: {:.2}%",
+            label, forced_reach
+        );
+        println!(
+            "══════════════════════════════════════════════════════════════════════════════════"
+        );
         println!("Beam (K)  Top-1%   Top-3%   Reach%   Errors  Coverage Err (%)   Search Err (%)   Model Err (%)");
-        println!("──────────────────────────────────────────────────────────────────────────────────");
+        println!(
+            "──────────────────────────────────────────────────────────────────────────────────"
+        );
 
         // Convert joint model to conditional units for standalone decoding
         let mut r_marginals: HashMap<String, f64> = HashMap::new();
@@ -842,7 +1007,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 4.3: Pruning Threshold Sweep on Held-Out DEV (0, 1, 3, 5, 10, 20, 50)
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 PRUNING THRESHOLD SWEEP ON HELD-OUT DEV (Count >= 0, 1, 3, 5, 10, 20, 50)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
     println!("Threshold  Units Retained  K=16 Top-1%  K=64 Top-1%  K=256 Top-1%  K=256 Reach%  Search Err% (K=256)");
@@ -873,18 +1040,46 @@ fn main() {
     let mut best_units = Vec::new();
 
     for &th in &thresholds {
-        let pruned = all_units.iter().filter(|u| u.count >= th).cloned().collect::<Vec<_>>();
+        let pruned = all_units
+            .iter()
+            .filter(|u| u.count >= th)
+            .cloned()
+            .collect::<Vec<_>>();
         let u_count = pruned.len();
 
-        let res_16 = decode_dev_with_classification(&dev_pairs, &selected_model, &pruned, selected_max_r, 16);
-        let res_64 = decode_dev_with_classification(&dev_pairs, &selected_model, &pruned, selected_max_r, 64);
-        let res_256 = decode_dev_with_classification(&dev_pairs, &selected_model, &pruned, selected_max_r, 256);
+        let res_16 = decode_dev_with_classification(
+            &dev_pairs,
+            &selected_model,
+            &pruned,
+            selected_max_r,
+            16,
+        );
+        let res_64 = decode_dev_with_classification(
+            &dev_pairs,
+            &selected_model,
+            &pruned,
+            selected_max_r,
+            64,
+        );
+        let res_256 = decode_dev_with_classification(
+            &dev_pairs,
+            &selected_model,
+            &pruned,
+            selected_max_r,
+            256,
+        );
 
         let srch_pct = (res_256.search_errors as f64 / res_256.total_errors as f64) * 100.0;
 
         println!(
             "Count >= {:<4.0} {:<14} {:>10.2}% {:>12.2}% {:>12.2}% {:>13.2}% {:>18.1}%",
-            th, u_count, res_16.top1_pct, res_64.top1_pct, res_256.top1_pct, res_256.reach_pct, srch_pct
+            th,
+            u_count,
+            res_16.top1_pct,
+            res_64.top1_pct,
+            res_256.top1_pct,
+            res_256.reach_pct,
+            srch_pct
         );
 
         if th == 10.0 {
@@ -893,17 +1088,33 @@ fn main() {
         }
     }
 
-    println!("\n   ✓ Selected Pruning Threshold on DEV: count >= {:.0} ({} units).", best_threshold, best_units.len());
-    best_units.sort_by(|a, b| b.count.partial_cmp(&a.count).unwrap_or(std::cmp::Ordering::Equal));
+    println!(
+        "\n   ✓ Selected Pruning Threshold on DEV: count >= {:.0} ({} units).",
+        best_threshold,
+        best_units.len()
+    );
+    best_units.sort_by(|a, b| {
+        b.count
+            .partial_cmp(&a.count)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let json_out = serde_json::to_string_pretty(&best_units).expect("Serialize units");
     std::fs::write("data/eval/m2m_units.json", json_out).expect("Write m2m_units.json");
-    println!("💾 Exported {} final pruned transition units to data/eval/m2m_units.json", best_units.len());
+    println!(
+        "💾 Exported {} final pruned transition units to data/eval/m2m_units.json",
+        best_units.len()
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 4.4: OOV Rate against the Shipped Pruned Inventory
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
-    println!("   🔬 OUT-OF-VOCABULARY (OOV) RATE AGAINST SHIPPED PRUNED INVENTORY ({} Units)", best_units.len());
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
+    println!(
+        "   🔬 OUT-OF-VOCABULARY (OOV) RATE AGAINST SHIPPED PRUNED INVENTORY ({} Units)",
+        best_units.len()
+    );
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
     let shipped_unit_set: HashSet<(String, String)> = best_units
@@ -916,7 +1127,8 @@ fn main() {
     let mut dev_oov_samples = Vec::new();
 
     for pair in &dev_pairs {
-        let (_, alignment) = viterbi_forced_alignment_score(pair, &selected_model, selected_max_r, selected_max_r);
+        let (_, alignment) =
+            viterbi_forced_alignment_score(pair, &selected_model, selected_max_r, selected_max_r);
         for (r, b) in alignment {
             if !r.is_empty() && !b.is_empty() {
                 dev_total_units += 1;
@@ -932,14 +1144,18 @@ fn main() {
 
     println!(
         "   - DEV Unit OOV Rate against Shipped Units: {} / {} ({:.2}%)",
-        dev_oov_units, dev_total_units, (dev_oov_units as f64 / dev_total_units as f64) * 100.0
+        dev_oov_units,
+        dev_total_units,
+        (dev_oov_units as f64 / dev_total_units as f64) * 100.0
     );
     println!("   - Sample DEV OOV Units: {:?}", dev_oov_samples);
 
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 4.5: Real Roman Segmentation Disagreement (Internal Digraph Slicing)
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 REAL ROMAN SEGMENTATION DISAGREEMENT: Slicing Inside Greedy Digraphs");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -960,19 +1176,26 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 4.6: Audit CSV Regeneration with Human Grading Metadata
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   💾 EXPORTING AUDIT CSV (data/eval/align_audit.csv) FOR HUMAN EVALUATION");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
     let mut rng_state: u64 = 42;
     let mut next_rand = || {
-        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng_state = rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (rng_state >> 32) as usize
     };
 
     let mut target_to_pairs: HashMap<String, Vec<&AlignerPair>> = HashMap::new();
     for pair in &train_pairs {
-        target_to_pairs.entry(pair.raw_bengali.clone()).or_default().push(pair);
+        target_to_pairs
+            .entry(pair.raw_bengali.clone())
+            .or_default()
+            .push(pair);
     }
 
     let mut conjunct_targets: Vec<String> = Vec::new();
@@ -1003,7 +1226,9 @@ fn main() {
     }
 
     let mut chosen_non_conj_indices = HashSet::new();
-    while chosen_non_conj_indices.len() < 96 && chosen_non_conj_indices.len() < non_conjunct_targets.len() {
+    while chosen_non_conj_indices.len() < 96
+        && chosen_non_conj_indices.len() < non_conjunct_targets.len()
+    {
         let idx = next_rand() % non_conjunct_targets.len();
         if chosen_non_conj_indices.insert(idx) {
             let target = &non_conjunct_targets[idx];
@@ -1034,7 +1259,8 @@ fn main() {
             audit_non_conj_count += 1;
         }
 
-        let (_, alignment) = viterbi_forced_alignment_score(pair, &selected_model, selected_max_r, selected_max_r);
+        let (_, alignment) =
+            viterbi_forced_alignment_score(pair, &selected_model, selected_max_r, selected_max_r);
         let align_str = alignment
             .iter()
             .map(|(r, b)| {
@@ -1096,7 +1322,9 @@ fn main() {
         audit_non_conj_count
     );
 
-    println!("\n══════════════════════════════════════════════════════════════════════════════════");
+    println!(
+        "\n══════════════════════════════════════════════════════════════════════════════════"
+    );
     println!("   🎉 PRAGYAN STEP 4 EXTENDED DIAGNOSTICS COMPLETE");
     println!("══════════════════════════════════════════════════════════════════════════════════");
 }

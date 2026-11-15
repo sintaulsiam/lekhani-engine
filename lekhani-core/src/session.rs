@@ -5,7 +5,9 @@ use serde_json::Value;
 use crate::fixed::FixedMethod;
 use crate::phonetic::PhoneticMethod;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum ShiftOrigin {
     #[default]
     AutoCapitalize,

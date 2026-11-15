@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Diagnose Baseline Performance Stratified by Conjunct and Word Length on DEV
 //!
 //! Evaluates the uncontaminated baseline (dictionary.json only) across:
@@ -88,25 +89,45 @@ struct AccCounter {
 impl AccCounter {
     fn record(&mut self, is_top1: bool, is_top3: bool, is_reachable: bool) {
         self.total += 1;
-        if is_top1 { self.top1 += 1; }
-        if is_top3 { self.top3 += 1; }
-        if !is_reachable { self.unreachable += 1; }
+        if is_top1 {
+            self.top1 += 1;
+        }
+        if is_top3 {
+            self.top3 += 1;
+        }
+        if !is_reachable {
+            self.unreachable += 1;
+        }
     }
     fn top1_pct(&self) -> f64 {
-        if self.total == 0 { 0.0 } else { self.top1 as f64 / self.total as f64 * 100.0 }
+        if self.total == 0 {
+            0.0
+        } else {
+            self.top1 as f64 / self.total as f64 * 100.0
+        }
     }
     fn top3_pct(&self) -> f64 {
-        if self.total == 0 { 0.0 } else { self.top3 as f64 / self.total as f64 * 100.0 }
+        if self.total == 0 {
+            0.0
+        } else {
+            self.top3 as f64 / self.total as f64 * 100.0
+        }
     }
     fn unreach_pct(&self) -> f64 {
-        if self.total == 0 { 0.0 } else { self.unreachable as f64 / self.total as f64 * 100.0 }
+        if self.total == 0 {
+            0.0
+        } else {
+            self.unreachable as f64 / self.total as f64 * 100.0
+        }
     }
 }
 
 fn main() {
     println!("══════════════════════════════════════════════════════════════════════════════════");
     println!("   🔬 BASELINE ENGINE STRATIFICATION: CONJUNCT VS NON-CONJUNCT & LENGTH ON DEV");
-    println!("══════════════════════════════════════════════════════════════════════════════════\n");
+    println!(
+        "══════════════════════════════════════════════════════════════════════════════════\n"
+    );
 
     let mut sugg = setup_engine();
     let dev_pairs = load_pairs("data/eval/bn.translit.sampled.dev.tsv");
@@ -163,33 +184,114 @@ fn main() {
             let bn_len = target.chars().count();
             if bn_len <= 3 {
                 len_1_3.record(is_top1, is_top3, is_reachable);
-                if is_conj { conj_len_1_3.record(is_top1, is_top3, is_reachable); }
-                else { non_conj_len_1_3.record(is_top1, is_top3, is_reachable); }
+                if is_conj {
+                    conj_len_1_3.record(is_top1, is_top3, is_reachable);
+                } else {
+                    non_conj_len_1_3.record(is_top1, is_top3, is_reachable);
+                }
             } else if bn_len <= 6 {
                 len_4_6.record(is_top1, is_top3, is_reachable);
-                if is_conj { conj_len_4_6.record(is_top1, is_top3, is_reachable); }
-                else { non_conj_len_4_6.record(is_top1, is_top3, is_reachable); }
+                if is_conj {
+                    conj_len_4_6.record(is_top1, is_top3, is_reachable);
+                } else {
+                    non_conj_len_4_6.record(is_top1, is_top3, is_reachable);
+                }
             } else {
                 len_7_plus.record(is_top1, is_top3, is_reachable);
-                if is_conj { conj_len_7_plus.record(is_top1, is_top3, is_reachable); }
-                else { non_conj_len_7_plus.record(is_top1, is_top3, is_reachable); }
+                if is_conj {
+                    conj_len_7_plus.record(is_top1, is_top3, is_reachable);
+                } else {
+                    non_conj_len_7_plus.record(is_top1, is_top3, is_reachable);
+                }
             }
         }
 
         println!("### Persona: {}", p_name);
         println!("| Stratum | Rows | Top-1 (%) | Top-3 (%) | Unreachable (%) |");
         println!("|:---|:---:|:---:|:---:|:---:|");
-        println!("| **Overall DEV** | {} | **{:.2}%** | {:.2}% | {:.2}% |", overall.total, overall.top1_pct(), overall.top3_pct(), overall.unreach_pct());
-        println!("| ├─ **With Conjunct** | {} | **{:.2}%** | {:.2}% | {:.2}% |", conj_acc.total, conj_acc.top1_pct(), conj_acc.top3_pct(), conj_acc.unreach_pct());
-        println!("| └─ **Without Conjunct** | {} | **{:.2}%** | {:.2}% | {:.2}% |", non_conj_acc.total, non_conj_acc.top1_pct(), non_conj_acc.top3_pct(), non_conj_acc.unreach_pct());
-        println!("| Length: 1-3 chars | {} | {:.2}% | {:.2}% | {:.2}% |", len_1_3.total, len_1_3.top1_pct(), len_1_3.top3_pct(), len_1_3.unreach_pct());
-        println!("| Length: 4-6 chars | {} | {:.2}% | {:.2}% | {:.2}% |", len_4_6.total, len_4_6.top1_pct(), len_4_6.top3_pct(), len_4_6.unreach_pct());
-        println!("| Length: 7+ chars | {} | {:.2}% | {:.2}% | {:.2}% |", len_7_plus.total, len_7_plus.top1_pct(), len_7_plus.top3_pct(), len_7_plus.unreach_pct());
-        println!("| Conjunct x Length: 1-3 | {} | {:.2}% | {:.2}% | {:.2}% |", conj_len_1_3.total, conj_len_1_3.top1_pct(), conj_len_1_3.top3_pct(), conj_len_1_3.unreach_pct());
-        println!("| Conjunct x Length: 4-6 | {} | {:.2}% | {:.2}% | {:.2}% |", conj_len_4_6.total, conj_len_4_6.top1_pct(), conj_len_4_6.top3_pct(), conj_len_4_6.unreach_pct());
-        println!("| Conjunct x Length: 7+ | {} | {:.2}% | {:.2}% | {:.2}% |", conj_len_7_plus.total, conj_len_7_plus.top1_pct(), conj_len_7_plus.top3_pct(), conj_len_7_plus.unreach_pct());
-        println!("| Non-Conj x Length: 1-3 | {} | {:.2}% | {:.2}% | {:.2}% |", non_conj_len_1_3.total, non_conj_len_1_3.top1_pct(), non_conj_len_1_3.top3_pct(), non_conj_len_1_3.unreach_pct());
-        println!("| Non-Conj x Length: 4-6 | {} | {:.2}% | {:.2}% | {:.2}% |", non_conj_len_4_6.total, non_conj_len_4_6.top1_pct(), non_conj_len_4_6.top3_pct(), non_conj_len_4_6.unreach_pct());
-        println!("| Non-Conj x Length: 7+ | {} | {:.2}% | {:.2}% | {:.2}% |\n", non_conj_len_7_plus.total, non_conj_len_7_plus.top1_pct(), non_conj_len_7_plus.top3_pct(), non_conj_len_7_plus.unreach_pct());
+        println!(
+            "| **Overall DEV** | {} | **{:.2}%** | {:.2}% | {:.2}% |",
+            overall.total,
+            overall.top1_pct(),
+            overall.top3_pct(),
+            overall.unreach_pct()
+        );
+        println!(
+            "| ├─ **With Conjunct** | {} | **{:.2}%** | {:.2}% | {:.2}% |",
+            conj_acc.total,
+            conj_acc.top1_pct(),
+            conj_acc.top3_pct(),
+            conj_acc.unreach_pct()
+        );
+        println!(
+            "| └─ **Without Conjunct** | {} | **{:.2}%** | {:.2}% | {:.2}% |",
+            non_conj_acc.total,
+            non_conj_acc.top1_pct(),
+            non_conj_acc.top3_pct(),
+            non_conj_acc.unreach_pct()
+        );
+        println!(
+            "| Length: 1-3 chars | {} | {:.2}% | {:.2}% | {:.2}% |",
+            len_1_3.total,
+            len_1_3.top1_pct(),
+            len_1_3.top3_pct(),
+            len_1_3.unreach_pct()
+        );
+        println!(
+            "| Length: 4-6 chars | {} | {:.2}% | {:.2}% | {:.2}% |",
+            len_4_6.total,
+            len_4_6.top1_pct(),
+            len_4_6.top3_pct(),
+            len_4_6.unreach_pct()
+        );
+        println!(
+            "| Length: 7+ chars | {} | {:.2}% | {:.2}% | {:.2}% |",
+            len_7_plus.total,
+            len_7_plus.top1_pct(),
+            len_7_plus.top3_pct(),
+            len_7_plus.unreach_pct()
+        );
+        println!(
+            "| Conjunct x Length: 1-3 | {} | {:.2}% | {:.2}% | {:.2}% |",
+            conj_len_1_3.total,
+            conj_len_1_3.top1_pct(),
+            conj_len_1_3.top3_pct(),
+            conj_len_1_3.unreach_pct()
+        );
+        println!(
+            "| Conjunct x Length: 4-6 | {} | {:.2}% | {:.2}% | {:.2}% |",
+            conj_len_4_6.total,
+            conj_len_4_6.top1_pct(),
+            conj_len_4_6.top3_pct(),
+            conj_len_4_6.unreach_pct()
+        );
+        println!(
+            "| Conjunct x Length: 7+ | {} | {:.2}% | {:.2}% | {:.2}% |",
+            conj_len_7_plus.total,
+            conj_len_7_plus.top1_pct(),
+            conj_len_7_plus.top3_pct(),
+            conj_len_7_plus.unreach_pct()
+        );
+        println!(
+            "| Non-Conj x Length: 1-3 | {} | {:.2}% | {:.2}% | {:.2}% |",
+            non_conj_len_1_3.total,
+            non_conj_len_1_3.top1_pct(),
+            non_conj_len_1_3.top3_pct(),
+            non_conj_len_1_3.unreach_pct()
+        );
+        println!(
+            "| Non-Conj x Length: 4-6 | {} | {:.2}% | {:.2}% | {:.2}% |",
+            non_conj_len_4_6.total,
+            non_conj_len_4_6.top1_pct(),
+            non_conj_len_4_6.top3_pct(),
+            non_conj_len_4_6.unreach_pct()
+        );
+        println!(
+            "| Non-Conj x Length: 7+ | {} | {:.2}% | {:.2}% | {:.2}% |\n",
+            non_conj_len_7_plus.total,
+            non_conj_len_7_plus.top1_pct(),
+            non_conj_len_7_plus.top3_pct(),
+            non_conj_len_7_plus.unreach_pct()
+        );
     }
 }

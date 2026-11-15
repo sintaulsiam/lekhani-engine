@@ -915,11 +915,19 @@ fn test_lps_grammar_integration() {
 
     // 1. Suggest exact form k-l-m
     let (cands, _) = sugg.suggest("k-l-m", false, true, &empty_memory);
-    assert!(cands.contains(&"কলম".to_string()), "LPS k-l-m must produce কলম, got {:?}", cands);
+    assert!(
+        cands.contains(&"কলম".to_string()),
+        "LPS k-l-m must produce কলম, got {:?}",
+        cands
+    );
 
     // 2. Suggest exact form b-i
     let (cands, _) = sugg.suggest("b-i", false, true, &empty_memory);
-    assert!(cands.contains(&"বই".to_string()), "LPS b-i must produce বই, got {:?}", cands);
+    assert!(
+        cands.contains(&"বই".to_string()),
+        "LPS b-i must produce বই, got {:?}",
+        cands
+    );
 
     // 3. Exact form round-trip helper
     assert_eq!(sugg.exact_form("কলম"), "k-l-m");
@@ -927,9 +935,18 @@ fn test_lps_grammar_integration() {
 
     // 4. Letter chips inspection
     let (cands, _) = sugg.suggest("bari", false, true, &empty_memory);
-    assert!(cands.iter().any(|c| c == "ব\u{09BE}\u{09DC}\u{09BF}" || c == "বারি"), "LPS bari must produce বাড়ি/বারি: {:?}", cands);
+    assert!(
+        cands
+            .iter()
+            .any(|c| c == "ব\u{09BE}\u{09DC}\u{09BF}" || c == "বারি"),
+        "LPS bari must produce বাড়ি/বারি: {:?}",
+        cands
+    );
     let chips = sugg.last_lps_chips();
-    assert!(!chips.is_empty(), "LPS bari must produce letter chips for ambiguous r variants");
+    assert!(
+        !chips.is_empty(),
+        "LPS bari must produce letter chips for ambiguous r variants"
+    );
 }
 
 #[test]
@@ -963,12 +980,23 @@ fn test_soccho_produces_swoccho() {
     }
     let empty_memory = HashMap::new();
     let (cands, _) = sugg.suggest("soccho", true, true, &empty_memory);
-    assert_eq!(cands[0], "স্বচ্ছ", "Expected 'স্বচ্ছ' at Rank 1 for 'soccho', got {:?}", cands);
+    assert_eq!(
+        cands[0], "স্বচ্ছ",
+        "Expected 'স্বচ্ছ' at Rank 1 for 'soccho', got {:?}",
+        cands
+    );
 
     let (cands_korcho, _) = sugg.suggest("korcho", true, true, &empty_memory);
-    assert_eq!(cands_korcho[0], "করছো", "Expected 'করছো' at Rank 1 for 'korcho', got {:?}", cands_korcho);
+    assert_eq!(
+        cands_korcho[0], "করছো",
+        "Expected 'করছো' at Rank 1 for 'korcho', got {:?}",
+        cands_korcho
+    );
 
     let (cands_khabo, _) = sugg.suggest("khabo", true, true, &empty_memory);
-    assert_eq!(cands_khabo[0], "খাবো", "Expected 'খাবো' at Rank 1 for 'khabo', got {:?}", cands_khabo);
+    assert_eq!(
+        cands_khabo[0], "খাবো",
+        "Expected 'খাবো' at Rank 1 for 'khabo', got {:?}",
+        cands_khabo
+    );
 }
-

@@ -419,30 +419,64 @@ pub fn extract_candidate_features(
             if dist == 0 {
                 f.source_weight = 1.0;
                 f.phonetic_similarity = 1.0;
-            } else if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
-                let input_starts_vowel = ctx.middle.starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
-                let cand_starts_vowel = cand.text.chars().next().is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
-                let dropped_initial_vowel = input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
+            } else if is_in_dict
+                && !ctx.is_primary_in_dict
+                && !ctx.has_explicit_casing
+                && !ctx.has_backtick
+            {
+                let input_starts_vowel = ctx
+                    .middle
+                    .starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
+                let cand_starts_vowel = cand
+                    .text
+                    .chars()
+                    .next()
+                    .is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
+                let dropped_initial_vowel =
+                    input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
 
                 let input_starts_a_o = ctx.middle.starts_with(['a', 'A', 'o', 'O']);
                 let cand_starts_e = cand.text.starts_with('এ');
-                let input_starts_a = ctx.middle.starts_with(['a', 'A']) && !ctx.middle.starts_with("aa") && !ctx.middle.starts_with("Aa");
+                let input_starts_a = ctx.middle.starts_with(['a', 'A'])
+                    && !ctx.middle.starts_with("aa")
+                    && !ctx.middle.starts_with("Aa");
                 let cand_starts_o = cand.text.starts_with('ও');
-                let vowel_mismatch = (input_starts_a_o && cand_starts_e) || (input_starts_a && cand_starts_o);
+                let vowel_mismatch =
+                    (input_starts_a_o && cand_starts_e) || (input_starts_a && cand_starts_o);
 
-                let input_ends_ey = ctx.middle.len() >= 5 && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
-                let dropped_ey_suffix = input_ends_ey && !cand.text.ends_with('ে') && !cand.text.ends_with('ই') && !cand.text.ends_with('য়');
+                let input_ends_ey = ctx.middle.len() >= 5
+                    && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
+                let dropped_ey_suffix = input_ends_ey
+                    && !cand.text.ends_with('ে')
+                    && !cand.text.ends_with('ই')
+                    && !cand.text.ends_with('য়');
                 let dropped_ke_suffix = ctx.has_ke_suffix_candidate && !cand.text.ends_with("কে");
 
-                let input_has_i = ctx.middle.contains(['i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']) || ctx.middle.contains("ee") || ctx.middle.contains("EE");
-                let cand_has_i = cand.text.contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
+                let input_has_i = ctx.middle.contains([
+                    'i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}',
+                ]) || ctx.middle.contains("ee")
+                    || ctx.middle.contains("EE");
+                let cand_has_i = cand
+                    .text
+                    .contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
                 let spurious_i = ctx.middle.len() >= 5 && !input_has_i && cand_has_i;
 
-                let input_has_u = ctx.middle.contains(['u', 'U', 'w', 'W', '\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']) || ctx.middle.contains("oo") || ctx.middle.contains("OO");
-                let cand_has_u = cand.text.contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
+                let input_has_u = ctx.middle.contains([
+                    'u', 'U', 'w', 'W', '\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}',
+                ]) || ctx.middle.contains("oo")
+                    || ctx.middle.contains("OO");
+                let cand_has_u = cand
+                    .text
+                    .contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
                 let spurious_u = ctx.middle.len() >= 5 && !input_has_u && cand_has_u;
 
-                if dropped_initial_vowel || dropped_ey_suffix || dropped_ke_suffix || vowel_mismatch || spurious_i || spurious_u {
+                if dropped_initial_vowel
+                    || dropped_ey_suffix
+                    || dropped_ke_suffix
+                    || vowel_mismatch
+                    || spurious_i
+                    || spurious_u
+                {
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
@@ -474,30 +508,64 @@ pub fn extract_candidate_features(
             if dist == 0 {
                 f.source_weight = 1.0;
                 f.phonetic_similarity = 1.0;
-            } else if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
-                let input_starts_vowel = ctx.middle.starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
-                let cand_starts_vowel = cand.text.chars().next().is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
-                let dropped_initial_vowel = input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
+            } else if is_in_dict
+                && !ctx.is_primary_in_dict
+                && !ctx.has_explicit_casing
+                && !ctx.has_backtick
+            {
+                let input_starts_vowel = ctx
+                    .middle
+                    .starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
+                let cand_starts_vowel = cand
+                    .text
+                    .chars()
+                    .next()
+                    .is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
+                let dropped_initial_vowel =
+                    input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
 
                 let input_starts_a_o = ctx.middle.starts_with(['a', 'A', 'o', 'O']);
                 let cand_starts_e = cand.text.starts_with('এ');
-                let input_starts_a = ctx.middle.starts_with(['a', 'A']) && !ctx.middle.starts_with("aa") && !ctx.middle.starts_with("Aa");
+                let input_starts_a = ctx.middle.starts_with(['a', 'A'])
+                    && !ctx.middle.starts_with("aa")
+                    && !ctx.middle.starts_with("Aa");
                 let cand_starts_o = cand.text.starts_with('ও');
-                let vowel_mismatch = (input_starts_a_o && cand_starts_e) || (input_starts_a && cand_starts_o);
+                let vowel_mismatch =
+                    (input_starts_a_o && cand_starts_e) || (input_starts_a && cand_starts_o);
 
-                let input_ends_ey = ctx.middle.len() >= 5 && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
-                let dropped_ey_suffix = input_ends_ey && !cand.text.ends_with('ে') && !cand.text.ends_with('ই') && !cand.text.ends_with('য়');
+                let input_ends_ey = ctx.middle.len() >= 5
+                    && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
+                let dropped_ey_suffix = input_ends_ey
+                    && !cand.text.ends_with('ে')
+                    && !cand.text.ends_with('ই')
+                    && !cand.text.ends_with('য়');
                 let dropped_ke_suffix = ctx.has_ke_suffix_candidate && !cand.text.ends_with("কে");
 
-                let input_has_i = ctx.middle.contains(['i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']) || ctx.middle.contains("ee") || ctx.middle.contains("EE");
-                let cand_has_i = cand.text.contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
+                let input_has_i = ctx.middle.contains([
+                    'i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}',
+                ]) || ctx.middle.contains("ee")
+                    || ctx.middle.contains("EE");
+                let cand_has_i = cand
+                    .text
+                    .contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
                 let spurious_i = ctx.middle.len() >= 5 && !input_has_i && cand_has_i;
 
-                let input_has_u = ctx.middle.contains(['u', 'U', 'w', 'W', '\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']) || ctx.middle.contains("oo") || ctx.middle.contains("OO");
-                let cand_has_u = cand.text.contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
+                let input_has_u = ctx.middle.contains([
+                    'u', 'U', 'w', 'W', '\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}',
+                ]) || ctx.middle.contains("oo")
+                    || ctx.middle.contains("OO");
+                let cand_has_u = cand
+                    .text
+                    .contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
                 let spurious_u = ctx.middle.len() >= 5 && !input_has_u && cand_has_u;
 
-                if dropped_initial_vowel || dropped_ey_suffix || dropped_ke_suffix || vowel_mismatch || spurious_i || spurious_u {
+                if dropped_initial_vowel
+                    || dropped_ey_suffix
+                    || dropped_ke_suffix
+                    || vowel_mismatch
+                    || spurious_i
+                    || spurious_u
+                {
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
@@ -539,7 +607,11 @@ pub fn extract_candidate_features(
                 - ctx.phonetic.chars().count() as isize)
                 .abs() as f32;
             f.length_penalty = -len_diff;
-            if is_in_dict && !ctx.is_primary_in_dict && !ctx.has_explicit_casing && !ctx.has_backtick {
+            if is_in_dict
+                && !ctx.is_primary_in_dict
+                && !ctx.has_explicit_casing
+                && !ctx.has_backtick
+            {
                 f.source_weight = 0.85;
                 f.phonetic_similarity = 0.80;
                 f.is_exact_phonetic = 0.85;
@@ -563,7 +635,9 @@ pub fn extract_candidate_features(
             if ctx.has_explicit_intent {
                 f.intent_modifier_boost -= 3.5;
             } else if cand.source == CandidateSource::FuzzySoundLaw {
-                let input_starts_a = ctx.middle.starts_with(['a', 'A']) && !ctx.middle.starts_with("aa") && !ctx.middle.starts_with("Aa");
+                let input_starts_a = ctx.middle.starts_with(['a', 'A'])
+                    && !ctx.middle.starts_with("aa")
+                    && !ctx.middle.starts_with("Aa");
                 let cand_starts_o = cand.text.starts_with('ও');
                 if input_starts_a && cand_starts_o {
                     f.source_weight = -0.60;

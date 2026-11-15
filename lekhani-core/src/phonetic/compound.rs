@@ -4,9 +4,9 @@
 //! অগ্রদূত, উপনিবেশবাদ, দেশপ্রেম, সমাজসেবা, রাজনীতি) fail because single-token transliteration
 //! misses multi-stem roots.
 
-use hashbrown::HashSet;
 use super::fuzzy::cuts_layout_digraph;
 use super::suggestion::PhoneticSuggestion;
+use hashbrown::HashSet;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompoundCandidate {
@@ -60,7 +60,7 @@ impl CompoundSplitter {
         let len = lower.len();
 
         // Compounds are typically 6 to 32 characters
-        if len < 6 || len > 32 || lower.contains(' ') {
+        if !(6..=32).contains(&len) || lower.contains(' ') {
             return Vec::new();
         }
 
@@ -103,26 +103,27 @@ impl CompoundSplitter {
 
                         // Terminal vowel congruence:
                         // If user typed '...i' (e.g. antorvukti), prefer stems ending in 'ি' over bare consonants
-                        let vowel_bonus = if stem_ro.ends_with('i') && stem.ends_with('ি') {
-                            400
-                        } else if stem_ro.ends_with('e') && stem.ends_with('ে') {
-                            400
-                        } else if stem_ro.ends_with('o') && stem.ends_with('ো') {
-                            400
-                        } else if stem_ro.ends_with('u') && (stem.ends_with('ু') || stem.ends_with('ূ')) {
+                        let vowel_bonus = if (stem_ro.ends_with('i') && stem.ends_with('ি'))
+                            || (stem_ro.ends_with('e') && stem.ends_with('ে'))
+                            || (stem_ro.ends_with('o') && stem.ends_with('ো'))
+                            || (stem_ro.ends_with('u')
+                                && (stem.ends_with('ু') || stem.ends_with('ূ')))
+                        {
                             400
                         } else {
                             0
                         };
 
                         // Reject autocomplete extensions that append extra semantic roots not in stem_ro
-                        let penalty = if stem.contains("যোগ্য") && !stem_ro.contains("jog") {
+                        let penalty = if stem.contains("যোগ্য") && !stem_ro.contains("jog")
+                        {
                             1000
                         } else {
                             0
                         };
 
-                        let score = 6500 + (freq.min(1000) as i32) + rank_score + vowel_bonus - penalty;
+                        let score =
+                            6500 + (freq.min(1000) as i32) + rank_score + vowel_bonus - penalty;
                         if seen.insert(compound.clone()) {
                             results.push(CompoundCandidate {
                                 word: compound,
@@ -184,7 +185,7 @@ impl CompoundSplitter {
         }
 
         // Sort descending by score
-        results.sort_by(|a, b| b.score.cmp(&a.score));
+        results.sort_by_key(|a| std::cmp::Reverse(a.score));
         results
     }
 
@@ -211,15 +212,15 @@ impl CompoundSplitter {
         }
 
         // initial o <-> a
-        if part.starts_with('o') {
-            let a_base = format!("a{}", &part[1..]);
+        if let Some(stripped) = part.strip_prefix('o') {
+            let a_base = format!("a{}", stripped);
             variants.push(a_base.clone());
             if a_base.contains("ri") {
                 variants.push(a_base.replace("ri", "rri"));
                 variants.push(a_base.replace("ri", "rF"));
             }
-        } else if part.starts_with('a') {
-            let o_base = format!("o{}", &part[1..]);
+        } else if let Some(stripped) = part.strip_prefix('a') {
+            let o_base = format!("o{}", stripped);
             variants.push(o_base.clone());
             if o_base.contains("ri") {
                 variants.push(o_base.replace("ri", "rri"));
@@ -242,8 +243,8 @@ impl CompoundSplitter {
                 variants.push(stripped.replace("ri", "rri"));
                 variants.push(stripped.replace("ri", "rF"));
             }
-            if stripped.starts_with('a') {
-                let o_s = format!("o{}", &stripped[1..]);
+            if let Some(s) = stripped.strip_prefix('a') {
+                let o_s = format!("o{}", s);
                 variants.push(o_s.clone());
                 if o_s.contains("ri") {
                     variants.push(o_s.replace("ri", "rri"));
@@ -281,4 +282,3 @@ impl CompoundSplitter {
         stems
     }
 }
-

@@ -673,7 +673,9 @@ impl PhoneticDatabase {
                 self.dictionary_path = Some(dict_path.clone());
                 self.dictionary_hash = Some(hash);
 
-                if let Ok(raw_map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&content) {
+                if let Ok(raw_map) =
+                    serde_json::from_str::<HashMap<String, serde_json::Value>>(&content)
+                {
                     let mut words = Vec::with_capacity(160000);
                     for val in raw_map.values() {
                         if let Some(list) = val.as_array() {
@@ -950,7 +952,12 @@ impl PhoneticDatabase {
     /// Suggests high-confidence phonetic equivalence candidates for unshifted/casual typing.
     /// Generates phoneme cluster sound laws, retroflex alternations (t <-> T, d <-> D), flap r, reph,
     /// and inherent vowel elisions, validated against the dictionary Trie and sorted by frequency.
-    pub fn suggest_phonetic_equivalences<F>(&self, input: &str, mut convert_fn: F, limit: usize) -> Vec<String>
+    pub fn suggest_phonetic_equivalences<F>(
+        &self,
+        input: &str,
+        mut convert_fn: F,
+        limit: usize,
+    ) -> Vec<String>
     where
         F: FnMut(&str) -> String,
     {
@@ -1063,9 +1070,11 @@ impl PhoneticDatabase {
         }
 
         // 6. Flap Rhotic 'r' -> 'R' (ড়)
-        let is_explicit_common_base = self.lookup_override(input).is_some() || self.lookup_override(&lower).is_some();
+        let is_explicit_common_base =
+            self.lookup_override(input).is_some() || self.lookup_override(&lower).is_some();
         let parser_base = convert_fn(&lower);
-        let is_exact_dict_base = !parser_base.is_empty() && (self.is_exact_dictionary_word(&parser_base) || is_explicit_common_base);
+        let is_exact_dict_base = !parser_base.is_empty()
+            && (self.is_exact_dictionary_word(&parser_base) || is_explicit_common_base);
         if lower.contains('r') {
             let r_indices: Vec<usize> = lower
                 .char_indices()
@@ -1140,7 +1149,12 @@ impl PhoneticDatabase {
                 }
             }
         }
-        if lower.len() >= 3 && (lower.ends_with("da") || lower.ends_with("to") || lower.ends_with("ta") || lower.ends_with("ti")) {
+        if lower.len() >= 3
+            && (lower.ends_with("da")
+                || lower.ends_with("to")
+                || lower.ends_with("ta")
+                || lower.ends_with("ti"))
+        {
             if lower.ends_with("da") {
                 let len = lower.len();
                 let mut with_d = lower.clone();
@@ -1219,7 +1233,9 @@ impl PhoneticDatabase {
             }
             let parsed = convert_fn(&k);
             if !parsed.is_empty()
-                && (self.trie.contains_exact(&parsed) || self.is_exact_dictionary_word(&parsed) || self.get_frequency(&parsed) > 0)
+                && (self.trie.contains_exact(&parsed)
+                    || self.is_exact_dictionary_word(&parsed)
+                    || self.get_frequency(&parsed) > 0)
                 && seen.insert(parsed.clone())
             {
                 let freq = self.get_frequency(&parsed);
@@ -1230,7 +1246,11 @@ impl PhoneticDatabase {
         // Sort by frequency descending
         scored_cands.sort_by_key(|a| std::cmp::Reverse(a.1));
 
-        scored_cands.into_iter().take(limit).map(|(w, _)| w).collect()
+        scored_cands
+            .into_iter()
+            .take(limit)
+            .map(|(w, _)| w)
+            .collect()
     }
 
     /// Bilingual loanwords for natural code-mixing (English -> Transliteration, English Word)

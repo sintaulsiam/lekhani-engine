@@ -190,7 +190,10 @@ impl PrefixTrie {
         if prefix.is_empty() {
             return true;
         }
-        let start_idx = match self.entries.binary_search_by(|e| self.word_at(e).cmp(prefix)) {
+        let start_idx = match self
+            .entries
+            .binary_search_by(|e| self.word_at(e).cmp(prefix))
+        {
             Ok(_) => return true,
             Err(idx) => idx,
         };

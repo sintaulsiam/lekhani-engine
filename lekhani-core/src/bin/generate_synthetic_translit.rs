@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Generate Scaled Synthetic Transliteration Dataset
 //!
 //! Generates 1M+ diverse, realistic Roman -> Bengali transliteration pairs from:
@@ -57,7 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        println!("   └─ Loaded {} test-set pairs into quarantine table.", quarantine_set.len());
+        println!(
+            "   └─ Loaded {} test-set pairs into quarantine table.",
+            quarantine_set.len()
+        );
     } else {
         println!("   └─ ⚠️ Test file not found; running without test quarantine.");
     }
@@ -65,7 +69,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output_pairs: HashSet<(String, String)> = HashSet::new();
 
     // 2. Ingest Gold Human Training Pairs
-    println!("\n2. Ingesting gold human training pairs from {:?}...", train_gold_path);
+    println!(
+        "\n2. Ingesting gold human training pairs from {:?}...",
+        train_gold_path
+    );
     if train_gold_path.exists() {
         let f = File::open(train_gold_path)?;
         let r = BufReader::new(f);
@@ -83,15 +90,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        println!("   └─ Ingested {} human gold pairs (post-quarantine).", gold_count);
+        println!(
+            "   └─ Ingested {} human gold pairs (post-quarantine).",
+            gold_count
+        );
     } else {
         println!("   └─ ⚠️ Gold train file not found!");
     }
 
     // 3. Generate Synthetic Transliteration from Expanded Vocabulary
-    println!("\n3. Generating synthetic permutations from {:?}...", vocab_path);
+    println!(
+        "\n3. Generating synthetic permutations from {:?}...",
+        vocab_path
+    );
     if !vocab_path.exists() {
-        eprintln!("❌ Fatal: {:?} not found! Run harvest_vocabulary first.", vocab_path);
+        eprintln!(
+            "❌ Fatal: {:?} not found! Run harvest_vocabulary first.",
+            vocab_path
+        );
         std::process::exit(1);
     }
 
@@ -181,9 +197,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("   ├─ Generated {} unique synthetic pairs.", synthetic_count);
-    println!("   ├─ Dropped {} pairs matching test quarantine table.", quarantined_drops);
-    println!("   └─ Combined total unique training pairs: {}", output_pairs.len());
+    println!(
+        "   ├─ Generated {} unique synthetic pairs.",
+        synthetic_count
+    );
+    println!(
+        "   ├─ Dropped {} pairs matching test quarantine table.",
+        quarantined_drops
+    );
+    println!(
+        "   └─ Combined total unique training pairs: {}",
+        output_pairs.len()
+    );
 
     // 4. Deterministically Sort and Write Dataset
     println!("\n4. Writing scaled dataset to {:?}...", out_path);
@@ -197,7 +222,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     writer.flush()?;
 
-    println!("   └─ ✓ Successfully wrote {} training pairs to {:?}", pairs_list.len(), out_path);
+    println!(
+        "   └─ ✓ Successfully wrote {} training pairs to {:?}",
+        pairs_list.len(),
+        out_path
+    );
     println!("\n══════════════════════════════════════════════════════════════════");
     println!("   🎉 Dataset Generation Complete!");
     println!("══════════════════════════════════════════════════════════════════");

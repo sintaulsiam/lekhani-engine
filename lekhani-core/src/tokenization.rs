@@ -84,10 +84,7 @@ fn is_bengali_consonant_char(c: char) -> bool {
 
 #[inline]
 fn is_bengali_kar(c: char) -> bool {
-    matches!(
-        c,
-        'া' | 'ি' | 'ী' | 'ু' | 'ূ' | 'ৃ' | 'ে' | 'ৈ' | 'ো' | 'ৌ'
-    )
+    matches!(c, 'া' | 'ি' | 'ী' | 'ু' | 'ূ' | 'ৃ' | 'ে' | 'ৈ' | 'ো' | 'ৌ')
 }
 
 #[inline]
@@ -115,7 +112,8 @@ pub fn tokenize_bengali(text: &str) -> Vec<BengaliToken> {
         let c = chars[i];
 
         // Composite independent vowel: অ/এ + ্ + য [+ া] (e.g. অ্যা in অ্যাসিড, অ্যাসোসিয়েশন)
-        if (c == 'অ' || c == 'এ') && i + 2 < n && chars[i + 1] == '\u{09CD}' && chars[i + 2] == 'য' {
+        if (c == 'অ' || c == 'এ') && i + 2 < n && chars[i + 1] == '\u{09CD}' && chars[i + 2] == 'য'
+        {
             let mut vow = String::with_capacity(8);
             vow.push(c);
             vow.push(chars[i + 1]);
@@ -130,7 +128,10 @@ pub fn tokenize_bengali(text: &str) -> Vec<BengaliToken> {
         }
 
         if is_bengali_independent_vowel(c) {
-            tokens.push(BengaliToken::new(BengaliTokenKind::IndependentVowel, c.to_string()));
+            tokens.push(BengaliToken::new(
+                BengaliTokenKind::IndependentVowel,
+                c.to_string(),
+            ));
             i += 1;
         } else if is_bengali_kar(c) {
             tokens.push(BengaliToken::new(BengaliTokenKind::VowelKar, c.to_string()));
@@ -139,7 +140,10 @@ pub fn tokenize_bengali(text: &str) -> Vec<BengaliToken> {
             tokens.push(BengaliToken::new(BengaliTokenKind::Modifier, c.to_string()));
             i += 1;
         } else if c == 'ৎ' {
-            tokens.push(BengaliToken::new(BengaliTokenKind::Consonant, c.to_string()));
+            tokens.push(BengaliToken::new(
+                BengaliTokenKind::Consonant,
+                c.to_string(),
+            ));
             i += 1;
         } else if is_bengali_consonant_char(c) {
             // Base consonant cluster (includes nukta if decomposed and hasanta chains)
@@ -189,9 +193,7 @@ const CONSONANT_DIGRAPHS: &[&str] = &[
     "chh", "kh", "gh", "ch", "th", "dh", "ph", "bh", "sh", "ng", "nj",
 ];
 
-const VOWEL_DIGRAPHS: &[&str] = &[
-    "aa", "ee", "oo", "oi", "ou", "ai", "au",
-];
+const VOWEL_DIGRAPHS: &[&str] = &["aa", "ee", "oo", "oi", "ou", "ai", "au"];
 
 /// Normalizes a Roman string by lowercasing and collapsing 3+ repeated letters to 2.
 pub fn normalize_roman(text: &str) -> String {
@@ -285,7 +287,10 @@ pub fn tokenize_roman_cased(text: &str) -> Vec<String> {
     while i < n {
         // 1. Try 3-char digraph ("chh", "Chh", etc.)
         if i + 3 <= n {
-            let sub_lower: String = chars[i..i + 3].iter().map(|c| c.to_ascii_lowercase()).collect();
+            let sub_lower: String = chars[i..i + 3]
+                .iter()
+                .map(|c| c.to_ascii_lowercase())
+                .collect();
             if CONSONANT_DIGRAPHS.contains(&sub_lower.as_str()) {
                 let token: String = chars[i..i + 3].iter().collect();
                 tokens.push(token);
@@ -296,11 +301,14 @@ pub fn tokenize_roman_cased(text: &str) -> Vec<String> {
 
         // 2. Try 2-char digraphs or doubled consonants
         if i + 2 <= n {
-            let sub_lower: String = chars[i..i + 2].iter().map(|c| c.to_ascii_lowercase()).collect();
+            let sub_lower: String = chars[i..i + 2]
+                .iter()
+                .map(|c| c.to_ascii_lowercase())
+                .collect();
             let is_digraph = CONSONANT_DIGRAPHS.contains(&sub_lower.as_str())
                 || VOWEL_DIGRAPHS.contains(&sub_lower.as_str());
-            let is_doubled = chars[i].eq_ignore_ascii_case(&chars[i + 1])
-                && chars[i].is_ascii_alphabetic();
+            let is_doubled =
+                chars[i].eq_ignore_ascii_case(&chars[i + 1]) && chars[i].is_ascii_alphabetic();
 
             if is_digraph || is_doubled {
                 let token: String = chars[i..i + 2].iter().collect();
@@ -510,10 +518,7 @@ pub fn is_authorized_multi_token_unit(roman: &str, bengali_tokens: &[BengaliToke
 /// 2. Consonant deletion to ε is forbidden (only Roman vowel tokens may delete to ε).
 /// 3. A conjunct (CONJ) is an atomic token; it is never split.
 /// 4. Default ratio is 1:1, 1:0 (vowel deletion only), 0:1 (insertion). Multi-token units must match whitelist.
-pub fn is_valid_translation_unit(
-    roman_tokens: &[String],
-    bengali_tokens: &[BengaliToken],
-) -> bool {
+pub fn is_valid_translation_unit(roman_tokens: &[String], bengali_tokens: &[BengaliToken]) -> bool {
     // Null-null mapping is invalid
     if roman_tokens.is_empty() && bengali_tokens.is_empty() {
         return false;

@@ -252,7 +252,12 @@ pub fn decode_beam_ngram(
         }
         step_matches.push(matches_at_pos);
     }
-    let empty_r_units = lm.vocab.roman_to_units.get("").map(|v| v.as_slice()).unwrap_or(&[]);
+    let empty_r_units = lm
+        .vocab
+        .roman_to_units
+        .get("")
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
 
     let initial_hist = vec![BOS_TOKEN; lm.order - 1];
     let mut beam = vec![BeamCandidate {
@@ -555,15 +560,23 @@ impl PragyanEngine {
                         } else if p_dict_json.exists() {
                             if let Ok(file) = std::fs::File::open(&p_dict_json) {
                                 let reader = std::io::BufReader::new(file);
-                                if let Ok(raw_map) = serde_json::from_reader::<_, hashbrown::HashMap<String, serde_json::Value>>(reader) {
+                                if let Ok(raw_map) = serde_json::from_reader::<
+                                    _,
+                                    hashbrown::HashMap<String, serde_json::Value>,
+                                >(reader)
+                                {
                                     for val in raw_map.values() {
                                         if let Some(list) = val.as_array() {
                                             for item in list {
                                                 if let Some(s) = item.as_str() {
-                                                    dict_words.insert(crate::chars::canonicalize(s));
+                                                    dict_words
+                                                        .insert(crate::chars::canonicalize(s));
                                                 } else if let Some(arr) = item.as_array() {
-                                                    if let Some(s) = arr.first().and_then(|v| v.as_str()) {
-                                                        dict_words.insert(crate::chars::canonicalize(s));
+                                                    if let Some(s) =
+                                                        arr.first().and_then(|v| v.as_str())
+                                                    {
+                                                        dict_words
+                                                            .insert(crate::chars::canonicalize(s));
                                                     }
                                                 }
                                             }
@@ -579,11 +592,8 @@ impl PragyanEngine {
                             .iter()
                             .map(|w| phonetic_equivalence_key(w))
                             .collect();
-                        let engine = Self::new(
-                            Arc::new(lm),
-                            Arc::new(dict_words),
-                            Arc::new(dict_keys),
-                        );
+                        let engine =
+                            Self::new(Arc::new(lm), Arc::new(dict_words), Arc::new(dict_keys));
                         return Some(Arc::new(engine));
                     }
                 }
@@ -663,8 +673,14 @@ mod tests {
 
     #[test]
     fn test_phonetic_equivalence_key() {
-        assert_eq!(phonetic_equivalence_key("শান্তি"), phonetic_equivalence_key("সান্তি"));
-        assert_eq!(phonetic_equivalence_key("পানি"), phonetic_equivalence_key("পাণী"));
+        assert_eq!(
+            phonetic_equivalence_key("শান্তি"),
+            phonetic_equivalence_key("সান্তি")
+        );
+        assert_eq!(
+            phonetic_equivalence_key("পানি"),
+            phonetic_equivalence_key("পাণী")
+        );
     }
 
     #[test]
@@ -677,7 +693,9 @@ mod tests {
         let model_path = match model_candidates.iter().find(|p| p.exists()) {
             Some(p) => *p,
             None => {
-                eprintln!("Skipping test_pragyan_production_model_suggest: pragyan_unit_lm.bin not found");
+                eprintln!(
+                    "Skipping test_pragyan_production_model_suggest: pragyan_unit_lm.bin not found"
+                );
                 return;
             }
         };
@@ -702,11 +720,17 @@ mod tests {
 
         let cands_shonge = engine.suggest("shonge", ShiftOrigin::AutoCapitalize);
         assert!(!cands_shonge.is_empty(), "shonge should produce candidates");
-        assert!(cands_shonge.contains(&"সঙ্গে".to_string()), "shonge should contain সঙ্গে");
+        assert!(
+            cands_shonge.contains(&"সঙ্গে".to_string()),
+            "shonge should contain সঙ্গে"
+        );
 
         let cands_kosto = engine.suggest("kosto", ShiftOrigin::AutoCapitalize);
         assert!(!cands_kosto.is_empty(), "kosto should produce candidates");
-        assert!(cands_kosto.contains(&"কষ্ট".to_string()), "kosto should contain কষ্ট");
+        assert!(
+            cands_kosto.contains(&"কষ্ট".to_string()),
+            "kosto should contain কষ্ট"
+        );
     }
 
     #[test]

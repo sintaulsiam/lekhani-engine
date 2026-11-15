@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Lekhani Multi-Persona Transliteration Evaluation Harness & Regression Gate
 //!
 //! Evaluates the phonetic transliteration engine across 6 standardized personas:
@@ -688,11 +689,16 @@ fn evaluate_split(
             }
             2 => {
                 // 3. Vowel-Dropped p=0.30
-                println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.30]...", split_name);
+                println!(
+                    "  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.30]...",
+                    split_name
+                );
                 let mut rng_p30 = SimpleRng::new(seed + 30);
                 let vdrop_p30_cases: Vec<(String, String)> = raw_pairs
                     .iter()
-                    .map(|(bn, latin)| (transform_vowel_drop(latin, 0.30, &mut rng_p30), bn.clone()))
+                    .map(|(bn, latin)| {
+                        (transform_vowel_drop(latin, 0.30, &mut rng_p30), bn.clone())
+                    })
                     .collect();
                 let vdrop_p30_metrics = evaluate_persona(
                     split_name,
@@ -708,11 +714,16 @@ fn evaluate_split(
             }
             3 => {
                 // 4. Vowel-Dropped p=0.60
-                println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.60]...", split_name);
+                println!(
+                    "  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.60]...",
+                    split_name
+                );
                 let mut rng_p60 = SimpleRng::new(seed + 60);
                 let vdrop_p60_cases: Vec<(String, String)> = raw_pairs
                     .iter()
-                    .map(|(bn, latin)| (transform_vowel_drop(latin, 0.60, &mut rng_p60), bn.clone()))
+                    .map(|(bn, latin)| {
+                        (transform_vowel_drop(latin, 0.60, &mut rng_p60), bn.clone())
+                    })
                     .collect();
                 let vdrop_p60_metrics = evaluate_persona(
                     split_name,
@@ -728,11 +739,16 @@ fn evaluate_split(
             }
             4 => {
                 // 5. Vowel-Dropped p=0.90
-                println!("  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.90]...", split_name);
+                println!(
+                    "  ▶️  Evaluating [{}] - [Vowel-Dropped p=0.90]...",
+                    split_name
+                );
                 let mut rng_p90 = SimpleRng::new(seed + 90);
                 let vdrop_p90_cases: Vec<(String, String)> = raw_pairs
                     .iter()
-                    .map(|(bn, latin)| (transform_vowel_drop(latin, 0.90, &mut rng_p90), bn.clone()))
+                    .map(|(bn, latin)| {
+                        (transform_vowel_drop(latin, 0.90, &mut rng_p90), bn.clone())
+                    })
                     .collect();
                 let vdrop_p90_metrics = evaluate_persona(
                     split_name,
@@ -784,7 +800,10 @@ fn evaluate_split(
 }
 
 fn print_split_table(title: &str, report: &SplitReport) {
-    println!("\n📊 {} (N = {}, Unique Targets = {}, Raw Avro Top-1 = {:.2}%):", title, report.n, report.unique_targets, report.raw_avro_top1);
+    println!(
+        "\n📊 {} (N = {}, Unique Targets = {}, Raw Avro Top-1 = {:.2}%):",
+        title, report.n, report.unique_targets, report.raw_avro_top1
+    );
     println!("───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
     println!(
         "{:<17} {:>6} {:>17} {:>10} {:>10} {:>8} {:>9} {:>9} {:>13} {:>11}",
@@ -864,7 +883,11 @@ fn main() {
 
     let json_path = dict_path.with_file_name("dictionary.json");
     let dict_words = load_dict_words(&json_path);
-    println!("Loaded {} canonical dictionary entries from {}.\n", dict_words.len(), json_path.display());
+    println!(
+        "Loaded {} canonical dictionary entries from {}.\n",
+        dict_words.len(),
+        json_path.display()
+    );
     let benchmark_runs = args
         .iter()
         .position(|a| a == "--benchmark-latency")
@@ -879,12 +902,17 @@ fn main() {
 
     if let Some(num_runs) = benchmark_runs {
         println!("══════════════════════════════════════════════════════════════════════════════════════════════════");
-        println!("   ⏱️  QUIET-MACHINE LATENCY BENCHMARK ({} RUNS ON HELD-OUT DEV)", num_runs);
+        println!(
+            "   ⏱️  QUIET-MACHINE LATENCY BENCHMARK ({} RUNS ON HELD-OUT DEV)",
+            num_runs
+        );
         println!("══════════════════════════════════════════════════════════════════════════════════════════════════\n");
 
         let (dev_rows, dev_gold, _) = load_split_data("dev");
-        let dev_pairs: Vec<(String, String)> =
-            dev_rows.into_iter().map(|r| (r.bn_target, r.latin)).collect();
+        let dev_pairs: Vec<(String, String)> = dev_rows
+            .into_iter()
+            .map(|r| (r.bn_target, r.latin))
+            .collect();
 
         let personas = [
             "avro_strict",
@@ -905,7 +933,10 @@ fn main() {
         }
 
         for run_idx in 1..=num_runs {
-            println!("▶️  Executing Run {} / {} on idle system...", run_idx, num_runs);
+            println!(
+                "▶️  Executing Run {} / {} on idle system...",
+                run_idx, num_runs
+            );
             std::thread::sleep(std::time::Duration::from_millis(500));
             let mut wc = Vec::new();
             let report = evaluate_split(
@@ -928,7 +959,10 @@ fn main() {
         }
 
         println!("\n══════════════════════════════════════════════════════════════════════════════════════════════════");
-        println!("   📊 QUIET-MACHINE LATENCY DISTRIBUTIONS (N = {} Runs, DEV 9,279 rows)", num_runs);
+        println!(
+            "   📊 QUIET-MACHINE LATENCY DISTRIBUTIONS (N = {} Runs, DEV 9,279 rows)",
+            num_runs
+        );
         println!("══════════════════════════════════════════════════════════════════════════════════════════════════");
         println!("| Persona | Median p50 (µs) | Median p95 (µs) | Median p99 (µs) | p95 Spread [Min, Max] (µs) | All Run p95s (µs) |");
         println!("|:---|:---:|:---:|:---:|:---:|:---|");
@@ -1019,7 +1053,10 @@ fn main() {
                         serde_json::to_string_pretty(&base_json).unwrap(),
                     )
                     .expect("Failed to update baseline.json with quiet-machine medians");
-                    println!("💾 Restored quiet-machine median latencies in {:?}", baseline_path);
+                    println!(
+                        "💾 Restored quiet-machine median latencies in {:?}",
+                        baseline_path
+                    );
                 }
             }
         }
@@ -1031,9 +1068,20 @@ fn main() {
     // ── DEV SPLIT EVALUATION ──────────────────────────────────────────────
     println!("▶️  Loading and Evaluating Held-Out DEV split...");
     let (dev_rows, dev_gold, dev_path) = load_split_data("dev");
-    let dev_pairs: Vec<(String, String)> = dev_rows.into_iter().map(|r| (r.bn_target, r.latin)).collect();
+    let dev_pairs: Vec<(String, String)> = dev_rows
+        .into_iter()
+        .map(|r| (r.bn_target, r.latin))
+        .collect();
     println!("Loaded {} dev pairs from {:?}", dev_pairs.len(), dev_path);
-    let dev_report = evaluate_split("dev", &dev_pairs, &dev_gold, &dict_words, &mut sugg, seed, &mut all_worst_cases);
+    let dev_report = evaluate_split(
+        "dev",
+        &dev_pairs,
+        &dev_gold,
+        &dict_words,
+        &mut sugg,
+        seed,
+        &mut all_worst_cases,
+    );
 
     let dev_only = args.iter().any(|a| a == "--dev-only");
     let update_baseline = args.iter().any(|a| a == "--update-baseline");
@@ -1046,7 +1094,9 @@ fn main() {
         let now = chrono::Utc::now().to_rfc3339();
         let log_entry = format!(
             "{} | SHA: {} | Multi-persona test run; dict: {}\n",
-            now, git_sha, dict_path.display()
+            now,
+            git_sha,
+            dict_path.display()
         );
         if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open(log_path) {
             use std::io::Write;
@@ -1056,9 +1106,24 @@ fn main() {
         // ── TEST SPLIT EVALUATION ─────────────────────────────────────────────
         println!("\n▶️  Loading and Evaluating Held-Out TEST split...");
         let (test_rows, test_gold, test_path) = load_split_data("test");
-        let test_pairs: Vec<(String, String)> = test_rows.into_iter().map(|r| (r.bn_target, r.latin)).collect();
-        println!("Loaded {} test pairs from {:?}", test_pairs.len(), test_path);
-        let test_report = evaluate_split("test", &test_pairs, &test_gold, &dict_words, &mut sugg, seed + 100, &mut all_worst_cases);
+        let test_pairs: Vec<(String, String)> = test_rows
+            .into_iter()
+            .map(|r| (r.bn_target, r.latin))
+            .collect();
+        println!(
+            "Loaded {} test pairs from {:?}",
+            test_pairs.len(),
+            test_path
+        );
+        let test_report = evaluate_split(
+            "test",
+            &test_pairs,
+            &test_gold,
+            &dict_words,
+            &mut sugg,
+            seed + 100,
+            &mut all_worst_cases,
+        );
 
         print_split_table("TEST SET EVALUATION SUMMARY", &test_report);
 

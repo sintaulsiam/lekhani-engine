@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Lekhani Language Model Sanitizer & Vocabulary Enrichment CLI
 //!
 //! Prunes crawl artifacts, Wikipedia citation tags, and unsegmented garbage

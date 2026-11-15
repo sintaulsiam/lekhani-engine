@@ -144,7 +144,11 @@ impl FixedMethod {
                     || MARKS.contains(rmc)
                     || rmc.is_ascii_punctuation();
 
-                if self.auto_vowel && (is_word_break || !rmc.is_pure_consonant()) && rmc != B_HASANTA && rmc != B_CHANDRA {
+                if self.auto_vowel
+                    && (is_word_break || !rmc.is_pure_consonant())
+                    && rmc != B_HASANTA
+                    && rmc != B_CHANDRA
+                {
                     match first_char {
                         B_AA_KAR => self.buffer.push(B_AA),
                         B_I_KAR => self.buffer.push(B_I),

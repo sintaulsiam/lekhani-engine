@@ -167,7 +167,10 @@ fn probe_pragyan_engine() -> Option<Arc<crate::phonetic::pragyan::PragyanEngine>
     crate::phonetic::pragyan::PragyanEngine::probe()
 }
 
-fn probe_seq2seq() -> Option<(Arc<lekhani_neural::Seq2SeqTransliterator>, lekhani_neural::InferenceScratch)> {
+fn probe_seq2seq() -> Option<(
+    Arc<lekhani_neural::Seq2SeqTransliterator>,
+    lekhani_neural::InferenceScratch,
+)> {
     let mut candidate_dirs: Vec<std::path::PathBuf> = Vec::new();
     if let Ok(env_dir) = std::env::var("LEKHANI_MODELS_DIR") {
         candidate_dirs.push(std::path::PathBuf::from(env_dir));
@@ -468,7 +471,10 @@ impl PhoneticSuggestion {
     pub fn parse_lps(
         &self,
         text: &str,
-    ) -> (Vec<lekhani_parser::lps::LpsCandidate>, Vec<lekhani_parser::lps::LpsWarning>) {
+    ) -> (
+        Vec<lekhani_parser::lps::LpsCandidate>,
+        Vec<lekhani_parser::lps::LpsWarning>,
+    ) {
         lekhani_parser::lps::LpsEngine::new().parse(text)
     }
 
@@ -834,7 +840,9 @@ impl PhoneticSuggestion {
                 {
                     if let Some(existing) = raw_candidates.iter_mut().find(|c| c.text == text) {
                         let can_upgrade = match source {
-                            CandidateSource::Autocorrect | CandidateSource::PhoneticOverride => true,
+                            CandidateSource::Autocorrect | CandidateSource::PhoneticOverride => {
+                                true
+                            }
                             _ => matches!(
                                 existing.source,
                                 CandidateSource::DirectTransliteration
@@ -845,11 +853,13 @@ impl PhoneticSuggestion {
                             ),
                         };
                         if can_upgrade {
-                            if matches!(source, CandidateSource::Autocorrect | CandidateSource::PhoneticOverride)
-                                || (source == CandidateSource::MorphologicalInflection
-                                    && (existing.source == CandidateSource::PragyanBeam
-                                        || existing.source == CandidateSource::NeuralTransducer
-                                        || existing.source == CandidateSource::FuzzySoundLaw))
+                            if matches!(
+                                source,
+                                CandidateSource::Autocorrect | CandidateSource::PhoneticOverride
+                            ) || (source == CandidateSource::MorphologicalInflection
+                                && (existing.source == CandidateSource::PragyanBeam
+                                    || existing.source == CandidateSource::NeuralTransducer
+                                    || existing.source == CandidateSource::FuzzySoundLaw))
                             {
                                 existing.source = source;
                                 existing.initial_boost = existing.initial_boost.max(initial_boost);
@@ -873,8 +883,7 @@ impl PhoneticSuggestion {
                 && !self.database.is_exact_dictionary_word(&phonetic)
                 && !is_atomic_cv_syllable(&phonetic)
         } else if is_tech_acronym {
-            !self.database.is_exact_dictionary_word(&phonetic)
-                && !is_atomic_cv_syllable(&phonetic)
+            !self.database.is_exact_dictionary_word(&phonetic) && !is_atomic_cv_syllable(&phonetic)
         } else {
             false
         };
@@ -891,7 +900,8 @@ impl PhoneticSuggestion {
         // 3a. Pragyan Statistical Phonetic Decoding (Mode 2: Smart Adaptive)
         if !self.config.strict_avro_mode && self.config.enable_pragyan && !is_code {
             if let Some(ref engine) = self.pragyan_engine {
-                let pragyan_cands = engine.suggest(middle, crate::session::ShiftOrigin::AutoCapitalize);
+                let pragyan_cands =
+                    engine.suggest(middle, crate::session::ShiftOrigin::AutoCapitalize);
                 for (idx, cand) in pragyan_cands.into_iter().take(4).enumerate() {
                     let boost = 5500 - (idx as i32 * 300);
                     if cand.ends_with('ও') && cand.chars().count() >= 4 {
@@ -1126,7 +1136,11 @@ impl PhoneticSuggestion {
                 } else {
                     false
                 };
-                let boost = if is_bengali_tech_collocation { 15000 } else { 6500 };
+                let boost = if is_bengali_tech_collocation {
+                    15000
+                } else {
+                    6500
+                };
                 add_cand(
                     bn_loan.to_string(),
                     CandidateSource::Loanword,
@@ -1253,7 +1267,8 @@ impl PhoneticSuggestion {
 
         // 4b. Generalized Bilingual Light-Verb & State Agreement (LVC Syntax: Foreign Noun + Light Verb)
         if let Some(&last_ctx) = context.last() {
-            let is_foreign_or_loan = (last_ctx.len() >= 2 && last_ctx.chars().all(|c| c.is_ascii_alphabetic()))
+            let is_foreign_or_loan = (last_ctx.len() >= 2
+                && last_ctx.chars().all(|c| c.is_ascii_alphabetic()))
                 || PhoneticDatabase::get_bilingual_loanword(last_ctx).is_some();
             if is_foreign_or_loan {
                 let middle_lower = middle.to_lowercase();
@@ -1377,13 +1392,16 @@ impl PhoneticSuggestion {
         };
 
         let learner_fav = self.database.learner.try_read().ok().and_then(|l| {
-            l.candidate_memory.get(term).cloned()
+            l.candidate_memory
+                .get(term)
+                .cloned()
                 .or_else(|| l.candidate_memory.get(middle).cloned())
         });
         let preferred_word = if let Some(fav) = candidate_memory
             .get(term)
             .or_else(|| candidate_memory.get(middle))
-            .or_else(|| learner_fav.as_ref()) {
+            .or(learner_fav.as_ref())
+        {
             Some(fav.clone())
         } else if is_tech_collocation
             && preferred_loanword
@@ -1450,7 +1468,8 @@ impl PhoneticSuggestion {
                 &mut seen,
             );
             Some(verbal_word)
-        } else if let Some((dialect_hyp, compound_hyp)) = if self.config.enable_colloquial_dialects {
+        } else if let Some((dialect_hyp, compound_hyp)) = if self.config.enable_colloquial_dialects
+        {
             let resolve_stem = |stem: &str| -> Option<String> {
                 let conv = if let Some(ref p) = self.phonetic_parser {
                     p.convert(stem)
@@ -1578,8 +1597,8 @@ impl PhoneticSuggestion {
         let primary_raw = preferred_word.as_deref().unwrap_or(&phonetic);
         let primary_norm = fix_chandra_bindu_position(primary_raw);
         let primary = primary_norm.as_str();
-        let is_primary_in_dict = self.database.is_exact_dictionary_word(primary)
-            || preferred_word.is_some();
+        let is_primary_in_dict =
+            self.database.is_exact_dictionary_word(primary) || preferred_word.is_some();
 
         // 7. Direct Transliterations
         let has_double_consonant = middle.contains("cc")
@@ -1861,7 +1880,12 @@ impl PhoneticSuggestion {
                     expanded.push(format!("a{}", &peeled[1..]));
                 }
             }
-            if middle.len() >= 5 && (middle.ends_with("ita") || middle.ends_with("pta") || middle.ends_with("kta") || middle.ends_with("dha")) {
+            if middle.len() >= 5
+                && (middle.ends_with("ita")
+                    || middle.ends_with("pta")
+                    || middle.ends_with("kta")
+                    || middle.ends_with("dha"))
+            {
                 let peeled = &middle[..middle.len() - 1];
                 expanded.push(peeled.to_string());
             }
@@ -2043,11 +2067,10 @@ impl PhoneticSuggestion {
             }
 
             // 10c. Curated Phonetic Equivalences & Sound Laws (Reph doubling, retroflex stops, geminates)
-            for eq_cand in self.database.suggest_phonetic_equivalences(
-                middle,
-                |k| self.convert_phonetic(k),
-                8,
-            ) {
+            for eq_cand in
+                self.database
+                    .suggest_phonetic_equivalences(middle, |k| self.convert_phonetic(k), 8)
+            {
                 if !valid_fuzzy_stems.contains(&eq_cand) {
                     valid_fuzzy_stems.push(eq_cand.clone());
                 }
@@ -2100,10 +2123,10 @@ impl PhoneticSuggestion {
                                 typo_matches.push(w_str);
                             }
                         }
-                    } else if let Some(ac) = self.database.get_autocorrect_raw_filtered(
-                        qv,
-                        self.config.enable_banglish_shorthand,
-                    ) {
+                    } else if let Some(ac) = self
+                        .database
+                        .get_autocorrect_raw_filtered(qv, self.config.enable_banglish_shorthand)
+                    {
                         let ac_str = if ac.chars().any(|c| c.is_bengali()) {
                             ac
                         } else {
@@ -2364,17 +2387,15 @@ impl PhoneticSuggestion {
             .map(|l| l.rank_weights)
             .unwrap_or_default();
 
-        let flat_context: Vec<&str> = context
-            .iter()
-            .flat_map(|s| s.split_whitespace())
-            .collect();
+        let flat_context: Vec<&str> = context.iter().flat_map(|s| s.split_whitespace()).collect();
 
         let prev = if self.config.ai_profile != AiProfile::Off && !flat_context.is_empty() {
             flat_context.last().copied()
         } else {
             None
         };
-        let prev_prev = if self.config.ai_profile == AiProfile::Balanced && flat_context.len() >= 2 {
+        let prev_prev = if self.config.ai_profile == AiProfile::Balanced && flat_context.len() >= 2
+        {
             flat_context.get(flat_context.len() - 2).copied()
         } else {
             None
@@ -2671,11 +2692,15 @@ impl PhoneticSuggestion {
                     let is_memory_or_ac = candidate_memory.get(term).is_some()
                         || candidate_memory.get(middle).is_some()
                         || learner_guard.as_ref().is_some_and(|l| {
-                            l.candidate_memory.contains_key(term) || l.candidate_memory.contains_key(middle)
+                            l.candidate_memory.contains_key(term)
+                                || l.candidate_memory.contains_key(middle)
                         })
                         || self
                             .database
-                            .get_autocorrect_raw_filtered(middle, self.config.enable_banglish_shorthand)
+                            .get_autocorrect_raw_filtered(
+                                middle,
+                                self.config.enable_banglish_shorthand,
+                            )
                             .is_some()
                         || preferred_override.as_ref().is_some_and(|o| o == pref)
                         || preferred_loanword.as_ref().is_some_and(|l| l == pref);
@@ -2692,14 +2717,16 @@ impl PhoneticSuggestion {
         // Explicit verbal inflection fidelity: If the user explicitly typed an inflection ending in
         // 'cho', prioritize the 'ো'-inflected form over un-inflected dictionary stems
         // (e.g. korcho->করছো), and purge nonsensical trailing 'বও' / 'ছও' artifacts.
-        let is_explicit_o_ending = (middle.ends_with("bo") || (middle.ends_with("cho") && middle != "accho"))
+        let is_explicit_o_ending = (middle.ends_with("bo")
+            || (middle.ends_with("cho") && middle != "accho"))
             && !middle.contains('`');
         if is_explicit_o_ending {
             scored_candidates.retain(|(t, _, _)| !t.ends_with("বও") && !t.ends_with("ছও"));
             if middle.ends_with("cho") && preferred_override.is_none() {
                 if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| {
                     t.ends_with('ো')
-                        && (self.database.is_exact_dictionary_word(t) || self.database.trie.contains_exact(t))
+                        && (self.database.is_exact_dictionary_word(t)
+                            || self.database.trie.contains_exact(t))
                 }) {
                     if pos > 0 {
                         let o_cand = scored_candidates.remove(pos);
@@ -2725,7 +2752,10 @@ impl PhoneticSuggestion {
             } else if lekhani_ai::AnvayaAgreementEngine::is_honorific_shift(typed_verb, conc) {
                 // Genuine honorific register clash (e.g. 'aso' [Familiar] after 'আপনি' [Formal]):
                 // Slot 0 strictly retains typed verb; concordant verb sits at Slot 1.
-                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == typed_verb) {
+                if let Some(pos) = scored_candidates
+                    .iter()
+                    .position(|(t, _, _)| t == typed_verb)
+                {
                     if pos != 0 {
                         let item = scored_candidates.remove(pos);
                         scored_candidates.insert(0, item);
@@ -2779,84 +2809,104 @@ impl PhoneticSuggestion {
             if let Some(prefix_len) = top_cand_vowel_prefix {
                 let top_cand = scored_candidates[0].0.clone();
                 let tail = &top_cand[prefix_len..];
-            let o_equivalent = format!("অ{}", tail);
+                let o_equivalent = format!("অ{}", tail);
 
-            let o_pos = scored_candidates.iter().position(|(t, _, _)| t == &o_equivalent);
-            let o_in_dict = self.database.is_exact_dictionary_word(&o_equivalent)
-                || self.database.trie.contains_exact(&o_equivalent);
-            let top_in_dict = self.database.is_exact_dictionary_word(&top_cand)
-                || self.database.trie.contains_exact(&top_cand)
-                || (top_cand.ends_with('ও')
-                    && self
-                        .database
-                        .is_exact_dictionary_word(&top_cand[..top_cand.len() - 'ও'.len_utf8()]));
+                let o_pos = scored_candidates
+                    .iter()
+                    .position(|(t, _, _)| t == &o_equivalent);
+                let o_in_dict = self.database.is_exact_dictionary_word(&o_equivalent)
+                    || self.database.trie.contains_exact(&o_equivalent);
+                let top_in_dict = self.database.is_exact_dictionary_word(&top_cand)
+                    || self.database.trie.contains_exact(&top_cand)
+                    || (top_cand.ends_with('ও')
+                        && self.database.is_exact_dictionary_word(
+                            &top_cand[..top_cand.len() - 'ও'.len_utf8()],
+                        ));
 
-            let should_promote_o = if !top_in_dict && o_in_dict {
-                true
-            } else if top_in_dict && o_in_dict {
-                let prev1 = context.last().copied();
-                let prev2 = if context.len() >= 2 { Some(context[context.len() - 2]) } else { None };
-                let prev3 = if context.len() >= 3 { Some(context[context.len() - 3]) } else { None };
-
-                let score_top = self.ai_context.lm().score_candidate_fourgram(prev3, prev2, prev1, &top_cand);
-                let score_o = self.ai_context.lm().score_candidate_fourgram(prev3, prev2, prev1, &o_equivalent);
-
-                if (score_o - score_top).abs() < 1e-4 {
-                    let freq_o = self.database.get_frequency(&o_equivalent);
-                    let freq_top = self.database.get_frequency(&top_cand);
-                    freq_o >= (freq_top as f32 * 1.5) as u32 || (freq_top == 0 && freq_o > 0)
-                } else {
-                    score_o > score_top
-                }
-            } else {
-                false
-            };
-
-            if should_promote_o {
-                if let Some(pos) = o_pos {
-                    if pos > 0 {
-                        let item = scored_candidates.remove(pos);
-                        scored_candidates.insert(0, item);
-                    }
-                } else if o_in_dict {
-                    let freq = self.database.get_frequency(&o_equivalent);
-                    let per_cand_ctx = CandidateContext {
-                        lm_score: None,
-                        user_bigram_boost: 0,
-                        is_user_favored: false,
-                        is_user_learned: false,
-                        context_lm_score: None,
-                        gru_log_prob: None,
-                        ..candidate_ctx
+                let should_promote_o = if !top_in_dict && o_in_dict {
+                    true
+                } else if top_in_dict && o_in_dict {
+                    let prev1 = context.last().copied();
+                    let prev2 = if context.len() >= 2 {
+                        Some(context[context.len() - 2])
+                    } else {
+                        None
                     };
-                    let features = extract_candidate_features(
-                        &CandidateHypothesis {
-                            text: o_equivalent.clone(),
-                            source: CandidateSource::ExactDictionary,
-                            initial_boost: 4200,
-                        },
-                        true,
-                        freq,
-                        true,
-                        &per_cand_ctx,
-                        false,
+                    let prev3 = if context.len() >= 3 {
+                        Some(context[context.len() - 3])
+                    } else {
+                        None
+                    };
+
+                    let score_top = self
+                        .ai_context
+                        .lm()
+                        .score_candidate_fourgram(prev3, prev2, prev1, &top_cand);
+                    let score_o = self.ai_context.lm().score_candidate_fourgram(
+                        prev3,
+                        prev2,
+                        prev1,
+                        &o_equivalent,
                     );
-                    let score = 4200 + weights.compute_score(&features);
-                    scored_candidates.insert(0, (o_equivalent, score, features));
-                }
-            } else if !top_in_dict {
-                // If top candidate is unverified non-dictionary text, see if any candidate starting with 'অ' is in dict
-                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| {
-                    t.starts_with('অ') && (self.database.is_exact_dictionary_word(t) || self.database.trie.contains_exact(t))
-                }) {
-                    if pos > 0 {
-                        let item = scored_candidates.remove(pos);
-                        scored_candidates.insert(0, item);
+
+                    if (score_o - score_top).abs() < 1e-4 {
+                        let freq_o = self.database.get_frequency(&o_equivalent);
+                        let freq_top = self.database.get_frequency(&top_cand);
+                        freq_o >= (freq_top as f32 * 1.5) as u32 || (freq_top == 0 && freq_o > 0)
+                    } else {
+                        score_o > score_top
+                    }
+                } else {
+                    false
+                };
+
+                if should_promote_o {
+                    if let Some(pos) = o_pos {
+                        if pos > 0 {
+                            let item = scored_candidates.remove(pos);
+                            scored_candidates.insert(0, item);
+                        }
+                    } else if o_in_dict {
+                        let freq = self.database.get_frequency(&o_equivalent);
+                        let per_cand_ctx = CandidateContext {
+                            lm_score: None,
+                            user_bigram_boost: 0,
+                            is_user_favored: false,
+                            is_user_learned: false,
+                            context_lm_score: None,
+                            gru_log_prob: None,
+                            ..candidate_ctx
+                        };
+                        let features = extract_candidate_features(
+                            &CandidateHypothesis {
+                                text: o_equivalent.clone(),
+                                source: CandidateSource::ExactDictionary,
+                                initial_boost: 4200,
+                            },
+                            true,
+                            freq,
+                            true,
+                            &per_cand_ctx,
+                            false,
+                        );
+                        let score = 4200 + weights.compute_score(&features);
+                        scored_candidates.insert(0, (o_equivalent, score, features));
+                    }
+                } else if !top_in_dict {
+                    // If top candidate is unverified non-dictionary text, see if any candidate starting with 'অ' is in dict
+                    if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| {
+                        t.starts_with('অ')
+                            && (self.database.is_exact_dictionary_word(t)
+                                || self.database.trie.contains_exact(t))
+                    }) {
+                        if pos > 0 {
+                            let item = scored_candidates.remove(pos);
+                            scored_candidates.insert(0, item);
+                        }
                     }
                 }
             }
         }
-    }
 
         // Phase 1: Context-Gated Bidirectional LM Re-sort Pass
         //
@@ -2874,9 +2924,12 @@ impl PhoneticSuggestion {
             .map(|l| !l.chars().any(|c| c.is_bengali()))
             .unwrap_or(false);
 
-        let top_is_override = preferred_override
-            .as_ref()
-            .is_some_and(|ov| scored_candidates.first().map(|(t, _, _)| t == ov).unwrap_or(false));
+        let top_is_override = preferred_override.as_ref().is_some_and(|ov| {
+            scored_candidates
+                .first()
+                .map(|(t, _, _)| t == ov)
+                .unwrap_or(false)
+        });
 
         if self.config.ai_profile != AiProfile::Off
             && !has_explicit_intent
@@ -2940,7 +2993,11 @@ impl PhoneticSuggestion {
 
         let mut text_cands = Vec::with_capacity(8);
         for (c, _, f) in &scored_candidates {
-            if (c == term && !is_code && (!is_tech_collocation || preferred_word.as_deref() != Some(c.as_str()))) || kw_emojis.contains(c) {
+            if (c == term
+                && !is_code
+                && (!is_tech_collocation || preferred_word.as_deref() != Some(c.as_str())))
+                || kw_emojis.contains(c)
+            {
                 continue;
             }
             if text_cands.len() < text_target_len {
@@ -3025,7 +3082,8 @@ impl PhoneticSuggestion {
             // 2. Unspaced 2-stem compound candidates (avoid overriding explicit supervised overrides or exact dictionary words)
             let has_override = self.database.lookup_override(&lower_term).is_some();
             if !has_override {
-                let compounds = super::compound::CompoundSplitter::split_compound(&lower_term, self);
+                let compounds =
+                    super::compound::CompoundSplitter::split_compound(&lower_term, self);
                 if !compounds.is_empty() {
                     for comp in compounds.into_iter().rev() {
                         final_candidates.retain(|c| c != &comp.word);
@@ -3045,7 +3103,9 @@ impl PhoneticSuggestion {
                 let empty_mem = hashbrown::HashMap::new();
                 let (o_cands, _) = self.suggest(&o_form, false, true, &empty_mem);
                 if let Some(first_o) = o_cands.first() {
-                    if self.database.is_exact_dictionary_word(first_o) || self.database.trie.contains_exact(first_o) {
+                    if self.database.is_exact_dictionary_word(first_o)
+                        || self.database.trie.contains_exact(first_o)
+                    {
                         final_candidates.retain(|c| c != first_o);
                         final_candidates.insert(0, first_o.clone());
                     }
@@ -3058,7 +3118,6 @@ impl PhoneticSuggestion {
             self.is_reranking = false;
         }
         // ──────────────────────────────────────────────────────────────────────
-
 
         self.last_computed_candidates = final_candidates.clone();
 
@@ -3562,10 +3621,10 @@ impl PhoneticSuggestion {
                         }
                     }
                 }
-                if let Some(ac) = self.database.get_autocorrect_raw_filtered(
-                    base_key,
-                    self.config.enable_banglish_shorthand,
-                ) {
+                if let Some(ac) = self
+                    .database
+                    .get_autocorrect_raw_filtered(base_key, self.config.enable_banglish_shorthand)
+                {
                     let base_stem = if ac.chars().any(|c| c.is_bengali()) {
                         ac
                     } else {
@@ -4712,15 +4771,31 @@ mod tests {
         let empty_memory = HashMap::new();
         // Inherent vowel words that users type with 'a' (e.g. upanibeshbad, chalaman, badan)
         let (cands, _) = sugg.suggest("upanibeshbad", true, true, &empty_memory);
-        assert!(cands.contains(&"উপনিবেশবাদ".to_string()), "Candidates {:?} should contain উপনিবেশবাদ", cands);
+        assert!(
+            cands.contains(&"উপনিবেশবাদ".to_string()),
+            "Candidates {:?} should contain উপনিবেশবাদ",
+            cands
+        );
 
         let (cands2, _) = sugg.suggest("chalaman", true, true, &empty_memory);
-        assert!(cands2.contains(&"চলমান".to_string()), "Candidates {:?} should contain চলমান", cands2);
+        assert!(
+            cands2.contains(&"চলমান".to_string()),
+            "Candidates {:?} should contain চলমান",
+            cands2
+        );
 
         let (cands3, _) = sugg.suggest("anchale", true, true, &empty_memory);
-        assert!(cands3.contains(&"অঞ্চলে".to_string()), "Candidates {:?} should contain অঞ্চলে", cands3);
+        assert!(
+            cands3.contains(&"অঞ্চলে".to_string()),
+            "Candidates {:?} should contain অঞ্চলে",
+            cands3
+        );
 
         let (cands4, _) = sugg.suggest("shadharon", true, true, &empty_memory);
-        assert!(cands4.contains(&"সাধারণ".to_string()), "Candidates {:?} should contain সাধারণ", cands4);
+        assert!(
+            cands4.contains(&"সাধারণ".to_string()),
+            "Candidates {:?} should contain সাধারণ",
+            cands4
+        );
     }
 }

@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Build and Compile Supervised Phonetic Overrides
 //!
 //! Mines Dakshina transliteration datasets, applies Bayesian confidence calibration,
@@ -311,30 +312,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open(train_path)?;
     let reader = BufReader::new(file);
     for line in reader.lines() {
-            let line = line?;
-            let parts: Vec<&str> = line.split('\t').collect();
-            if parts.len() != 3 {
-                continue;
-            }
-            let bn_raw = parts[0].trim();
-            let bn = lekhani_core::chars::canonicalize(bn_raw);
-            let latin = parts[1].trim().to_ascii_lowercase();
-            let cnt: usize = match parts[2].trim().parse() {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-
-            if !is_valid_latin(&latin) || !is_valid_bengali(&bn) {
-                continue;
-            }
-
-            *latin_to_bn_counts
-                .entry(latin)
-                .or_default()
-                .entry(bn.to_string())
-                .or_insert(0) += cnt;
-            total_tsv_lines += 1;
+        let line = line?;
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() != 3 {
+            continue;
         }
+        let bn_raw = parts[0].trim();
+        let bn = lekhani_core::chars::canonicalize(bn_raw);
+        let latin = parts[1].trim().to_ascii_lowercase();
+        let cnt: usize = match parts[2].trim().parse() {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        if !is_valid_latin(&latin) || !is_valid_bengali(&bn) {
+            continue;
+        }
+
+        *latin_to_bn_counts
+            .entry(latin)
+            .or_default()
+            .entry(bn.to_string())
+            .or_insert(0) += cnt;
+        total_tsv_lines += 1;
+    }
     println!(
         "📊 Processed {} TSV records across {} unique Latin keys.",
         total_tsv_lines,

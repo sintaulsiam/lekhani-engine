@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Build Pragyan Production Statistical Language Model (pragyan_unit_lm.bin)
 //!
 //! Compiles the canonical constrained M2M aligned joint unit language model
@@ -91,20 +92,60 @@ pub fn seed_avro_prior(counts: &mut HashMap<(String, String), f64>, alpha: f64) 
         return;
     }
     let priors: &[(&str, &str)] = &[
-        ("k", "ক"), ("kh", "খ"), ("g", "গ"), ("gh", "ঘ"), ("ng", "ঙ"),
-        ("c", "চ"), ("ch", "ছ"), ("j", "জ"), ("jh", "ঝ"),
-        ("t", "ত"), ("t", "ট"), ("th", "থ"), ("th", "ঠ"),
-        ("d", "দ"), ("d", "ড"), ("dh", "ধ"), ("dh", "ঢ"),
-        ("n", "ন"), ("n", "ণ"),
-        ("p", "প"), ("f", "ফ"), ("ph", "ফ"), ("b", "ব"), ("bh", "ভ"), ("v", "ভ"),
-        ("m", "ম"), ("z", "য"), ("r", "র"), ("l", "ল"),
-        ("sh", "শ"), ("s", "স"), ("s", "ষ"), ("h", "হ"),
-        ("r", "ড়"), ("rh", "ঢ়"), ("y", "য়"),
-        ("a", "া"), ("a", "আ"), ("i", "ি"), ("i", "ই"),
-        ("ee", "ী"), ("ee", "ঈ"), ("u", "ু"), ("u", "উ"),
-        ("oo", "ূ"), ("oo", "ঊ"), ("e", "ে"), ("e", "এ"),
-        ("oi", "ৈ"), ("oi", "ঐ"), ("o", "ো"), ("o", "ও"),
-        ("ou", "ৌ"), ("ou", "ঔ"),
+        ("k", "ক"),
+        ("kh", "খ"),
+        ("g", "গ"),
+        ("gh", "ঘ"),
+        ("ng", "ঙ"),
+        ("c", "চ"),
+        ("ch", "ছ"),
+        ("j", "জ"),
+        ("jh", "ঝ"),
+        ("t", "ত"),
+        ("t", "ট"),
+        ("th", "থ"),
+        ("th", "ঠ"),
+        ("d", "দ"),
+        ("d", "ড"),
+        ("dh", "ধ"),
+        ("dh", "ঢ"),
+        ("n", "ন"),
+        ("n", "ণ"),
+        ("p", "প"),
+        ("f", "ফ"),
+        ("ph", "ফ"),
+        ("b", "ব"),
+        ("bh", "ভ"),
+        ("v", "ভ"),
+        ("m", "ম"),
+        ("z", "য"),
+        ("r", "র"),
+        ("l", "ল"),
+        ("sh", "শ"),
+        ("s", "স"),
+        ("s", "ষ"),
+        ("h", "হ"),
+        ("r", "ড়"),
+        ("rh", "ঢ়"),
+        ("y", "য়"),
+        ("a", "া"),
+        ("a", "আ"),
+        ("i", "ি"),
+        ("i", "ই"),
+        ("ee", "ী"),
+        ("ee", "ঈ"),
+        ("u", "ু"),
+        ("u", "উ"),
+        ("oo", "ূ"),
+        ("oo", "ঊ"),
+        ("e", "ে"),
+        ("e", "এ"),
+        ("oi", "ৈ"),
+        ("oi", "ঐ"),
+        ("o", "ো"),
+        ("o", "ও"),
+        ("ou", "ৌ"),
+        ("ou", "ঔ"),
     ];
     for (r, b) in priors {
         *counts.entry((r.to_string(), b.to_string())).or_default() += alpha;
@@ -175,133 +216,140 @@ pub fn run_em_iteration(
 ) -> (HashMap<(String, String), f64>, f64) {
     let chunk_size = (pairs.len() / rayon::current_num_threads()).max(1);
 
-    let (partial_counts, total_log_likelihood): (Vec<HashMap<(String, String), f64>>, Vec<f64>) = pairs
-        .par_chunks(chunk_size)
-        .map(|chunk| {
-            let mut local_counts: HashMap<(String, String), f64> = HashMap::new();
-            let mut local_ll = 0.0f64;
+    let (partial_counts, total_log_likelihood): (Vec<HashMap<(String, String), f64>>, Vec<f64>) =
+        pairs
+            .par_chunks(chunk_size)
+            .map(|chunk| {
+                let mut local_counts: HashMap<(String, String), f64> = HashMap::new();
+                let mut local_ll = 0.0f64;
 
-            for pair in chunk {
-                let m = pair.roman_tokens.len();
-                let n = pair.bengali_tokens.len();
+                for pair in chunk {
+                    let m = pair.roman_tokens.len();
+                    let n = pair.bengali_tokens.len();
 
-                let mut alpha_matrix = vec![vec![0.0f64; n + 1]; m + 1];
-                alpha_matrix[0][0] = 1.0;
+                    let mut alpha_matrix = vec![vec![0.0f64; n + 1]; m + 1];
+                    alpha_matrix[0][0] = 1.0;
 
-                for i in 0..=m {
-                    for j in 0..=n {
-                        let a_ij = alpha_matrix[i][j];
-                        if a_ij == 0.0 {
-                            continue;
-                        }
+                    for i in 0..=m {
+                        for j in 0..=n {
+                            let a_ij = alpha_matrix[i][j];
+                            if a_ij == 0.0 {
+                                continue;
+                            }
 
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            if is_valid_translation_unit(r_slice, &[]) {
-                                let r = r_slice.join("");
-                                if let Some(&p) = model.get(&(r, String::new())) {
-                                    alpha_matrix[i + kr][j] += a_ij * p;
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                if is_valid_translation_unit(r_slice, &[]) {
+                                    let r = r_slice.join("");
+                                    if let Some(&p) = model.get(&(r, String::new())) {
+                                        alpha_matrix[i + kr][j] += a_ij * p;
+                                    }
                                 }
                             }
-                        }
 
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            for kb in 1..=max_b.min(n - j) {
-                                let b_slice = &pair.bengali_tokens[j..j + kb];
-                                if is_valid_translation_unit(r_slice, b_slice) {
-                                    let r = r_slice.join("");
-                                    let b: String = b_slice.iter().map(|t| t.text.as_str()).collect();
-                                    if let Some(&p) = model.get(&(r, b)) {
-                                        alpha_matrix[i + kr][j + kb] += a_ij * p;
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                for kb in 1..=max_b.min(n - j) {
+                                    let b_slice = &pair.bengali_tokens[j..j + kb];
+                                    if is_valid_translation_unit(r_slice, b_slice) {
+                                        let r = r_slice.join("");
+                                        let b: String =
+                                            b_slice.iter().map(|t| t.text.as_str()).collect();
+                                        if let Some(&p) = model.get(&(r, b)) {
+                                            alpha_matrix[i + kr][j + kb] += a_ij * p;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
 
-                let total_prob = alpha_matrix[m][n];
-                if total_prob <= 0.0 || !total_prob.is_finite() {
-                    continue;
-                }
+                    let total_prob = alpha_matrix[m][n];
+                    if total_prob <= 0.0 || !total_prob.is_finite() {
+                        continue;
+                    }
 
-                local_ll += pair.count * total_prob.ln();
+                    local_ll += pair.count * total_prob.ln();
 
-                let mut beta = vec![vec![0.0f64; n + 1]; m + 1];
-                beta[m][n] = 1.0;
+                    let mut beta = vec![vec![0.0f64; n + 1]; m + 1];
+                    beta[m][n] = 1.0;
 
-                for i in (0..=m).rev() {
-                    for j in (0..=n).rev() {
-                        let mut b_sum = 0.0f64;
+                    for i in (0..=m).rev() {
+                        for j in (0..=n).rev() {
+                            let mut b_sum = 0.0f64;
 
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            if is_valid_translation_unit(r_slice, &[]) {
-                                let r = r_slice.join("");
-                                if let Some(&p) = model.get(&(r, String::new())) {
-                                    b_sum += p * beta[i + kr][j];
-                                }
-                            }
-                        }
-
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            for kb in 1..=max_b.min(n - j) {
-                                let b_slice = &pair.bengali_tokens[j..j + kb];
-                                if is_valid_translation_unit(r_slice, b_slice) {
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                if is_valid_translation_unit(r_slice, &[]) {
                                     let r = r_slice.join("");
-                                    let b: String = b_slice.iter().map(|t| t.text.as_str()).collect();
-                                    if let Some(&p) = model.get(&(r, b)) {
-                                        b_sum += p * beta[i + kr][j + kb];
+                                    if let Some(&p) = model.get(&(r, String::new())) {
+                                        b_sum += p * beta[i + kr][j];
                                     }
                                 }
                             }
-                        }
 
-                        if i == m && j == n {
-                            // keep 1.0
-                        } else {
-                            beta[i][j] = b_sum;
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                for kb in 1..=max_b.min(n - j) {
+                                    let b_slice = &pair.bengali_tokens[j..j + kb];
+                                    if is_valid_translation_unit(r_slice, b_slice) {
+                                        let r = r_slice.join("");
+                                        let b: String =
+                                            b_slice.iter().map(|t| t.text.as_str()).collect();
+                                        if let Some(&p) = model.get(&(r, b)) {
+                                            b_sum += p * beta[i + kr][j + kb];
+                                        }
+                                    }
+                                }
+                            }
+
+                            if i == m && j == n {
+                                // keep 1.0
+                            } else {
+                                beta[i][j] = b_sum;
+                            }
                         }
                     }
-                }
 
-                let inv_total = pair.count / total_prob;
+                    let inv_total = pair.count / total_prob;
 
-                for i in 0..=m {
-                    for j in 0..=n {
-                        let a_ij = alpha_matrix[i][j];
-                        if a_ij == 0.0 {
-                            continue;
-                        }
-
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            if is_valid_translation_unit(r_slice, &[]) {
-                                let r = r_slice.join("");
-                                if let Some(&p) = model.get(&(r.clone(), String::new())) {
-                                    let b_next = beta[i + kr][j];
-                                    let expected = a_ij * p * b_next * inv_total;
-                                    if expected > 0.0 {
-                                        *local_counts.entry((r, String::new())).or_default() += expected;
-                                    }
-                                }
+                    for i in 0..=m {
+                        for j in 0..=n {
+                            let a_ij = alpha_matrix[i][j];
+                            if a_ij == 0.0 {
+                                continue;
                             }
-                        }
 
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            for kb in 1..=max_b.min(n - j) {
-                                let b_slice = &pair.bengali_tokens[j..j + kb];
-                                if is_valid_translation_unit(r_slice, b_slice) {
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                if is_valid_translation_unit(r_slice, &[]) {
                                     let r = r_slice.join("");
-                                    let b: String = b_slice.iter().map(|t| t.text.as_str()).collect();
-                                    if let Some(&p) = model.get(&(r.clone(), b.clone())) {
-                                        let b_next = beta[i + kr][j + kb];
+                                    if let Some(&p) = model.get(&(r.clone(), String::new())) {
+                                        let b_next = beta[i + kr][j];
                                         let expected = a_ij * p * b_next * inv_total;
                                         if expected > 0.0 {
-                                            *local_counts.entry((r, b)).or_default() += expected;
+                                            *local_counts.entry((r, String::new())).or_default() +=
+                                                expected;
+                                        }
+                                    }
+                                }
+                            }
+
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                for kb in 1..=max_b.min(n - j) {
+                                    let b_slice = &pair.bengali_tokens[j..j + kb];
+                                    if is_valid_translation_unit(r_slice, b_slice) {
+                                        let r = r_slice.join("");
+                                        let b: String =
+                                            b_slice.iter().map(|t| t.text.as_str()).collect();
+                                        if let Some(&p) = model.get(&(r.clone(), b.clone())) {
+                                            let b_next = beta[i + kr][j + kb];
+                                            let expected = a_ij * p * b_next * inv_total;
+                                            if expected > 0.0 {
+                                                *local_counts.entry((r, b)).or_default() +=
+                                                    expected;
+                                            }
                                         }
                                     }
                                 }
@@ -309,11 +357,10 @@ pub fn run_em_iteration(
                         }
                     }
                 }
-            }
 
-            (local_counts, local_ll)
-        })
-        .unzip();
+                (local_counts, local_ll)
+            })
+            .unzip();
 
     let mut merged_counts: HashMap<(String, String), f64> = HashMap::new();
     seed_avro_prior(&mut merged_counts, alpha);
@@ -445,7 +492,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   └─ ✓ Lexicon Integrity Verified.");
 
     let train_path = PathBuf::from("data/eval/bn.translit.sampled.train.tsv");
-    println!("\n2. Loading Training Dataset (Filters OFF): {:?}", train_path);
+    println!(
+        "\n2. Loading Training Dataset (Filters OFF): {:?}",
+        train_path
+    );
     let (train_pairs, train_dropped) = load_dataset(&train_path);
     println!("   ├─ Total Loaded: {} pairs", train_pairs.len());
     println!("   └─ Dropped: {} (100.0% kept)", train_dropped);
@@ -456,11 +506,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for it in 1..=DEFAULT_EM_ITERATIONS {
         let t0 = Instant::now();
         let (new_model, ll) = run_em_iteration(&train_pairs, &model, 3, 2, 0.5);
-        println!("   ├─ Iteration {}/{}: Log-Likelihood = {:.2} ({:.2}s)",
-            it, DEFAULT_EM_ITERATIONS, ll, t0.elapsed().as_secs_f64());
+        println!(
+            "   ├─ Iteration {}/{}: Log-Likelihood = {:.2} ({:.2}s)",
+            it,
+            DEFAULT_EM_ITERATIONS,
+            ll,
+            t0.elapsed().as_secs_f64()
+        );
         model = new_model;
     }
-    println!("   └─ ✓ EM Alignment finished in {:.2}s", start_em.elapsed().as_secs_f64());
+    println!(
+        "   └─ ✓ EM Alignment finished in {:.2}s",
+        start_em.elapsed().as_secs_f64()
+    );
 
     println!("\n4. Viterbi Aligning Sequences & Deduplicating Type-Level Map...");
     let alignments: Vec<Vec<(String, String)>> = train_pairs
@@ -481,20 +539,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .or_insert(align);
         }
     }
-    println!("   ├─ Successfully aligned: {} / {} pairs ({:.2}%)",
-        aligned_count, train_pairs.len(), (aligned_count as f64 / train_pairs.len() as f64) * 100.0);
-    println!("   └─ Unique Type-Level Sequences: {}", type_level_map.len());
+    println!(
+        "   ├─ Successfully aligned: {} / {} pairs ({:.2}%)",
+        aligned_count,
+        train_pairs.len(),
+        (aligned_count as f64 / train_pairs.len() as f64) * 100.0
+    );
+    println!(
+        "   └─ Unique Type-Level Sequences: {}",
+        type_level_map.len()
+    );
 
     let type_level_seqs: Vec<Vec<(String, String)>> = type_level_map.into_values().collect();
     let vocab = UnitVocab::build(&type_level_seqs);
-    println!("   └─ Unit Vocabulary Size: {} units", vocab.id_to_unit.len());
+    println!(
+        "   └─ Unit Vocabulary Size: {} units",
+        vocab.id_to_unit.len()
+    );
 
     println!("\n5. Training Compact Joint Unit LM (Order 4, Min Count = 3.0)...");
     let lm = JointUnitLM::train(&type_level_seqs, vocab, 4, 3.0);
 
     let serialized = bincode::serialize(&lm)?;
     let size_mb = serialized.len() as f64 / 1024.0 / 1024.0;
-    println!("   ├─ Serialized Size: {:.2} MB ({} bytes)", size_mb, serialized.len());
+    println!(
+        "   ├─ Serialized Size: {:.2} MB ({} bytes)",
+        size_mb,
+        serialized.len()
+    );
 
     let out_path = PathBuf::from("data/dictionaries/pragyan_unit_lm.bin");
     let mut out_file = File::create(&out_path)?;
@@ -508,7 +580,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let g6_passed = size_mb <= 3.5;
     println!("   ├─ Model File Size : {:.2} MB", size_mb);
     println!("   ├─ Budget Ceiling  : <= 3.50 MB");
-    println!("   └─ Gate G6 Status  : {}", if g6_passed { "✅ PASSED" } else { "❌ FAILED" });
+    println!(
+        "   └─ Gate G6 Status  : {}",
+        if g6_passed {
+            "✅ PASSED"
+        } else {
+            "❌ FAILED"
+        }
+    );
 
     if !g6_passed {
         eprintln!("❌ Fatal: Gate G6 violated!");

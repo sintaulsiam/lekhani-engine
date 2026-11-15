@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Diagnostic and Ablation Analysis on Held-Out Test Set
 //!
 //! Investigates:

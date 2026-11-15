@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Measure Digraph Disagreement & Consonant Deletions in Viterbi Alignments
 //!
 //! Re-measures the disagreement properly across all 94,546 training pairs:
@@ -84,20 +85,64 @@ pub fn seed_avro_prior(counts: &mut HashMap<(String, String), f64>, alpha: f64) 
         return;
     }
     let priors: &[(&str, &str)] = &[
-        ("k", "ক"), ("kh", "খ"), ("g", "গ"), ("gh", "ঘ"), ("ng", "ঙ"),
-        ("c", "চ"), ("ch", "ছ"), ("j", "জ"), ("jh", "ঝ"),
-        ("t", "ত"), ("t", "ট"), ("th", "থ"), ("th", "ঠ"),
-        ("d", "দ"), ("d", "ড"), ("dh", "ধ"), ("dh", "ঢ"),
-        ("n", "ন"), ("n", "ণ"),
-        ("p", "প"), ("ph", "ফ"), ("f", "ফ"), ("b", "ব"), ("bh", "ভ"), ("v", "ভ"), ("m", "ম"),
-        ("z", "য"), ("r", "র"), ("l", "ল"),
-        ("sh", "শ"), ("sh", "ষ"), ("s", "স"), ("s", "শ"), ("h", "হ"),
-        ("y", "য়"), ("w", "ও"), ("q", "ক"), ("x", "ক্স"),
-        ("a", "া"), ("a", "আ"), ("a", "অ"), ("aa", "আ"), ("aa", "া"),
-        ("i", "ি"), ("i", "ই"), ("ee", "ী"), ("ee", "ি"),
-        ("u", "ু"), ("u", "উ"), ("oo", "ূ"), ("oo", "ু"),
-        ("e", "ে"), ("e", "এ"), ("o", "ো"), ("o", "অ"), ("o", "ও"),
-        ("oi", "ৈ"), ("ou", "ৌ"),
+        ("k", "ক"),
+        ("kh", "খ"),
+        ("g", "গ"),
+        ("gh", "ঘ"),
+        ("ng", "ঙ"),
+        ("c", "চ"),
+        ("ch", "ছ"),
+        ("j", "জ"),
+        ("jh", "ঝ"),
+        ("t", "ত"),
+        ("t", "ট"),
+        ("th", "থ"),
+        ("th", "ঠ"),
+        ("d", "দ"),
+        ("d", "ড"),
+        ("dh", "ধ"),
+        ("dh", "ঢ"),
+        ("n", "ন"),
+        ("n", "ণ"),
+        ("p", "প"),
+        ("ph", "ফ"),
+        ("f", "ফ"),
+        ("b", "ব"),
+        ("bh", "ভ"),
+        ("v", "ভ"),
+        ("m", "ম"),
+        ("z", "য"),
+        ("r", "র"),
+        ("l", "ল"),
+        ("sh", "শ"),
+        ("sh", "ষ"),
+        ("s", "স"),
+        ("s", "শ"),
+        ("h", "হ"),
+        ("y", "য়"),
+        ("w", "ও"),
+        ("q", "ক"),
+        ("x", "ক্স"),
+        ("a", "া"),
+        ("a", "আ"),
+        ("a", "অ"),
+        ("aa", "আ"),
+        ("aa", "া"),
+        ("i", "ি"),
+        ("i", "ই"),
+        ("ee", "ী"),
+        ("ee", "ি"),
+        ("u", "ু"),
+        ("u", "উ"),
+        ("oo", "ূ"),
+        ("oo", "ু"),
+        ("e", "ে"),
+        ("e", "এ"),
+        ("o", "ো"),
+        ("o", "অ"),
+        ("o", "ও"),
+        ("oi", "ৈ"),
+        ("ou", "ৌ"),
     ];
     for &(r, b) in priors {
         *counts.entry((r.to_string(), b.to_string())).or_default() += alpha;
@@ -195,8 +240,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -238,8 +291,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i - kr..i] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j - kb..j] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i - kr..i]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j - kb..j]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -278,8 +339,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -344,8 +413,16 @@ pub fn viterbi_forced_alignment(
                         continue;
                     }
 
-                    let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                    let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                    let r_slice = if kr == 0 {
+                        &[]
+                    } else {
+                        &pair.roman_tokens[i..i + kr]
+                    };
+                    let b_slice = if kb == 0 {
+                        &[]
+                    } else {
+                        &pair.bengali_tokens[j..j + kb]
+                    };
 
                     if !is_valid_translation_unit(r_slice, b_slice) {
                         continue;
@@ -395,8 +472,29 @@ pub fn viterbi_forced_alignment(
 }
 
 fn is_consonant_char(c: char) -> bool {
-    matches!(c, 'b'|'c'|'d'|'f'|'g'|'h'|'j'|'k'|'l'|'m'|'n'|'p'|'q'|'r'|'s'|'t'|'v'|'w'|'x'|'y'|'z')
-        && !matches!(c, 'a'|'e'|'i'|'o'|'u')
+    matches!(
+        c,
+        'b' | 'c'
+            | 'd'
+            | 'f'
+            | 'g'
+            | 'h'
+            | 'j'
+            | 'k'
+            | 'l'
+            | 'm'
+            | 'n'
+            | 'p'
+            | 'q'
+            | 'r'
+            | 's'
+            | 't'
+            | 'v'
+            | 'w'
+            | 'x'
+            | 'y'
+            | 'z'
+    ) && !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u')
 }
 
 fn main() {
@@ -406,7 +504,11 @@ fn main() {
 
     let train_path = Path::new("data/eval/bn.translit.sampled.train.tsv");
     let (train_pairs, dropped) = load_dataset(train_path);
-    println!("Loaded {} pairs from TRAIN (Dropped: {})", train_pairs.len(), dropped);
+    println!(
+        "Loaded {} pairs from TRAIN (Dropped: {})",
+        train_pairs.len(),
+        dropped
+    );
 
     let t0 = Instant::now();
     println!("▶️  Training Baseline 1:1 Aligner on TRAIN...");
@@ -414,7 +516,10 @@ fn main() {
     for _ in 1..=DEFAULT_EM_ITERATIONS {
         model_1_1 = em_iteration(&train_pairs, &model_1_1, 1, 1);
     }
-    println!("   1:1 Aligner training complete in {:.2}s", t0.elapsed().as_secs_f64());
+    println!(
+        "   1:1 Aligner training complete in {:.2}s",
+        t0.elapsed().as_secs_f64()
+    );
 
     let t1 = Instant::now();
     println!("▶️  Training Baseline 2:2 Aligner on TRAIN...");
@@ -422,15 +527,22 @@ fn main() {
     for _ in 1..=DEFAULT_EM_ITERATIONS {
         model_2_2 = em_iteration(&train_pairs, &model_2_2, 2, 2);
     }
-    println!("   2:2 Aligner training complete in {:.2}s", t1.elapsed().as_secs_f64());
+    println!(
+        "   2:2 Aligner training complete in {:.2}s",
+        t1.elapsed().as_secs_f64()
+    );
 
     for (label, model, max_r, max_b) in [
         ("1:1 Baseline Model", &model_1_1, 1, 1),
         ("2:2 Baseline Model", &model_2_2, 2, 2),
     ] {
-        println!("\n──────────────────────────────────────────────────────────────────────────────────");
+        println!(
+            "\n──────────────────────────────────────────────────────────────────────────────────"
+        );
         println!("   Auditing: {}", label);
-        println!("──────────────────────────────────────────────────────────────────────────────────");
+        println!(
+            "──────────────────────────────────────────────────────────────────────────────────"
+        );
 
         let results: Vec<(bool, bool, Vec<String>, Vec<String>)> = train_pairs
             .par_iter()
@@ -470,14 +582,17 @@ fn main() {
                     }
                 }
 
-                let has_split = interior_char_indices.iter().any(|idx| viterbi_cuts.contains(idx));
+                let has_split = interior_char_indices
+                    .iter()
+                    .any(|idx| viterbi_cuts.contains(idx));
                 if has_split {
                     // Collect which tokens were split
                     let mut tok_start = 0;
                     for tok in &greedy_tokens {
                         let tok_end = tok_start + tok.len();
                         if tok.len() >= 2 {
-                            let was_cut = (tok_start + 1..tok_end).any(|c| viterbi_cuts.contains(&c));
+                            let was_cut =
+                                (tok_start + 1..tok_end).any(|c| viterbi_cuts.contains(&c));
                             if was_cut {
                                 split_digraphs.push(tok.clone());
                             }
@@ -486,7 +601,12 @@ fn main() {
                     }
                 }
 
-                (has_split, !consonant_deletions.is_empty(), split_digraphs, consonant_deletions)
+                (
+                    has_split,
+                    !consonant_deletions.is_empty(),
+                    split_digraphs,
+                    consonant_deletions,
+                )
             })
             .collect();
 
@@ -496,9 +616,24 @@ fn main() {
         let either_defect = results.iter().filter(|r| r.0 || r.1).count();
 
         println!("Audit Results on All {} Pairs:", total);
-        println!("  ├─ Pairs with Internal Digraph Split : {:>6} / {} ({:>6.2}%)", split_count, total, split_count as f64 / total as f64 * 100.0);
-        println!("  ├─ Pairs with Consonant Deleted (→ε) : {:>6} / {} ({:>6.2}%)", deletion_count, total, deletion_count as f64 / total as f64 * 100.0);
-        println!("  └─ Pairs with EITHER Defect          : {:>6} / {} ({:>6.2}%)", either_defect, total, either_defect as f64 / total as f64 * 100.0);
+        println!(
+            "  ├─ Pairs with Internal Digraph Split : {:>6} / {} ({:>6.2}%)",
+            split_count,
+            total,
+            split_count as f64 / total as f64 * 100.0
+        );
+        println!(
+            "  ├─ Pairs with Consonant Deleted (→ε) : {:>6} / {} ({:>6.2}%)",
+            deletion_count,
+            total,
+            deletion_count as f64 / total as f64 * 100.0
+        );
+        println!(
+            "  └─ Pairs with EITHER Defect          : {:>6} / {} ({:>6.2}%)",
+            either_defect,
+            total,
+            either_defect as f64 / total as f64 * 100.0
+        );
 
         let mut digraph_freq: HashMap<String, usize> = HashMap::new();
         for r in &results {
@@ -511,7 +646,12 @@ fn main() {
 
         println!("\nTop Split Digraphs / Tokens:");
         for (tok, cnt) in sorted_digraphs.iter().take(15) {
-            println!("    {:>6} : {:>5} occurrences ({:.2}% of split pairs)", tok, cnt, *cnt as f64 / split_count.max(1) as f64 * 100.0);
+            println!(
+                "    {:>6} : {:>5} occurrences ({:.2}% of split pairs)",
+                tok,
+                cnt,
+                *cnt as f64 / split_count.max(1) as f64 * 100.0
+            );
         }
 
         let mut del_freq: HashMap<String, usize> = HashMap::new();
@@ -532,10 +672,12 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // Constrained Model: Aligned strictly on Roman tokens with lattice options
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n══════════════════════════════════════════════════════════════════════════════════");
+    println!(
+        "\n══════════════════════════════════════════════════════════════════════════════════"
+    );
     println!("   🛡️  TRAINING CONSTRAINED ATOMIC TOKEN ALIGNER (LATTICE OPTIONS ONLY)");
     println!("══════════════════════════════════════════════════════════════════════════════════");
-    
+
     // Convert pairs to atomic Roman tokens (greedy tokens by default)
     let token_pairs: Vec<AlignerPair> = train_pairs
         .iter()
@@ -552,9 +694,14 @@ fn main() {
     for _ in 1..=DEFAULT_EM_ITERATIONS {
         model_constrained = em_iteration(&token_pairs, &model_constrained, 1, 1);
     }
-    println!("   Constrained Aligner training complete in {:.2}s", t2.elapsed().as_secs_f64());
+    println!(
+        "   Constrained Aligner training complete in {:.2}s",
+        t2.elapsed().as_secs_f64()
+    );
 
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   Auditing: Constrained Atomic Token Model (with Lattice Options)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -563,14 +710,15 @@ fn main() {
         .map(|pair| {
             use lekhani_core::tokenization::roman_segmentation_lattice;
             let lattice_paths = roman_segmentation_lattice(&pair.roman_norm);
-            
+
             let mut best_score = f64::NEG_INFINITY;
             let mut best_alignment = Vec::new();
 
             for path in &lattice_paths {
                 let mut temp_pair = pair.clone();
                 temp_pair.roman_tokens = path.clone();
-                let (score, alignment) = viterbi_forced_alignment(&temp_pair, &model_constrained, 1, 1);
+                let (score, alignment) =
+                    viterbi_forced_alignment(&temp_pair, &model_constrained, 1, 1);
                 if score > best_score {
                     best_score = score;
                     best_alignment = alignment;
@@ -616,7 +764,9 @@ fn main() {
                 }
             }
 
-            let has_split = interior_char_indices.iter().any(|idx| viterbi_cuts.contains(idx));
+            let has_split = interior_char_indices
+                .iter()
+                .any(|idx| viterbi_cuts.contains(idx));
             if has_split {
                 let mut tok_start = 0;
                 for tok in &greedy_tokens {
@@ -631,7 +781,12 @@ fn main() {
                 }
             }
 
-            (has_split, !consonant_deletions.is_empty(), split_digraphs, consonant_deletions)
+            (
+                has_split,
+                !consonant_deletions.is_empty(),
+                split_digraphs,
+                consonant_deletions,
+            )
         })
         .collect();
 
@@ -641,9 +796,24 @@ fn main() {
     let either_defect_c = results_constrained.iter().filter(|r| r.0 || r.1).count();
 
     println!("Audit Results on All {} Pairs:", total_c);
-    println!("  ├─ Pairs with Internal Digraph Split : {:>6} / {} ({:>6.2}%)", split_count_c, total_c, split_count_c as f64 / total_c as f64 * 100.0);
-    println!("  ├─ Pairs with Consonant Deleted (→ε) : {:>6} / {} ({:>6.2}%)", deletion_count_c, total_c, deletion_count_c as f64 / total_c as f64 * 100.0);
-    println!("  └─ Pairs with EITHER Defect          : {:>6} / {} ({:>6.2}%)", either_defect_c, total_c, either_defect_c as f64 / total_c as f64 * 100.0);
+    println!(
+        "  ├─ Pairs with Internal Digraph Split : {:>6} / {} ({:>6.2}%)",
+        split_count_c,
+        total_c,
+        split_count_c as f64 / total_c as f64 * 100.0
+    );
+    println!(
+        "  ├─ Pairs with Consonant Deleted (→ε) : {:>6} / {} ({:>6.2}%)",
+        deletion_count_c,
+        total_c,
+        deletion_count_c as f64 / total_c as f64 * 100.0
+    );
+    println!(
+        "  └─ Pairs with EITHER Defect          : {:>6} / {} ({:>6.2}%)",
+        either_defect_c,
+        total_c,
+        either_defect_c as f64 / total_c as f64 * 100.0
+    );
 
     let mut digraph_freq_c: HashMap<String, usize> = HashMap::new();
     for r in &results_constrained {
@@ -656,7 +826,12 @@ fn main() {
 
     println!("\nTop Split Digraphs / Tokens (Constrained Model):");
     for (tok, cnt) in sorted_digraphs_c.iter().take(15) {
-        println!("    {:>6} : {:>5} occurrences ({:.2}% of split pairs)", tok, cnt, *cnt as f64 / split_count_c.max(1) as f64 * 100.0);
+        println!(
+            "    {:>6} : {:>5} occurrences ({:.2}% of split pairs)",
+            tok,
+            cnt,
+            *cnt as f64 / split_count_c.max(1) as f64 * 100.0
+        );
     }
 
     let mut del_freq_c: HashMap<String, usize> = HashMap::new();

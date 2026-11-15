@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Offline perceptron pre-trainer for Lekhani ranking weights.
 //! Usage: pretrain_rank_weights <path-to-phonetic_overrides.json>
 

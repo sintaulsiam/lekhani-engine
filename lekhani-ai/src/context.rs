@@ -445,7 +445,8 @@ impl ContextScorer {
         let personal_boost = (personal * 200.0) as i32;
 
         let topic_vector = self.compute_topic_vector(context);
-        let topic_boost_pts = (topic_vector.topic_boost(candidate, &self.embeddings) * 500.0) as i32;
+        let topic_boost_pts =
+            (topic_vector.topic_boost(candidate, &self.embeddings) * 500.0) as i32;
 
         if clean_context.is_empty() {
             return personal_boost + topic_boost_pts;
@@ -1145,11 +1146,8 @@ mod tests {
         );
 
         // 5. Dedicated disambiguate_homophone_by_topic helper
-        let disambiguated = scorer.disambiguate_homophone_by_topic(
-            &["আদালত", "মামলা", "আইন"],
-            "কোর্ট",
-            "কোট",
-        );
+        let disambiguated =
+            scorer.disambiguate_homophone_by_topic(&["আদালত", "মামলা", "আইন"], "কোর্ট", "কোট");
         assert_eq!(disambiguated.map(|(w, _)| w), Some("কোর্ট"));
     }
 }

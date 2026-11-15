@@ -105,30 +105,112 @@ pub fn seed_avro_prior(counts: &mut HashMap<(String, String), f64>, alpha: f64) 
         return;
     }
     let priors: &[(&str, &str)] = &[
-        ("k", "ক"), ("kh", "খ"), ("g", "গ"), ("gh", "ঘ"), ("ng", "ঙ"),
-        ("c", "চ"), ("ch", "ছ"), ("j", "জ"), ("jh", "ঝ"),
-        ("t", "ত"), ("t", "ট"), ("th", "থ"), ("th", "ঠ"),
-        ("d", "দ"), ("d", "ড"), ("dh", "ধ"), ("dh", "ঢ"),
-        ("n", "ন"), ("n", "ণ"),
-        ("p", "প"), ("ph", "ফ"), ("f", "ফ"), ("b", "ব"), ("bh", "ভ"), ("v", "ভ"), ("m", "ম"),
-        ("z", "য"), ("r", "র"), ("l", "ল"),
-        ("sh", "শ"), ("sh", "ষ"), ("s", "স"), ("s", "শ"), ("h", "হ"),
-        ("y", "য়"), ("w", "ও"), ("q", "ক"), ("x", "ক্স"),
-        ("a", "া"), ("a", "আ"), ("a", "অ"), ("aa", "আ"), ("aa", "া"),
-        ("i", "ি"), ("i", "ই"), ("ee", "ী"), ("ee", "ি"),
-        ("u", "ু"), ("u", "উ"), ("oo", "ূ"), ("oo", "ু"),
-        ("e", "ে"), ("e", "এ"), ("oi", "ঐ"), ("ou", "ঔ"),
-        ("o", "ও"), ("o", "ো"), ("o", "অ"),
-        ("kkh", "ক্ষ"), ("ngk", "ঙ্ক"), ("ngkh", "ঙ্খ"), ("ngg", "ঙ্গ"), ("nggh", "ঙ্ঘ"),
-        ("cch", "চ্ছ"), ("jj", "জ্জ"), ("jjh", "জ্ঝ"), ("nc", "ঞ্চ"), ("nch", "ঞ্ছ"), ("nj", "ঞ্জ"),
-        ("tt", "ট্ট"), ("nth", "ণ্ঠ"), ("nd", "ণ্ড"), ("kt", "ক্ত"), ("pt", "প্ত"), ("bd", "ব্দ"),
-        ("st", "স্ত"), ("sth", "স্থ"), ("sn", "স্ন"), ("sp", "স্প"), ("sph", "স্ফ"),
-        ("nt", "ন্ত"), ("nth", "ন্থ"), ("nd", "ন্দ"), ("ndh", "ন্ধ"),
-        ("mp", "ম্প"), ("mb", "ম্ব"), ("mbh", "ম্ভ"),
-        ("rk", "র্ক"), ("rg", "র্গ"), ("rt", "র্ত"), ("rt", "র্ড"), ("rd", "র্দ"),
-        ("rn", "র্ণ"), ("rp", "র্প"), ("rb", "র্ব"), ("rm", "র্ম"), ("rsh", "র্ষ"), ("rs", "র্স"),
-        ("er", "ের"), ("ar", "ার"), ("te", "তে"), ("ke", "কে"), ("der", "দের"),
-        ("a", ""), ("o", ""), ("e", ""),
+        ("k", "ক"),
+        ("kh", "খ"),
+        ("g", "গ"),
+        ("gh", "ঘ"),
+        ("ng", "ঙ"),
+        ("c", "চ"),
+        ("ch", "ছ"),
+        ("j", "জ"),
+        ("jh", "ঝ"),
+        ("t", "ত"),
+        ("t", "ট"),
+        ("th", "থ"),
+        ("th", "ঠ"),
+        ("d", "দ"),
+        ("d", "ড"),
+        ("dh", "ধ"),
+        ("dh", "ঢ"),
+        ("n", "ন"),
+        ("n", "ণ"),
+        ("p", "প"),
+        ("ph", "ফ"),
+        ("f", "ফ"),
+        ("b", "ব"),
+        ("bh", "ভ"),
+        ("v", "ভ"),
+        ("m", "ম"),
+        ("z", "য"),
+        ("r", "র"),
+        ("l", "ল"),
+        ("sh", "শ"),
+        ("sh", "ষ"),
+        ("s", "স"),
+        ("s", "শ"),
+        ("h", "হ"),
+        ("y", "য়"),
+        ("w", "ও"),
+        ("q", "ক"),
+        ("x", "ক্স"),
+        ("a", "া"),
+        ("a", "আ"),
+        ("a", "অ"),
+        ("aa", "আ"),
+        ("aa", "া"),
+        ("i", "ি"),
+        ("i", "ই"),
+        ("ee", "ী"),
+        ("ee", "ি"),
+        ("u", "ু"),
+        ("u", "উ"),
+        ("oo", "ূ"),
+        ("oo", "ু"),
+        ("e", "ে"),
+        ("e", "এ"),
+        ("oi", "ঐ"),
+        ("ou", "ঔ"),
+        ("o", "ও"),
+        ("o", "ো"),
+        ("o", "অ"),
+        ("kkh", "ক্ষ"),
+        ("ngk", "ঙ্ক"),
+        ("ngkh", "ঙ্খ"),
+        ("ngg", "ঙ্গ"),
+        ("nggh", "ঙ্ঘ"),
+        ("cch", "চ্ছ"),
+        ("jj", "জ্জ"),
+        ("jjh", "জ্ঝ"),
+        ("nc", "ঞ্চ"),
+        ("nch", "ঞ্ছ"),
+        ("nj", "ঞ্জ"),
+        ("tt", "ট্ট"),
+        ("nth", "ণ্ঠ"),
+        ("nd", "ণ্ড"),
+        ("kt", "ক্ত"),
+        ("pt", "প্ত"),
+        ("bd", "ব্দ"),
+        ("st", "স্ত"),
+        ("sth", "স্থ"),
+        ("sn", "স্ন"),
+        ("sp", "স্প"),
+        ("sph", "স্ফ"),
+        ("nt", "ন্ত"),
+        ("nth", "ন্থ"),
+        ("nd", "ন্দ"),
+        ("ndh", "ন্ধ"),
+        ("mp", "ম্প"),
+        ("mb", "ম্ব"),
+        ("mbh", "ম্ভ"),
+        ("rk", "র্ক"),
+        ("rg", "র্গ"),
+        ("rt", "র্ত"),
+        ("rt", "র্ড"),
+        ("rd", "র্দ"),
+        ("rn", "র্ণ"),
+        ("rp", "র্প"),
+        ("rb", "র্ব"),
+        ("rm", "র্ম"),
+        ("rsh", "র্ষ"),
+        ("rs", "র্স"),
+        ("er", "ের"),
+        ("ar", "ার"),
+        ("te", "তে"),
+        ("ke", "কে"),
+        ("der", "দের"),
+        ("a", ""),
+        ("o", ""),
+        ("e", ""),
     ];
     for &(r, b) in priors {
         *counts.entry((r.to_string(), b.to_string())).or_default() += alpha;
@@ -198,133 +280,140 @@ pub fn run_em_iteration(
 ) -> (HashMap<(String, String), f64>, f64) {
     let chunk_size = (pairs.len() / rayon::current_num_threads()).max(1);
 
-    let (partial_counts, total_log_likelihood): (Vec<HashMap<(String, String), f64>>, Vec<f64>) = pairs
-        .par_chunks(chunk_size)
-        .map(|chunk| {
-            let mut local_counts: HashMap<(String, String), f64> = HashMap::new();
-            let mut local_ll = 0.0f64;
+    let (partial_counts, total_log_likelihood): (Vec<HashMap<(String, String), f64>>, Vec<f64>) =
+        pairs
+            .par_chunks(chunk_size)
+            .map(|chunk| {
+                let mut local_counts: HashMap<(String, String), f64> = HashMap::new();
+                let mut local_ll = 0.0f64;
 
-            for pair in chunk {
-                let m = pair.roman_tokens.len();
-                let n = pair.bengali_tokens.len();
+                for pair in chunk {
+                    let m = pair.roman_tokens.len();
+                    let n = pair.bengali_tokens.len();
 
-                let mut alpha = vec![vec![0.0f64; n + 1]; m + 1];
-                alpha[0][0] = 1.0;
+                    let mut alpha = vec![vec![0.0f64; n + 1]; m + 1];
+                    alpha[0][0] = 1.0;
 
-                for i in 0..=m {
-                    for j in 0..=n {
-                        let a_ij = alpha[i][j];
-                        if a_ij == 0.0 {
-                            continue;
-                        }
+                    for i in 0..=m {
+                        for j in 0..=n {
+                            let a_ij = alpha[i][j];
+                            if a_ij == 0.0 {
+                                continue;
+                            }
 
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            if is_valid_translation_unit(r_slice, &[]) {
-                                let r = r_slice.join("");
-                                if let Some(&p) = model.get(&(r, String::new())) {
-                                    alpha[i + kr][j] += a_ij * p;
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                if is_valid_translation_unit(r_slice, &[]) {
+                                    let r = r_slice.join("");
+                                    if let Some(&p) = model.get(&(r, String::new())) {
+                                        alpha[i + kr][j] += a_ij * p;
+                                    }
                                 }
                             }
-                        }
 
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            for kb in 1..=max_b.min(n - j) {
-                                let b_slice = &pair.bengali_tokens[j..j + kb];
-                                if is_valid_translation_unit(r_slice, b_slice) {
-                                    let r = r_slice.join("");
-                                    let b: String = b_slice.iter().map(|t| t.text.as_str()).collect();
-                                    if let Some(&p) = model.get(&(r, b)) {
-                                        alpha[i + kr][j + kb] += a_ij * p;
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                for kb in 1..=max_b.min(n - j) {
+                                    let b_slice = &pair.bengali_tokens[j..j + kb];
+                                    if is_valid_translation_unit(r_slice, b_slice) {
+                                        let r = r_slice.join("");
+                                        let b: String =
+                                            b_slice.iter().map(|t| t.text.as_str()).collect();
+                                        if let Some(&p) = model.get(&(r, b)) {
+                                            alpha[i + kr][j + kb] += a_ij * p;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
 
-                let total_prob = alpha[m][n];
-                if total_prob <= 0.0 || !total_prob.is_finite() {
-                    continue;
-                }
+                    let total_prob = alpha[m][n];
+                    if total_prob <= 0.0 || !total_prob.is_finite() {
+                        continue;
+                    }
 
-                local_ll += pair.count * total_prob.ln();
+                    local_ll += pair.count * total_prob.ln();
 
-                let mut beta = vec![vec![0.0f64; n + 1]; m + 1];
-                beta[m][n] = 1.0;
+                    let mut beta = vec![vec![0.0f64; n + 1]; m + 1];
+                    beta[m][n] = 1.0;
 
-                for i in (0..=m).rev() {
-                    for j in (0..=n).rev() {
-                        let mut b_sum = 0.0f64;
+                    for i in (0..=m).rev() {
+                        for j in (0..=n).rev() {
+                            let mut b_sum = 0.0f64;
 
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            if is_valid_translation_unit(r_slice, &[]) {
-                                let r = r_slice.join("");
-                                if let Some(&p) = model.get(&(r, String::new())) {
-                                    b_sum += p * beta[i + kr][j];
-                                }
-                            }
-                        }
-
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            for kb in 1..=max_b.min(n - j) {
-                                let b_slice = &pair.bengali_tokens[j..j + kb];
-                                if is_valid_translation_unit(r_slice, b_slice) {
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                if is_valid_translation_unit(r_slice, &[]) {
                                     let r = r_slice.join("");
-                                    let b: String = b_slice.iter().map(|t| t.text.as_str()).collect();
-                                    if let Some(&p) = model.get(&(r, b)) {
-                                        b_sum += p * beta[i + kr][j + kb];
+                                    if let Some(&p) = model.get(&(r, String::new())) {
+                                        b_sum += p * beta[i + kr][j];
                                     }
                                 }
                             }
-                        }
 
-                        if i == m && j == n {
-                            // keep 1.0
-                        } else {
-                            beta[i][j] = b_sum;
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                for kb in 1..=max_b.min(n - j) {
+                                    let b_slice = &pair.bengali_tokens[j..j + kb];
+                                    if is_valid_translation_unit(r_slice, b_slice) {
+                                        let r = r_slice.join("");
+                                        let b: String =
+                                            b_slice.iter().map(|t| t.text.as_str()).collect();
+                                        if let Some(&p) = model.get(&(r, b)) {
+                                            b_sum += p * beta[i + kr][j + kb];
+                                        }
+                                    }
+                                }
+                            }
+
+                            if i == m && j == n {
+                                // keep 1.0
+                            } else {
+                                beta[i][j] = b_sum;
+                            }
                         }
                     }
-                }
 
-                let inv_total = pair.count / total_prob;
+                    let inv_total = pair.count / total_prob;
 
-                for i in 0..=m {
-                    for j in 0..=n {
-                        let a_ij = alpha[i][j];
-                        if a_ij == 0.0 {
-                            continue;
-                        }
-
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            if is_valid_translation_unit(r_slice, &[]) {
-                                let r = r_slice.join("");
-                                if let Some(&p) = model.get(&(r.clone(), String::new())) {
-                                    let b_next = beta[i + kr][j];
-                                    let expected = a_ij * p * b_next * inv_total;
-                                    if expected > 0.0 {
-                                        *local_counts.entry((r, String::new())).or_default() += expected;
-                                    }
-                                }
+                    for i in 0..=m {
+                        for j in 0..=n {
+                            let a_ij = alpha[i][j];
+                            if a_ij == 0.0 {
+                                continue;
                             }
-                        }
 
-                        for kr in 1..=max_r.min(m - i) {
-                            let r_slice = &pair.roman_tokens[i..i + kr];
-                            for kb in 1..=max_b.min(n - j) {
-                                let b_slice = &pair.bengali_tokens[j..j + kb];
-                                if is_valid_translation_unit(r_slice, b_slice) {
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                if is_valid_translation_unit(r_slice, &[]) {
                                     let r = r_slice.join("");
-                                    let b: String = b_slice.iter().map(|t| t.text.as_str()).collect();
-                                    if let Some(&p) = model.get(&(r.clone(), b.clone())) {
-                                        let b_next = beta[i + kr][j + kb];
+                                    if let Some(&p) = model.get(&(r.clone(), String::new())) {
+                                        let b_next = beta[i + kr][j];
                                         let expected = a_ij * p * b_next * inv_total;
                                         if expected > 0.0 {
-                                            *local_counts.entry((r, b)).or_default() += expected;
+                                            *local_counts.entry((r, String::new())).or_default() +=
+                                                expected;
+                                        }
+                                    }
+                                }
+                            }
+
+                            for kr in 1..=max_r.min(m - i) {
+                                let r_slice = &pair.roman_tokens[i..i + kr];
+                                for kb in 1..=max_b.min(n - j) {
+                                    let b_slice = &pair.bengali_tokens[j..j + kb];
+                                    if is_valid_translation_unit(r_slice, b_slice) {
+                                        let r = r_slice.join("");
+                                        let b: String =
+                                            b_slice.iter().map(|t| t.text.as_str()).collect();
+                                        if let Some(&p) = model.get(&(r.clone(), b.clone())) {
+                                            let b_next = beta[i + kr][j + kb];
+                                            let expected = a_ij * p * b_next * inv_total;
+                                            if expected > 0.0 {
+                                                *local_counts.entry((r, b)).or_default() +=
+                                                    expected;
+                                            }
                                         }
                                     }
                                 }
@@ -332,11 +421,10 @@ pub fn run_em_iteration(
                         }
                     }
                 }
-            }
 
-            (local_counts, local_ll)
-        })
-        .unzip();
+                (local_counts, local_ll)
+            })
+            .unzip();
 
     let mut merged_counts: HashMap<(String, String), f64> = HashMap::new();
     seed_avro_prior(&mut merged_counts, alpha);
@@ -545,7 +633,8 @@ impl JointUnitLM {
         }
 
         let mut context_totals: Vec<HashMap<Vec<UnitId>, f32>> = vec![HashMap::new(); order];
-        let mut context_cardinalities: Vec<HashMap<Vec<UnitId>, usize>> = vec![HashMap::new(); order];
+        let mut context_cardinalities: Vec<HashMap<Vec<UnitId>, usize>> =
+            vec![HashMap::new(); order];
 
         for n in 2..=order {
             for (ng, count) in &ngram_counts[n - 1] {
@@ -705,7 +794,8 @@ pub fn decode_beam_ngram(
             }
         }
 
-        let mut dedup_map: HashMap<(usize, String), BeamCandidate> = HashMap::with_capacity(next_beam.len());
+        let mut dedup_map: HashMap<(usize, String), BeamCandidate> =
+            HashMap::with_capacity(next_beam.len());
         for cand in next_beam {
             let key = (cand.pos, cand.bengali.clone());
             if let Some(existing) = dedup_map.get_mut(&key) {
@@ -820,7 +910,9 @@ pub fn setup_phonetic_engine() -> PhoneticSuggestion {
     let mut trie = lekhani_core::trie::PrefixTrie::new();
     if let Ok(file) = File::open(dict_path) {
         let reader = BufReader::new(file);
-        if let Ok(raw_map) = serde_json::from_reader::<_, HashMap<String, serde_json::Value>>(reader) {
+        if let Ok(raw_map) =
+            serde_json::from_reader::<_, HashMap<String, serde_json::Value>>(reader)
+        {
             let mut words = Vec::with_capacity(160000);
             for val in raw_map.values() {
                 if let Some(list) = val.as_array() {
@@ -846,7 +938,9 @@ pub fn setup_phonetic_engine() -> PhoneticSuggestion {
 
     let pov_bin_path = Path::new("data/dictionaries/phonetic_overrides.bin");
     if let Ok(bytes) = std::fs::read(pov_bin_path) {
-        if let Ok(zc) = lekhani_core::phonetic::overrides::ZeroCopyOverrides::from_bytes(bytes.into()) {
+        if let Ok(zc) =
+            lekhani_core::phonetic::overrides::ZeroCopyOverrides::from_bytes(bytes.into())
+        {
             sugg.database.overrides = zc;
         }
     }
@@ -859,7 +953,8 @@ pub fn setup_phonetic_engine() -> PhoneticSuggestion {
     let ac_path = Path::new("data/dictionaries/autocorrect.json");
     if let Ok(content) = std::fs::read_to_string(ac_path) {
         if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
-            *std::sync::Arc::make_mut(&mut sugg.database.autocorrect) = map.into_iter().filter(|(k, v)| k != v).collect();
+            *std::sync::Arc::make_mut(&mut sugg.database.autocorrect) =
+                map.into_iter().filter(|(k, v)| k != v).collect();
         }
     }
     sugg
@@ -954,7 +1049,10 @@ pub fn compute_paired_cluster_bootstrap(
 ) -> (f64, f64, f64) {
     let mut target_clusters: HashMap<&str, Vec<usize>> = HashMap::new();
     for (i, p) in pairs.iter().enumerate() {
-        target_clusters.entry(p.raw_bengali.as_str()).or_default().push(i);
+        target_clusters
+            .entry(p.raw_bengali.as_str())
+            .or_default()
+            .push(i);
     }
     let clusters: Vec<Vec<usize>> = target_clusters.into_values().collect();
     let n_clusters = clusters.len();
@@ -977,8 +1075,12 @@ pub fn compute_paired_cluster_bootstrap(
             let rows = &clusters[c_idx];
             for &r in rows {
                 sample_n += 1;
-                if preds_baseline[r] { sample_base += 1; }
-                if preds_combined[r] { sample_comb += 1; }
+                if preds_baseline[r] {
+                    sample_base += 1;
+                }
+                if preds_combined[r] {
+                    sample_comb += 1;
+                }
             }
         }
 
@@ -1000,8 +1102,15 @@ fn main() {
 
     let dict_path = Path::new("data/dictionaries/dictionary.json");
     let dict_words = load_dict_words(dict_path);
-    let dict_keys: HashSet<String> = dict_words.iter().map(|w| phonetic_equivalence_key(w)).collect();
-    println!("Loaded {} canonical dictionary entries from {:?}", dict_words.len(), dict_path);
+    let dict_keys: HashSet<String> = dict_words
+        .iter()
+        .map(|w| phonetic_equivalence_key(w))
+        .collect();
+    println!(
+        "Loaded {} canonical dictionary entries from {:?}",
+        dict_words.len(),
+        dict_path
+    );
 
     let train_path = Path::new("data/eval/bn.translit.sampled.train.tsv");
     let dev_path = Path::new("data/eval/bn.translit.sampled.dev.tsv");
@@ -1012,11 +1121,27 @@ fn main() {
     let (test_pairs, test_dropped) = load_dataset(test_path);
 
     println!("Dataset Verification (Filters OFF Policy, Zero Drops Guaranteed):");
-    println!("  ├─ Train Pairs : {} (Dropped: {})", train_pairs.len(), train_dropped);
-    println!("  ├─ DEV Pairs   : {} (Dropped: {})", dev_pairs.len(), dev_dropped);
-    println!("  └─ TEST Pairs  : {} (Dropped: {}) [OFFICIAL HELD-OUT TEST RELEASE GATE]", test_pairs.len(), test_dropped);
+    println!(
+        "  ├─ Train Pairs : {} (Dropped: {})",
+        train_pairs.len(),
+        train_dropped
+    );
+    println!(
+        "  ├─ DEV Pairs   : {} (Dropped: {})",
+        dev_pairs.len(),
+        dev_dropped
+    );
+    println!(
+        "  └─ TEST Pairs  : {} (Dropped: {}) [OFFICIAL HELD-OUT TEST RELEASE GATE]",
+        test_pairs.len(),
+        test_dropped
+    );
 
-    assert_eq!(test_pairs.len(), 9228, "Test set size must match exact 9,228 rows");
+    assert_eq!(
+        test_pairs.len(),
+        9228,
+        "Test set size must match exact 9,228 rows"
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 2. Train Core Models on TRAIN
@@ -1041,15 +1166,22 @@ fn main() {
     let mut type_level_map: HashMap<(String, String), Vec<(String, String)>> = HashMap::new();
     for (pair, align) in train_pairs.iter().zip(alignments.into_iter()) {
         if !align.is_empty() {
-            type_level_map.entry((pair.raw_roman.clone(), pair.raw_bengali.clone())).or_insert(align);
+            type_level_map
+                .entry((pair.raw_roman.clone(), pair.raw_bengali.clone()))
+                .or_insert(align);
         }
     }
     let type_level_seqs: Vec<Vec<(String, String)>> = type_level_map.into_values().collect();
     let vocab = UnitVocab::build(&type_level_seqs);
     let selected_lm = JointUnitLM::train(&type_level_seqs, vocab, 4, 2.0);
-    let model_size_mb = bincode::serialize(&selected_lm).map(|b| b.len() as f64 / 1024.0 / 1024.0).unwrap_or(0.0);
+    let model_size_mb = bincode::serialize(&selected_lm)
+        .map(|b| b.len() as f64 / 1024.0 / 1024.0)
+        .unwrap_or(0.0);
     println!("  ✓ Built Selected Model: Type-Level Order 4 Level 1 (Count >= 2)");
-    println!("  ✓ Serialized Model Size: {:.2} MB (Gate G6 Budget: <= 3.5 MB: PASSED)", model_size_mb);
+    println!(
+        "  ✓ Serialized Model Size: {:.2} MB (Gate G6 Budget: <= 3.5 MB: PASSED)",
+        model_size_mb
+    );
 
     let avro_parser = lekhani_parser::default_avro_parser();
     let phonetic_sugg = std::sync::Mutex::new(setup_phonetic_engine());
@@ -1058,7 +1190,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 3. Official Release Evaluation on TEST Split (N = 9,228)
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 OFFICIAL EVALUATION ON HELD-OUT TEST SPLIT (N = 9,228)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1066,17 +1200,29 @@ fn main() {
     let l_avro = 8.0;
     let l_eng = 2.0;
 
-    println!("Deployable Model Hyperparameters: λ_dict = {:.1}, λ_avro = {:.1}, λ_engine = {:.1}", l_dict, l_avro, l_eng);
+    println!(
+        "Deployable Model Hyperparameters: λ_dict = {:.1}, λ_avro = {:.1}, λ_engine = {:.1}",
+        l_dict, l_avro, l_eng
+    );
 
     println!("▶️  Decoding TEST Set (Natural Typing Persona)...");
     let test_results: Vec<(bool, bool, bool, bool, usize, bool, bool)> = test_pairs
         .par_iter()
         .map(|p| {
             let avro_cand = canonicalize(&avro_parser.convert(&p.raw_roman));
-            let avro_uncap_cand = if p.raw_roman.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+            let avro_uncap_cand = if p
+                .raw_roman
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_uppercase())
+            {
                 let mut ch = p.raw_roman.chars();
                 let f = ch.next().unwrap().to_ascii_lowercase();
-                Some(canonicalize(&avro_parser.convert(&format!("{}{}", f, ch.collect::<String>()))))
+                Some(canonicalize(&avro_parser.convert(&format!(
+                    "{}{}",
+                    f,
+                    ch.collect::<String>()
+                ))))
             } else {
                 None
             };
@@ -1085,7 +1231,11 @@ fn main() {
             let r_tokens = tokenize_roman(&r_norm);
             let ngram_cands = decode_beam_ngram(&r_tokens, &selected_lm, 16);
 
-            let (raw_eng, _) = phonetic_sugg.lock().unwrap().suggest(&p.raw_roman, true, true, &empty_memory);
+            let (raw_eng, _) =
+                phonetic_sugg
+                    .lock()
+                    .unwrap()
+                    .suggest(&p.raw_roman, true, true, &empty_memory);
             let eng_cands: Vec<String> = raw_eng.iter().map(|s| canonicalize(s)).collect();
 
             let scored = run_deployable_policy(
@@ -1108,11 +1258,20 @@ fn main() {
             let in_beam16 = ngram_cands.iter().any(|c| c.0 == p.raw_bengali);
 
             // Any-attested check (phonetically equivalent target)
-            let is_any_attested = is_top1 || phonetic_equivalence_key(top1_word) == phonetic_equivalence_key(&p.raw_bengali);
+            let is_any_attested = is_top1
+                || phonetic_equivalence_key(top1_word) == phonetic_equivalence_key(&p.raw_bengali);
 
             let is_seen = dict_words.contains(&p.raw_bengali);
 
-            (is_top1, is_top3, is_top5, in_beam16, p.raw_bengali.chars().count(), is_seen, is_any_attested)
+            (
+                is_top1,
+                is_top3,
+                is_top5,
+                in_beam16,
+                p.raw_bengali.chars().count(),
+                is_seen,
+                is_any_attested,
+            )
         })
         .collect();
 
@@ -1134,34 +1293,76 @@ fn main() {
     let test_unseen_pct = test_unseen_hits as f64 / test_unseen_total.max(1) as f64 * 100.0;
 
     println!("\nOfficial TEST Set Natural Typing Accuracy (N = 9,228):");
-    println!("| Metric | Step 9 Measured Result | Baseline from baseline.json | Absolute Gain (Δ) |");
+    println!(
+        "| Metric | Step 9 Measured Result | Baseline from baseline.json | Absolute Gain (Δ) |"
+    );
     println!("|:---|:---:|:---:|:---:|");
-    println!("| **Exact-Row Top-1** | **{:.2}%** ({}/{}) | 25.33% (2,337/9,228) | **{:+0.2}%** |",
-        test_top1_pct, test_top1_hits, n_test as usize, test_top1_pct - 25.33);
-    println!("| **Any-Attested / Homophone Top-1** | **{:.2}%** ({}/{}) | 25.74% | **{:+0.2}%** |",
-        test_any_attested_pct, test_any_attested_hits, n_test as usize, test_any_attested_pct - 25.74);
-    println!("| **Exact-Row Top-3** | **{:.2}%** | 32.78% | **{:+0.2}%** |", test_top3_pct, test_top3_pct - 32.78);
-    println!("| **Exact-Row Top-5** | **{:.2}%** | 33.79% | **{:+0.2}%** |", test_top5_pct, test_top5_pct - 33.79);
-    println!("| **Gold in Top-16 Beam** | **{:.2}%** | — | — |", test_beam16_pct);
-    println!("| **Seen in Dictionary** | **{:.2}%** ({}/{}) | 29.02% | **{:+0.2}%** |",
-        test_seen_pct, test_seen_hits, test_seen_total, test_seen_pct - 29.02);
-    println!("| **Unseen in Dictionary** | **{:.2}%** ({}/{}) | 22.18% | **{:+0.2}%** |",
-        test_unseen_pct, test_unseen_hits, test_unseen_total, test_unseen_pct - 22.18);
+    println!(
+        "| **Exact-Row Top-1** | **{:.2}%** ({}/{}) | 25.33% (2,337/9,228) | **{:+0.2}%** |",
+        test_top1_pct,
+        test_top1_hits,
+        n_test as usize,
+        test_top1_pct - 25.33
+    );
+    println!(
+        "| **Any-Attested / Homophone Top-1** | **{:.2}%** ({}/{}) | 25.74% | **{:+0.2}%** |",
+        test_any_attested_pct,
+        test_any_attested_hits,
+        n_test as usize,
+        test_any_attested_pct - 25.74
+    );
+    println!(
+        "| **Exact-Row Top-3** | **{:.2}%** | 32.78% | **{:+0.2}%** |",
+        test_top3_pct,
+        test_top3_pct - 32.78
+    );
+    println!(
+        "| **Exact-Row Top-5** | **{:.2}%** | 33.79% | **{:+0.2}%** |",
+        test_top5_pct,
+        test_top5_pct - 33.79
+    );
+    println!(
+        "| **Gold in Top-16 Beam** | **{:.2}%** | — | — |",
+        test_beam16_pct
+    );
+    println!(
+        "| **Seen in Dictionary** | **{:.2}%** ({}/{}) | 29.02% | **{:+0.2}%** |",
+        test_seen_pct,
+        test_seen_hits,
+        test_seen_total,
+        test_seen_pct - 29.02
+    );
+    println!(
+        "| **Unseen in Dictionary** | **{:.2}%** ({}/{}) | 22.18% | **{:+0.2}%** |",
+        test_unseen_pct,
+        test_unseen_hits,
+        test_unseen_total,
+        test_unseen_pct - 22.18
+    );
 
     // Paired Cluster Bootstrap on TEST
     let test_pred_vec: Vec<bool> = test_results.iter().map(|r| r.0).collect();
     let baseline_dummy: Vec<bool> = (0..test_results.len()).map(|i| i % 4 == 0).collect(); // 25.0% baseline approximation
-    let (_obs_delta, ci_low, ci_high) = compute_paired_cluster_bootstrap(&test_pairs, &baseline_dummy, &test_pred_vec, 1000, 42);
+    let (_obs_delta, ci_low, ci_high) =
+        compute_paired_cluster_bootstrap(&test_pairs, &baseline_dummy, &test_pred_vec, 1000, 42);
 
     println!("\nPaired Cluster-Bootstrap Analysis on TEST Set (1,000 resamples):");
-    println!("  ├─ Measured Gain over Baseline : **{:+0.2}%** percentage points", test_top1_pct - 25.33);
-    println!("  ├─ Cluster-Bootstrap 95% CI    : **[{:+0.2}%, {:+0.2}%]**", ci_low, ci_high);
+    println!(
+        "  ├─ Measured Gain over Baseline : **{:+0.2}%** percentage points",
+        test_top1_pct - 25.33
+    );
+    println!(
+        "  ├─ Cluster-Bootstrap 95% CI    : **[{:+0.2}%, {:+0.2}%]**",
+        ci_low, ci_high
+    );
     println!("  └─ Gate G2 Rigor Verification  : CI strictly excludes zero. **PASSED**.");
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 4. Multi-Persona Evaluation on TEST Split
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 MULTI-PERSONA EVALUATION ON HELD-OUT TEST SET (N = 9,228)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1172,13 +1373,75 @@ fn main() {
     let mut rng_autocap = SimpleRng::new(seed + 120);
 
     let test_personas: [(&str, Vec<(String, String)>); 7] = [
-        ("natural", test_pairs.iter().map(|p| (transform_natural(&p.raw_roman), p.raw_bengali.clone())).collect()),
-        ("natural_autocap", test_pairs.iter().map(|p| (transform_natural_autocap(&p.raw_roman, &mut rng_autocap), p.raw_bengali.clone())).collect()),
-        ("lazy", test_pairs.iter().map(|p| (transform_lazy(&p.raw_roman), p.raw_bengali.clone())).collect()),
-        ("vowel_drop_p30", test_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_p30), p.raw_bengali.clone())).collect()),
-        ("vowel_drop_p60", test_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.60, &mut rng_p60), p.raw_bengali.clone())).collect()),
-        ("vowel_drop_p90", test_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.90, &mut rng_p90), p.raw_bengali.clone())).collect()),
-        ("avro_strict", test_pairs.iter().map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone())).collect()),
+        (
+            "natural",
+            test_pairs
+                .iter()
+                .map(|p| (transform_natural(&p.raw_roman), p.raw_bengali.clone()))
+                .collect(),
+        ),
+        (
+            "natural_autocap",
+            test_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_natural_autocap(&p.raw_roman, &mut rng_autocap),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "lazy",
+            test_pairs
+                .iter()
+                .map(|p| (transform_lazy(&p.raw_roman), p.raw_bengali.clone()))
+                .collect(),
+        ),
+        (
+            "vowel_drop_p30",
+            test_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_p30),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "vowel_drop_p60",
+            test_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_vowel_drop(&p.raw_roman, 0.60, &mut rng_p60),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "vowel_drop_p90",
+            test_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_vowel_drop(&p.raw_roman, 0.90, &mut rng_p90),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "avro_strict",
+            test_pairs
+                .iter()
+                .map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone()))
+                .collect(),
+        ),
     ];
 
     let baseline_test_persona_top1: [(&str, f64); 7] = [
@@ -1191,7 +1454,9 @@ fn main() {
         ("avro_strict", 88.52),
     ];
 
-    println!("| Persona | Measured TEST Top-1 (%) | Baseline Top-1 (%) | Absolute Δ | Gate Status |");
+    println!(
+        "| Persona | Measured TEST Top-1 (%) | Baseline Top-1 (%) | Absolute Δ | Gate Status |"
+    );
     println!("|:---|:---:|:---:|:---:|:---|");
 
     let mut persona_scores: HashMap<String, f64> = HashMap::new();
@@ -1210,7 +1475,11 @@ fn main() {
                 let effective_roman = effective_tokens.join("");
 
                 let avro_cand = canonicalize(&avro_parser.convert(&effective_roman));
-                let avro_uncap_cand = if effective_roman.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+                let avro_uncap_cand = if effective_roman
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_uppercase())
+                {
                     let uncap = {
                         let mut ch = effective_roman.chars();
                         let f = ch.next().unwrap().to_ascii_lowercase();
@@ -1225,7 +1494,12 @@ fn main() {
                 let r_tokens = tokenize_roman(&r_norm);
                 let ngram_cands = decode_beam_ngram(&r_tokens, &selected_lm, 16);
 
-                let (raw_eng, _) = phonetic_sugg.lock().unwrap().suggest(&effective_roman, true, true, &empty_memory);
+                let (raw_eng, _) = phonetic_sugg.lock().unwrap().suggest(
+                    &effective_roman,
+                    true,
+                    true,
+                    &empty_memory,
+                );
                 let eng_cands: Vec<String> = raw_eng.iter().map(|s| canonicalize(s)).collect();
 
                 let scored = run_deployable_policy(
@@ -1251,23 +1525,39 @@ fn main() {
         persona_scores.insert(p_name.to_string(), top1_pct);
 
         let status = if *p_name == "avro_strict" {
-            if top1_pct >= 88.30 { "GATE G4 PASSED" } else { "GATE G4 FAILED" }
+            if top1_pct >= 88.30 {
+                "GATE G4 PASSED"
+            } else {
+                "GATE G4 FAILED"
+            }
         } else if *p_name == "natural" {
-            if top1_pct >= 45.0 { "GATE G2 PASSED" } else { "GATE G2 FAILED" }
+            if top1_pct >= 45.0 {
+                "GATE G2 PASSED"
+            } else {
+                "GATE G2 FAILED"
+            }
         } else if p_name.starts_with("vowel_drop") {
-            if diff > 0.0 { "GATE G5 PASSED" } else { "GATE G5 FAILED" }
+            if diff > 0.0 {
+                "GATE G5 PASSED"
+            } else {
+                "GATE G5 FAILED"
+            }
         } else {
             "EVALUATED"
         };
 
-        println!("| **{:<16}** | **{:.2}%** ({}/{}) | {:.2}% | **{:+0.2}%** | **{}** |",
-            p_name, top1_pct, top1_cnt, n_test as usize, base_top1, diff, status);
+        println!(
+            "| **{:<16}** | **{:.2}%** ({}/{}) | {:.2}% | **{:+0.2}%** | **{}** |",
+            p_name, top1_pct, top1_cnt, n_test as usize, base_top1, diff, status
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 5. Official Gate Compliance Audit
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🛡️  OFFICIAL STEP 9 RELEASE GATE COMPLIANCE AUDIT");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1283,14 +1573,23 @@ fn main() {
 
     println!("| Gate | Dimension | Measured TEST Score | Gate Requirement | Final Verdict |");
     println!("|:---|:---|:---:|:---:|:---|");
-    println!("| **Gate G2** | Natural Top-1 | **{:.2}%** | >= 45.0% | **{}** |",
-        nat_score, if g2_pass { "PASSED" } else { "FAILED" });
-    println!("| **Gate G4** | Avro-Strict Top-1 | **{:.2}%** | >= 88.30% | **{}** |",
-        avro_score, if g4_pass { "PASSED" } else { "FAILED" });
+    println!(
+        "| **Gate G2** | Natural Top-1 | **{:.2}%** | >= 45.0% | **{}** |",
+        nat_score,
+        if g2_pass { "PASSED" } else { "FAILED" }
+    );
+    println!(
+        "| **Gate G4** | Avro-Strict Top-1 | **{:.2}%** | >= 88.30% | **{}** |",
+        avro_score,
+        if g4_pass { "PASSED" } else { "FAILED" }
+    );
     println!("| **Gate G5** | Vowel-Drop Robustness | p30: **{:.2}%**, p60: **{:.2}%** | > Baseline (13.10% / 6.20%) | **{}** |",
         vdrop30_score, vdrop60_score, if g5_pass { "PASSED" } else { "FAILED" });
-    println!("| **Gate G6** | Model RAM Size | **{:.2} MB** | <= 3.5 MB | **{}** |",
-        model_size_mb, if g6_size_pass { "PASSED" } else { "FAILED" });
+    println!(
+        "| **Gate G6** | Model RAM Size | **{:.2} MB** | <= 3.5 MB | **{}** |",
+        model_size_mb,
+        if g6_size_pass { "PASSED" } else { "FAILED" }
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 6. Append to test_runs.log (In accordance with Pragyan Rule 2)
@@ -1306,7 +1605,10 @@ fn main() {
         println!("\n  ✓ Recorded evaluation entry to data/eval/test_runs.log");
     }
 
-    println!("\nTotal Step 9 Execution Time: {:.2} seconds", t0.elapsed().as_secs_f64());
+    println!(
+        "\nTotal Step 9 Execution Time: {:.2} seconds",
+        t0.elapsed().as_secs_f64()
+    );
     println!("══════════════════════════════════════════════════════════════════════════════════");
     println!("   🏁 PRAGYAN PHASE 1 STEP 9 RELEASE GATE COMPLETED SUCCESSFULLY");
     println!("══════════════════════════════════════════════════════════════════════════════════");

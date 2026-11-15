@@ -455,8 +455,14 @@ impl TopicVector {
         }
         let clean_a = cand_a.trim_matches(is_punct);
         let clean_b = cand_b.trim_matches(is_punct);
-        let sim_a = embeddings.get_vector(clean_a).map(|v| self.similarity(v)).unwrap_or(0.0);
-        let sim_b = embeddings.get_vector(clean_b).map(|v| self.similarity(v)).unwrap_or(0.0);
+        let sim_a = embeddings
+            .get_vector(clean_a)
+            .map(|v| self.similarity(v))
+            .unwrap_or(0.0);
+        let sim_b = embeddings
+            .get_vector(clean_b)
+            .map(|v| self.similarity(v))
+            .unwrap_or(0.0);
 
         let delta = sim_a - sim_b;
         if delta > 0.08 {
@@ -1512,8 +1518,8 @@ pub const CORE_EMBEDDINGS: &[(&str, [f32; EMBEDDING_DIM])] = &[
     (
         "দিন",
         vec32![
-            0.88, 0.32, 0.12, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            0.88, 0.32, 0.12, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         ],
     ),
     (
@@ -1527,8 +1533,8 @@ pub const CORE_EMBEDDINGS: &[(&str, [f32; EMBEDDING_DIM])] = &[
     (
         "নীল",
         vec32![
-            0.0, 0.0, 0.0, 0.70, 0.40, 0.20, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            0.0, 0.0, 0.0, 0.70, 0.40, 0.20, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         ],
     ),
     (

@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Pragyan Phase 1 Step 7b: Rigorous Verification of the Joint Unit Language Model
 //!
 //! Executes all 7 verification items required before Step 8:
@@ -91,30 +92,112 @@ pub fn seed_avro_prior(counts: &mut HashMap<(String, String), f64>, alpha: f64) 
         return;
     }
     let priors: &[(&str, &str)] = &[
-        ("k", "ক"), ("kh", "খ"), ("g", "গ"), ("gh", "ঘ"), ("ng", "ঙ"),
-        ("c", "চ"), ("ch", "ছ"), ("j", "জ"), ("jh", "ঝ"),
-        ("t", "ত"), ("t", "ট"), ("th", "থ"), ("th", "ঠ"),
-        ("d", "দ"), ("d", "ড"), ("dh", "ধ"), ("dh", "ঢ"),
-        ("n", "ন"), ("n", "ণ"),
-        ("p", "প"), ("ph", "ফ"), ("f", "ফ"), ("b", "ব"), ("bh", "ভ"), ("v", "ভ"), ("m", "ম"),
-        ("z", "য"), ("r", "র"), ("l", "ল"),
-        ("sh", "শ"), ("sh", "ষ"), ("s", "স"), ("s", "শ"), ("h", "হ"),
-        ("y", "য়"), ("w", "ও"), ("q", "ক"), ("x", "ক্স"),
-        ("a", "া"), ("a", "আ"), ("a", "অ"), ("aa", "আ"), ("aa", "া"),
-        ("i", "ি"), ("i", "ই"), ("ee", "ী"), ("ee", "ি"),
-        ("u", "ু"), ("u", "উ"), ("oo", "ূ"), ("oo", "ু"),
-        ("e", "ে"), ("e", "এ"), ("oi", "ঐ"), ("ou", "ঔ"),
-        ("o", "ও"), ("o", "ো"), ("o", "অ"),
-        ("kkh", "ক্ষ"), ("ngk", "ঙ্ক"), ("ngkh", "ঙ্খ"), ("ngg", "ঙ্গ"), ("nggh", "ঙ্ঘ"),
-        ("cch", "চ্ছ"), ("jj", "জ্জ"), ("jjh", "জ্ঝ"), ("nc", "ঞ্চ"), ("nch", "ঞ্ছ"), ("nj", "ঞ্জ"),
-        ("tt", "ট্ট"), ("nth", "ণ্ঠ"), ("nd", "ণ্ড"), ("kt", "ক্ত"), ("pt", "প্ত"), ("bd", "ব্দ"),
-        ("st", "স্ত"), ("sth", "স্থ"), ("sn", "স্ন"), ("sp", "স্প"), ("sph", "স্ফ"),
-        ("nt", "ন্ত"), ("nth", "ন্থ"), ("nd", "ন্দ"), ("ndh", "ন্ধ"),
-        ("mp", "ম্প"), ("mb", "ম্ব"), ("mbh", "ম্ভ"),
-        ("rk", "র্ক"), ("rg", "র্গ"), ("rt", "র্ত"), ("rt", "র্ড"), ("rd", "র্দ"),
-        ("rn", "র্ণ"), ("rp", "র্প"), ("rb", "র্ব"), ("rm", "র্ম"), ("rsh", "র্ষ"), ("rs", "র্স"),
-        ("er", "ের"), ("ar", "ার"), ("te", "তে"), ("ke", "কে"), ("der", "দের"),
-        ("a", ""), ("o", ""), ("e", ""),
+        ("k", "ক"),
+        ("kh", "খ"),
+        ("g", "গ"),
+        ("gh", "ঘ"),
+        ("ng", "ঙ"),
+        ("c", "চ"),
+        ("ch", "ছ"),
+        ("j", "জ"),
+        ("jh", "ঝ"),
+        ("t", "ত"),
+        ("t", "ট"),
+        ("th", "থ"),
+        ("th", "ঠ"),
+        ("d", "দ"),
+        ("d", "ড"),
+        ("dh", "ধ"),
+        ("dh", "ঢ"),
+        ("n", "ন"),
+        ("n", "ণ"),
+        ("p", "প"),
+        ("ph", "ফ"),
+        ("f", "ফ"),
+        ("b", "ব"),
+        ("bh", "ভ"),
+        ("v", "ভ"),
+        ("m", "ম"),
+        ("z", "য"),
+        ("r", "র"),
+        ("l", "ল"),
+        ("sh", "শ"),
+        ("sh", "ষ"),
+        ("s", "স"),
+        ("s", "শ"),
+        ("h", "হ"),
+        ("y", "য়"),
+        ("w", "ও"),
+        ("q", "ক"),
+        ("x", "ক্স"),
+        ("a", "া"),
+        ("a", "আ"),
+        ("a", "অ"),
+        ("aa", "আ"),
+        ("aa", "া"),
+        ("i", "ি"),
+        ("i", "ই"),
+        ("ee", "ী"),
+        ("ee", "ি"),
+        ("u", "ু"),
+        ("u", "উ"),
+        ("oo", "ূ"),
+        ("oo", "ু"),
+        ("e", "ে"),
+        ("e", "এ"),
+        ("oi", "ঐ"),
+        ("ou", "ঔ"),
+        ("o", "ও"),
+        ("o", "ো"),
+        ("o", "অ"),
+        ("kkh", "ক্ষ"),
+        ("ngk", "ঙ্ক"),
+        ("ngkh", "ঙ্খ"),
+        ("ngg", "ঙ্গ"),
+        ("nggh", "ঙ্ঘ"),
+        ("cch", "চ্ছ"),
+        ("jj", "জ্জ"),
+        ("jjh", "জ্ঝ"),
+        ("nc", "ঞ্চ"),
+        ("nch", "ঞ্ছ"),
+        ("nj", "ঞ্জ"),
+        ("tt", "ট্ট"),
+        ("nth", "ণ্ঠ"),
+        ("nd", "ণ্ড"),
+        ("kt", "ক্ত"),
+        ("pt", "প্ত"),
+        ("bd", "ব্দ"),
+        ("st", "স্ত"),
+        ("sth", "স্থ"),
+        ("sn", "স্ন"),
+        ("sp", "স্প"),
+        ("sph", "স্ফ"),
+        ("nt", "ন্ত"),
+        ("nth", "ন্থ"),
+        ("nd", "ন্দ"),
+        ("ndh", "ন্ধ"),
+        ("mp", "ম্প"),
+        ("mb", "ম্ব"),
+        ("mbh", "ম্ভ"),
+        ("rk", "র্ক"),
+        ("rg", "র্গ"),
+        ("rt", "র্ত"),
+        ("rt", "র্ড"),
+        ("rd", "র্দ"),
+        ("rn", "র্ণ"),
+        ("rp", "র্প"),
+        ("rb", "র্ব"),
+        ("rm", "র্ম"),
+        ("rsh", "র্ষ"),
+        ("rs", "র্স"),
+        ("er", "ের"),
+        ("ar", "ার"),
+        ("te", "তে"),
+        ("ke", "কে"),
+        ("der", "দের"),
+        ("a", ""),
+        ("o", ""),
+        ("e", ""),
     ];
     for &(r, b) in priors {
         *counts.entry((r.to_string(), b.to_string())).or_default() += alpha;
@@ -213,8 +296,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -257,8 +348,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i - kr..i] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j - kb..j] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i - kr..i]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j - kb..j]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -297,8 +396,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -384,8 +491,16 @@ pub fn viterbi_forced_alignment_detailed(
                         continue;
                     }
 
-                    let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                    let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                    let r_slice = if kr == 0 {
+                        &[]
+                    } else {
+                        &pair.roman_tokens[i..i + kr]
+                    };
+                    let b_slice = if kb == 0 {
+                        &[]
+                    } else {
+                        &pair.bengali_tokens[j..j + kb]
+                    };
 
                     if !is_valid_translation_unit(r_slice, b_slice) {
                         continue;
@@ -458,7 +573,9 @@ impl UnitVocabulary {
         unit_to_id.insert(("</s>".to_string(), "</s>".to_string()), EOS_TOKEN);
 
         for (r, b) in units {
-            if (r.as_str(), b.as_str()) == ("<s>", "<s>") || (r.as_str(), b.as_str()) == ("</s>", "</s>") {
+            if (r.as_str(), b.as_str()) == ("<s>", "<s>")
+                || (r.as_str(), b.as_str()) == ("</s>", "</s>")
+            {
                 continue;
             }
             if unit_to_id.contains_key(&(r.clone(), b.clone())) {
@@ -484,7 +601,9 @@ impl UnitVocabulary {
 
     #[inline]
     pub fn get_id(&self, r: &str, b: &str) -> Option<UnitId> {
-        self.unit_to_id.get(&(r.to_string(), b.to_string())).copied()
+        self.unit_to_id
+            .get(&(r.to_string(), b.to_string()))
+            .copied()
     }
 }
 
@@ -688,7 +807,8 @@ pub fn decode_beam_ngram(
             }
         }
 
-        let mut dedup_map: HashMap<(usize, String), BeamCandidate> = HashMap::with_capacity(next_beam.len());
+        let mut dedup_map: HashMap<(usize, String), BeamCandidate> =
+            HashMap::with_capacity(next_beam.len());
         for cand in next_beam {
             let key = (cand.pos, cand.bengali.clone());
             if let Some(existing) = dedup_map.get_mut(&key) {
@@ -701,7 +821,11 @@ pub fn decode_beam_ngram(
         }
 
         let mut sorted_cands: Vec<BeamCandidate> = dedup_map.into_values().collect();
-        sorted_cands.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_cands.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         sorted_cands.truncate(beam_width);
 
         beam = sorted_cands;
@@ -818,7 +942,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 7b ITEM 7: Account for the Unaligned Train Rows
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 ITEM 7: DETAILED ACCOUNTING OF UNALIGNED TRAIN ROWS");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -834,9 +960,18 @@ fn main() {
         let (s_forced, align) = viterbi_forced_alignment_detailed(pair, &aligner_model, 1, 1);
         if s_forced == f64::NEG_INFINITY || align.is_empty() {
             // Diagnose reason
-            let cat = if pair.roman_tokens.iter().any(|t| t.chars().any(|c| !c.is_ascii_alphabetic())) {
+            let cat = if pair
+                .roman_tokens
+                .iter()
+                .any(|t| t.chars().any(|c| !c.is_ascii_alphabetic()))
+            {
                 "Non-alphabetic Roman glyph (punctuation/digits/symbols)"
-            } else if pair.bengali_tokens.first().map(|t| t.is_vowel_kar()).unwrap_or(false) {
+            } else if pair
+                .bengali_tokens
+                .first()
+                .map(|t| t.is_vowel_kar())
+                .unwrap_or(false)
+            {
                 "Leading dependent Kar without preceding base consonant"
             } else if pair.roman_tokens.len() > pair.bengali_tokens.len() * 3 {
                 "Extreme token length disparity (Roman >> Bengali)"
@@ -846,7 +981,12 @@ fn main() {
                 "Zero-probability co-occurrence lattice under 1:1 constraints"
             };
             *unaligned_categories.entry(cat).or_default() += 1;
-            unaligned_train_rows.push((idx + 1, pair.raw_bengali.clone(), pair.raw_roman.clone(), cat));
+            unaligned_train_rows.push((
+                idx + 1,
+                pair.raw_bengali.clone(),
+                pair.raw_roman.clone(),
+                cat,
+            ));
         } else {
             for (r, b) in &align {
                 all_unique_units.insert((r.clone(), b.clone()));
@@ -857,10 +997,7 @@ fn main() {
 
     let unaligned_count = unaligned_train_rows.len();
     let aligned_count = aligned_train_seqs.len();
-    println!(
-        "   - Total Train Pairs: {}",
-        train_pairs.len()
-    );
+    println!("   - Total Train Pairs: {}", train_pairs.len());
     println!(
         "   - Successfully Aligned: {} ({:.2}%)",
         aligned_count,
@@ -874,25 +1011,39 @@ fn main() {
 
     println!("\n   Taxonomy of Unaligned Rows by Specific Cause:");
     for (cat, cnt) in &unaligned_categories {
-        println!("     ├─ {:<62} : {:>4} rows ({:.2}%)", cat, cnt, (*cnt as f64 / unaligned_count as f64) * 100.0);
+        println!(
+            "     ├─ {:<62} : {:>4} rows ({:.2}%)",
+            cat,
+            cnt,
+            (*cnt as f64 / unaligned_count as f64) * 100.0
+        );
     }
 
     println!("\n   First 10 Unaligned Rows Sample:");
     for (id, bn, lat, reason) in unaligned_train_rows.iter().take(10) {
-        println!("     Row #{:<5} Target: {:<12} Roman: {:<12} | Cause: {}", id, bn, lat, reason);
+        println!(
+            "     Row #{:<5} Target: {:<12} Roman: {:<12} | Cause: {}",
+            id, bn, lat, reason
+        );
     }
 
     // Build vocabulary & training sequences
     let mut sorted_units: Vec<(String, String)> = all_unique_units.into_iter().collect();
     sorted_units.sort();
     let vocab = UnitVocabulary::new(sorted_units);
-    println!("\n   ✓ Unit Vocabulary: {} tokens (including <s>, </s>)", vocab.size());
+    println!(
+        "\n   ✓ Unit Vocabulary: {} tokens (including <s>, </s>)",
+        vocab.size()
+    );
 
     let mut row_level_seqs: Vec<(Vec<UnitId>, f64)> = Vec::with_capacity(aligned_train_seqs.len());
     let mut type_level_seqs: Vec<(Vec<UnitId>, f64)> = Vec::with_capacity(aligned_train_seqs.len());
 
     for (seq, count) in &aligned_train_seqs {
-        let id_seq: Vec<UnitId> = seq.iter().map(|(r, b)| vocab.get_id(r, b).unwrap()).collect();
+        let id_seq: Vec<UnitId> = seq
+            .iter()
+            .map(|(r, b)| vocab.get_id(r, b).unwrap())
+            .collect();
         row_level_seqs.push((id_seq.clone(), *count));
         type_level_seqs.push((id_seq, 1.0));
     }
@@ -926,7 +1077,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 7b ITEM 2: Cluster-Bootstrap 95% CIs across Grid
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 ITEM 2: CLUSTER-BOOTSTRAP 95% CIs (Resampled 1,000x by Bengali Target)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -964,13 +1117,18 @@ fn main() {
         for &order in &orders {
             for &(p_lvl, p_desc, min_cnt) in &prune_configs {
                 let lm = JointUnitLM::train(w_seqs, vocab.clone(), order, min_cnt);
-                let size_kb = bincode::serialize(&lm).map(|b| b.len() as f64 / 1024.0).unwrap_or(0.0);
+                let size_kb = bincode::serialize(&lm)
+                    .map(|b| b.len() as f64 / 1024.0)
+                    .unwrap_or(0.0);
 
                 let eval_results: Vec<(bool, bool, bool)> = dev_pairs
                     .par_iter()
                     .map(|pair| {
                         let cands = decode_beam_ngram(&pair.roman_tokens, &lm, 16);
-                        let is_t1 = cands.first().map(|c| &c.0 == &pair.raw_bengali).unwrap_or(false);
+                        let is_t1 = cands
+                            .first()
+                            .map(|c| &c.0 == &pair.raw_bengali)
+                            .unwrap_or(false);
                         let is_t3 = cands.iter().take(3).any(|c| &c.0 == &pair.raw_bengali);
                         let is_reach = cands.iter().any(|c| &c.0 == &pair.raw_bengali);
                         (is_t1, is_t3, is_reach)
@@ -989,7 +1147,10 @@ fn main() {
                 // Target clusters for bootstrap
                 let mut target_clusters: HashMap<&str, Vec<bool>> = HashMap::new();
                 for (pair, r) in dev_pairs.iter().zip(eval_results.iter()) {
-                    target_clusters.entry(pair.raw_bengali.as_str()).or_default().push(r.0);
+                    target_clusters
+                        .entry(pair.raw_bengali.as_str())
+                        .or_default()
+                        .push(r.0);
                 }
                 let clusters: Vec<Vec<bool>> = target_clusters.into_values().collect();
                 let ci95 = compute_cluster_bootstrap_ci95(&clusters, 42);
@@ -1016,9 +1177,20 @@ fn main() {
     }
 
     // Identify the best model and find overlapping compact models
-    let best_entry = grid_entries.iter().max_by(|a, b| a.top1.partial_cmp(&b.top1).unwrap()).unwrap();
-    println!("\n   Best Model: {} Order {} Level {} ({:.2}%, CI: [{:.2}%, {:.2}%], {:.1} KB)",
-        best_entry.weighting, best_entry.order, best_entry.prune_level, best_entry.top1, best_entry.ci95[0], best_entry.ci95[1], best_entry.size_kb);
+    let best_entry = grid_entries
+        .iter()
+        .max_by(|a, b| a.top1.partial_cmp(&b.top1).unwrap())
+        .unwrap();
+    println!(
+        "\n   Best Model: {} Order {} Level {} ({:.2}%, CI: [{:.2}%, {:.2}%], {:.1} KB)",
+        best_entry.weighting,
+        best_entry.order,
+        best_entry.prune_level,
+        best_entry.top1,
+        best_entry.ci95[0],
+        best_entry.ci95[1],
+        best_entry.size_kb
+    );
 
     let mut overlapping_models = Vec::new();
     for entry in &grid_entries {
@@ -1028,8 +1200,10 @@ fn main() {
     }
     println!("   Models whose Cluster-Bootstrap 95% CI overlaps the Best Model:");
     for m in &overlapping_models {
-        println!("     ├─ {} Order {} Level {} (Size: {:>7.1} KB, Top-1: {:.2}% [{:.2}%, {:.2}%])",
-            m.weighting, m.order, m.prune_level, m.size_kb, m.top1, m.ci95[0], m.ci95[1]);
+        println!(
+            "     ├─ {} Order {} Level {} (Size: {:>7.1} KB, Top-1: {:.2}% [{:.2}%, {:.2}%])",
+            m.weighting, m.order, m.prune_level, m.size_kb, m.top1, m.ci95[0], m.ci95[1]
+        );
     }
 
     // Select the best model for subsequent checks (Order 4 Level 1 Type-Level)
@@ -1038,7 +1212,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 7b ITEM 1: Scoring Check (Exact Row, Most Frequent, Any Attested)
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 ITEM 1: SCORING HARNESS COMPARABILITY ON HELD-OUT DEV (N = 9,279)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1080,16 +1256,38 @@ fn main() {
     }
 
     let n_dev = dev_pairs.len() as f64;
-    println!("   - Exact-Row Top-1 Accuracy:          {:>4} / 9,279 ({:.2}%)", exact_row_hits, exact_row_hits as f64 / n_dev * 100.0);
-    println!("   - Most-Frequent Attested Top-1:      {:>4} / 9,279 ({:.2}%)", most_freq_hits, most_freq_hits as f64 / n_dev * 100.0);
-    println!("   - Any-Attested Top-1 Accuracy:       {:>4} / 9,279 ({:.2}%)", any_attested_hits, any_attested_hits as f64 / n_dev * 100.0);
-    println!("   - Exact-Row Top-3 Accuracy:          {:>4} / 9,279 ({:.2}%)", top3_hits, top3_hits as f64 / n_dev * 100.0);
-    println!("   - Beam Reachability (Gold in Top-16):{:>4} / 9,279 ({:.2}%)", reach_hits, reach_hits as f64 / n_dev * 100.0);
+    println!(
+        "   - Exact-Row Top-1 Accuracy:          {:>4} / 9,279 ({:.2}%)",
+        exact_row_hits,
+        exact_row_hits as f64 / n_dev * 100.0
+    );
+    println!(
+        "   - Most-Frequent Attested Top-1:      {:>4} / 9,279 ({:.2}%)",
+        most_freq_hits,
+        most_freq_hits as f64 / n_dev * 100.0
+    );
+    println!(
+        "   - Any-Attested Top-1 Accuracy:       {:>4} / 9,279 ({:.2}%)",
+        any_attested_hits,
+        any_attested_hits as f64 / n_dev * 100.0
+    );
+    println!(
+        "   - Exact-Row Top-3 Accuracy:          {:>4} / 9,279 ({:.2}%)",
+        top3_hits,
+        top3_hits as f64 / n_dev * 100.0
+    );
+    println!(
+        "   - Beam Reachability (Gold in Top-16):{:>4} / 9,279 ({:.2}%)",
+        reach_hits,
+        reach_hits as f64 / n_dev * 100.0
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
     // Latency Benchmark & Gate G6 Compliance Audit
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n   ⏱️  LATENCY BENCHMARK & GATE G6 AUDIT (Single-threaded, 1,000 DEV words, K = 16):");
+    println!(
+        "\n   ⏱️  LATENCY BENCHMARK & GATE G6 AUDIT (Single-threaded, 1,000 DEV words, K = 16):"
+    );
     let mut latencies_us = Vec::with_capacity(1000);
     for pair in dev_pairs.iter().take(1000) {
         let t0 = Instant::now();
@@ -1108,7 +1306,10 @@ fn main() {
     println!("   - Mean Latency:  {:>8.1} µs", mean_lat);
     println!("   - p50 Latency:   {:>8} µs", p50);
     println!("   - p90 Latency:   {:>8} µs", p90);
-    println!("   - p95 Latency:   {:>8} µs (Gate G6 Budget: <= 3,000 µs)", p95);
+    println!(
+        "   - p95 Latency:   {:>8} µs (Gate G6 Budget: <= 3,000 µs)",
+        p95
+    );
     println!("   - p99 Latency:   {:>8} µs", p99);
     println!("   - Max Latency:   {:>8} µs", max_lat);
     println!("   - Baseline Engine Reference: ~1,500 µs");
@@ -1119,9 +1320,16 @@ fn main() {
     }
 
     // Profile a sample 7+ character conjunct word
-    let sample_long_conj = dev_pairs.iter().find(|p| p.raw_bengali.chars().count() >= 7 && p.raw_bengali.contains('্'));
+    let sample_long_conj = dev_pairs
+        .iter()
+        .find(|p| p.raw_bengali.chars().count() >= 7 && p.raw_bengali.contains('্'));
     if let Some(target_pair) = sample_long_conj {
-        println!("\n   🔍 Profiling Long Conjunct Word: \"{}\" (\"{}\", {} chars):", target_pair.raw_bengali, target_pair.raw_roman, target_pair.raw_bengali.chars().count());
+        println!(
+            "\n   🔍 Profiling Long Conjunct Word: \"{}\" (\"{}\", {} chars):",
+            target_pair.raw_bengali,
+            target_pair.raw_roman,
+            target_pair.raw_bengali.chars().count()
+        );
         let iters = 100;
         let t0 = Instant::now();
         for _ in 0..iters {
@@ -1129,14 +1337,19 @@ fn main() {
         }
         let total_us = t0.elapsed().as_micros() as f64;
         let avg_us = total_us / iters as f64;
-        println!("     ├─ Avg Latency: {:.1} µs ({} iterations)", avg_us, iters);
+        println!(
+            "     ├─ Avg Latency: {:.1} µs ({} iterations)",
+            avg_us, iters
+        );
         println!("     ├─ Primary Bottleneck: Dynamic heap allocations inside inner beam loops (Vec::clone, String::clone, dedup HashMap hashing)");
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 7b ITEM 3: Failure Classification across K = 16, 64, 256
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 ITEM 3: N-GRAM FAILURE CLASSIFICATION ACROSS BEAM WIDTHS (K = 16, 64, 256)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1149,7 +1362,10 @@ fn main() {
                 let s_forced = if align.is_empty() {
                     f64::NEG_INFINITY
                 } else {
-                    let u_seq: Vec<UnitId> = align.iter().filter_map(|(r, b)| selected_model.vocab.get_id(r, b)).collect();
+                    let u_seq: Vec<UnitId> = align
+                        .iter()
+                        .filter_map(|(r, b)| selected_model.vocab.get_id(r, b))
+                        .collect();
                     if u_seq.len() == align.len() {
                         selected_model.score_unit_sequence(&u_seq)
                     } else {
@@ -1178,11 +1394,27 @@ fn main() {
                     }
                 }
 
-                (is_top1 as usize, is_top3 as usize, is_reach as usize, cov, search, model)
+                (
+                    is_top1 as usize,
+                    is_top3 as usize,
+                    is_reach as usize,
+                    cov,
+                    search,
+                    model,
+                )
             })
             .reduce(
                 || (0, 0, 0, 0, 0, 0),
-                |a, b| (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3, a.4 + b.4, a.5 + b.5),
+                |a, b| {
+                    (
+                        a.0 + b.0,
+                        a.1 + b.1,
+                        a.2 + b.2,
+                        a.3 + b.3,
+                        a.4 + b.4,
+                        a.5 + b.5,
+                    )
+                },
             );
 
         let total_err = n_dev as usize - top1_c;
@@ -1200,7 +1432,10 @@ fn main() {
     }
 
     println!("\n   Sample 20 DEV Failures (Forced vs Best Decoded Score under N-Gram Model):");
-    println!("   {:<4} {:<12} {:<12} {:<12} {:<12} {:>10} {:>10} {:<10}", "ID", "Target", "Roman", "Top Decoded", "Class", "S_forced", "S_decoded", "Status");
+    println!(
+        "   {:<4} {:<12} {:<12} {:<12} {:<12} {:>10} {:>10} {:<10}",
+        "ID", "Target", "Roman", "Top Decoded", "Class", "S_forced", "S_decoded", "Status"
+    );
     println!("   {}", "-".repeat(85));
 
     let mut sample_count = 0;
@@ -1209,7 +1444,10 @@ fn main() {
         let s_forced = if align.is_empty() {
             f64::NEG_INFINITY
         } else {
-            let u_seq: Vec<UnitId> = align.iter().filter_map(|(r, b)| selected_model.vocab.get_id(r, b)).collect();
+            let u_seq: Vec<UnitId> = align
+                .iter()
+                .filter_map(|(r, b)| selected_model.vocab.get_id(r, b))
+                .collect();
             if u_seq.len() == align.len() {
                 selected_model.score_unit_sequence(&u_seq)
             } else {
@@ -1234,7 +1472,14 @@ fn main() {
             };
             println!(
                 "   {:<4} {:<12} {:<12} {:<12} {:<12} {:>10.2} {:>10.2} {:<10}",
-                i + 1, target, pair.raw_roman, top_cand, cat, s_forced, s_best, "FAIL"
+                i + 1,
+                target,
+                pair.raw_roman,
+                top_cand,
+                cat,
+                s_forced,
+                s_best,
+                "FAIL"
             );
         }
     }
@@ -1242,17 +1487,26 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 7b ITEM 4: Stratified Results
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 ITEM 4: STRATIFIED RESULTS (Compared Against Old Baseline Engine)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
-    let mut conj_n = 0; let mut conj_hits = 0;
-    let mut non_conj_n = 0; let mut non_conj_hits = 0;
-    let mut len_1_3_n = 0; let mut len_1_3_hits = 0;
-    let mut len_4_6_n = 0; let mut len_4_6_hits = 0;
-    let mut len_7_n = 0; let mut len_7_hits = 0;
-    let mut seen_n = 0; let mut seen_hits = 0;
-    let mut unseen_n = 0; let mut unseen_hits = 0;
+    let mut conj_n = 0;
+    let mut conj_hits = 0;
+    let mut non_conj_n = 0;
+    let mut non_conj_hits = 0;
+    let mut len_1_3_n = 0;
+    let mut len_1_3_hits = 0;
+    let mut len_4_6_n = 0;
+    let mut len_4_6_hits = 0;
+    let mut len_7_n = 0;
+    let mut len_7_hits = 0;
+    let mut seen_n = 0;
+    let mut seen_hits = 0;
+    let mut unseen_n = 0;
+    let mut unseen_hits = 0;
 
     for (target, _, cands) in &dev_eval {
         let is_top1 = cands.first().map(|c| &c.0 == target).unwrap_or(false);
@@ -1263,46 +1517,97 @@ fn main() {
 
         if has_conj {
             conj_n += 1;
-            if is_top1 { conj_hits += 1; }
+            if is_top1 {
+                conj_hits += 1;
+            }
         } else {
             non_conj_n += 1;
-            if is_top1 { non_conj_hits += 1; }
+            if is_top1 {
+                non_conj_hits += 1;
+            }
         }
 
         if char_len <= 3 {
             len_1_3_n += 1;
-            if is_top1 { len_1_3_hits += 1; }
+            if is_top1 {
+                len_1_3_hits += 1;
+            }
         } else if char_len <= 6 {
             len_4_6_n += 1;
-            if is_top1 { len_4_6_hits += 1; }
+            if is_top1 {
+                len_4_6_hits += 1;
+            }
         } else {
             len_7_n += 1;
-            if is_top1 { len_7_hits += 1; }
+            if is_top1 {
+                len_7_hits += 1;
+            }
         }
 
         if in_dict {
             seen_n += 1;
-            if is_top1 { seen_hits += 1; }
+            if is_top1 {
+                seen_hits += 1;
+            }
         } else {
             unseen_n += 1;
-            if is_top1 { unseen_hits += 1; }
+            if is_top1 {
+                unseen_hits += 1;
+            }
         }
     }
 
     println!("| Stratum | N | N-Gram Top-1 (%) | Old Baseline Top-1 (%) | Absolute Diff |");
     println!("|:---|:---:|:---:|:---:|:---:|");
-    println!("| **With Conjunct (যুক্তবর্ণ)** | {} | **{:.2}%** | 22.8% | **+{:.2}%** |", conj_n, conj_hits as f64 / conj_n as f64 * 100.0, (conj_hits as f64 / conj_n as f64 * 100.0) - 22.8);
-    println!("| **Without Conjunct** | {} | **{:.2}%** | 26.6% | **+{:.2}%** |", non_conj_n, non_conj_hits as f64 / non_conj_n as f64 * 100.0, (non_conj_hits as f64 / non_conj_n as f64 * 100.0) - 26.6);
-    println!("| **Length 1–3 chars** | {} | **{:.2}%** | 35.8% | **+{:.2}%** |", len_1_3_n, len_1_3_hits as f64 / len_1_3_n as f64 * 100.0, (len_1_3_hits as f64 / len_1_3_n as f64 * 100.0) - 35.8);
-    println!("| **Length 4–6 chars** | {} | **{:.2}%** | 26.1% | **+{:.2}%** |", len_4_6_n, len_4_6_hits as f64 / len_4_6_n as f64 * 100.0, (len_4_6_hits as f64 / len_4_6_n as f64 * 100.0) - 26.1);
-    println!("| **Length 7+ chars** | {} | **{:.2}%** | 22.4% | **+{:.2}%** |", len_7_n, len_7_hits as f64 / len_7_n as f64 * 100.0, (len_7_hits as f64 / len_7_n as f64 * 100.0) - 22.4);
-    println!("| **Seen in dictionary.json** | {} | **{:.2}%** | 29.5% | **+{:.2}%** |", seen_n, seen_hits as f64 / seen_n as f64 * 100.0, (seen_hits as f64 / seen_n as f64 * 100.0) - 29.5);
-    println!("| **Unseen in dictionary.json** | {} | **{:.2}%** | 20.8% | **+{:.2}%** |", unseen_n, unseen_hits as f64 / unseen_n as f64 * 100.0, (unseen_hits as f64 / unseen_n as f64 * 100.0) - 20.8);
+    println!(
+        "| **With Conjunct (যুক্তবর্ণ)** | {} | **{:.2}%** | 22.8% | **+{:.2}%** |",
+        conj_n,
+        conj_hits as f64 / conj_n as f64 * 100.0,
+        (conj_hits as f64 / conj_n as f64 * 100.0) - 22.8
+    );
+    println!(
+        "| **Without Conjunct** | {} | **{:.2}%** | 26.6% | **+{:.2}%** |",
+        non_conj_n,
+        non_conj_hits as f64 / non_conj_n as f64 * 100.0,
+        (non_conj_hits as f64 / non_conj_n as f64 * 100.0) - 26.6
+    );
+    println!(
+        "| **Length 1–3 chars** | {} | **{:.2}%** | 35.8% | **+{:.2}%** |",
+        len_1_3_n,
+        len_1_3_hits as f64 / len_1_3_n as f64 * 100.0,
+        (len_1_3_hits as f64 / len_1_3_n as f64 * 100.0) - 35.8
+    );
+    println!(
+        "| **Length 4–6 chars** | {} | **{:.2}%** | 26.1% | **+{:.2}%** |",
+        len_4_6_n,
+        len_4_6_hits as f64 / len_4_6_n as f64 * 100.0,
+        (len_4_6_hits as f64 / len_4_6_n as f64 * 100.0) - 26.1
+    );
+    println!(
+        "| **Length 7+ chars** | {} | **{:.2}%** | 22.4% | **+{:.2}%** |",
+        len_7_n,
+        len_7_hits as f64 / len_7_n as f64 * 100.0,
+        (len_7_hits as f64 / len_7_n as f64 * 100.0) - 22.4
+    );
+    println!(
+        "| **Seen in dictionary.json** | {} | **{:.2}%** | 29.5% | **+{:.2}%** |",
+        seen_n,
+        seen_hits as f64 / seen_n as f64 * 100.0,
+        (seen_hits as f64 / seen_n as f64 * 100.0) - 29.5
+    );
+    println!(
+        "| **Unseen in dictionary.json** | {} | **{:.2}%** | 20.8% | **+{:.2}%** |",
+        unseen_n,
+        unseen_hits as f64 / unseen_n as f64 * 100.0,
+        (unseen_hits as f64 / unseen_n as f64 * 100.0) - 20.8
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 7b ITEM 5: Multi-Persona Evaluation on DEV
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 ITEM 5: ALL SIX STANDARDIZED PERSONAS ON HELD-OUT DEV");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1312,15 +1617,68 @@ fn main() {
     let mut rng_p90 = SimpleRng::new(seed + 90);
 
     let personas_cases: [(&str, Vec<(String, String)>); 6] = [
-        ("natural", dev_pairs.iter().map(|p| (transform_natural(&p.raw_roman), p.raw_bengali.clone())).collect()),
-        ("lazy", dev_pairs.iter().map(|p| (transform_lazy(&p.raw_roman), p.raw_bengali.clone())).collect()),
-        ("vowel_drop_p30", dev_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_p30), p.raw_bengali.clone())).collect()),
-        ("vowel_drop_p60", dev_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.60, &mut rng_p60), p.raw_bengali.clone())).collect()),
-        ("vowel_drop_p90", dev_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.90, &mut rng_p90), p.raw_bengali.clone())).collect()),
-        ("avro_strict", dev_pairs.iter().map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone())).collect()),
+        (
+            "natural",
+            dev_pairs
+                .iter()
+                .map(|p| (transform_natural(&p.raw_roman), p.raw_bengali.clone()))
+                .collect(),
+        ),
+        (
+            "lazy",
+            dev_pairs
+                .iter()
+                .map(|p| (transform_lazy(&p.raw_roman), p.raw_bengali.clone()))
+                .collect(),
+        ),
+        (
+            "vowel_drop_p30",
+            dev_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_p30),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "vowel_drop_p60",
+            dev_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_vowel_drop(&p.raw_roman, 0.60, &mut rng_p60),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "vowel_drop_p90",
+            dev_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_vowel_drop(&p.raw_roman, 0.90, &mut rng_p90),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "avro_strict",
+            dev_pairs
+                .iter()
+                .map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone()))
+                .collect(),
+        ),
     ];
 
-    println!("| Persona | N-Gram Top-1 (%) | Baseline Top-1 (%) | N-Gram Top-3 (%) | N-Gram Reach (%) |");
+    println!(
+        "| Persona | N-Gram Top-1 (%) | Baseline Top-1 (%) | N-Gram Top-3 (%) | N-Gram Reach (%) |"
+    );
     println!("|:---|:---:|:---:|:---:|:---:|");
 
     let baseline_persona_top1: [(&str, f64); 6] = [
@@ -1364,7 +1722,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 7b ITEM 6: 50 Unreachable-Case Sample (Gold Not in Top-16)
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 ITEM 6: 50 UNREACHABLE-CASE SAMPLES (Gold Target Missing from Top-16)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1399,11 +1759,20 @@ fn main() {
                 }
             };
 
-            println!("| {} | {} | {} | {} | {} |", i + 1, target, pair.raw_roman, top3_str, diag);
+            println!(
+                "| {} | {} | {} | {} | {} |",
+                i + 1,
+                target,
+                pair.raw_roman,
+                top3_str,
+                diag
+            );
         }
     }
 
-    println!("\n══════════════════════════════════════════════════════════════════════════════════");
+    println!(
+        "\n══════════════════════════════════════════════════════════════════════════════════"
+    );
     println!("   ✓ STEP 7b VERIFICATION COMPLETE: ALL 7 ITEMS TABULATED RIGOROUSLY");
     println!("══════════════════════════════════════════════════════════════════════════════════");
 }

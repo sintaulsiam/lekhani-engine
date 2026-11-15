@@ -482,7 +482,13 @@ fn test_massive_deep_simulation_suite() {
         );
         for (inp, exp, got) in &failures {
             let (cands, _) = sugg.suggest(inp, true, true, &empty_memory);
-            eprintln!("{:<25} -> Expected: {:<20} | Got: {:<10} | Candidates: {:?}", inp, exp, got, &cands[..cands.len().min(4)]);
+            eprintln!(
+                "{:<25} -> Expected: {:<20} | Got: {:<10} | Candidates: {:?}",
+                inp,
+                exp,
+                got,
+                &cands[..cands.len().min(4)]
+            );
         }
     }
 

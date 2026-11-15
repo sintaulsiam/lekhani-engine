@@ -19,16 +19,19 @@ pub struct CandidateReranker;
 
 impl CandidateReranker {
     /// Applies intelligent contextual reranking to the candidate list.
-    pub fn rerank(
-        input: &str,
-        candidates: &mut Vec<String>,
-        suggestion: &mut PhoneticSuggestion,
-    ) {
+    pub fn rerank(input: &str, candidates: &mut Vec<String>, suggestion: &mut PhoneticSuggestion) {
         if candidates.is_empty() {
             return;
         }
 
         let lower = input.to_ascii_lowercase();
+
+        // Supervised phonetic override has absolute authority; never demote or disrupt it
+        if suggestion.database.lookup_override(&lower).is_some()
+            || suggestion.database.lookup_override(input).is_some()
+        {
+            return;
+        }
 
         // 1. Initial Vowel Reranker (আ- vs অ-)
         Self::rerank_initial_vowel(&lower, candidates, suggestion);
@@ -158,7 +161,9 @@ impl CandidateReranker {
             return;
         }
 
-        if (input.ends_with("io") || input.ends_with("eo") || input.ends_with("ao")) && input.len() >= 4 {
+        if (input.ends_with("io") || input.ends_with("eo") || input.ends_with("ao"))
+            && input.len() >= 4
+        {
             let first = candidates[0].clone();
             if !first.ends_with('ও') {
                 let target_clitic = format!("{}ও", first);
@@ -208,7 +213,6 @@ impl CandidateReranker {
                 {
                     candidates.retain(|c| c != &alt2);
                     candidates.insert(0, alt2);
-                    return;
                 }
             }
         }
@@ -223,7 +227,10 @@ impl CandidateReranker {
         if input.starts_with("au") && input.len() >= 4 {
             let o_form = input.replacen("au", "o", 1);
             let o_conv = suggestion.convert_phonetic(&o_form);
-            if !o_conv.is_empty() && (suggestion.database.is_exact_dictionary_word(&o_conv) || suggestion.database.trie.contains_exact(&o_conv)) {
+            if !o_conv.is_empty()
+                && (suggestion.database.is_exact_dictionary_word(&o_conv)
+                    || suggestion.database.trie.contains_exact(&o_conv))
+            {
                 candidates.retain(|c| c != &o_conv);
                 candidates.insert(0, o_conv);
             }
@@ -252,12 +259,15 @@ impl CandidateReranker {
                 let single = &dc[..1];
                 let degeminated_input = input.replace(dc, single);
                 let empty_mem = hashbrown::HashMap::new();
-                let (alt_cands, _) = suggestion.suggest(&degeminated_input, false, true, &empty_mem);
+                let (alt_cands, _) =
+                    suggestion.suggest(&degeminated_input, false, true, &empty_mem);
                 if let Some(first_alt) = alt_cands.first() {
                     let first_orig = &candidates[0];
                     let freq_alt = suggestion.database.get_frequency(first_alt);
                     let freq_orig = suggestion.database.get_frequency(first_orig);
-                    if freq_alt > freq_orig * 2 && suggestion.database.is_exact_dictionary_word(first_alt) {
+                    if freq_alt > freq_orig * 2
+                        && suggestion.database.is_exact_dictionary_word(first_alt)
+                    {
                         candidates.retain(|c| c != first_alt);
                         candidates.insert(0, first_alt.clone());
                         break;
@@ -290,7 +300,6 @@ impl CandidateReranker {
                 // If an inflected candidate ending in 'ে' exists elsewhere in the candidate strip, promote it
                 let item = candidates.remove(pos);
                 candidates.insert(0, item);
-                return;
             } else {
                 // Otherwise try suggesting for stem + 'e'
                 let stem = &input[..input.len() - 2];
@@ -304,7 +313,6 @@ impl CandidateReranker {
                 }) {
                     candidates.retain(|c| c != first_alt);
                     candidates.insert(0, first_alt.clone());
-                    return;
                 }
             }
         }
@@ -332,17 +340,14 @@ impl CandidateReranker {
 
         // C. Terminal Genitive -er -> promote candidates ending in 'ের' / 'র'
         // Prevents locative -e (e.g. অবদমনে) from hijacking genitive -er (e.g. অবদমনের)
-        if input.ends_with("er") && input.len() >= 4 {
-            if !candidates[0].ends_with('র') {
-                if let Some(pos) = candidates.iter().position(|c| {
-                    (c.ends_with("ের") || c.ends_with('র'))
-                        && (suggestion.database.is_exact_dictionary_word(c)
-                            || suggestion.database.trie.contains_exact(c))
-                }) {
-                    let item = candidates.remove(pos);
-                    candidates.insert(0, item);
-                    return;
-                }
+        if input.ends_with("er") && input.len() >= 4 && !candidates[0].ends_with('র') {
+            if let Some(pos) = candidates.iter().position(|c| {
+                (c.ends_with("ের") || c.ends_with('র'))
+                    && (suggestion.database.is_exact_dictionary_word(c)
+                        || suggestion.database.trie.contains_exact(c))
+            }) {
+                let item = candidates.remove(pos);
+                candidates.insert(0, item);
             }
         }
     }
@@ -366,7 +371,6 @@ impl CandidateReranker {
             }) {
                 let item = candidates.remove(pos);
                 candidates.insert(0, item);
-                return;
             }
         }
 
@@ -378,9 +382,9 @@ impl CandidateReranker {
         let freq_first = suggestion.database.get_frequency(first);
 
         let b_inputs = [
-            input.replace('v', "b").replace('w', "b"),
-            if input.starts_with('a') {
-                format!("o{}", &input[1..].replace('v', "b").replace('w', "b"))
+            input.replace(['v', 'w'], "b"),
+            if let Some(stripped) = input.strip_prefix('a') {
+                format!("o{}", stripped.replace(['v', 'w'], "b"))
             } else {
                 String::new()
             },
@@ -401,7 +405,10 @@ impl CandidateReranker {
                         || suggestion.database.trie.contains_exact(c))
             }) {
                 let freq_alt = suggestion.database.get_frequency(valid_alt);
-                if freq_alt > freq_first || (!suggestion.database.is_exact_dictionary_word(first) && freq_alt >= freq_first) {
+                if freq_alt > freq_first
+                    || (!suggestion.database.is_exact_dictionary_word(first)
+                        && freq_alt >= freq_first)
+                {
                     candidates.retain(|c| c != valid_alt);
                     candidates.insert(0, valid_alt.clone());
                     return;
@@ -421,7 +428,10 @@ impl CandidateReranker {
         }
 
         // Sanskrit/Tatsama participial stems have length >= 6 and never end with dipthongs "oi"/"ai"
-        if (input.ends_with("ito") || (input.ends_with("ita") && !input.ends_with("oita") && !input.ends_with("aita"))) && input.len() >= 6 {
+        if (input.ends_with("ito")
+            || (input.ends_with("ita") && !input.ends_with("oita") && !input.ends_with("aita")))
+            && input.len() >= 6
+        {
             // First, if an exact participial candidate ending in -িত is already in candidates, promote it!
             if let Some(pos) = candidates.iter().position(|c| {
                 c.ends_with("িত")
@@ -430,7 +440,6 @@ impl CandidateReranker {
             }) {
                 let item = candidates.remove(pos);
                 candidates.insert(0, item);
-                return;
             }
 
             let stem = &input[..input.len() - 3];
@@ -443,7 +452,6 @@ impl CandidateReranker {
                 {
                     candidates.retain(|c| c != first_alt);
                     candidates.insert(0, first_alt.clone());
-                    return;
                 }
             }
         }
@@ -465,7 +473,9 @@ impl CandidateReranker {
         // Specifically fix archaic 'ভূক্ত' -> 'ভুক্ত' (e.g. অন্তর্ভূক্ত -> অন্তর্ভুক্ত)
         if first.contains("ভূক্ত") && !input.contains("oo") && !input.contains("uu") {
             let modern_variant = first.replace("ভূক্ত", "ভুক্ত");
-            if suggestion.database.is_exact_dictionary_word(&modern_variant)
+            if suggestion
+                .database
+                .is_exact_dictionary_word(&modern_variant)
                 || suggestion.database.trie.contains_exact(&modern_variant)
             {
                 candidates.retain(|c| c != &modern_variant);

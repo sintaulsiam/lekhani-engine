@@ -175,15 +175,9 @@ pub fn exact(text: &str) -> String {
 }
 
 fn is_consonant(ch: char) -> bool {
-    matches!(
-        ch,
-        'ক'..='হ' | 'ড়' | 'ঢ়' | 'য়' | 'ৎ'
-    )
+    matches!(ch, 'ক'..='হ' | 'ড়' | 'ঢ়' | 'য়' | 'ৎ')
 }
 
 fn is_independent_vowel(ch: char) -> bool {
-    matches!(
-        ch,
-        'অ'..='ঔ'
-    )
+    matches!(ch, 'অ'..='ঔ')
 }

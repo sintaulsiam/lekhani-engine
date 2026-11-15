@@ -54,7 +54,12 @@ impl ConjunctCatalog {
             ConjunctInfo::new("চ্ছ্ব", "চ + ্ + ছ + ্ + ব", "cchw", "উচ্ছ্বাস, উচ্ছ্বল"),
             ConjunctInfo::new("চ্ঞ", "চ + ্ + ঞ", "cn", "যাচঞা"),
             // J-series
-            ConjunctInfo::new("জ্ঞ", "জ + ্ + ঞ", "ggy / jn / gn / gy", "জ্ঞান, বিজ্ঞান, অজ্ঞ, প্রজ্ঞা"),
+            ConjunctInfo::new(
+                "জ্ঞ",
+                "জ + ্ + ঞ",
+                "ggy / jn / gn / gy",
+                "জ্ঞান, বিজ্ঞান, অজ্ঞ, প্রজ্ঞা",
+            ),
             ConjunctInfo::new("জ্জ", "জ + ্ + জ", "jj", "লজ্জা, সজ্জা, মজ্জা"),
             ConjunctInfo::new("জ্ঝ", "জ + ্ + ঝ", "jjh", "ঝঞ্ঝা, উজ্ঝট"),
             ConjunctInfo::new("জ্ব", "জ + ্ + ব", "jw", "জ্বর, জ্বালা, উজ্জ্বল"),

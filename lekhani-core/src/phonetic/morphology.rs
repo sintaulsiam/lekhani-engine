@@ -687,7 +687,10 @@ pub struct DialectMorphHypothesis {
 }
 
 /// Decompose a regional dialect verbal form (e.g. kortachi -> করতাছি/করছি, jamu -> যামু/যাব, dhoros -> ধরস/ধরিস)
-pub fn decompose_dialect_verbal_token<F>(input: &str, mut resolve_stem: F) -> Option<DialectMorphHypothesis>
+pub fn decompose_dialect_verbal_token<F>(
+    input: &str,
+    mut resolve_stem: F,
+) -> Option<DialectMorphHypothesis>
 where
     F: FnMut(&str) -> Option<String>,
 {
@@ -720,7 +723,8 @@ where
                     stem.to_string()
                 };
 
-                if let Some(stem_bn) = resolve_stem(&stem_effective).or_else(|| resolve_stem(stem)) {
+                if let Some(stem_bn) = resolve_stem(&stem_effective).or_else(|| resolve_stem(stem))
+                {
                     if !stem_bn.is_empty() {
                         let dialect = format!("{}{}", stem_bn, d_form);
                         let standard = format!("{}{}", stem_bn, s_form);
@@ -939,20 +943,18 @@ mod tests {
             _ => None,
         };
 
-        let tachi = decompose_dialect_verbal_token("kortachi", resolve)
-            .expect("Should resolve kortachi");
+        let tachi =
+            decompose_dialect_verbal_token("kortachi", resolve).expect("Should resolve kortachi");
         assert_eq!(tachi.dialect, "করতাছি");
         assert_eq!(tachi.standard, "করছি");
 
-        let jamu = decompose_dialect_verbal_token("jamu", resolve)
-            .expect("Should resolve jamu");
+        let jamu = decompose_dialect_verbal_token("jamu", resolve).expect("Should resolve jamu");
         assert_eq!(jamu.dialect, "যামু");
         assert_eq!(jamu.standard, "যাব");
 
-        let dhoros = decompose_dialect_verbal_token("dhoros", resolve)
-            .expect("Should resolve dhoros");
+        let dhoros =
+            decompose_dialect_verbal_token("dhoros", resolve).expect("Should resolve dhoros");
         assert_eq!(dhoros.dialect, "ধরস");
         assert_eq!(dhoros.standard, "ধরিস");
     }
 }
-

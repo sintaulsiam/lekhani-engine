@@ -399,14 +399,18 @@ pub const TECH_COLLOCATIONS_BENGALI: &[(&str, &str)] = &[
 pub fn is_english_tech_collocation(prev: &str, curr: &str) -> bool {
     let p = prev.to_ascii_lowercase();
     let c = curr.to_ascii_lowercase();
-    TECH_COLLOCATIONS_ENGLISH.iter().any(|&(w1, w2)| w1 == p && w2 == c)
+    TECH_COLLOCATIONS_ENGLISH
+        .iter()
+        .any(|&(w1, w2)| w1 == p && w2 == c)
 }
 
 #[inline]
 pub fn is_bengali_tech_collocation(prev: &str, curr: &str) -> bool {
     let p = prev.to_ascii_lowercase();
     let c = curr.to_ascii_lowercase();
-    TECH_COLLOCATIONS_BENGALI.iter().any(|&(w1, w2)| w1 == p && w2 == c)
+    TECH_COLLOCATIONS_BENGALI
+        .iter()
+        .any(|&(w1, w2)| w1 == p && w2 == c)
 }
 
 #[cfg(test)]

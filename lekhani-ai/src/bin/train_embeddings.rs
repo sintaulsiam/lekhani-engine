@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 use hashbrown::HashMap;
 use lekhani_ai::embeddings::{WordEmbeddings, EMBEDDING_DIM};
 use lekhani_ai::trainer::is_junk_token;

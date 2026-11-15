@@ -472,16 +472,15 @@ pub fn generate_phonetic_variants(input: &str) -> Vec<String> {
             + (lower.contains("onchol") && s.contains("oncol")) as usize
             + (lower.contains("onchal") && s.contains("oncol")) as usize;
         let len_diff = (s.len() as isize - base_len as isize).abs();
-        let eff_diff = (s.len() as isize + shrink as isize - exp as isize - base_len as isize).abs();
+        let eff_diff =
+            (s.len() as isize + shrink as isize - exp as isize - base_len as isize).abs();
         let diff = std::cmp::min(len_diff, eff_diff);
         let pen = s.contains("hhh") as usize * 2;
         (diff, pen, -(exp as isize), s.len())
     };
 
-    let mut p1_vec: Vec<((isize, usize, isize, usize), String)> = pass1
-        .into_iter()
-        .map(|s| (compute_score(&s), s))
-        .collect();
+    let mut p1_vec: Vec<((isize, usize, isize, usize), String)> =
+        pass1.into_iter().map(|s| (compute_score(&s), s)).collect();
     p1_vec.sort_unstable_by_key(|a| a.0);
 
     // 3. Second pass for compounding sound laws on top sorted candidates
@@ -692,7 +691,9 @@ pub fn generate_qwerty_typo_variants(input: &str) -> Vec<String> {
     // Preserve vowel digraphs ('a', 'e', 'i', 'o', 'u') which represent phonological long vowels in Avro (ee, oo, aa, ii, uu)
     for i in 0..chars.len() - 1 {
         let c = chars[i];
-        if c == chars[i + 1] && !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'A' | 'E' | 'I' | 'O' | 'U') {
+        if c == chars[i + 1]
+            && !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'A' | 'E' | 'I' | 'O' | 'U')
+        {
             let mut deduped = chars.clone();
             deduped.remove(i);
             let s: String = deduped.into_iter().collect();
@@ -980,13 +981,18 @@ mod tests {
     #[test]
     fn test_octane_sound_laws() {
         let v = generate_phonetic_variants("octane");
-        assert!(v.iter().any(|s| s == "okoTane" || s == "okoTen" || s == "okTen"));
+        assert!(v
+            .iter()
+            .any(|s| s == "okoTane" || s == "okoTen" || s == "okTen"));
         let v_agahir = generate_phonetic_variants("agahir");
         assert!(v_agahir.iter().any(|s| s == "ogobhIr" || s == "ogobhir"));
         let mut sugg = crate::phonetic::suggestion::PhoneticSuggestion::new();
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let dict_dir = manifest_dir.join("../data/dictionaries");
-        if sugg.load_from_dir_with_dict(&dict_dir, "dictionary.json").is_ok() {
+        if sugg
+            .load_from_dir_with_dict(&dict_dir, "dictionary.json")
+            .is_ok()
+        {
             let layout_path = manifest_dir.join("../data/layouts/avrophonetic.json");
             if let Ok(content) = std::fs::read_to_string(&layout_path) {
                 if let Ok(json) = serde_json::from_str(&content) {
@@ -998,7 +1004,10 @@ mod tests {
             assert_eq!(cands.0[0], "অঞ্চলগুলোতে");
             let cands_tee = sugg.suggest("ancholtee", false, true, &empty_mem);
             assert_eq!(cands_tee.0[0], "অঞ্চলটি");
-            assert_eq!(sugg.suggest("atorkite", false, true, &empty_mem).0[0], "অতর্কিতে");
+            assert_eq!(
+                sugg.suggest("atorkite", false, true, &empty_mem).0[0],
+                "অতর্কিতে"
+            );
         }
     }
 

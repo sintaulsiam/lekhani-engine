@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Audit Beam Ties & Deterministic Tie-Breaking
 //!
 //! Evaluates the exact mechanism of the 42.10% (K=256) vs 41.27% (K=16) Dev-A gap
@@ -84,20 +85,64 @@ pub fn seed_avro_prior(counts: &mut HashMap<(String, String), f64>, alpha: f64) 
         return;
     }
     let priors: &[(&str, &str)] = &[
-        ("k", "ক"), ("kh", "খ"), ("g", "গ"), ("gh", "ঘ"), ("ng", "ঙ"),
-        ("c", "চ"), ("ch", "ছ"), ("j", "জ"), ("jh", "ঝ"),
-        ("t", "ত"), ("t", "ট"), ("th", "থ"), ("th", "ঠ"),
-        ("d", "দ"), ("d", "ড"), ("dh", "ধ"), ("dh", "ঢ"),
-        ("n", "ন"), ("n", "ণ"),
-        ("p", "প"), ("ph", "ফ"), ("f", "ফ"), ("b", "ব"), ("bh", "ভ"), ("v", "ভ"), ("m", "ম"),
-        ("z", "য"), ("r", "র"), ("l", "ল"),
-        ("sh", "শ"), ("sh", "ষ"), ("s", "স"), ("s", "শ"), ("h", "হ"),
-        ("y", "য়"), ("w", "ও"), ("q", "ক"), ("x", "ক্স"),
-        ("a", "া"), ("a", "আ"), ("a", "অ"), ("aa", "আ"), ("aa", "া"),
-        ("i", "ি"), ("i", "ই"), ("ee", "ী"), ("ee", "ি"),
-        ("u", "ু"), ("u", "উ"), ("oo", "ূ"), ("oo", "ু"),
-        ("e", "ে"), ("e", "এ"), ("o", "ো"), ("o", "অ"), ("o", "ও"),
-        ("oi", "ৈ"), ("ou", "ৌ"),
+        ("k", "ক"),
+        ("kh", "খ"),
+        ("g", "গ"),
+        ("gh", "ঘ"),
+        ("ng", "ঙ"),
+        ("c", "চ"),
+        ("ch", "ছ"),
+        ("j", "জ"),
+        ("jh", "ঝ"),
+        ("t", "ত"),
+        ("t", "ট"),
+        ("th", "থ"),
+        ("th", "ঠ"),
+        ("d", "দ"),
+        ("d", "ড"),
+        ("dh", "ধ"),
+        ("dh", "ঢ"),
+        ("n", "ন"),
+        ("n", "ণ"),
+        ("p", "প"),
+        ("ph", "ফ"),
+        ("f", "ফ"),
+        ("b", "ব"),
+        ("bh", "ভ"),
+        ("v", "ভ"),
+        ("m", "ম"),
+        ("z", "য"),
+        ("r", "র"),
+        ("l", "ল"),
+        ("sh", "শ"),
+        ("sh", "ষ"),
+        ("s", "স"),
+        ("s", "শ"),
+        ("h", "হ"),
+        ("y", "য়"),
+        ("w", "ও"),
+        ("q", "ক"),
+        ("x", "ক্স"),
+        ("a", "া"),
+        ("a", "আ"),
+        ("a", "অ"),
+        ("aa", "আ"),
+        ("aa", "া"),
+        ("i", "ি"),
+        ("i", "ই"),
+        ("ee", "ী"),
+        ("ee", "ি"),
+        ("u", "ু"),
+        ("u", "উ"),
+        ("oo", "ূ"),
+        ("oo", "ু"),
+        ("e", "ে"),
+        ("e", "এ"),
+        ("o", "ো"),
+        ("o", "অ"),
+        ("o", "ও"),
+        ("oi", "ৈ"),
+        ("ou", "ৌ"),
     ];
     for &(r, b) in priors {
         *counts.entry((r.to_string(), b.to_string())).or_default() += alpha;
@@ -195,8 +240,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -238,8 +291,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i - kr..i] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j - kb..j] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i - kr..i]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j - kb..j]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -278,8 +339,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -344,8 +413,16 @@ pub fn viterbi_forced_alignment(
                         continue;
                     }
 
-                    let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                    let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                    let r_slice = if kr == 0 {
+                        &[]
+                    } else {
+                        &pair.roman_tokens[i..i + kr]
+                    };
+                    let b_slice = if kb == 0 {
+                        &[]
+                    } else {
+                        &pair.bengali_tokens[j..j + kb]
+                    };
 
                     if !is_valid_translation_unit(r_slice, b_slice) {
                         continue;
@@ -593,7 +670,8 @@ pub fn decode_beam_ngram(
             }
         }
 
-        let mut dedup_map: HashMap<(usize, String), BeamCandidate> = HashMap::with_capacity(next_beam.len());
+        let mut dedup_map: HashMap<(usize, String), BeamCandidate> =
+            HashMap::with_capacity(next_beam.len());
         for cand in next_beam {
             let key = (cand.pos, cand.bengali.clone());
             if let Some(existing) = dedup_map.get_mut(&key) {
@@ -611,11 +689,19 @@ pub fn decode_beam_ngram(
                 b.score
                     .partial_cmp(&a.score)
                     .unwrap_or(std::cmp::Ordering::Equal)
-                    .then_with(|| dict_words.contains(&b.bengali).cmp(&dict_words.contains(&a.bengali)))
+                    .then_with(|| {
+                        dict_words
+                            .contains(&b.bengali)
+                            .cmp(&dict_words.contains(&a.bengali))
+                    })
                     .then_with(|| a.bengali.cmp(&b.bengali))
             });
         } else {
-            sorted_cands.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            sorted_cands.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
         }
         sorted_cands.truncate(beam_width);
 
@@ -683,7 +769,12 @@ fn main() {
     let (dev_a_pairs, _) = load_dataset(Path::new("data/eval/bn.translit.sampled.dev_a.tsv"));
     let (dev_b_pairs, _) = load_dataset(Path::new("data/eval/bn.translit.sampled.dev_b.tsv"));
 
-    println!("Dataset counts: Train={}, Dev-A={}, Dev-B={}", train_pairs.len(), dev_a_pairs.len(), dev_b_pairs.len());
+    println!(
+        "Dataset counts: Train={}, Dev-A={}, Dev-B={}",
+        train_pairs.len(),
+        dev_a_pairs.len(),
+        dev_b_pairs.len()
+    );
 
     // 1. Train Aligner & Model
     println!("▶️  Training 1:1 Aligner on TRAIN...");
@@ -702,32 +793,62 @@ fn main() {
 
     // 2. Evaluate on Dev-A and Dev-B across configurations
     for (split_name, pairs) in [("Dev-A", &dev_a_pairs), ("Dev-B", &dev_b_pairs)] {
-        println!("\n──────────────────────────────────────────────────────────────────────────────────");
+        println!(
+            "\n──────────────────────────────────────────────────────────────────────────────────"
+        );
         println!("   Evaluating {} (N = {})", split_name, pairs.len());
-        println!("──────────────────────────────────────────────────────────────────────────────────");
+        println!(
+            "──────────────────────────────────────────────────────────────────────────────────"
+        );
 
         let row_results: Vec<_> = pairs
             .par_iter()
             .enumerate()
             .map(|(idx, pair)| {
                 let cands_256 = decode_beam_ngram(&pair.roman_tokens, &lm, 256, false, &dict_words);
-                let cands_16_std = decode_beam_ngram(&pair.roman_tokens, &lm, 16, false, &dict_words);
-                let cands_16_det = decode_beam_ngram(&pair.roman_tokens, &lm, 16, true, &dict_words);
+                let cands_16_std =
+                    decode_beam_ngram(&pair.roman_tokens, &lm, 16, false, &dict_words);
+                let cands_16_det =
+                    decode_beam_ngram(&pair.roman_tokens, &lm, 16, true, &dict_words);
 
-                let hit_256 = cands_256.first().map(|c| c.0 == pair.raw_bengali).unwrap_or(false);
-                let hit_16_std = cands_16_std.first().map(|c| c.0 == pair.raw_bengali).unwrap_or(false);
-                let hit_16_det = cands_16_det.first().map(|c| c.0 == pair.raw_bengali).unwrap_or(false);
+                let hit_256 = cands_256
+                    .first()
+                    .map(|c| c.0 == pair.raw_bengali)
+                    .unwrap_or(false);
+                let hit_16_std = cands_16_std
+                    .first()
+                    .map(|c| c.0 == pair.raw_bengali)
+                    .unwrap_or(false);
+                let hit_16_det = cands_16_det
+                    .first()
+                    .map(|c| c.0 == pair.raw_bengali)
+                    .unwrap_or(false);
 
                 let mut tied = None;
                 if cands_16_std.len() >= 2 && (cands_16_std[0].1 - cands_16_std[1].1).abs() < 1e-9 {
-                    tied = Some((idx + 1, pair.raw_bengali.clone(), pair.raw_roman.clone(), cands_16_std[0].clone(), cands_16_std[1].clone()));
+                    tied = Some((
+                        idx + 1,
+                        pair.raw_bengali.clone(),
+                        pair.raw_roman.clone(),
+                        cands_16_std[0].clone(),
+                        cands_16_std[1].clone(),
+                    ));
                 }
 
                 let mut pruned = None;
                 if hit_256 && !hit_16_std {
                     let rank_in_16 = cands_16_std.iter().position(|c| c.0 == pair.raw_bengali);
-                    let top_16 = cands_16_std.first().map(|c| c.0.clone()).unwrap_or_else(|| "NONE".into());
-                    pruned = Some((idx + 1, pair.raw_bengali.clone(), pair.raw_roman.clone(), top_16, rank_in_16));
+                    let top_16 = cands_16_std
+                        .first()
+                        .map(|c| c.0.clone())
+                        .unwrap_or_else(|| "NONE".into());
+                    pruned = Some((
+                        idx + 1,
+                        pair.raw_bengali.clone(),
+                        pair.raw_roman.clone(),
+                        top_16,
+                        rank_in_16,
+                    ));
                 }
 
                 (hit_256, hit_16_std, hit_16_det, tied, pruned)
@@ -741,31 +862,66 @@ fn main() {
         let beam_pruned_rows: Vec<_> = row_results.iter().filter_map(|r| r.4.clone()).collect();
 
         println!("Top-1 Accuracy on {}:", split_name);
-        println!("  ├─ Beam K=256 (Standard)     : {} / {} ({:.2}%)", hits_256_std, pairs.len(), hits_256_std as f64 / pairs.len() as f64 * 100.0);
-        println!("  ├─ Beam K=16  (Standard)     : {} / {} ({:.2}%)", hits_16_std, pairs.len(), hits_16_std as f64 / pairs.len() as f64 * 100.0);
-        println!("  ├─ Beam K=16  (Deterministic): {} / {} ({:.2}%)", hits_16_det, pairs.len(), hits_16_det as f64 / pairs.len() as f64 * 100.0);
-        println!("  ├─ Delta (K=256 minus K=16)  : {} rows ({:+.2}%)", hits_256_std - hits_16_std, (hits_256_std - hits_16_std) as f64 / pairs.len() as f64 * 100.0);
+        println!(
+            "  ├─ Beam K=256 (Standard)     : {} / {} ({:.2}%)",
+            hits_256_std,
+            pairs.len(),
+            hits_256_std as f64 / pairs.len() as f64 * 100.0
+        );
+        println!(
+            "  ├─ Beam K=16  (Standard)     : {} / {} ({:.2}%)",
+            hits_16_std,
+            pairs.len(),
+            hits_16_std as f64 / pairs.len() as f64 * 100.0
+        );
+        println!(
+            "  ├─ Beam K=16  (Deterministic): {} / {} ({:.2}%)",
+            hits_16_det,
+            pairs.len(),
+            hits_16_det as f64 / pairs.len() as f64 * 100.0
+        );
+        println!(
+            "  ├─ Delta (K=256 minus K=16)  : {} rows ({:+.2}%)",
+            hits_256_std - hits_16_std,
+            (hits_256_std - hits_16_std) as f64 / pairs.len() as f64 * 100.0
+        );
         println!("  └─ Rows with Score Ties in Top-2: {}", tied_rows.len());
 
         if !tied_rows.is_empty() {
-            println!("\nSample Rows with Score Ties among Top Candidates ({} rows):", tied_rows.len());
+            println!(
+                "\nSample Rows with Score Ties among Top Candidates ({} rows):",
+                tied_rows.len()
+            );
             for r in tied_rows.iter().take(10) {
                 println!("  Row #{:<4} Gold: {:<12} Roman: {:<12} Cand 1: {:<12} ({:.4}) | Cand 2: {:<12} ({:.4})",
                     r.0, r.1, r.2, (r.3).0, (r.3).1, (r.4).0, (r.4).1);
             }
         }
 
-        println!("\nDissecting Rows where K=256 Hits but K=16 Misses ({} rows):", beam_pruned_rows.len());
+        println!(
+            "\nDissecting Rows where K=256 Hits but K=16 Misses ({} rows):",
+            beam_pruned_rows.len()
+        );
         for (i, r) in beam_pruned_rows.iter().enumerate() {
             let status = match r.4 {
                 Some(rank) => format!("Ranked #{} in K=16 beam", rank + 1),
                 None => "Pruned completely from K=16 beam (Search Error)".to_string(),
             };
             if i < 15 || i >= beam_pruned_rows.len() - 5 {
-                println!("  {:>2}. Row #{:<4} Gold: {:<14} Roman: {:<14} Top in K=16: {:<14} -> {}",
-                    i + 1, r.0, r.1, r.2, r.3, status);
+                println!(
+                    "  {:>2}. Row #{:<4} Gold: {:<14} Roman: {:<14} Top in K=16: {:<14} -> {}",
+                    i + 1,
+                    r.0,
+                    r.1,
+                    r.2,
+                    r.3,
+                    status
+                );
             } else if i == 15 {
-                println!("  ... [{} rows omitted for brevity] ...", beam_pruned_rows.len() - 20);
+                println!(
+                    "  ... [{} rows omitted for brevity] ...",
+                    beam_pruned_rows.len() - 20
+                );
             }
         }
     }

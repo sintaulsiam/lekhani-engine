@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Pragyan Phase 1 Step 7: Joint Translation Unit N-gram Language Model
 //!
 //! Architectural Directives & Work Order Specifications:
@@ -101,34 +102,116 @@ pub fn seed_avro_prior(counts: &mut HashMap<(String, String), f64>, alpha: f64) 
 
     let priors: &[(&str, &str)] = &[
         // Single Consonants
-        ("k", "ক"), ("kh", "খ"), ("g", "গ"), ("gh", "ঘ"), ("ng", "ঙ"),
-        ("c", "চ"), ("ch", "ছ"), ("j", "জ"), ("jh", "ঝ"),
-        ("t", "ত"), ("t", "ট"), ("th", "থ"), ("th", "ঠ"),
-        ("d", "দ"), ("d", "ড"), ("dh", "ধ"), ("dh", "ঢ"),
-        ("n", "ন"), ("n", "ণ"),
-        ("p", "প"), ("ph", "ফ"), ("f", "ফ"), ("b", "ব"), ("bh", "ভ"), ("v", "ভ"), ("m", "ম"),
-        ("z", "য"), ("r", "র"), ("l", "ল"),
-        ("sh", "শ"), ("sh", "ষ"), ("s", "স"), ("s", "শ"), ("h", "হ"),
-        ("y", "য়"), ("w", "ও"), ("q", "ক"), ("x", "ক্স"),
+        ("k", "ক"),
+        ("kh", "খ"),
+        ("g", "গ"),
+        ("gh", "ঘ"),
+        ("ng", "ঙ"),
+        ("c", "চ"),
+        ("ch", "ছ"),
+        ("j", "জ"),
+        ("jh", "ঝ"),
+        ("t", "ত"),
+        ("t", "ট"),
+        ("th", "থ"),
+        ("th", "ঠ"),
+        ("d", "দ"),
+        ("d", "ড"),
+        ("dh", "ধ"),
+        ("dh", "ঢ"),
+        ("n", "ন"),
+        ("n", "ণ"),
+        ("p", "প"),
+        ("ph", "ফ"),
+        ("f", "ফ"),
+        ("b", "ব"),
+        ("bh", "ভ"),
+        ("v", "ভ"),
+        ("m", "ম"),
+        ("z", "য"),
+        ("r", "র"),
+        ("l", "ল"),
+        ("sh", "শ"),
+        ("sh", "ষ"),
+        ("s", "স"),
+        ("s", "শ"),
+        ("h", "হ"),
+        ("y", "য়"),
+        ("w", "ও"),
+        ("q", "ক"),
+        ("x", "ক্স"),
         // Vowels & Kars
-        ("a", "া"), ("a", "আ"), ("a", "অ"), ("aa", "আ"), ("aa", "া"),
-        ("i", "ি"), ("i", "ই"), ("ee", "ী"), ("ee", "ি"),
-        ("u", "ু"), ("u", "উ"), ("oo", "ূ"), ("oo", "ু"),
-        ("e", "ে"), ("e", "এ"), ("oi", "ঐ"), ("ou", "ঔ"),
-        ("o", "ও"), ("o", "ো"), ("o", "অ"),
+        ("a", "া"),
+        ("a", "আ"),
+        ("a", "অ"),
+        ("aa", "আ"),
+        ("aa", "া"),
+        ("i", "ি"),
+        ("i", "ই"),
+        ("ee", "ী"),
+        ("ee", "ি"),
+        ("u", "ু"),
+        ("u", "উ"),
+        ("oo", "ূ"),
+        ("oo", "ু"),
+        ("e", "ে"),
+        ("e", "এ"),
+        ("oi", "ঐ"),
+        ("ou", "ঔ"),
+        ("o", "ও"),
+        ("o", "ো"),
+        ("o", "অ"),
         // Rule-Based Conjuncts
-        ("kkh", "ক্ষ"), ("ngk", "ঙ্ক"), ("ngkh", "ঙ্খ"), ("ngg", "ঙ্গ"), ("nggh", "ঙ্ঘ"),
-        ("cch", "চ্ছ"), ("jj", "জ্জ"), ("jjh", "জ্ঝ"), ("nc", "ঞ্চ"), ("nch", "ঞ্ছ"), ("nj", "ঞ্জ"),
-        ("tt", "ট্ট"), ("nth", "ণ্ঠ"), ("nd", "ণ্ড"), ("kt", "ক্ত"), ("pt", "প্ত"), ("bd", "ব্দ"),
-        ("st", "স্ত"), ("sth", "স্থ"), ("sn", "স্ন"), ("sp", "স্প"), ("sph", "স্ফ"),
-        ("nt", "ন্ত"), ("nth", "ন্থ"), ("nd", "ন্দ"), ("ndh", "ন্ধ"),
-        ("mp", "ম্প"), ("mb", "ম্ব"), ("mbh", "ম্ভ"),
-        ("rk", "র্ক"), ("rg", "র্গ"), ("rt", "র্ত"), ("rt", "র্ড"), ("rd", "র্দ"),
-        ("rn", "র্ণ"), ("rp", "র্প"), ("rb", "র্ব"), ("rm", "র্ম"), ("rsh", "র্ষ"), ("rs", "র্স"),
+        ("kkh", "ক্ষ"),
+        ("ngk", "ঙ্ক"),
+        ("ngkh", "ঙ্খ"),
+        ("ngg", "ঙ্গ"),
+        ("nggh", "ঙ্ঘ"),
+        ("cch", "চ্ছ"),
+        ("jj", "জ্জ"),
+        ("jjh", "জ্ঝ"),
+        ("nc", "ঞ্চ"),
+        ("nch", "ঞ্ছ"),
+        ("nj", "ঞ্জ"),
+        ("tt", "ট্ট"),
+        ("nth", "ণ্ঠ"),
+        ("nd", "ণ্ড"),
+        ("kt", "ক্ত"),
+        ("pt", "প্ত"),
+        ("bd", "ব্দ"),
+        ("st", "স্ত"),
+        ("sth", "স্থ"),
+        ("sn", "স্ন"),
+        ("sp", "স্প"),
+        ("sph", "স্ফ"),
+        ("nt", "ন্ত"),
+        ("nth", "ন্থ"),
+        ("nd", "ন্দ"),
+        ("ndh", "ন্ধ"),
+        ("mp", "ম্প"),
+        ("mb", "ম্ব"),
+        ("mbh", "ম্ভ"),
+        ("rk", "র্ক"),
+        ("rg", "র্গ"),
+        ("rt", "র্ত"),
+        ("rt", "র্ড"),
+        ("rd", "র্দ"),
+        ("rn", "র্ণ"),
+        ("rp", "র্প"),
+        ("rb", "র্ব"),
+        ("rm", "র্ম"),
+        ("rsh", "র্ষ"),
+        ("rs", "র্স"),
         // Common Affixes & Morphological Suffixes
-        ("er", "ের"), ("ar", "ার"), ("te", "তে"), ("ke", "কে"), ("der", "দের"),
+        ("er", "ের"),
+        ("ar", "ার"),
+        ("te", "তে"),
+        ("ke", "কে"),
+        ("der", "দের"),
         // Deletion / Inherent Vowel Syncope
-        ("a", ""), ("o", ""), ("e", ""),
+        ("a", ""),
+        ("o", ""),
+        ("e", ""),
     ];
 
     for &(r, b) in priors {
@@ -230,8 +313,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -274,8 +365,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i - kr..i] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j - kb..j] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i - kr..i]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j - kb..j]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -314,8 +413,16 @@ pub fn em_iteration(
                                     continue;
                                 }
 
-                                let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                                let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                                let r_slice = if kr == 0 {
+                                    &[]
+                                } else {
+                                    &pair.roman_tokens[i..i + kr]
+                                };
+                                let b_slice = if kb == 0 {
+                                    &[]
+                                } else {
+                                    &pair.bengali_tokens[j..j + kb]
+                                };
 
                                 if !is_valid_translation_unit(r_slice, b_slice) {
                                     continue;
@@ -403,8 +510,16 @@ pub fn viterbi_forced_alignment(
                         continue;
                     }
 
-                    let r_slice = if kr == 0 { &[] } else { &pair.roman_tokens[i..i + kr] };
-                    let b_slice = if kb == 0 { &[] } else { &pair.bengali_tokens[j..j + kb] };
+                    let r_slice = if kr == 0 {
+                        &[]
+                    } else {
+                        &pair.roman_tokens[i..i + kr]
+                    };
+                    let b_slice = if kb == 0 {
+                        &[]
+                    } else {
+                        &pair.bengali_tokens[j..j + kb]
+                    };
 
                     if !is_valid_translation_unit(r_slice, b_slice) {
                         continue;
@@ -480,7 +595,9 @@ impl UnitVocabulary {
         unit_to_id.insert(("</s>".to_string(), "</s>".to_string()), EOS_TOKEN);
 
         for (r, b) in units {
-            if (r.as_str(), b.as_str()) == ("<s>", "<s>") || (r.as_str(), b.as_str()) == ("</s>", "</s>") {
+            if (r.as_str(), b.as_str()) == ("<s>", "<s>")
+                || (r.as_str(), b.as_str()) == ("</s>", "</s>")
+            {
                 continue;
             }
             if unit_to_id.contains_key(&(r.clone(), b.clone())) {
@@ -506,7 +623,9 @@ impl UnitVocabulary {
 
     #[inline]
     pub fn get_id(&self, r: &str, b: &str) -> Option<UnitId> {
-        self.unit_to_id.get(&(r.to_string(), b.to_string())).copied()
+        self.unit_to_id
+            .get(&(r.to_string(), b.to_string()))
+            .copied()
     }
 }
 
@@ -623,7 +742,9 @@ impl JointUnitLM {
 
     /// Serialized size in bytes.
     pub fn serialized_size_bytes(&self) -> usize {
-        bincode::serialize(self).map(|bytes| bytes.len()).unwrap_or(0)
+        bincode::serialize(self)
+            .map(|bytes| bytes.len())
+            .unwrap_or(0)
     }
 }
 
@@ -716,7 +837,8 @@ pub fn decode_beam_ngram(
         }
 
         // Deduplicate hypotheses by (pos, bengali) keeping highest score
-        let mut dedup_map: HashMap<(usize, String), BeamCandidate> = HashMap::with_capacity(next_beam.len());
+        let mut dedup_map: HashMap<(usize, String), BeamCandidate> =
+            HashMap::with_capacity(next_beam.len());
         for cand in next_beam {
             let key = (cand.pos, cand.bengali.clone());
             if let Some(existing) = dedup_map.get_mut(&key) {
@@ -729,7 +851,11 @@ pub fn decode_beam_ngram(
         }
 
         let mut sorted_cands: Vec<BeamCandidate> = dedup_map.into_values().collect();
-        sorted_cands.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_cands.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         sorted_cands.truncate(beam_width);
 
         beam = sorted_cands;
@@ -870,10 +996,12 @@ fn main() {
     let t_vit = Instant::now();
 
     let alignments_tsv_path = PathBuf::from("data/eval/train_alignments.tsv");
-    let mut alignments_tsv = File::create(&alignments_tsv_path).expect("Create train_alignments.tsv");
+    let mut alignments_tsv =
+        File::create(&alignments_tsv_path).expect("Create train_alignments.tsv");
     writeln!(alignments_tsv, "id\tbengali\troman\tcount\tunit_alignment").unwrap();
 
-    let mut raw_train_sequences: Vec<(Vec<(String, String)>, f64)> = Vec::with_capacity(train_pairs.len());
+    let mut raw_train_sequences: Vec<(Vec<(String, String)>, f64)> =
+        Vec::with_capacity(train_pairs.len());
     let mut all_unique_units: HashSet<(String, String)> = HashSet::new();
 
     use lekhani_core::tokenization::roman_segmentation_lattice;
@@ -909,7 +1037,13 @@ fn main() {
 
         let align_str: String = align
             .iter()
-            .map(|(r, b)| format!("{}→{}", if r.is_empty() { "ε" } else { r }, if b.is_empty() { "ε" } else { b }))
+            .map(|(r, b)| {
+                format!(
+                    "{}→{}",
+                    if r.is_empty() { "ε" } else { r },
+                    if b.is_empty() { "ε" } else { b }
+                )
+            })
             .collect::<Vec<_>>()
             .join(" | ");
 
@@ -933,17 +1067,25 @@ fn main() {
         all_unique_units.len(),
         t_vit.elapsed()
     );
-    println!("   💾 Saved Viterbi alignments to {:?}", alignments_tsv_path);
+    println!(
+        "   💾 Saved Viterbi alignments to {:?}",
+        alignments_tsv_path
+    );
 
     // Build vocabulary
     let mut sorted_units: Vec<(String, String)> = all_unique_units.into_iter().collect();
     sorted_units.sort();
     let vocab = UnitVocabulary::new(sorted_units);
-    println!("   ✓ Compiled Unit Vocabulary: {} tokens (including <s>, </s>)", vocab.size());
+    println!(
+        "   ✓ Compiled Unit Vocabulary: {} tokens (including <s>, </s>)",
+        vocab.size()
+    );
 
     // Encode sequences to UnitIds
-    let mut row_level_sequences: Vec<(Vec<UnitId>, f64)> = Vec::with_capacity(raw_train_sequences.len());
-    let mut type_level_sequences: Vec<(Vec<UnitId>, f64)> = Vec::with_capacity(raw_train_sequences.len());
+    let mut row_level_sequences: Vec<(Vec<UnitId>, f64)> =
+        Vec::with_capacity(raw_train_sequences.len());
+    let mut type_level_sequences: Vec<(Vec<UnitId>, f64)> =
+        Vec::with_capacity(raw_train_sequences.len());
 
     for (seq, count) in &raw_train_sequences {
         let id_seq: Vec<UnitId> = seq
@@ -957,7 +1099,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 7.2: Weighting Scheme Comparison on DEV (Order = 3, Prune = 0)
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 WEIGHTING SCHEME COMPARISON: Row-Level (Dakshina Freq) vs Type-Level (1.0)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -973,17 +1117,25 @@ fn main() {
         m_type.top1_pct, m_type.top3_pct, m_type.reach_pct, m_type.size_kb);
 
     let (chosen_weighting, chosen_seqs) = if m_row.top1_pct >= m_type.top1_pct {
-        println!("   👉 Decision on DEV: Selected ROW-LEVEL weighting (Top-1: {:.2}% >= {:.2}%)", m_row.top1_pct, m_type.top1_pct);
+        println!(
+            "   👉 Decision on DEV: Selected ROW-LEVEL weighting (Top-1: {:.2}% >= {:.2}%)",
+            m_row.top1_pct, m_type.top1_pct
+        );
         ("Row-Level", &row_level_sequences)
     } else {
-        println!("   👉 Decision on DEV: Selected TYPE-LEVEL weighting (Top-1: {:.2}% > {:.2}%)", m_type.top1_pct, m_row.top1_pct);
+        println!(
+            "   👉 Decision on DEV: Selected TYPE-LEVEL weighting (Top-1: {:.2}% > {:.2}%)",
+            m_type.top1_pct, m_row.top1_pct
+        );
         ("Type-Level", &type_level_sequences)
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 7.3: Full Sweeps Across Orders (3, 4, 5) and Prune Levels (0, 1, 2)
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 FULL GRID SWEEP: Order (3, 4, 5) × Prune Level (0, 1, 2) on Held-Out DEV");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -998,12 +1150,21 @@ fn main() {
 
     for &order in &orders {
         for &(p_lvl, p_desc, min_cnt) in &prune_configs {
-            print!("▶️  Evaluating Order = {}, Prune Level = {} ({})... ", order, p_lvl, p_desc);
+            print!(
+                "▶️  Evaluating Order = {}, Prune Level = {} ({})... ",
+                order, p_lvl, p_desc
+            );
             let t0 = Instant::now();
             let lm = JointUnitLM::train(chosen_seqs, vocab.clone(), order, min_cnt);
-            let metrics = evaluate_on_dev(&dev_pairs, &lm, order, p_lvl, p_desc, chosen_weighting, 16);
-            println!("Done in {:.2?}: Top-1 = {:.2}%, Reach = {:.2}%, Size = {:.1} KB",
-                t0.elapsed(), metrics.top1_pct, metrics.reach_pct, metrics.size_kb);
+            let metrics =
+                evaluate_on_dev(&dev_pairs, &lm, order, p_lvl, p_desc, chosen_weighting, 16);
+            println!(
+                "Done in {:.2?}: Top-1 = {:.2}%, Reach = {:.2}%, Size = {:.1} KB",
+                t0.elapsed(),
+                metrics.top1_pct,
+                metrics.reach_pct,
+                metrics.size_kb
+            );
             sweep_results.push(metrics);
         }
     }
@@ -1011,7 +1172,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 7.4: Print Standard Work Order Markdown Table
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n══════════════════════════════════════════════════════════════════════════════════");
+    println!(
+        "\n══════════════════════════════════════════════════════════════════════════════════"
+    );
     println!("   📊 WORK ORDER STEP 7 REPORT TABLE: Order × Prune Level → DEV Performance");
     println!("══════════════════════════════════════════════════════════════════════════════════");
     println!("| Order | Prune Level | Description | Weighting | File Size (KB) | DEV Top-1 (%) | DEV Top-3 (%) | Reachability (%) | p95 Latency (µs) |");
@@ -1019,32 +1182,55 @@ fn main() {
     for m in &sweep_results {
         println!(
             "| **{}** | Level {} | {} | {} | **{:.1}** | **{:.2}%** | {:.2}% | {:.2}% | {:.1} µs |",
-            m.order, m.prune_level, m.prune_desc, m.weighting, m.size_kb, m.top1_pct, m.top3_pct, m.reach_pct, m.p95_latency_us
+            m.order,
+            m.prune_level,
+            m.prune_desc,
+            m.weighting,
+            m.size_kb,
+            m.top1_pct,
+            m.top3_pct,
+            m.reach_pct,
+            m.p95_latency_us
         );
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // STEP 7.5: Gate G1 Verification
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🛡️ GATE G1 VERIFICATION: N-Gram Alone > Raw Avro on DEV");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
     let raw_avro_dev_top1 = 12.37; // from baseline.json
-    let best_top1 = sweep_results.iter().map(|m| m.top1_pct).fold(0.0f64, f64::max);
-    let best_model_entry = sweep_results.iter().find(|m| (m.top1_pct - best_top1).abs() < 1e-4).unwrap();
+    let best_top1 = sweep_results
+        .iter()
+        .map(|m| m.top1_pct)
+        .fold(0.0f64, f64::max);
+    let best_model_entry = sweep_results
+        .iter()
+        .find(|m| (m.top1_pct - best_top1).abs() < 1e-4)
+        .unwrap();
 
-    println!("   - Raw Avro DEV Top-1 (baseline.json): {:.2}%", raw_avro_dev_top1);
-    println!("   - Best N-Gram Alone DEV Top-1       : {:.2}% (Order {}, Prune Level {})",
-        best_top1, best_model_entry.order, best_model_entry.prune_level);
+    println!(
+        "   - Raw Avro DEV Top-1 (baseline.json): {:.2}%",
+        raw_avro_dev_top1
+    );
+    println!(
+        "   - Best N-Gram Alone DEV Top-1       : {:.2}% (Order {}, Prune Level {})",
+        best_top1, best_model_entry.order, best_model_entry.prune_level
+    );
 
     if best_top1 > raw_avro_dev_top1 {
         let gain = best_top1 - raw_avro_dev_top1;
         println!("   🎉 GATE G1 PASSED! N-gram alone ({:.2}%) outperforms Raw Avro ({:.2}%) by +{:.2}% points!",
             best_top1, raw_avro_dev_top1, gain);
     } else {
-        println!("   ❌ GATE G1 FAILED: N-gram alone ({:.2}%) did not beat Raw Avro ({:.2}%)",
-            best_top1, raw_avro_dev_top1);
+        println!(
+            "   ❌ GATE G1 FAILED: N-gram alone ({:.2}%) did not beat Raw Avro ({:.2}%)",
+            best_top1, raw_avro_dev_top1
+        );
     }
 
     // Export the best trained model artifact to data/eval/joint_unit_lm_best.bin
@@ -1052,11 +1238,23 @@ fn main() {
         chosen_seqs,
         vocab.clone(),
         best_model_entry.order,
-        if best_model_entry.prune_level == 0 { 1.0 } else if best_model_entry.prune_level == 1 { 2.0 } else { 5.0 },
+        if best_model_entry.prune_level == 0 {
+            1.0
+        } else if best_model_entry.prune_level == 1 {
+            2.0
+        } else {
+            5.0
+        },
     );
     let out_model_path = PathBuf::from("data/eval/joint_unit_lm_best.bin");
     let serialized_bytes = bincode::serialize(&best_lm).expect("Serialize LM");
     let mut out_file = File::create(&out_model_path).expect("Create joint_unit_lm_best.bin");
-    out_file.write_all(&serialized_bytes).expect("Write serialized LM");
-    println!("💾 Exported best model artifact to {:?} ({:.1} KB)", out_model_path, serialized_bytes.len() as f64 / 1024.0);
+    out_file
+        .write_all(&serialized_bytes)
+        .expect("Write serialized LM");
+    println!(
+        "💾 Exported best model artifact to {:?} ({:.1} KB)",
+        out_model_path,
+        serialized_bytes.len() as f64 / 1024.0
+    );
 }

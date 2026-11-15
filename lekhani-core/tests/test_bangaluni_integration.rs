@@ -3,7 +3,10 @@ use lekhani_core::PhoneticSuggestion;
 
 #[test]
 fn test_all_fixed_words_upstream() {
-    std::env::set_var("LEKHANI_MODELS_DIR", "/mnt/data/lekhani-engine/data/dictionaries");
+    std::env::set_var(
+        "LEKHANI_MODELS_DIR",
+        "/mnt/data/lekhani-engine/data/dictionaries",
+    );
 
     let mut suggestion = PhoneticSuggestion::new();
 
@@ -24,7 +27,8 @@ fn test_all_fixed_words_upstream() {
     }
 
     // Set layout
-    let layout_path = std::path::PathBuf::from("/mnt/data/lekhani-engine/data/layouts/avrophonetic.json");
+    let layout_path =
+        std::path::PathBuf::from("/mnt/data/lekhani-engine/data/layouts/avrophonetic.json");
     if layout_path.exists() {
         if let Ok(content) = std::fs::read_to_string(&layout_path) {
             if let Ok(json) = serde_json::from_str(&content) {

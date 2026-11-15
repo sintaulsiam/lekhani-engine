@@ -1695,7 +1695,11 @@ impl LanguageModelInner {
                 }
                 if let Some(w2) = clean_w2 {
                     if let Some(curated_tri) = get_curated_trigram(w2, w1, clean_word) {
-                        boost = Some(boost.map(|b: f32| b.max(curated_tri)).unwrap_or(curated_tri));
+                        boost = Some(
+                            boost
+                                .map(|b: f32| b.max(curated_tri))
+                                .unwrap_or(curated_tri),
+                        );
                     }
                 }
             }
@@ -1784,7 +1788,11 @@ impl LanguageModelInner {
                 }
                 if let Some(w2) = clean_w2 {
                     if let Some(curated_tri) = get_curated_trigram(w2, w1, clean_word) {
-                        boost = Some(boost.map(|b: f32| b.max(curated_tri)).unwrap_or(curated_tri));
+                        boost = Some(
+                            boost
+                                .map(|b: f32| b.max(curated_tri))
+                                .unwrap_or(curated_tri),
+                        );
                     }
                 }
             }

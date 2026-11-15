@@ -46,7 +46,10 @@ impl CharVocab {
         match id {
             PAD_ID | BOS_ID | UNK_ID => None,
             EOS_ID => None,
-            _ => self.chars.get((id as usize).saturating_sub(SPECIAL_COUNT)).copied(),
+            _ => self
+                .chars
+                .get((id as usize).saturating_sub(SPECIAL_COUNT))
+                .copied(),
         }
     }
 
@@ -111,11 +114,11 @@ pub struct S2SGruCell {
     // Reset gate
     pub w_ir: Vec<f32>, // hidden × input
     pub w_hr: Vec<f32>, // hidden × hidden
-    pub b_r:  Vec<f32>, // hidden
+    pub b_r: Vec<f32>,  // hidden
     // Update gate
     pub w_iz: Vec<f32>,
     pub w_hz: Vec<f32>,
-    pub b_z:  Vec<f32>,
+    pub b_z: Vec<f32>,
     // Candidate state
     pub w_in: Vec<f32>,
     pub w_hn: Vec<f32>,
@@ -150,16 +153,28 @@ impl S2SGruCell {
         Self {
             input_dim,
             hidden_dim,
-            w_ir: vec![0.0; ih], w_hr: vec![0.0; hh], b_r: vec![0.0; hidden_dim],
-            w_iz: vec![0.0; ih], w_hz: vec![0.0; hh], b_z: vec![0.0; hidden_dim],
-            w_in: vec![0.0; ih], w_hn: vec![0.0; hh],
-            b_in: vec![0.0; hidden_dim], b_hn: vec![0.0; hidden_dim],
+            w_ir: vec![0.0; ih],
+            w_hr: vec![0.0; hh],
+            b_r: vec![0.0; hidden_dim],
+            w_iz: vec![0.0; ih],
+            w_hz: vec![0.0; hh],
+            b_z: vec![0.0; hidden_dim],
+            w_in: vec![0.0; ih],
+            w_hn: vec![0.0; hh],
+            b_in: vec![0.0; hidden_dim],
+            b_hn: vec![0.0; hidden_dim],
         }
     }
 
     /// Forward step. Writes new hidden state to `h_out`.
     /// Also writes gate values to `gate_buf` (for BPTT): [r | z | n | preact_r | preact_z | n_in | n_hn]
-    pub fn step(&self, x: &[f32], h_prev: &[f32], h_out: &mut [f32], mut gate_buf: Option<&mut GateBuf>) {
+    pub fn step(
+        &self,
+        x: &[f32],
+        h_prev: &[f32],
+        h_out: &mut [f32],
+        mut gate_buf: Option<&mut GateBuf>,
+    ) {
         let h = self.hidden_dim;
         let in_d = self.input_dim;
         for i in 0..h {
@@ -179,9 +194,13 @@ impl S2SGruCell {
             let n = fast_tanh(nin + r * nhn);
             h_out[i] = (1.0 - z) * n + z * h_prev[i];
             if let Some(ref mut gb) = gate_buf.as_deref_mut() {
-                gb.r[i] = r; gb.z[i] = z; gb.n[i] = n;
-                gb.pre_r[i] = rv; gb.pre_z[i] = zv;
-                gb.n_in[i] = nin; gb.n_hn[i] = nhn;
+                gb.r[i] = r;
+                gb.z[i] = z;
+                gb.n[i] = n;
+                gb.pre_r[i] = rv;
+                gb.pre_z[i] = zv;
+                gb.n_in[i] = nin;
+                gb.n_hn[i] = nhn;
             }
         }
     }
@@ -190,17 +209,25 @@ impl S2SGruCell {
 /// Per-step gate buffer for BPTT (Backprop Through Time)
 #[derive(Debug, Clone)]
 pub struct GateBuf {
-    pub r: Vec<f32>, pub z: Vec<f32>, pub n: Vec<f32>,
-    pub pre_r: Vec<f32>, pub pre_z: Vec<f32>,
-    pub n_in: Vec<f32>, pub n_hn: Vec<f32>,
+    pub r: Vec<f32>,
+    pub z: Vec<f32>,
+    pub n: Vec<f32>,
+    pub pre_r: Vec<f32>,
+    pub pre_z: Vec<f32>,
+    pub n_in: Vec<f32>,
+    pub n_hn: Vec<f32>,
 }
 
 impl GateBuf {
     pub fn new(h: usize) -> Self {
         Self {
-            r: vec![0.0; h], z: vec![0.0; h], n: vec![0.0; h],
-            pre_r: vec![0.0; h], pre_z: vec![0.0; h],
-            n_in: vec![0.0; h], n_hn: vec![0.0; h],
+            r: vec![0.0; h],
+            z: vec![0.0; h],
+            n: vec![0.0; h],
+            pre_r: vec![0.0; h],
+            pre_z: vec![0.0; h],
+            n_in: vec![0.0; h],
+            n_hn: vec![0.0; h],
         }
     }
 }
@@ -213,27 +240,32 @@ impl GateBuf {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Seq2SeqTransliterator {
     // Vocabulary
-    pub src_vocab: CharVocab,  // Latin
-    pub tgt_vocab: CharVocab,  // Bengali
+    pub src_vocab: CharVocab, // Latin
+    pub tgt_vocab: CharVocab, // Bengali
     // Dimensions
     pub emb_dim: usize,
     pub hidden_dim: usize,
     // Embeddings
-    pub enc_emb: Vec<f32>,  // src_vocab_size × emb_dim
-    pub dec_emb: Vec<f32>,  // tgt_vocab_size × emb_dim
+    pub enc_emb: Vec<f32>, // src_vocab_size × emb_dim
+    pub dec_emb: Vec<f32>, // tgt_vocab_size × emb_dim
     // Encoder
     pub encoder: S2SGruCell,
     // Decoder (input = emb_dim + hidden_dim for context concat)
     pub decoder: S2SGruCell,
     // Attention: score = enc_states · W_a · dec_h
-    pub attn_w: Vec<f32>,   // hidden_dim × hidden_dim
+    pub attn_w: Vec<f32>, // hidden_dim × hidden_dim
     // Output projection
-    pub out_w: Vec<f32>,    // tgt_vocab_size × hidden_dim
-    pub out_b: Vec<f32>,    // tgt_vocab_size
+    pub out_w: Vec<f32>, // tgt_vocab_size × hidden_dim
+    pub out_b: Vec<f32>, // tgt_vocab_size
 }
 
 impl Seq2SeqTransliterator {
-    pub fn new(src_vocab: CharVocab, tgt_vocab: CharVocab, emb_dim: usize, hidden_dim: usize) -> Self {
+    pub fn new(
+        src_vocab: CharVocab,
+        tgt_vocab: CharVocab,
+        emb_dim: usize,
+        hidden_dim: usize,
+    ) -> Self {
         let sv = src_vocab.size();
         let tv = tgt_vocab.size();
         Self {
@@ -254,8 +286,7 @@ impl Seq2SeqTransliterator {
     /// Save model to bincode binary
     pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> std::io::Result<()> {
         let file = std::fs::File::create(path)?;
-        bincode::serialize_into(std::io::BufWriter::new(file), self)
-            .map_err(std::io::Error::other)
+        bincode::serialize_into(std::io::BufWriter::new(file), self).map_err(std::io::Error::other)
     }
 
     /// Load model from bincode binary
@@ -300,7 +331,8 @@ impl Seq2SeqTransliterator {
 
         for &id in ids {
             self.src_embed(id, &mut scratch.emb_buf);
-            self.encoder.step(&scratch.emb_buf, &h_cur, &mut h_next, None);
+            self.encoder
+                .step(&scratch.emb_buf, &h_cur, &mut h_next, None);
             h_cur.copy_from_slice(&h_next);
             enc_states.push(h_cur.clone());
         }
@@ -309,7 +341,9 @@ impl Seq2SeqTransliterator {
             enc_states.push(vec![0.0; h]);
         }
         // Store final encoder state in scratch
-        scratch.enc_final.copy_from_slice(enc_states.last().unwrap());
+        scratch
+            .enc_final
+            .copy_from_slice(enc_states.last().unwrap());
         enc_states
     }
 
@@ -327,7 +361,11 @@ impl Seq2SeqTransliterator {
             scratch.attn_scores.push(dot(enc_h, &scratch.attn_q));
         }
         // Softmax
-        let max_s = scratch.attn_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max_s = scratch
+            .attn_scores
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let mut sum_exp = 0.0f32;
         for s in scratch.attn_scores.iter_mut() {
             *s = (*s - max_s).exp();
@@ -391,9 +429,14 @@ impl Seq2SeqTransliterator {
         let mut completed: Vec<(f32, Vec<u32>)> = Vec::new();
 
         for _ in 0..max_len {
-            if active.is_empty() { break; }
+            if active.is_empty() {
+                break;
+            }
             if completed.len() >= beam {
-                let best_active = active.iter().map(|h| h.score).fold(f32::NEG_INFINITY, f32::max);
+                let best_active = active
+                    .iter()
+                    .map(|h| h.score)
+                    .fold(f32::NEG_INFINITY, f32::max);
                 let worst_completed = completed.iter().map(|c| c.0).fold(f32::INFINITY, f32::min);
                 if best_active <= worst_completed {
                     break;
@@ -413,11 +456,16 @@ impl Seq2SeqTransliterator {
                 // Concat emb + context
                 scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
                 scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
-                self.decoder.step(&scratch.dec_in, &hyp.h, &mut scratch.h_next, None);
+                self.decoder
+                    .step(&scratch.dec_in, &hyp.h, &mut scratch.h_next, None);
                 self.project(&scratch.h_next, &mut scratch.logits_buf);
 
                 // Log-softmax
-                let max_l = scratch.logits_buf.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+                let max_l = scratch
+                    .logits_buf
+                    .iter()
+                    .cloned()
+                    .fold(f32::NEG_INFINITY, f32::max);
                 let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
                 let log_sum = max_l + sum_e.ln();
 
@@ -426,7 +474,9 @@ impl Seq2SeqTransliterator {
                 for (idx, &l) in scratch.logits_buf.iter().enumerate().take(tv) {
                     scratch.scored_buf.push((idx as u32, l - log_sum));
                 }
-                scratch.scored_buf.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                scratch
+                    .scored_buf
+                    .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
                 let explore_count = if prefix_filter.is_some() || word_filter.is_some() {
                     (beam * 2).min(scratch.scored_buf.len())
@@ -481,7 +531,11 @@ impl Seq2SeqTransliterator {
             }
 
             // Prune to top-beam
-            candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            candidates.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             candidates.truncate(beam);
             active = candidates;
         }
@@ -511,7 +565,12 @@ impl Seq2SeqTransliterator {
     }
 
     /// Transliterate a Latin string to up to `beam` Bengali candidates.
-    pub fn transliterate(&self, latin: &str, beam: usize, scratch: &mut InferenceScratch) -> Vec<String> {
+    pub fn transliterate(
+        &self,
+        latin: &str,
+        beam: usize,
+        scratch: &mut InferenceScratch,
+    ) -> Vec<String> {
         self.transliterate_constrained(latin, beam, scratch, None, None)
     }
 
@@ -554,7 +613,7 @@ impl Seq2SeqTransliterator {
             + 3 * h * in_e + 3 * h * h + 5 * h        // encoder GRU
             + 3 * h * in_d + 3 * h * h + 5 * h        // decoder GRU
             + h * h                                     // attn_w
-            + tv * h + tv                               // output projection
+            + tv * h + tv // output projection
     }
 }
 
@@ -608,9 +667,16 @@ pub struct Seq2SeqGrad {
 
 #[derive(Debug, Clone)]
 pub struct CellGrad {
-    pub w_ir: Vec<f32>, pub w_hr: Vec<f32>, pub b_r: Vec<f32>,
-    pub w_iz: Vec<f32>, pub w_hz: Vec<f32>, pub b_z: Vec<f32>,
-    pub w_in: Vec<f32>, pub w_hn: Vec<f32>, pub b_in: Vec<f32>, pub b_hn: Vec<f32>,
+    pub w_ir: Vec<f32>,
+    pub w_hr: Vec<f32>,
+    pub b_r: Vec<f32>,
+    pub w_iz: Vec<f32>,
+    pub w_hz: Vec<f32>,
+    pub b_z: Vec<f32>,
+    pub w_in: Vec<f32>,
+    pub w_hn: Vec<f32>,
+    pub b_in: Vec<f32>,
+    pub b_hn: Vec<f32>,
 }
 
 impl CellGrad {
@@ -618,44 +684,96 @@ impl CellGrad {
         let ih = hidden_dim * input_dim;
         let hh = hidden_dim * hidden_dim;
         Self {
-            w_ir: vec![0.0; ih], w_hr: vec![0.0; hh], b_r: vec![0.0; hidden_dim],
-            w_iz: vec![0.0; ih], w_hz: vec![0.0; hh], b_z: vec![0.0; hidden_dim],
-            w_in: vec![0.0; ih], w_hn: vec![0.0; hh], b_in: vec![0.0; hidden_dim],
+            w_ir: vec![0.0; ih],
+            w_hr: vec![0.0; hh],
+            b_r: vec![0.0; hidden_dim],
+            w_iz: vec![0.0; ih],
+            w_hz: vec![0.0; hh],
+            b_z: vec![0.0; hidden_dim],
+            w_in: vec![0.0; ih],
+            w_hn: vec![0.0; hh],
+            b_in: vec![0.0; hidden_dim],
             b_hn: vec![0.0; hidden_dim],
         }
     }
 
     pub fn zero(&mut self) {
-        self.w_ir.fill(0.0); self.w_hr.fill(0.0); self.b_r.fill(0.0);
-        self.w_iz.fill(0.0); self.w_hz.fill(0.0); self.b_z.fill(0.0);
-        self.w_in.fill(0.0); self.w_hn.fill(0.0); self.b_in.fill(0.0);
+        self.w_ir.fill(0.0);
+        self.w_hr.fill(0.0);
+        self.b_r.fill(0.0);
+        self.w_iz.fill(0.0);
+        self.w_hz.fill(0.0);
+        self.b_z.fill(0.0);
+        self.w_in.fill(0.0);
+        self.w_hn.fill(0.0);
+        self.b_in.fill(0.0);
         self.b_hn.fill(0.0);
     }
 
     pub fn add(&mut self, other: &Self) {
-        for (a, &b) in self.w_ir.iter_mut().zip(&other.w_ir) { *a += b; }
-        for (a, &b) in self.w_hr.iter_mut().zip(&other.w_hr) { *a += b; }
-        for (a, &b) in self.b_r.iter_mut().zip(&other.b_r) { *a += b; }
-        for (a, &b) in self.w_iz.iter_mut().zip(&other.w_iz) { *a += b; }
-        for (a, &b) in self.w_hz.iter_mut().zip(&other.w_hz) { *a += b; }
-        for (a, &b) in self.b_z.iter_mut().zip(&other.b_z) { *a += b; }
-        for (a, &b) in self.w_in.iter_mut().zip(&other.w_in) { *a += b; }
-        for (a, &b) in self.w_hn.iter_mut().zip(&other.w_hn) { *a += b; }
-        for (a, &b) in self.b_in.iter_mut().zip(&other.b_in) { *a += b; }
-        for (a, &b) in self.b_hn.iter_mut().zip(&other.b_hn) { *a += b; }
+        for (a, &b) in self.w_ir.iter_mut().zip(&other.w_ir) {
+            *a += b;
+        }
+        for (a, &b) in self.w_hr.iter_mut().zip(&other.w_hr) {
+            *a += b;
+        }
+        for (a, &b) in self.b_r.iter_mut().zip(&other.b_r) {
+            *a += b;
+        }
+        for (a, &b) in self.w_iz.iter_mut().zip(&other.w_iz) {
+            *a += b;
+        }
+        for (a, &b) in self.w_hz.iter_mut().zip(&other.w_hz) {
+            *a += b;
+        }
+        for (a, &b) in self.b_z.iter_mut().zip(&other.b_z) {
+            *a += b;
+        }
+        for (a, &b) in self.w_in.iter_mut().zip(&other.w_in) {
+            *a += b;
+        }
+        for (a, &b) in self.w_hn.iter_mut().zip(&other.w_hn) {
+            *a += b;
+        }
+        for (a, &b) in self.b_in.iter_mut().zip(&other.b_in) {
+            *a += b;
+        }
+        for (a, &b) in self.b_hn.iter_mut().zip(&other.b_hn) {
+            *a += b;
+        }
     }
 
     pub fn scale(&mut self, s: f32) {
-        for g in &mut self.w_ir { *g *= s; }
-        for g in &mut self.w_hr { *g *= s; }
-        for g in &mut self.b_r  { *g *= s; }
-        for g in &mut self.w_iz { *g *= s; }
-        for g in &mut self.w_hz { *g *= s; }
-        for g in &mut self.b_z  { *g *= s; }
-        for g in &mut self.w_in { *g *= s; }
-        for g in &mut self.w_hn { *g *= s; }
-        for g in &mut self.b_in { *g *= s; }
-        for g in &mut self.b_hn { *g *= s; }
+        for g in &mut self.w_ir {
+            *g *= s;
+        }
+        for g in &mut self.w_hr {
+            *g *= s;
+        }
+        for g in &mut self.b_r {
+            *g *= s;
+        }
+        for g in &mut self.w_iz {
+            *g *= s;
+        }
+        for g in &mut self.w_hz {
+            *g *= s;
+        }
+        for g in &mut self.b_z {
+            *g *= s;
+        }
+        for g in &mut self.w_in {
+            *g *= s;
+        }
+        for g in &mut self.w_hn {
+            *g *= s;
+        }
+        for g in &mut self.b_in {
+            *g *= s;
+        }
+        for g in &mut self.b_hn {
+            *g *= s;
+        }
     }
 }
 
@@ -678,30 +796,53 @@ impl Seq2SeqGrad {
     }
 
     pub fn zero(&mut self) {
-        self.enc_emb.fill(0.0); self.dec_emb.fill(0.0);
-        self.enc.zero(); self.dec.zero();
+        self.enc_emb.fill(0.0);
+        self.dec_emb.fill(0.0);
+        self.enc.zero();
+        self.dec.zero();
         self.attn_w.fill(0.0);
-        self.out_w.fill(0.0); self.out_b.fill(0.0);
+        self.out_w.fill(0.0);
+        self.out_b.fill(0.0);
     }
 
     pub fn add(&mut self, other: &Self) {
-        for (a, &b) in self.enc_emb.iter_mut().zip(&other.enc_emb) { *a += b; }
-        for (a, &b) in self.dec_emb.iter_mut().zip(&other.dec_emb) { *a += b; }
+        for (a, &b) in self.enc_emb.iter_mut().zip(&other.enc_emb) {
+            *a += b;
+        }
+        for (a, &b) in self.dec_emb.iter_mut().zip(&other.dec_emb) {
+            *a += b;
+        }
         self.enc.add(&other.enc);
         self.dec.add(&other.dec);
-        for (a, &b) in self.attn_w.iter_mut().zip(&other.attn_w) { *a += b; }
-        for (a, &b) in self.out_w.iter_mut().zip(&other.out_w) { *a += b; }
-        for (a, &b) in self.out_b.iter_mut().zip(&other.out_b) { *a += b; }
+        for (a, &b) in self.attn_w.iter_mut().zip(&other.attn_w) {
+            *a += b;
+        }
+        for (a, &b) in self.out_w.iter_mut().zip(&other.out_w) {
+            *a += b;
+        }
+        for (a, &b) in self.out_b.iter_mut().zip(&other.out_b) {
+            *a += b;
+        }
     }
 
     pub fn scale(&mut self, s: f32) {
-        for g in &mut self.enc_emb { *g *= s; }
-        for g in &mut self.dec_emb { *g *= s; }
+        for g in &mut self.enc_emb {
+            *g *= s;
+        }
+        for g in &mut self.dec_emb {
+            *g *= s;
+        }
         self.enc.scale(s);
         self.dec.scale(s);
-        for g in &mut self.attn_w { *g *= s; }
-        for g in &mut self.out_w  { *g *= s; }
-        for g in &mut self.out_b  { *g *= s; }
+        for g in &mut self.attn_w {
+            *g *= s;
+        }
+        for g in &mut self.out_w {
+            *g *= s;
+        }
+        for g in &mut self.out_b {
+            *g *= s;
+        }
     }
 }
 
@@ -714,7 +855,7 @@ pub fn gru_backward(
     x: &[f32],
     h_prev: &[f32],
     gb: &GateBuf,
-    d_h: &[f32],       // gradient wrt h_out
+    d_h: &[f32], // gradient wrt h_out
     grad: &mut CellGrad,
     d_h_prev_out: &mut [f32],
     d_x_out: &mut [f32],
@@ -814,7 +955,11 @@ mod tests {
     #[test]
     fn test_param_count_reasonable() {
         let sv = CharVocab::from_strings(["abcdefghijklmnopqrstuvwxyz0123456789"].iter().copied());
-        let tv = CharVocab::from_strings(["অআইউএওকখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহড়ঢ়য়ৎংঃঁ"].iter().copied());
+        let tv = CharVocab::from_strings(
+            ["অআইউএওকখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহড়ঢ়য়ৎংঃঁ"]
+                .iter()
+                .copied(),
+        );
         let m = Seq2SeqTransliterator::new(sv, tv, 16, 64);
         let params = m.param_count();
         // Should be < 200K parameters → < 800 KB
@@ -830,7 +975,13 @@ mod tests {
         // Constraint: only allow prefixes starting with 'অ'
         let prefix_filter = |p: &str| p.starts_with('অ');
         let word_filter = |w: &str| w == "অ";
-        let result = m.transliterate_constrained("a", 3, &mut scratch, Some(&prefix_filter), Some(&word_filter));
+        let result = m.transliterate_constrained(
+            "a",
+            3,
+            &mut scratch,
+            Some(&prefix_filter),
+            Some(&word_filter),
+        );
         for cand in &result {
             assert!(cand.starts_with('অ'));
         }

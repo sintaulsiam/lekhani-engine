@@ -100,30 +100,112 @@ pub fn seed_avro_prior(counts: &mut HashMap<(String, String), f64>, alpha: f64) 
         return;
     }
     let priors: &[(&str, &str)] = &[
-        ("k", "ক"), ("kh", "খ"), ("g", "গ"), ("gh", "ঘ"), ("ng", "ঙ"),
-        ("c", "চ"), ("ch", "ছ"), ("j", "জ"), ("jh", "ঝ"),
-        ("t", "ত"), ("t", "ট"), ("th", "থ"), ("th", "ঠ"),
-        ("d", "দ"), ("d", "ড"), ("dh", "ধ"), ("dh", "ঢ"),
-        ("n", "ন"), ("n", "ণ"),
-        ("p", "প"), ("ph", "ফ"), ("f", "ফ"), ("b", "ব"), ("bh", "ভ"), ("v", "ভ"), ("m", "ম"),
-        ("z", "য"), ("r", "র"), ("l", "ল"),
-        ("sh", "শ"), ("sh", "ষ"), ("s", "স"), ("s", "শ"), ("h", "হ"),
-        ("y", "য়"), ("w", "ও"), ("q", "ক"), ("x", "ক্স"),
-        ("a", "া"), ("a", "আ"), ("a", "অ"), ("aa", "আ"), ("aa", "া"),
-        ("i", "ি"), ("i", "ই"), ("ee", "ী"), ("ee", "ি"),
-        ("u", "ু"), ("u", "উ"), ("oo", "ূ"), ("oo", "ু"),
-        ("e", "ে"), ("e", "এ"), ("oi", "ঐ"), ("ou", "ঔ"),
-        ("o", "ও"), ("o", "ো"), ("o", "অ"),
-        ("kkh", "ক্ষ"), ("ngk", "ঙ্ক"), ("ngkh", "ঙ্খ"), ("ngg", "ঙ্গ"), ("nggh", "ঙ্ঘ"),
-        ("cch", "চ্ছ"), ("jj", "জ্জ"), ("jjh", "জ্ঝ"), ("nc", "ঞ্চ"), ("nch", "ঞ্ছ"), ("nj", "ঞ্জ"),
-        ("tt", "ট্ট"), ("nth", "ণ্ঠ"), ("nd", "ণ্ড"), ("kt", "ক্ত"), ("pt", "প্ত"), ("bd", "ব্দ"),
-        ("st", "স্ত"), ("sth", "স্থ"), ("sn", "স্ন"), ("sp", "স্প"), ("sph", "স্ফ"),
-        ("nt", "ন্ত"), ("nth", "ন্থ"), ("nd", "ন্দ"), ("ndh", "ন্ধ"),
-        ("mp", "ম্প"), ("mb", "ম্ব"), ("mbh", "ম্ভ"),
-        ("rk", "র্ক"), ("rg", "র্গ"), ("rt", "র্ত"), ("rt", "র্ড"), ("rd", "র্দ"),
-        ("rn", "র্ণ"), ("rp", "র্প"), ("rb", "র্ব"), ("rm", "র্ম"), ("rsh", "র্ষ"), ("rs", "র্স"),
-        ("er", "ের"), ("ar", "ার"), ("te", "তে"), ("ke", "কে"), ("der", "দের"),
-        ("a", ""), ("o", ""), ("e", ""),
+        ("k", "ক"),
+        ("kh", "খ"),
+        ("g", "গ"),
+        ("gh", "ঘ"),
+        ("ng", "ঙ"),
+        ("c", "চ"),
+        ("ch", "ছ"),
+        ("j", "জ"),
+        ("jh", "ঝ"),
+        ("t", "ত"),
+        ("t", "ট"),
+        ("th", "থ"),
+        ("th", "ঠ"),
+        ("d", "দ"),
+        ("d", "ড"),
+        ("dh", "ধ"),
+        ("dh", "ঢ"),
+        ("n", "ন"),
+        ("n", "ণ"),
+        ("p", "প"),
+        ("ph", "ফ"),
+        ("f", "ফ"),
+        ("b", "ব"),
+        ("bh", "ভ"),
+        ("v", "ভ"),
+        ("m", "ম"),
+        ("z", "য"),
+        ("r", "র"),
+        ("l", "ল"),
+        ("sh", "শ"),
+        ("sh", "ষ"),
+        ("s", "স"),
+        ("s", "শ"),
+        ("h", "হ"),
+        ("y", "য়"),
+        ("w", "ও"),
+        ("q", "ক"),
+        ("x", "ক্স"),
+        ("a", "া"),
+        ("a", "আ"),
+        ("a", "অ"),
+        ("aa", "আ"),
+        ("aa", "া"),
+        ("i", "ি"),
+        ("i", "ই"),
+        ("ee", "ী"),
+        ("ee", "ি"),
+        ("u", "ু"),
+        ("u", "উ"),
+        ("oo", "ূ"),
+        ("oo", "ু"),
+        ("e", "ে"),
+        ("e", "এ"),
+        ("oi", "ঐ"),
+        ("ou", "ঔ"),
+        ("o", "ও"),
+        ("o", "ো"),
+        ("o", "অ"),
+        ("kkh", "ক্ষ"),
+        ("ngk", "ঙ্ক"),
+        ("ngkh", "ঙ্খ"),
+        ("ngg", "ঙ্গ"),
+        ("nggh", "ঙ্ঘ"),
+        ("cch", "চ্ছ"),
+        ("jj", "জ্জ"),
+        ("jjh", "জ্ঝ"),
+        ("nc", "ঞ্চ"),
+        ("nch", "ঞ্ছ"),
+        ("nj", "ঞ্জ"),
+        ("tt", "ট্ট"),
+        ("nth", "ণ্ঠ"),
+        ("nd", "ণ্ড"),
+        ("kt", "ক্ত"),
+        ("pt", "প্ত"),
+        ("bd", "ব্দ"),
+        ("st", "স্ত"),
+        ("sth", "স্থ"),
+        ("sn", "স্ন"),
+        ("sp", "স্প"),
+        ("sph", "স্ফ"),
+        ("nt", "ন্ত"),
+        ("nth", "ন্থ"),
+        ("nd", "ন্দ"),
+        ("ndh", "ন্ধ"),
+        ("mp", "ম্প"),
+        ("mb", "ম্ব"),
+        ("mbh", "ম্ভ"),
+        ("rk", "র্ক"),
+        ("rg", "র্গ"),
+        ("rt", "র্ত"),
+        ("rt", "র্ড"),
+        ("rd", "র্দ"),
+        ("rn", "র্ণ"),
+        ("rp", "র্প"),
+        ("rb", "র্ব"),
+        ("rm", "র্ম"),
+        ("rsh", "র্ষ"),
+        ("rs", "র্স"),
+        ("er", "ের"),
+        ("ar", "ার"),
+        ("te", "তে"),
+        ("ke", "কে"),
+        ("der", "দের"),
+        ("a", ""),
+        ("o", ""),
+        ("e", ""),
     ];
     for &(r, b) in priors {
         *counts.entry((r.to_string(), b.to_string())).or_default() += alpha;
@@ -228,7 +310,8 @@ pub fn em_iteration(
                                 let b_slice = &pair.bengali_tokens[j..j + kb];
                                 if is_valid_translation_unit(r_slice, b_slice) {
                                     let r = r_slice.join("");
-                                    let b: String = b_slice.iter().map(|t| t.text.as_str()).collect();
+                                    let b: String =
+                                        b_slice.iter().map(|t| t.text.as_str()).collect();
                                     if let Some(&p) = model.get(&(r, b)) {
                                         alpha[i + kr][j + kb] += a_ij * p;
                                     }
@@ -268,7 +351,8 @@ pub fn em_iteration(
                                 let b_slice = &pair.bengali_tokens[j..j + kb];
                                 if is_valid_translation_unit(r_slice, b_slice) {
                                     let r = r_slice.join("");
-                                    let b: String = b_slice.iter().map(|t| t.text.as_str()).collect();
+                                    let b: String =
+                                        b_slice.iter().map(|t| t.text.as_str()).collect();
                                     if let Some(&p) = model.get(&(r, b)) {
                                         b_sum += p * beta[i + kr][j + kb];
                                     }
@@ -301,7 +385,8 @@ pub fn em_iteration(
                                     let b_next = beta[i + kr][j];
                                     if b_next > 0.0 {
                                         let expected = a_ij * p * b_next * inv_total;
-                                        *local_counts.entry((r, String::new())).or_default() += expected;
+                                        *local_counts.entry((r, String::new())).or_default() +=
+                                            expected;
                                     }
                                 }
                             }
@@ -313,7 +398,8 @@ pub fn em_iteration(
                                 let b_slice = &pair.bengali_tokens[j..j + kb];
                                 if is_valid_translation_unit(r_slice, b_slice) {
                                     let r = r_slice.join("");
-                                    let b: String = b_slice.iter().map(|t| t.text.as_str()).collect();
+                                    let b: String =
+                                        b_slice.iter().map(|t| t.text.as_str()).collect();
                                     if let Some(&p) = model.get(&(r.clone(), b.clone())) {
                                         let b_next = beta[i + kr][j + kb];
                                         if b_next > 0.0 {
@@ -491,7 +577,9 @@ impl UnitVocabulary {
     }
 
     pub fn get_id(&self, r: &str, b: &str) -> Option<UnitId> {
-        self.unit_to_id.get(&(r.to_string(), b.to_string())).copied()
+        self.unit_to_id
+            .get(&(r.to_string(), b.to_string()))
+            .copied()
     }
 }
 
@@ -511,9 +599,12 @@ impl JointUnitLM {
         order: usize,
         min_count: f64,
     ) -> Self {
-        let mut ngram_counts: Vec<HashMap<Vec<UnitId>, f64>> = (0..=order).map(|_| HashMap::new()).collect();
-        let mut context_totals: Vec<HashMap<Vec<UnitId>, f64>> = (0..=order).map(|_| HashMap::new()).collect();
-        let mut context_cardinalities: Vec<HashMap<Vec<UnitId>, usize>> = (0..=order).map(|_| HashMap::new()).collect();
+        let mut ngram_counts: Vec<HashMap<Vec<UnitId>, f64>> =
+            (0..=order).map(|_| HashMap::new()).collect();
+        let mut context_totals: Vec<HashMap<Vec<UnitId>, f64>> =
+            (0..=order).map(|_| HashMap::new()).collect();
+        let mut context_cardinalities: Vec<HashMap<Vec<UnitId>, usize>> =
+            (0..=order).map(|_| HashMap::new()).collect();
 
         for (seq, count) in sequences {
             let mut full_seq = Vec::with_capacity(seq.len() + order);
@@ -584,9 +675,15 @@ impl JointUnitLM {
 
     fn prob_witten_bell(&self, unit: UnitId, history: &[UnitId], n: usize) -> f64 {
         if n == 1 {
-            let count = self.ngram_counts[1].get(&vec![unit]).copied().unwrap_or(0.0);
+            let count = self.ngram_counts[1]
+                .get(&vec![unit])
+                .copied()
+                .unwrap_or(0.0);
             let total = self.context_totals[1].get(&vec![]).copied().unwrap_or(1.0);
-            let card = self.context_cardinalities[1].get(&vec![]).copied().unwrap_or(1) as f64;
+            let card = self.context_cardinalities[1]
+                .get(&vec![])
+                .copied()
+                .unwrap_or(1) as f64;
             let vocab_size = self.vocab.id_to_unit.len() as f64;
 
             let numerator = count + (card / vocab_size);
@@ -614,7 +711,10 @@ impl JointUnitLM {
         let count = self.ngram_counts[n].get(&ng).copied().unwrap_or(0.0);
         let ctx_vec = ctx.to_vec();
         let total = self.context_totals[n].get(&ctx_vec).copied().unwrap_or(0.0);
-        let card = self.context_cardinalities[n].get(&ctx_vec).copied().unwrap_or(0) as f64;
+        let card = self.context_cardinalities[n]
+            .get(&ctx_vec)
+            .copied()
+            .unwrap_or(0) as f64;
 
         if total > 0.0 && card > 0.0 {
             let backoff_weight = card / (total + card);
@@ -660,11 +760,7 @@ pub fn phonetic_equivalence_key(word: &str) -> String {
     out
 }
 
-pub fn is_valid_bengali_word(
-    w: &str,
-    dict: &HashSet<String>,
-    dict_keys: &HashSet<String>,
-) -> bool {
+pub fn is_valid_bengali_word(w: &str, dict: &HashSet<String>, dict_keys: &HashSet<String>) -> bool {
     if dict.contains(w) {
         return true;
     }
@@ -672,13 +768,41 @@ pub fn is_valid_bengali_word(
         return true;
     }
     const SUFFIXES: &[&str] = &[
-        "গুলোর", "গুলোতে", "গুলোকে", "গুলোরে", "গুলো",
-        "গুলির", "গুলিতে", "গুলিকে", "গুলি",
-        "দেরকে", "দের",
-        "টিতে", "টাতে", "টির", "টার", "টিকে", "টাকে", "টি", "টা",
-        "খানা", "খানি", "খানির",
-        "ভাবে", "মূলক",
-        "েরটি", "েরটা", "ের", "কে", "তে", "ে", "রা", "র", "য়", "য়ে", "ও"
+        "গুলোর",
+        "গুলোতে",
+        "গুলোকে",
+        "গুলোরে",
+        "গুলো",
+        "গুলির",
+        "গুলিতে",
+        "গুলিকে",
+        "গুলি",
+        "দেরকে",
+        "দের",
+        "টিতে",
+        "টাতে",
+        "টির",
+        "টার",
+        "টিকে",
+        "টাকে",
+        "টি",
+        "টা",
+        "খানা",
+        "খানি",
+        "খানির",
+        "ভাবে",
+        "মূলক",
+        "েরটি",
+        "েরটা",
+        "ের",
+        "কে",
+        "তে",
+        "ে",
+        "রা",
+        "র",
+        "য়",
+        "য়ে",
+        "ও",
     ];
     for sfx in SUFFIXES {
         if let Some(stem) = w.strip_suffix(sfx) {
@@ -711,7 +835,10 @@ pub fn compute_paired_cluster_bootstrap(
 ) -> (f64, f64, f64) {
     let mut target_clusters: HashMap<&str, Vec<usize>> = HashMap::new();
     for (i, p) in pairs.iter().enumerate() {
-        target_clusters.entry(p.raw_bengali.as_str()).or_default().push(i);
+        target_clusters
+            .entry(p.raw_bengali.as_str())
+            .or_default()
+            .push(i);
     }
     let clusters: Vec<Vec<usize>> = target_clusters.into_values().collect();
     let n_clusters = clusters.len();
@@ -734,8 +861,12 @@ pub fn compute_paired_cluster_bootstrap(
             let rows = &clusters[c_idx];
             for &r in rows {
                 sample_n += 1;
-                if preds_baseline[r] { sample_base += 1; }
-                if preds_combined[r] { sample_comb += 1; }
+                if preds_baseline[r] {
+                    sample_base += 1;
+                }
+                if preds_combined[r] {
+                    sample_comb += 1;
+                }
             }
         }
 
@@ -778,7 +909,12 @@ impl IncrementalSession {
         }
     }
 
-    pub fn step(&mut self, next_token: &str, lm: &JointUnitLM, beam_width: usize) -> Vec<(String, f64)> {
+    pub fn step(
+        &mut self,
+        next_token: &str,
+        lm: &JointUnitLM,
+        beam_width: usize,
+    ) -> Vec<(String, f64)> {
         self.tokens_so_far.push(next_token.to_string());
         let m = self.tokens_so_far.len();
         let mut next_beam = Vec::with_capacity(self.beam.len() * 8);
@@ -834,7 +970,8 @@ impl IncrementalSession {
             }
         }
 
-        let mut dedup_map: HashMap<(usize, String), BeamCandidate> = HashMap::with_capacity(next_beam.len());
+        let mut dedup_map: HashMap<(usize, String), BeamCandidate> =
+            HashMap::with_capacity(next_beam.len());
         for cand in next_beam {
             let key = (cand.pos, cand.bengali.clone());
             if let Some(existing) = dedup_map.get_mut(&key) {
@@ -951,7 +1088,8 @@ pub fn decode_beam_ngram(
             }
         }
 
-        let mut dedup_map: HashMap<(usize, String), BeamCandidate> = HashMap::with_capacity(next_beam.len());
+        let mut dedup_map: HashMap<(usize, String), BeamCandidate> =
+            HashMap::with_capacity(next_beam.len());
         for cand in next_beam {
             let key = (cand.pos, cand.bengali.clone());
             if let Some(existing) = dedup_map.get_mut(&key) {
@@ -1033,7 +1171,9 @@ fn setup_phonetic_engine() -> PhoneticSuggestion {
         }
     }
     let dict_dir = Path::new("data/dictionaries");
-    let _ = sugg.database.load_from_dir_with_dict(dict_dir, "dictionary.json");
+    let _ = sugg
+        .database
+        .load_from_dir_with_dict(dict_dir, "dictionary.json");
     sugg
 }
 
@@ -1057,7 +1197,9 @@ fn setup_ablated_engine(
     let mut trie = lekhani_core::trie::PrefixTrie::new();
     if let Ok(file) = File::open(dict_path) {
         let reader = BufReader::new(file);
-        if let Ok(raw_map) = serde_json::from_reader::<_, HashMap<String, serde_json::Value>>(reader) {
+        if let Ok(raw_map) =
+            serde_json::from_reader::<_, HashMap<String, serde_json::Value>>(reader)
+        {
             let mut words = Vec::with_capacity(160000);
             for val in raw_map.values() {
                 if let Some(list) = val.as_array() {
@@ -1086,7 +1228,9 @@ fn setup_ablated_engine(
     if with_overrides {
         let pov_bin_path = Path::new("data/dictionaries/phonetic_overrides.bin");
         if let Ok(bytes) = std::fs::read(pov_bin_path) {
-            if let Ok(zc) = lekhani_core::phonetic::overrides::ZeroCopyOverrides::from_bytes(bytes.into()) {
+            if let Ok(zc) =
+                lekhani_core::phonetic::overrides::ZeroCopyOverrides::from_bytes(bytes.into())
+            {
                 sugg.database.overrides = zc;
             }
         }
@@ -1109,7 +1253,8 @@ fn setup_ablated_engine(
         let ac_path = Path::new("data/dictionaries/autocorrect.json");
         if let Ok(content) = std::fs::read_to_string(ac_path) {
             if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
-                *std::sync::Arc::make_mut(&mut sugg.database.autocorrect) = map.into_iter().filter(|(k, v)| k != v).collect();
+                *std::sync::Arc::make_mut(&mut sugg.database.autocorrect) =
+                    map.into_iter().filter(|(k, v)| k != v).collect();
             }
         }
     } else {
@@ -1134,8 +1279,15 @@ fn main() {
     let dict_path = Path::new("data/dictionaries/dictionary.json");
 
     let dict_words = load_dict_words(dict_path);
-    println!("Loaded {} canonical dictionary entries from {:?}", dict_words.len(), dict_path);
-    let dict_keys: HashSet<String> = dict_words.iter().map(|w| phonetic_equivalence_key(w)).collect();
+    println!(
+        "Loaded {} canonical dictionary entries from {:?}",
+        dict_words.len(),
+        dict_path
+    );
+    let dict_keys: HashSet<String> = dict_words
+        .iter()
+        .map(|w| phonetic_equivalence_key(w))
+        .collect();
 
     let (train_pairs, train_dropped) = load_dataset(train_path);
     let (dev_a_pairs, dev_a_dropped) = load_dataset(dev_a_path);
@@ -1143,16 +1295,38 @@ fn main() {
     let (dev_full_pairs, dev_dropped) = load_dataset(dev_full_path);
 
     println!("Dataset Verification (Filters OFF Policy):");
-    println!("  ├─ Train Pairs : {} (Dropped: {})", train_pairs.len(), train_dropped);
-    println!("  ├─ Dev-A (Tune): {} (Dropped: {})", dev_a_pairs.len(), dev_a_dropped);
-    println!("  ├─ Dev-B (Conf): {} (Dropped: {})", dev_b_pairs.len(), dev_b_dropped);
-    println!("  └─ Dev-Full    : {} (Dropped: {})", dev_full_pairs.len(), dev_dropped);
+    println!(
+        "  ├─ Train Pairs : {} (Dropped: {})",
+        train_pairs.len(),
+        train_dropped
+    );
+    println!(
+        "  ├─ Dev-A (Tune): {} (Dropped: {})",
+        dev_a_pairs.len(),
+        dev_a_dropped
+    );
+    println!(
+        "  ├─ Dev-B (Conf): {} (Dropped: {})",
+        dev_b_pairs.len(),
+        dev_b_dropped
+    );
+    println!(
+        "  └─ Dev-Full    : {} (Dropped: {})",
+        dev_full_pairs.len(),
+        dev_dropped
+    );
 
     let targets_a: HashSet<&str> = dev_a_pairs.iter().map(|p| p.raw_bengali.as_str()).collect();
     let targets_b: HashSet<&str> = dev_b_pairs.iter().map(|p| p.raw_bengali.as_str()).collect();
     let overlap_targets = targets_a.intersection(&targets_b).count();
-    println!("  ✓ Target Disjointness: {} shared targets between dev-A and dev-B (100% disjoint).", overlap_targets);
-    assert_eq!(overlap_targets, 0, "dev-A and dev-B must have 0 target overlap!");
+    println!(
+        "  ✓ Target Disjointness: {} shared targets between dev-A and dev-B (100% disjoint).",
+        overlap_targets
+    );
+    assert_eq!(
+        overlap_targets, 0,
+        "dev-A and dev-B must have 0 target overlap!"
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 2. Train Selected Unit LM (Type-Level Order 4 Level 1, 3.07 MB)
@@ -1207,20 +1381,30 @@ fn main() {
     // Build Type-level training sequences
     let mut type_level_seqs: Vec<(Vec<UnitId>, f64)> = Vec::with_capacity(aligned_train_seqs.len());
     for (seq, _) in &aligned_train_seqs {
-        let id_seq: Vec<UnitId> = seq.iter().map(|(r, b)| vocab.get_id(r, b).unwrap()).collect();
+        let id_seq: Vec<UnitId> = seq
+            .iter()
+            .map(|(r, b)| vocab.get_id(r, b).unwrap())
+            .collect();
         type_level_seqs.push((id_seq, 1.0));
     }
 
     println!("▶️  Building Selected Model: Type-Level Order 4 Level 1 (Count >= 2)...");
     let selected_lm = JointUnitLM::train(&type_level_seqs, vocab, 4, 2.0);
-    let model_size_kb = bincode::serialize(&selected_lm).map(|b| b.len() as f64 / 1024.0).unwrap_or(0.0);
-    println!("  ✓ Serialized File Size: {:.1} KB ({:.2} MB) [Gate G6 Budget: <= 3.5 MB: PASSED]",
-        model_size_kb, model_size_kb / 1024.0);
+    let model_size_kb = bincode::serialize(&selected_lm)
+        .map(|b| b.len() as f64 / 1024.0)
+        .unwrap_or(0.0);
+    println!(
+        "  ✓ Serialized File Size: {:.1} KB ({:.2} MB) [Gate G6 Budget: <= 3.5 MB: PASSED]",
+        model_size_kb,
+        model_size_kb / 1024.0
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 3. Step 8 Item 2: Oracle Analyses Before Tuning Anything
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 STEP 8 ITEM 2: ORACLE ANALYSES BEFORE TUNING");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1243,18 +1427,36 @@ fn main() {
         .collect();
 
     // Oracle 1: Perfect Reranker Ceiling at K=256
-    let oracle_ceiling_a = dev_a_cands_256.iter().filter(|(gold, _, cands)| cands.iter().any(|c| &c.0 == gold)).count();
-    let oracle_ceiling_b = dev_b_cands_256.iter().filter(|(gold, _, cands)| cands.iter().any(|c| &c.0 == gold)).count();
+    let oracle_ceiling_a = dev_a_cands_256
+        .iter()
+        .filter(|(gold, _, cands)| cands.iter().any(|c| &c.0 == gold))
+        .count();
+    let oracle_ceiling_b = dev_b_cands_256
+        .iter()
+        .filter(|(gold, _, cands)| cands.iter().any(|c| &c.0 == gold))
+        .count();
     let total_oracle_ceiling = oracle_ceiling_a + oracle_ceiling_b;
     let n_full = (dev_a_pairs.len() + dev_b_pairs.len()) as f64;
 
     println!("1. Oracle Perfect Reranker Ceiling (Gold reachable in top 256):");
-    println!("   ├─ Dev-A (Tuning)      : {:>4} / {} ({:.2}%)",
-        oracle_ceiling_a, dev_a_pairs.len(), oracle_ceiling_a as f64 / dev_a_pairs.len() as f64 * 100.0);
-    println!("   ├─ Dev-B (Confirmation): {:>4} / {} ({:.2}%)",
-        oracle_ceiling_b, dev_b_pairs.len(), oracle_ceiling_b as f64 / dev_b_pairs.len() as f64 * 100.0);
-    println!("   └─ Full Dev (Combined) : {:>4} / {} ({:.2}%)",
-        total_oracle_ceiling, n_full as usize, total_oracle_ceiling as f64 / n_full * 100.0);
+    println!(
+        "   ├─ Dev-A (Tuning)      : {:>4} / {} ({:.2}%)",
+        oracle_ceiling_a,
+        dev_a_pairs.len(),
+        oracle_ceiling_a as f64 / dev_a_pairs.len() as f64 * 100.0
+    );
+    println!(
+        "   ├─ Dev-B (Confirmation): {:>4} / {} ({:.2}%)",
+        oracle_ceiling_b,
+        dev_b_pairs.len(),
+        oracle_ceiling_b as f64 / dev_b_pairs.len() as f64 * 100.0
+    );
+    println!(
+        "   └─ Full Dev (Combined) : {:>4} / {} ({:.2}%)",
+        total_oracle_ceiling,
+        n_full as usize,
+        total_oracle_ceiling as f64 / n_full * 100.0
+    );
 
     // Oracle 2: In-Dictionary Flag Alone as Reranker (at K=16)
     println!("\n2. In-Dictionary Flag Alone as Reranker (Evaluating on Dev-A and Dev-B, K=16):");
@@ -1286,7 +1488,11 @@ fn main() {
             let base_top = cands_16.first().map(|c| &c.0 == gold).unwrap_or(false);
             if base_top {
                 base_top1 += 1;
-                if is_gold_seen { seen_base_top1 += 1; } else { unseen_base_top1 += 1; }
+                if is_gold_seen {
+                    seen_base_top1 += 1;
+                } else {
+                    unseen_base_top1 += 1;
+                }
             }
 
             // In-Dictionary Reranker: (in_dict as u8, score)
@@ -1302,36 +1508,83 @@ fn main() {
             let dict_top = reranked.first().map(|c| &c.0 == gold).unwrap_or(false);
             if dict_top {
                 dict_rerank_top1 += 1;
-                if is_gold_seen { seen_dict_top1 += 1; } else { unseen_dict_top1 += 1; }
+                if is_gold_seen {
+                    seen_dict_top1 += 1;
+                } else {
+                    unseen_dict_top1 += 1;
+                }
             }
         }
 
-        (base_top1, dict_rerank_top1, seen_n, seen_base_top1, seen_dict_top1, unseen_n, unseen_base_top1, unseen_dict_top1)
+        (
+            base_top1,
+            dict_rerank_top1,
+            seen_n,
+            seen_base_top1,
+            seen_dict_top1,
+            unseen_n,
+            unseen_base_top1,
+            unseen_dict_top1,
+        )
     };
 
-    let (a_base, a_dict, a_seen, a_seen_base, a_seen_dict, a_unseen, a_unseen_base, a_unseen_dict) = run_dict_oracle(&dev_a_cands_256);
-    let (b_base, b_dict, b_seen, b_seen_base, b_seen_dict, b_unseen, b_unseen_base, b_unseen_dict) = run_dict_oracle(&dev_b_cands_256);
+    let (a_base, a_dict, a_seen, a_seen_base, a_seen_dict, a_unseen, a_unseen_base, a_unseen_dict) =
+        run_dict_oracle(&dev_a_cands_256);
+    let (b_base, b_dict, b_seen, b_seen_base, b_seen_dict, b_unseen, b_unseen_base, b_unseen_dict) =
+        run_dict_oracle(&dev_b_cands_256);
 
     println!("\n| Dataset Split | Stratum | N Rows | Base N-Gram Top-1 | Dict Reranker Top-1 | Absolute Delta |");
     println!("|:---|:---|:---:|:---:|:---:|:---:|");
-    println!("| **Dev-A (Tuning)** | **Overall** | {} | {:.2}% | {:.2}% | **{:+0.2}%** |",
-        dev_a_pairs.len(), a_base as f64 / dev_a_pairs.len() as f64 * 100.0, a_dict as f64 / dev_a_pairs.len() as f64 * 100.0, (a_dict - a_base) as f64 / dev_a_pairs.len() as f64 * 100.0);
-    println!("| Dev-A | ├─ Gold in Dictionary | {} | {:.2}% | {:.2}% | **{:+0.2}% (HELPS)** |",
-        a_seen, a_seen_base as f64 / a_seen as f64 * 100.0, a_seen_dict as f64 / a_seen as f64 * 100.0, (a_seen_dict - a_seen_base) as f64 / a_seen as f64 * 100.0);
-    println!("| Dev-A | └─ Gold NOT in Dict | {} | {:.2}% | {:.2}% | **{:+0.2}% (HURTS)** |",
-        a_unseen, a_unseen_base as f64 / a_unseen as f64 * 100.0, a_unseen_dict as f64 / a_unseen as f64 * 100.0, (a_unseen_dict - a_unseen_base) as f64 / a_unseen as f64 * 100.0);
+    println!(
+        "| **Dev-A (Tuning)** | **Overall** | {} | {:.2}% | {:.2}% | **{:+0.2}%** |",
+        dev_a_pairs.len(),
+        a_base as f64 / dev_a_pairs.len() as f64 * 100.0,
+        a_dict as f64 / dev_a_pairs.len() as f64 * 100.0,
+        (a_dict - a_base) as f64 / dev_a_pairs.len() as f64 * 100.0
+    );
+    println!(
+        "| Dev-A | ├─ Gold in Dictionary | {} | {:.2}% | {:.2}% | **{:+0.2}% (HELPS)** |",
+        a_seen,
+        a_seen_base as f64 / a_seen as f64 * 100.0,
+        a_seen_dict as f64 / a_seen as f64 * 100.0,
+        (a_seen_dict - a_seen_base) as f64 / a_seen as f64 * 100.0
+    );
+    println!(
+        "| Dev-A | └─ Gold NOT in Dict | {} | {:.2}% | {:.2}% | **{:+0.2}% (HURTS)** |",
+        a_unseen,
+        a_unseen_base as f64 / a_unseen as f64 * 100.0,
+        a_unseen_dict as f64 / a_unseen as f64 * 100.0,
+        (a_unseen_dict - a_unseen_base) as f64 / a_unseen as f64 * 100.0
+    );
 
-    println!("| **Dev-B (Confirm)** | **Overall** | {} | {:.2}% | {:.2}% | **{:+0.2}%** |",
-        dev_b_pairs.len(), b_base as f64 / dev_b_pairs.len() as f64 * 100.0, b_dict as f64 / dev_b_pairs.len() as f64 * 100.0, (b_dict - b_base) as f64 / dev_b_pairs.len() as f64 * 100.0);
-    println!("| Dev-B | ├─ Gold in Dictionary | {} | {:.2}% | {:.2}% | **{:+0.2}% (HELPS)** |",
-        b_seen, b_seen_base as f64 / b_seen as f64 * 100.0, b_seen_dict as f64 / b_seen as f64 * 100.0, (b_seen_dict - b_seen_base) as f64 / b_seen as f64 * 100.0);
-    println!("| Dev-B | └─ Gold NOT in Dict | {} | {:.2}% | {:.2}% | **{:+0.2}% (HURTS)** |",
-        b_unseen, b_unseen_base as f64 / b_unseen as f64 * 100.0, b_unseen_dict as f64 / b_unseen as f64 * 100.0, (b_unseen_dict - b_unseen_base) as f64 / b_unseen as f64 * 100.0);
+    println!(
+        "| **Dev-B (Confirm)** | **Overall** | {} | {:.2}% | {:.2}% | **{:+0.2}%** |",
+        dev_b_pairs.len(),
+        b_base as f64 / dev_b_pairs.len() as f64 * 100.0,
+        b_dict as f64 / dev_b_pairs.len() as f64 * 100.0,
+        (b_dict - b_base) as f64 / dev_b_pairs.len() as f64 * 100.0
+    );
+    println!(
+        "| Dev-B | ├─ Gold in Dictionary | {} | {:.2}% | {:.2}% | **{:+0.2}% (HELPS)** |",
+        b_seen,
+        b_seen_base as f64 / b_seen as f64 * 100.0,
+        b_seen_dict as f64 / b_seen as f64 * 100.0,
+        (b_seen_dict - b_seen_base) as f64 / b_seen as f64 * 100.0
+    );
+    println!(
+        "| Dev-B | └─ Gold NOT in Dict | {} | {:.2}% | {:.2}% | **{:+0.2}% (HURTS)** |",
+        b_unseen,
+        b_unseen_base as f64 / b_unseen as f64 * 100.0,
+        b_unseen_dict as f64 / b_unseen as f64 * 100.0,
+        (b_unseen_dict - b_unseen_base) as f64 / b_unseen as f64 * 100.0
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 4. Latency Profiling & Per-Stage Time Breakdown
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   ⏱️  MEASURED STAGE-BY-STAGE LATENCY PROFILING (1,000 DEV words)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1348,8 +1601,10 @@ fn main() {
 
     for pair in &sample_words {
         let m = pair.roman_tokens.len();
-        if m == 0 { continue; }
-        
+        if m == 0 {
+            continue;
+        }
+
         let t_init_start = Instant::now();
         let initial_hist = vec![BOS_TOKEN; selected_lm.order - 1];
         let mut beam = vec![BeamCandidate {
@@ -1432,7 +1687,8 @@ fn main() {
             }
 
             let t3 = Instant::now();
-            let mut dedup_map: HashMap<(usize, String), BeamCandidate> = HashMap::with_capacity(next_beam.len());
+            let mut dedup_map: HashMap<(usize, String), BeamCandidate> =
+                HashMap::with_capacity(next_beam.len());
             for cand in next_beam {
                 let key = (cand.pos, cand.bengali.clone());
                 if let Some(existing) = dedup_map.get_mut(&key) {
@@ -1483,32 +1739,67 @@ fn main() {
 
     let total_nanos = t_start_all.elapsed().as_nanos();
     let total_millis = total_nanos as f64 / 1_000_000.0;
-    println!("Total Whole-Word Execution Time (1,000 words): {:.2} ms (Avg: {:.2} µs/word)",
-        total_millis, total_nanos as f64 / 1000.0 / 1000.0);
+    println!(
+        "Total Whole-Word Execution Time (1,000 words): {:.2} ms (Avg: {:.2} µs/word)",
+        total_millis,
+        total_nanos as f64 / 1000.0 / 1000.0
+    );
 
-    let stage_sum = (t_beam_init + t_slice_lookup + t_score_calc + t_clone_alloc + t_dedup_hash + t_sort_prune + t_eos_final) as f64;
+    let stage_sum = (t_beam_init
+        + t_slice_lookup
+        + t_score_calc
+        + t_clone_alloc
+        + t_dedup_hash
+        + t_sort_prune
+        + t_eos_final) as f64;
     let unprofiled_nanos = total_nanos.saturating_sub(stage_sum as u128);
 
     println!("\nPer-Stage Execution Breakdown (% of Total Measured Whole-Word Time):");
-    println!("  ├─ 1. Beam Allocation & Setup     : {:>6.2}% ({:>6.1} µs/word)",
-        t_beam_init as f64 / total_nanos as f64 * 100.0, t_beam_init as f64 / 1000.0 / 1000.0);
-    println!("  ├─ 2. Unit Slicing & Roman Lookup : {:>6.2}% ({:>6.1} µs/word)",
-        t_slice_lookup as f64 / total_nanos as f64 * 100.0, t_slice_lookup as f64 / 1000.0 / 1000.0);
-    println!("  ├─ 3. N-Gram Scoring (score_log)  : {:>6.2}% ({:>6.1} µs/word)",
-        t_score_calc as f64 / total_nanos as f64 * 100.0, t_score_calc as f64 / 1000.0 / 1000.0);
-    println!("  ├─ 4. Vector Cloning & String Allocs: {:>6.2}% ({:>6.1} µs/word)",
-        t_clone_alloc as f64 / total_nanos as f64 * 100.0, t_clone_alloc as f64 / 1000.0 / 1000.0);
-    println!("  ├─ 5. Dedup Hashing (HashMap)     : {:>6.2}% ({:>6.1} µs/word)",
-        t_dedup_hash as f64 / total_nanos as f64 * 100.0, t_dedup_hash as f64 / 1000.0 / 1000.0);
-    println!("  ├─ 6. Beam Sorting & Truncation   : {:>6.2}% ({:>6.1} µs/word)",
-        t_sort_prune as f64 / total_nanos as f64 * 100.0, t_sort_prune as f64 / 1000.0 / 1000.0);
-    println!("  ├─ 7. EOS Evaluation & Ranking    : {:>6.2}% ({:>6.1} µs/word)",
-        t_eos_final as f64 / total_nanos as f64 * 100.0, t_eos_final as f64 / 1000.0 / 1000.0);
-    println!("  └─ 8. Loop & Runtime Overhead     : {:>6.2}% ({:>6.1} µs/word) [100.0% Attributed]",
-        unprofiled_nanos as f64 / total_nanos as f64 * 100.0, unprofiled_nanos as f64 / 1000.0 / 1000.0);
+    println!(
+        "  ├─ 1. Beam Allocation & Setup     : {:>6.2}% ({:>6.1} µs/word)",
+        t_beam_init as f64 / total_nanos as f64 * 100.0,
+        t_beam_init as f64 / 1000.0 / 1000.0
+    );
+    println!(
+        "  ├─ 2. Unit Slicing & Roman Lookup : {:>6.2}% ({:>6.1} µs/word)",
+        t_slice_lookup as f64 / total_nanos as f64 * 100.0,
+        t_slice_lookup as f64 / 1000.0 / 1000.0
+    );
+    println!(
+        "  ├─ 3. N-Gram Scoring (score_log)  : {:>6.2}% ({:>6.1} µs/word)",
+        t_score_calc as f64 / total_nanos as f64 * 100.0,
+        t_score_calc as f64 / 1000.0 / 1000.0
+    );
+    println!(
+        "  ├─ 4. Vector Cloning & String Allocs: {:>6.2}% ({:>6.1} µs/word)",
+        t_clone_alloc as f64 / total_nanos as f64 * 100.0,
+        t_clone_alloc as f64 / 1000.0 / 1000.0
+    );
+    println!(
+        "  ├─ 5. Dedup Hashing (HashMap)     : {:>6.2}% ({:>6.1} µs/word)",
+        t_dedup_hash as f64 / total_nanos as f64 * 100.0,
+        t_dedup_hash as f64 / 1000.0 / 1000.0
+    );
+    println!(
+        "  ├─ 6. Beam Sorting & Truncation   : {:>6.2}% ({:>6.1} µs/word)",
+        t_sort_prune as f64 / total_nanos as f64 * 100.0,
+        t_sort_prune as f64 / 1000.0 / 1000.0
+    );
+    println!(
+        "  ├─ 7. EOS Evaluation & Ranking    : {:>6.2}% ({:>6.1} µs/word)",
+        t_eos_final as f64 / total_nanos as f64 * 100.0,
+        t_eos_final as f64 / 1000.0 / 1000.0
+    );
+    println!(
+        "  └─ 8. Loop & Runtime Overhead     : {:>6.2}% ({:>6.1} µs/word) [100.0% Attributed]",
+        unprofiled_nanos as f64 / total_nanos as f64 * 100.0,
+        unprofiled_nanos as f64 / 1000.0 / 1000.0
+    );
 
     // True Incremental Decoder Keystroke Profiling
-    println!("\n▶️  Running True Incremental Decoder Loop (1,000 DEV words, keystroke-by-keystroke)...");
+    println!(
+        "\n▶️  Running True Incremental Decoder Loop (1,000 DEV words, keystroke-by-keystroke)..."
+    );
     let mut keystroke_times_ngram_us: Vec<f64> = Vec::with_capacity(10_000);
     let mut keystroke_times_combined_us: Vec<f64> = Vec::with_capacity(10_000);
 
@@ -1530,14 +1821,20 @@ fn main() {
 
             let t_comb_start = Instant::now();
             let _avro_c = canonicalize(&avro_parser.convert(&accumulated_roman));
-            let _eng_c = phonetic_sugg.lock().unwrap().suggest(&accumulated_roman, true, true, &empty_memory);
+            let _eng_c = phonetic_sugg.lock().unwrap().suggest(
+                &accumulated_roman,
+                true,
+                true,
+                &empty_memory,
+            );
             let t_comb_us = t_ngram_us + (t_comb_start.elapsed().as_nanos() as f64 / 1000.0);
             keystroke_times_combined_us.push(t_comb_us);
         }
     }
 
     keystroke_times_ngram_us.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    keystroke_times_combined_us.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    keystroke_times_combined_us
+        .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     let n_ks = keystroke_times_ngram_us.len() as f64;
     let mean_ngram = keystroke_times_ngram_us.iter().sum::<f64>() / n_ks;
@@ -1554,7 +1851,10 @@ fn main() {
     let p99_comb = keystroke_times_combined_us[(n_ks * 0.99) as usize];
     let max_comb = *keystroke_times_combined_us.last().unwrap_or(&0.0);
 
-    println!("Incremental Keystroke Latency Profile ({} total keystroke events):", n_ks as usize);
+    println!(
+        "Incremental Keystroke Latency Profile ({} total keystroke events):",
+        n_ks as usize
+    );
     println!("| Pipeline Configuration | Mean (µs) | p50 (µs) | p90 (µs) | p95 (µs) | p99 (µs) | Max (µs) | Gate G6 Status (p95 <= 3,000 µs) |");
     println!("|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|");
     println!("| **Incremental N-Gram Decoder** | {:>7.1} | {:>6.1} | {:>6.1} | **{:>6.1}** | {:>6.1} | {:>7.1} | **PASSED (Desktop)** |",
@@ -1571,14 +1871,18 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 5. Build Combined Decoder & Grid Tuning on Dev-A
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 STEP 8 ITEM 3 & 4: COMBINED DECODER GRID TUNING ON DEV-A");
     println!("──────────────────────────────────────────────────────────────────────────────────");
     println!("Architectural Audit of Injected Components:");
     println!("  ├─ N-Gram LM Beam: Joint Translation Unit LM (Order 4 Level 1) scoring P(W|R).");
     println!("  ├─ Deterministic Avro: Pure Avro parser conversion of Roman input.");
     println!("  └─ λ_engine Injection: Injects top candidate from lekhani-core PhoneticSuggestion, which");
-    println!("     synthesizes: (1) exact dictionary trie prefix matches, (2) phonetic_overrides.bin,");
+    println!(
+        "     synthesizes: (1) exact dictionary trie prefix matches, (2) phonetic_overrides.bin,"
+    );
     println!("     (3) suffix.json agglutinative decomposition, (4) autocorrect.json, and");
     println!("     (5) CORE_BENGALI_FREQUENCIES high-frequency prior weights.");
 
@@ -1591,7 +1895,8 @@ fn main() {
                                  dict_keys: &HashSet<String>,
                                  l_dict: f64,
                                  l_avro: f64,
-                                 l_eng: f64| -> Vec<(String, f64)> {
+                                 l_eng: f64|
+     -> Vec<(String, f64)> {
         let top_s = ngram_cands.first().map(|c| c.1).unwrap_or(0.0);
         let min_s = ngram_cands.last().map(|c| c.1).unwrap_or(-50.0);
         let floor_s = min_s.max(top_s - 3.5);
@@ -1607,7 +1912,8 @@ fn main() {
 
         // Task B2 Injection Guard:
         // Inject Avro candidates ONLY when they exist in the dictionary OR when explicit intent is present.
-        if avro_in_dict || has_intent || is_avro_cased || eng_cands.contains(&avro_cand.to_string()) {
+        if avro_in_dict || has_intent || is_avro_cased || eng_cands.contains(&avro_cand.to_string())
+        {
             cand_map.entry(avro_cand.to_string()).or_insert(floor_s);
         }
         if let Some(u) = avro_uncap_cand {
@@ -1670,37 +1976,73 @@ fn main() {
 
     println!("▶️  Pre-computing Engine and Avro hypotheses on Dev-A and Dev-B...");
 
-    let precompute_persona_hypotheses = |inputs: &[(String, String)]| -> Vec<(String, String, String, Option<String>, Vec<String>, Vec<(String, f64)>)> {
+    let precompute_persona_hypotheses = |inputs: &[(String, String)]| -> Vec<(
+        String,
+        String,
+        String,
+        Option<String>,
+        Vec<String>,
+        Vec<(String, f64)>,
+    )> {
         inputs
             .par_iter()
             .map(|(input, gold)| {
                 let avro_cand = canonicalize(&avro_parser.convert(input));
-                let avro_uncap_cand = if input.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
-                    let uncap = {
-                        let mut ch = input.chars();
-                        let f = ch.next().unwrap().to_ascii_lowercase();
-                        format!("{}{}", f, ch.collect::<String>())
+                let avro_uncap_cand =
+                    if input.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+                        let uncap = {
+                            let mut ch = input.chars();
+                            let f = ch.next().unwrap().to_ascii_lowercase();
+                            format!("{}{}", f, ch.collect::<String>())
+                        };
+                        Some(canonicalize(&avro_parser.convert(&uncap)))
+                    } else {
+                        None
                     };
-                    Some(canonicalize(&avro_parser.convert(&uncap)))
-                } else {
-                    None
-                };
                 let r_norm = normalize_roman(input);
                 let r_tokens = tokenize_roman(&r_norm);
                 let cands = decode_beam_ngram(&r_tokens, &selected_lm, 16);
-                let (raw_eng, _) = phonetic_sugg.lock().unwrap().suggest(input, true, true, &empty_memory);
+                let (raw_eng, _) =
+                    phonetic_sugg
+                        .lock()
+                        .unwrap()
+                        .suggest(input, true, true, &empty_memory);
                 let eng_cands: Vec<String> = raw_eng.iter().map(|s| canonicalize(s)).collect();
-                (gold.clone(), input.clone(), avro_cand, avro_uncap_cand, eng_cands, cands)
+                (
+                    gold.clone(),
+                    input.clone(),
+                    avro_cand,
+                    avro_uncap_cand,
+                    eng_cands,
+                    cands,
+                )
             })
             .collect()
     };
 
     println!("  ├─ Pre-computing Dev-A Composite Personas (Natural, Lazy, Vowel-Drop p30, Avro-Strict)...");
-    let dev_a_nat_inputs: Vec<(String, String)> = dev_a_pairs.iter().map(|p| (p.raw_roman.clone(), p.raw_bengali.clone())).collect();
-    let dev_a_lazy_inputs: Vec<(String, String)> = dev_a_pairs.iter().map(|p| (transform_lazy(&p.raw_roman), p.raw_bengali.clone())).collect();
+    let dev_a_nat_inputs: Vec<(String, String)> = dev_a_pairs
+        .iter()
+        .map(|p| (p.raw_roman.clone(), p.raw_bengali.clone()))
+        .collect();
+    let dev_a_lazy_inputs: Vec<(String, String)> = dev_a_pairs
+        .iter()
+        .map(|p| (transform_lazy(&p.raw_roman), p.raw_bengali.clone()))
+        .collect();
     let mut rng_a_vdrop = SimpleRng::new(42 + 30);
-    let dev_a_vdrop_inputs: Vec<(String, String)> = dev_a_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_a_vdrop), p.raw_bengali.clone())).collect();
-    let dev_a_avro_inputs: Vec<(String, String)> = dev_a_pairs.iter().map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone())).collect();
+    let dev_a_vdrop_inputs: Vec<(String, String)> = dev_a_pairs
+        .iter()
+        .map(|p| {
+            (
+                transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_a_vdrop),
+                p.raw_bengali.clone(),
+            )
+        })
+        .collect();
+    let dev_a_avro_inputs: Vec<(String, String)> = dev_a_pairs
+        .iter()
+        .map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone()))
+        .collect();
 
     let dev_a_nat_hyp = precompute_persona_hypotheses(&dev_a_nat_inputs);
     let dev_a_lazy_hyp = precompute_persona_hypotheses(&dev_a_lazy_inputs);
@@ -1708,20 +2050,52 @@ fn main() {
     let dev_a_avro_hyp = precompute_persona_hypotheses(&dev_a_avro_inputs);
 
     println!("  └─ Pre-computing Dev-B Personas (Natural, Avro-Strict, Vowel-Drop p30, Vowel-Drop p60)...");
-    let dev_b_nat_inputs: Vec<(String, String)> = dev_b_pairs.iter().map(|p| (p.raw_roman.clone(), p.raw_bengali.clone())).collect();
-    let dev_b_avro_inputs: Vec<(String, String)> = dev_b_pairs.iter().map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone())).collect();
+    let dev_b_nat_inputs: Vec<(String, String)> = dev_b_pairs
+        .iter()
+        .map(|p| (p.raw_roman.clone(), p.raw_bengali.clone()))
+        .collect();
+    let dev_b_avro_inputs: Vec<(String, String)> = dev_b_pairs
+        .iter()
+        .map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone()))
+        .collect();
     let mut rng_b_vdrop30 = SimpleRng::new(42 + 130);
     let mut rng_b_vdrop60 = SimpleRng::new(42 + 160);
-    let dev_b_vdrop30_inputs: Vec<(String, String)> = dev_b_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_b_vdrop30), p.raw_bengali.clone())).collect();
-    let dev_b_vdrop60_inputs: Vec<(String, String)> = dev_b_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.60, &mut rng_b_vdrop60), p.raw_bengali.clone())).collect();
+    let dev_b_vdrop30_inputs: Vec<(String, String)> = dev_b_pairs
+        .iter()
+        .map(|p| {
+            (
+                transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_b_vdrop30),
+                p.raw_bengali.clone(),
+            )
+        })
+        .collect();
+    let dev_b_vdrop60_inputs: Vec<(String, String)> = dev_b_pairs
+        .iter()
+        .map(|p| {
+            (
+                transform_vowel_drop(&p.raw_roman, 0.60, &mut rng_b_vdrop60),
+                p.raw_bengali.clone(),
+            )
+        })
+        .collect();
 
     let dev_b_hypotheses = precompute_persona_hypotheses(&dev_b_nat_inputs);
     let dev_b_avro_hyp = precompute_persona_hypotheses(&dev_b_avro_inputs);
     let dev_b_vdrop30_hyp = precompute_persona_hypotheses(&dev_b_vdrop30_inputs);
     let dev_b_vdrop60_hyp = precompute_persona_hypotheses(&dev_b_vdrop60_inputs);
 
-    let evaluate_hypotheses = |hypotheses: &[(String, String, String, Option<String>, Vec<String>, Vec<(String, f64)>)],
-                               l_dict: f64, l_avro: f64, l_eng: f64| -> (f64, f64, f64, Vec<bool>) {
+    let evaluate_hypotheses = |hypotheses: &[(
+        String,
+        String,
+        String,
+        Option<String>,
+        Vec<String>,
+        Vec<(String, f64)>,
+    )],
+                               l_dict: f64,
+                               l_avro: f64,
+                               l_eng: f64|
+     -> (f64, f64, f64, Vec<bool>) {
         let mut total_hits = 0;
         let mut seen_hits = 0;
         let mut seen_total = 0;
@@ -1731,15 +2105,34 @@ fn main() {
 
         for (gold, raw_r, avro_cand, avro_uncap, eng_cands, ngram_cands) in hypotheses {
             let is_gold_seen = dict_words.contains(gold);
-            if is_gold_seen { seen_total += 1; } else { unseen_total += 1; }
+            if is_gold_seen {
+                seen_total += 1;
+            } else {
+                unseen_total += 1;
+            }
 
-            let scored = run_deployable_policy(raw_r, ngram_cands, avro_cand, avro_uncap.as_deref(), eng_cands, &dict_words, &dict_keys, l_dict, l_avro, l_eng);
+            let scored = run_deployable_policy(
+                raw_r,
+                ngram_cands,
+                avro_cand,
+                avro_uncap.as_deref(),
+                eng_cands,
+                &dict_words,
+                &dict_keys,
+                l_dict,
+                l_avro,
+                l_eng,
+            );
             let is_top1 = scored.first().map(|c| &c.0 == gold).unwrap_or(false);
             hit_vec.push(is_top1);
 
             if is_top1 {
                 total_hits += 1;
-                if is_gold_seen { seen_hits += 1; } else { unseen_hits += 1; }
+                if is_gold_seen {
+                    seen_hits += 1;
+                } else {
+                    unseen_hits += 1;
+                }
             }
         }
 
@@ -1749,7 +2142,9 @@ fn main() {
         (overall, seen, unseen, hit_vec)
     };
 
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 TASK B1: PERSONA MIX TUNING & PARETO FRONTIER ON DEV-A");
     println!("──────────────────────────────────────────────────────────────────────────────────");
     println!("Composite Persona Mix Weights:");
@@ -1810,18 +2205,30 @@ fn main() {
     println!("|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|");
 
     // Explicitly display unconstrained peaks for λ_avro = 0.0 and λ_avro = 1.0 to show Gate G4 cost transparently:
-    if let Some(best_la0) = grid_results.iter().filter(|r| r.la == 0.0).max_by(|a, b| a.nat.partial_cmp(&b.nat).unwrap()) {
+    if let Some(best_la0) = grid_results
+        .iter()
+        .filter(|r| r.la == 0.0)
+        .max_by(|a, b| a.nat.partial_cmp(&b.nat).unwrap())
+    {
         println!("| **{:.2}%** | **{:.2}%** | **{:.2}%** | {:>5.1} | {:>5.1} | {:>5.1} | NO | Zero Avro Bias (λ_avro = 0.0) |",
             best_la0.nat, best_la0.avro, best_la0.composite, best_la0.ld, best_la0.la, best_la0.le);
     }
-    if let Some(best_la1) = grid_results.iter().filter(|r| r.la == 1.0).max_by(|a, b| a.nat.partial_cmp(&b.nat).unwrap()) {
+    if let Some(best_la1) = grid_results
+        .iter()
+        .filter(|r| r.la == 1.0)
+        .max_by(|a, b| a.nat.partial_cmp(&b.nat).unwrap())
+    {
         println!("| **{:.2}%** | **{:.2}%** | **{:.2}%** | {:>5.1} | {:>5.1} | {:>5.1} | NO | Minimal Avro Bias (λ_avro = 1.0) |",
             best_la1.nat, best_la1.avro, best_la1.composite, best_la1.ld, best_la1.la, best_la1.le);
     }
 
     // Sort by Natural descending
     let mut sorted_by_nat = grid_results.clone();
-    sorted_by_nat.sort_by(|a, b| b.nat.partial_cmp(&a.nat).unwrap_or(std::cmp::Ordering::Equal));
+    sorted_by_nat.sort_by(|a, b| {
+        b.nat
+            .partial_cmp(&a.nat)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let mut max_avro_seen = -1.0;
     let mut pareto_points: Vec<GridResult> = Vec::new();
@@ -1833,7 +2240,11 @@ fn main() {
     }
 
     for p in &pareto_points {
-        let g4_met = if p.avro >= 88.30 { "YES (PASSED)" } else { "NO" };
+        let g4_met = if p.avro >= 88.30 {
+            "YES (PASSED)"
+        } else {
+            "NO"
+        };
         let nat_delta = p.nat - unconstrained_nat;
         println!("| **{:.2}%** | **{:.2}%** | **{:.2}%** | {:>5.1} | {:>5.1} | {:>5.1} | {} | Δ_nat: {:+0.2}% |",
             p.nat, p.avro, p.composite, p.ld, p.la, p.le, g4_met, nat_delta);
@@ -1869,7 +2280,8 @@ fn main() {
         }
     }
 
-    let selected = best_policy.expect("At least one configuration must satisfy Gate G4 and composite constraints!");
+    let selected = best_policy
+        .expect("At least one configuration must satisfy Gate G4 and composite constraints!");
     let best_l_dict = selected.ld;
     let best_l_avro = selected.la;
     let best_l_eng = selected.le;
@@ -1878,29 +2290,42 @@ fn main() {
     println!("     ├─ λ_dict   = {:.1}", best_l_dict);
     println!("     ├─ λ_avro   = {:.1}", best_l_avro);
     println!("     ├─ λ_engine = {:.1}", best_l_eng);
-    println!("     ├─ Composite Dev-A Score : **{:.2}%**", selected.composite);
-    println!("     ├─ Dev-A Natural Top-1  : **{:.2}%** (Unconstrained max: {:.2}%, Δ = {:+0.2}%)", selected.nat, unconstrained_nat, selected.nat - unconstrained_nat);
-    println!("     ├─ Dev-A Avro-Strict    : **{:.2}%** (Gate G4: PASSED >= 88.3%)", selected.avro);
+    println!(
+        "     ├─ Composite Dev-A Score : **{:.2}%**",
+        selected.composite
+    );
+    println!(
+        "     ├─ Dev-A Natural Top-1  : **{:.2}%** (Unconstrained max: {:.2}%, Δ = {:+0.2}%)",
+        selected.nat,
+        unconstrained_nat,
+        selected.nat - unconstrained_nat
+    );
+    println!(
+        "     ├─ Dev-A Avro-Strict    : **{:.2}%** (Gate G4: PASSED >= 88.3%)",
+        selected.avro
+    );
     println!("     ├─ Dev-A Lazy           : **{:.2}%**", selected.lazy);
     println!("     └─ Dev-A Vowel-Drop p30 : **{:.2}%**", selected.vdrop);
 
     // Sensitivity Analysis: compute optimal policy under different Avro user shares:
-    let select_policy_for_weights = |w_nat: f64, w_lazy: f64, w_avro: f64, w_vdrop: f64| -> GridResult {
-        let mut best: Option<(GridResult, f64)> = None;
-        for r in &grid_results {
-            let comp = w_nat * r.nat + w_lazy * r.lazy + w_avro * r.avro + w_vdrop * r.vdrop;
-            if r.avro >= 88.30 {
-                if let Some((_, cur_best)) = best {
-                    if comp > cur_best {
+    let select_policy_for_weights =
+        |w_nat: f64, w_lazy: f64, w_avro: f64, w_vdrop: f64| -> GridResult {
+            let mut best: Option<(GridResult, f64)> = None;
+            for r in &grid_results {
+                let comp = w_nat * r.nat + w_lazy * r.lazy + w_avro * r.avro + w_vdrop * r.vdrop;
+                if r.avro >= 88.30 {
+                    if let Some((_, cur_best)) = best {
+                        if comp > cur_best {
+                            best = Some((r.clone(), comp));
+                        }
+                    } else {
                         best = Some((r.clone(), comp));
                     }
-                } else {
-                    best = Some((r.clone(), comp));
                 }
             }
-        }
-        best.map(|(r, _)| r).unwrap_or_else(|| grid_results[0].clone())
-    };
+            best.map(|(r, _)| r)
+                .unwrap_or_else(|| grid_results[0].clone())
+        };
 
     let pol_5 = select_policy_for_weights(0.65, 0.15, 0.05, 0.15);
     let pol_20 = selected.clone();
@@ -1919,7 +2344,9 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 6. Task B4: λ_engine Component Ablation & Provenance Audit
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 TASK B4: λ_engine COMPONENT ABLATION & PROVENANCE AUDIT (Dev-A)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -1928,12 +2355,18 @@ fn main() {
                                ld: f64,
                                la: f64,
                                le: f64,
-                               provenance: &str| -> (f64, String) {
+                               provenance: &str|
+     -> (f64, String) {
         let ablated_hyp: Vec<_> = dev_a_pairs
             .par_iter()
             .map(|pair| {
                 let avro_cand = canonicalize(&avro_parser.convert(&pair.raw_roman));
-                let avro_uncap_cand = if pair.raw_roman.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+                let avro_uncap_cand = if pair
+                    .raw_roman
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_uppercase())
+                {
                     let uncap = {
                         let mut ch = pair.raw_roman.chars();
                         let f = ch.next().unwrap().to_ascii_lowercase();
@@ -1946,9 +2379,20 @@ fn main() {
                 let r_norm = normalize_roman(&pair.raw_roman);
                 let r_tokens = tokenize_roman(&r_norm);
                 let cands = decode_beam_ngram(&r_tokens, &selected_lm, 16);
-                let (raw_eng, _) = eng_inst.lock().unwrap().suggest(&pair.raw_roman, true, true, &empty_memory);
+                let (raw_eng, _) =
+                    eng_inst
+                        .lock()
+                        .unwrap()
+                        .suggest(&pair.raw_roman, true, true, &empty_memory);
                 let eng_cands: Vec<String> = raw_eng.iter().map(|s| canonicalize(s)).collect();
-                (pair.raw_bengali.clone(), pair.raw_roman.clone(), avro_cand, avro_uncap_cand, eng_cands, cands)
+                (
+                    pair.raw_bengali.clone(),
+                    pair.raw_roman.clone(),
+                    avro_cand,
+                    avro_uncap_cand,
+                    eng_cands,
+                    cands,
+                )
             })
             .collect();
 
@@ -1962,88 +2406,218 @@ fn main() {
     let autocorrect_eng = std::sync::Mutex::new(setup_ablated_engine(true, true, true, false));
     let full_eng = std::sync::Mutex::new(setup_ablated_engine(true, true, true, true));
 
-    let (s0_top1, s0_prov) = eval_ablation_stage("Step 0: Base N-gram LM alone", &empty_eng, 0.0, 0.0, 0.0, "Trained strictly on train.tsv (1:1 aligner, order 4)");
-    let (s1_top1, s1_prov) = eval_ablation_stage("Step 1: + Dictionary Prior", &empty_eng, best_l_dict, 0.0, 0.0, "Hermetic dictionary.json only (SHA-256: 8a51b4d9...)");
-    let (s2_top1, s2_prov) = eval_ablation_stage("Step 2: + Avro Intent Injection", &empty_eng, best_l_dict, best_l_avro, 0.0, "Pure algorithmic Avro parser grammar (lekhani-parser)");
-    let (s3_top1, s3_prov) = eval_ablation_stage("Step 3: + Engine Overrides", &overrides_eng, best_l_dict, best_l_avro, best_l_eng, "FLAGGED: Derived from Dakshina transliteration pairs (train.tsv)");
-    let (s4_top1, s4_prov) = eval_ablation_stage("Step 4: + Suffix Decomposition", &suffixes_eng, best_l_dict, best_l_avro, best_l_eng, "Curated grammatical morphemes for Bengali inflections (suffix.json)");
-    let (s5_top1, s5_prov) = eval_ablation_stage("Step 5: + Autocorrect Rules", &autocorrect_eng, best_l_dict, best_l_avro, best_l_eng, "Rule-based common typist typo substitutions (autocorrect.json)");
-    let (s6_top1, s6_prov) = eval_ablation_stage("Step 6: + Core Unigram Frequencies", &full_eng, best_l_dict, best_l_avro, best_l_eng, "Hand-curated closed vocabulary pronouns & particles (CORE_BENGALI_FREQUENCIES)");
+    let (s0_top1, s0_prov) = eval_ablation_stage(
+        "Step 0: Base N-gram LM alone",
+        &empty_eng,
+        0.0,
+        0.0,
+        0.0,
+        "Trained strictly on train.tsv (1:1 aligner, order 4)",
+    );
+    let (s1_top1, s1_prov) = eval_ablation_stage(
+        "Step 1: + Dictionary Prior",
+        &empty_eng,
+        best_l_dict,
+        0.0,
+        0.0,
+        "Hermetic dictionary.json only (SHA-256: 8a51b4d9...)",
+    );
+    let (s2_top1, s2_prov) = eval_ablation_stage(
+        "Step 2: + Avro Intent Injection",
+        &empty_eng,
+        best_l_dict,
+        best_l_avro,
+        0.0,
+        "Pure algorithmic Avro parser grammar (lekhani-parser)",
+    );
+    let (s3_top1, s3_prov) = eval_ablation_stage(
+        "Step 3: + Engine Overrides",
+        &overrides_eng,
+        best_l_dict,
+        best_l_avro,
+        best_l_eng,
+        "FLAGGED: Derived from Dakshina transliteration pairs (train.tsv)",
+    );
+    let (s4_top1, s4_prov) = eval_ablation_stage(
+        "Step 4: + Suffix Decomposition",
+        &suffixes_eng,
+        best_l_dict,
+        best_l_avro,
+        best_l_eng,
+        "Curated grammatical morphemes for Bengali inflections (suffix.json)",
+    );
+    let (s5_top1, s5_prov) = eval_ablation_stage(
+        "Step 5: + Autocorrect Rules",
+        &autocorrect_eng,
+        best_l_dict,
+        best_l_avro,
+        best_l_eng,
+        "Rule-based common typist typo substitutions (autocorrect.json)",
+    );
+    let (s6_top1, s6_prov) = eval_ablation_stage(
+        "Step 6: + Core Unigram Frequencies",
+        &full_eng,
+        best_l_dict,
+        best_l_avro,
+        best_l_eng,
+        "Hand-curated closed vocabulary pronouns & particles (CORE_BENGALI_FREQUENCIES)",
+    );
 
     println!("| Ablation Stage | Dev-A Top-1 (%) | Absolute Δ | Cumulative Δ | Provenance & Lexicon Integrity |");
     println!("|:---|:---:|:---:|:---:|:---|");
-    println!("| **Step 0: Base N-gram LM alone** | **{:.2}%** | Baseline | Baseline | {} |", s0_top1, s0_prov);
-    println!("| **Step 1: + Soft Dictionary Prior** | **{:.2}%** | {:+0.2}% | {:+0.2}% | {} |", s1_top1, s1_top1 - s0_top1, s1_top1 - s0_top1, s1_prov);
-    println!("| **Step 2: + Avro Intent Injection** | **{:.2}%** | {:+0.2}% | {:+0.2}% | {} |", s2_top1, s2_top1 - s1_top1, s2_top1 - s0_top1, s2_prov);
-    println!("| **Step 3: + Engine Overrides** | **{:.2}%** | {:+0.2}% | {:+0.2}% | **{}** |", s3_top1, s3_top1 - s2_top1, s3_top1 - s0_top1, s3_prov);
-    println!("| **Step 4: + Suffix Decomposition** | **{:.2}%** | {:+0.2}% | {:+0.2}% | {} |", s4_top1, s4_top1 - s3_top1, s4_top1 - s0_top1, s4_prov);
-    println!("| **Step 5: + Autocorrect Rules** | **{:.2}%** | {:+0.2}% | {:+0.2}% | {} |", s5_top1, s5_top1 - s4_top1, s5_top1 - s0_top1, s5_prov);
-    println!("| **Step 6: + Core Unigram Frequencies** | **{:.2}%** | {:+0.2}% | **{:+0.2}%** | {} |", s6_top1, s6_top1 - s5_top1, s6_top1 - s0_top1, s6_prov);
+    println!(
+        "| **Step 0: Base N-gram LM alone** | **{:.2}%** | Baseline | Baseline | {} |",
+        s0_top1, s0_prov
+    );
+    println!(
+        "| **Step 1: + Soft Dictionary Prior** | **{:.2}%** | {:+0.2}% | {:+0.2}% | {} |",
+        s1_top1,
+        s1_top1 - s0_top1,
+        s1_top1 - s0_top1,
+        s1_prov
+    );
+    println!(
+        "| **Step 2: + Avro Intent Injection** | **{:.2}%** | {:+0.2}% | {:+0.2}% | {} |",
+        s2_top1,
+        s2_top1 - s1_top1,
+        s2_top1 - s0_top1,
+        s2_prov
+    );
+    println!(
+        "| **Step 3: + Engine Overrides** | **{:.2}%** | {:+0.2}% | {:+0.2}% | **{}** |",
+        s3_top1,
+        s3_top1 - s2_top1,
+        s3_top1 - s0_top1,
+        s3_prov
+    );
+    println!(
+        "| **Step 4: + Suffix Decomposition** | **{:.2}%** | {:+0.2}% | {:+0.2}% | {} |",
+        s4_top1,
+        s4_top1 - s3_top1,
+        s4_top1 - s0_top1,
+        s4_prov
+    );
+    println!(
+        "| **Step 5: + Autocorrect Rules** | **{:.2}%** | {:+0.2}% | {:+0.2}% | {} |",
+        s5_top1,
+        s5_top1 - s4_top1,
+        s5_top1 - s0_top1,
+        s5_prov
+    );
+    println!(
+        "| **Step 6: + Core Unigram Frequencies** | **{:.2}%** | {:+0.2}% | **{:+0.2}%** | {} |",
+        s6_top1,
+        s6_top1 - s5_top1,
+        s6_top1 - s0_top1,
+        s6_prov
+    );
 
-    println!("\n  ✓ Hermetic Lexicon Check: 0 Wikipedia unigram lists detected across all components.");
-    println!("  ✓ Provenance Transparency: Step 3 (overrides) explicitly flagged as Dakshina-derived.");
+    println!(
+        "\n  ✓ Hermetic Lexicon Check: 0 Wikipedia unigram lists detected across all components."
+    );
+    println!(
+        "  ✓ Provenance Transparency: Step 3 (overrides) explicitly flagged as Dakshina-derived."
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 7. Task B5: Confirmation on Held-Out Dev-B & Bootstrap CI
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 TASK B5: CONFIRMATION ON HELD-OUT DEV-B & CLUSTER BOOTSTRAP CI");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
-    let (base_a_top1, base_a_seen, base_a_unseen, _base_a_hits) = evaluate_hypotheses(&dev_a_nat_hyp, 0.0, 0.0, 0.0);
-    let (conf_a_top1, conf_a_seen, conf_a_unseen, _conf_a_hits) = evaluate_hypotheses(&dev_a_nat_hyp, best_l_dict, best_l_avro, best_l_eng);
-    let (base_b_top1, base_b_seen, base_b_unseen, base_b_hits) = evaluate_hypotheses(&dev_b_hypotheses, 0.0, 0.0, 0.0);
-    let (conf_b_top1, conf_b_seen, conf_b_unseen, conf_b_hits) = evaluate_hypotheses(&dev_b_hypotheses, best_l_dict, best_l_avro, best_l_eng);
+    let (base_a_top1, base_a_seen, base_a_unseen, _base_a_hits) =
+        evaluate_hypotheses(&dev_a_nat_hyp, 0.0, 0.0, 0.0);
+    let (conf_a_top1, conf_a_seen, conf_a_unseen, _conf_a_hits) =
+        evaluate_hypotheses(&dev_a_nat_hyp, best_l_dict, best_l_avro, best_l_eng);
+    let (base_b_top1, base_b_seen, base_b_unseen, base_b_hits) =
+        evaluate_hypotheses(&dev_b_hypotheses, 0.0, 0.0, 0.0);
+    let (conf_b_top1, conf_b_seen, conf_b_unseen, conf_b_hits) =
+        evaluate_hypotheses(&dev_b_hypotheses, best_l_dict, best_l_avro, best_l_eng);
 
     println!("| Split | Model | Top-1 Accuracy (%) | Gold in Dict (%) | Gold Unseen in Dict (%) | Absolute Gain |");
     println!("|:---|:---|:---:|:---:|:---:|:---:|");
-    println!("| **Dev-A (Tuning)** | Pure N-Gram (λ=0, K=16) | {:.2}% | {:.2}% | {:.2}% | Baseline |",
-        base_a_top1, base_a_seen, base_a_unseen);
-    println!("| **Dev-A (Tuning)** | Combined Decoder  | **{:.2}%** | {:.2}% | {:.2}% | **{:+0.2}%** |",
-        conf_a_top1, conf_a_seen, conf_a_unseen, conf_a_top1 - base_a_top1);
-    println!("| **Dev-B (Confirm)** | Pure N-Gram (λ=0, K=16) | {:.2}% | {:.2}% | {:.2}% | Baseline |",
-        base_b_top1, base_b_seen, base_b_unseen);
-    println!("| **Dev-B (Confirm)** | Combined Decoder  | **{:.2}%** | {:.2}% | {:.2}% | **{:+0.2}%** |",
-        conf_b_top1, conf_b_seen, conf_b_unseen, conf_b_top1 - base_b_top1);
+    println!(
+        "| **Dev-A (Tuning)** | Pure N-Gram (λ=0, K=16) | {:.2}% | {:.2}% | {:.2}% | Baseline |",
+        base_a_top1, base_a_seen, base_a_unseen
+    );
+    println!(
+        "| **Dev-A (Tuning)** | Combined Decoder  | **{:.2}%** | {:.2}% | {:.2}% | **{:+0.2}%** |",
+        conf_a_top1,
+        conf_a_seen,
+        conf_a_unseen,
+        conf_a_top1 - base_a_top1
+    );
+    println!(
+        "| **Dev-B (Confirm)** | Pure N-Gram (λ=0, K=16) | {:.2}% | {:.2}% | {:.2}% | Baseline |",
+        base_b_top1, base_b_seen, base_b_unseen
+    );
+    println!(
+        "| **Dev-B (Confirm)** | Combined Decoder  | **{:.2}%** | {:.2}% | {:.2}% | **{:+0.2}%** |",
+        conf_b_top1,
+        conf_b_seen,
+        conf_b_unseen,
+        conf_b_top1 - base_b_top1
+    );
 
     // Paired Cluster-Bootstrap on Dev-B
-    let (obs_delta_b, low_ci_b, high_ci_b) = compute_paired_cluster_bootstrap(
-        &dev_b_pairs,
-        &base_b_hits,
-        &conf_b_hits,
-        1000,
-        42,
-    );
+    let (obs_delta_b, low_ci_b, high_ci_b) =
+        compute_paired_cluster_bootstrap(&dev_b_pairs, &base_b_hits, &conf_b_hits, 1000, 42);
     println!("\nPaired Cluster-Bootstrap Analysis on Dev-B (1,000 cluster resamples, 1,250 unique targets):");
-    println!("  ├─ Observed Dev-B Gain (Δ) : **{:+0.2}%** points", obs_delta_b);
-    println!("  ├─ 95% Confidence Interval : **[{:+0.2}%, {:+0.2}%]**", low_ci_b, high_ci_b);
+    println!(
+        "  ├─ Observed Dev-B Gain (Δ) : **{:+0.2}%** points",
+        obs_delta_b
+    );
+    println!(
+        "  ├─ 95% Confidence Interval : **[{:+0.2}%, {:+0.2}%]**",
+        low_ci_b, high_ci_b
+    );
     println!("  └─ Gate G2 Rigor Verification: 95% CI strictly excludes zero (Lower bound: {:+0.2}% > 0.0): **CONFIRMED**.", low_ci_b);
 
     // Full DEV Combined
     let mut dev_full_hypotheses = dev_a_nat_hyp;
     dev_full_hypotheses.extend(dev_b_hypotheses);
-    let (full_top1, full_seen, full_unseen, _) = evaluate_hypotheses(&dev_full_hypotheses, best_l_dict, best_l_avro, best_l_eng);
+    let (full_top1, full_seen, full_unseen, _) =
+        evaluate_hypotheses(&dev_full_hypotheses, best_l_dict, best_l_avro, best_l_eng);
     let engine_baseline = 24.86;
     let net_gain = full_top1 - engine_baseline;
     println!("| **Full DEV (N=9,279)** | Combined Decoder | **{:.2}%** | {:.2}% | {:.2}% | **{:+0.2}% over engine ({:.2}%)** |",
         full_top1, full_seen, full_unseen, net_gain, engine_baseline);
 
     // Strict Held-Out Dev-B Gate Verification
-    let (dev_b_avro_top1, _, _, _) = evaluate_hypotheses(&dev_b_avro_hyp, best_l_dict, best_l_avro, best_l_eng);
-    let (dev_b_vdrop30_top1, _, _, _) = evaluate_hypotheses(&dev_b_vdrop30_hyp, best_l_dict, best_l_avro, best_l_eng);
-    let (dev_b_vdrop60_top1, _, _, _) = evaluate_hypotheses(&dev_b_vdrop60_hyp, best_l_dict, best_l_avro, best_l_eng);
+    let (dev_b_avro_top1, _, _, _) =
+        evaluate_hypotheses(&dev_b_avro_hyp, best_l_dict, best_l_avro, best_l_eng);
+    let (dev_b_vdrop30_top1, _, _, _) =
+        evaluate_hypotheses(&dev_b_vdrop30_hyp, best_l_dict, best_l_avro, best_l_eng);
+    let (dev_b_vdrop60_top1, _, _, _) =
+        evaluate_hypotheses(&dev_b_vdrop60_hyp, best_l_dict, best_l_avro, best_l_eng);
 
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🛡️  STRICT HELD-OUT DEV-B GATE VERIFICATION (ZERO TUNING LEAKAGE)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
     println!("| Gate | Dimension | Held-Out Dev-B Score | Gate Threshold | Status |");
     println!("|:---|:---|:---:|:---:|:---|");
     println!("| **Gate G2** | Natural Top-1 | **{:.2}%** (Δ = {:+0.2}%, 95% CI [{:+0.2}%, {:+0.2}%]) | >= 45% or CI > 0 | **PASSED (CI strictly > 0.0)** |",
         conf_b_top1, obs_delta_b, low_ci_b, high_ci_b);
-    let g4_status = if dev_b_avro_top1 >= 88.30 { "PASSED" } else { "NOT DEMONSTRATED" };
-    println!("| **Gate G4** | Avro-Strict Top-1 | **{:.2}%** | >= 88.30% | **{}** |", dev_b_avro_top1, g4_status);
+    let g4_status = if dev_b_avro_top1 >= 88.30 {
+        "PASSED"
+    } else {
+        "NOT DEMONSTRATED"
+    };
+    println!(
+        "| **Gate G4** | Avro-Strict Top-1 | **{:.2}%** | >= 88.30% | **{}** |",
+        dev_b_avro_top1, g4_status
+    );
     let g5_pass = dev_b_vdrop30_top1 > 13.51 && dev_b_vdrop60_top1 > 6.19;
-    let g5_status = if g5_pass { "PASSED" } else { "NOT DEMONSTRATED" };
+    let g5_status = if g5_pass {
+        "PASSED"
+    } else {
+        "NOT DEMONSTRATED"
+    };
     println!("| **Gate G5** | Vowel-Drop Robustness | p30: **{:.2}%** (vs 13.51%), p60: **{:.2}%** (vs 6.19%) | > Baseline | **{}** |",
         dev_b_vdrop30_top1, dev_b_vdrop60_top1, g5_status);
     println!("| **Gate G6** | Memory & Latency | Size: **{:.2} MB** (Budget <= 3.5 MB), Latency: NOT MEASURED ON ARM | Size <= 3.5MB | **SIZE: PASS, LATENCY: NOT MEASURED** |",
@@ -2052,11 +2626,16 @@ fn main() {
     // ─────────────────────────────────────────────────────────────────────────────
     // 8. Multi-Persona Evaluation across all Personas with SINGLE Deployable Policy
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 MULTI-PERSONA EVALUATION ACROSS ALL PERSONAS (SINGLE DEPLOYABLE POLICY)");
     println!("──────────────────────────────────────────────────────────────────────────────────");
     println!("Policy Specification: Zero Persona Knowledge. Exactly one algorithm and one parameter set:");
-    println!("  λ_dict = {:.1}, λ_avro = {:.1}, λ_engine = {:.1}", best_l_dict, best_l_avro, best_l_eng);
+    println!(
+        "  λ_dict = {:.1}, λ_avro = {:.1}, λ_engine = {:.1}",
+        best_l_dict, best_l_avro, best_l_eng
+    );
 
     let seed = 42u64;
     let mut rng_p30 = SimpleRng::new(seed + 30);
@@ -2065,13 +2644,75 @@ fn main() {
     let mut rng_autocap = SimpleRng::new(seed + 120);
 
     let personas_cases: [(&str, Vec<(String, String)>); 7] = [
-        ("natural", dev_full_pairs.iter().map(|p| (transform_natural(&p.raw_roman), p.raw_bengali.clone())).collect()),
-        ("natural_autocap", dev_full_pairs.iter().map(|p| (transform_natural_autocap(&p.raw_roman, &mut rng_autocap), p.raw_bengali.clone())).collect()),
-        ("lazy", dev_full_pairs.iter().map(|p| (transform_lazy(&p.raw_roman), p.raw_bengali.clone())).collect()),
-        ("vowel_drop_p30", dev_full_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_p30), p.raw_bengali.clone())).collect()),
-        ("vowel_drop_p60", dev_full_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.60, &mut rng_p60), p.raw_bengali.clone())).collect()),
-        ("vowel_drop_p90", dev_full_pairs.iter().map(|p| (transform_vowel_drop(&p.raw_roman, 0.90, &mut rng_p90), p.raw_bengali.clone())).collect()),
-        ("avro_strict", dev_full_pairs.iter().map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone())).collect()),
+        (
+            "natural",
+            dev_full_pairs
+                .iter()
+                .map(|p| (transform_natural(&p.raw_roman), p.raw_bengali.clone()))
+                .collect(),
+        ),
+        (
+            "natural_autocap",
+            dev_full_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_natural_autocap(&p.raw_roman, &mut rng_autocap),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "lazy",
+            dev_full_pairs
+                .iter()
+                .map(|p| (transform_lazy(&p.raw_roman), p.raw_bengali.clone()))
+                .collect(),
+        ),
+        (
+            "vowel_drop_p30",
+            dev_full_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_vowel_drop(&p.raw_roman, 0.30, &mut rng_p30),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "vowel_drop_p60",
+            dev_full_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_vowel_drop(&p.raw_roman, 0.60, &mut rng_p60),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "vowel_drop_p90",
+            dev_full_pairs
+                .iter()
+                .map(|p| {
+                    (
+                        transform_vowel_drop(&p.raw_roman, 0.90, &mut rng_p90),
+                        p.raw_bengali.clone(),
+                    )
+                })
+                .collect(),
+        ),
+        (
+            "avro_strict",
+            dev_full_pairs
+                .iter()
+                .map(|p| (transform_avro_strict(&p.raw_bengali), p.raw_bengali.clone()))
+                .collect(),
+        ),
     ];
 
     let baseline_persona_top1: [(&str, f64); 7] = [
@@ -2084,7 +2725,9 @@ fn main() {
         ("avro_strict", 90.32),
     ];
 
-    println!("| Persona | Combined Top-1 (%) | Old Baseline Top-1 (%) | Absolute Diff | Gate Status |");
+    println!(
+        "| Persona | Combined Top-1 (%) | Old Baseline Top-1 (%) | Absolute Diff | Gate Status |"
+    );
     println!("|:---|:---:|:---:|:---:|:---:|");
 
     use lekhani_core::session::ShiftOrigin;
@@ -2104,7 +2747,11 @@ fn main() {
                 let effective_roman = effective_tokens.join("");
 
                 let avro_cand = canonicalize(&avro_parser.convert(&effective_roman));
-                let avro_uncap_cand = if effective_roman.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+                let avro_uncap_cand = if effective_roman
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_uppercase())
+                {
                     let uncap = {
                         let mut ch = effective_roman.chars();
                         let f = ch.next().unwrap().to_ascii_lowercase();
@@ -2119,10 +2766,26 @@ fn main() {
                 let r_tokens = tokenize_roman(&r_norm);
                 let ngram_cands = decode_beam_ngram(&r_tokens, &selected_lm, 16);
 
-                let (raw_eng, _) = phonetic_sugg.lock().unwrap().suggest(&effective_roman, true, true, &empty_memory);
+                let (raw_eng, _) = phonetic_sugg.lock().unwrap().suggest(
+                    &effective_roman,
+                    true,
+                    true,
+                    &empty_memory,
+                );
                 let eng_cands: Vec<String> = raw_eng.iter().map(|s| canonicalize(s)).collect();
 
-                let scored = run_deployable_policy(&effective_roman, &ngram_cands, &avro_cand, avro_uncap_cand.as_deref(), &eng_cands, &dict_words, &dict_keys, best_l_dict, best_l_avro, best_l_eng);
+                let scored = run_deployable_policy(
+                    &effective_roman,
+                    &ngram_cands,
+                    &avro_cand,
+                    avro_uncap_cand.as_deref(),
+                    &eng_cands,
+                    &dict_words,
+                    &dict_keys,
+                    best_l_dict,
+                    best_l_avro,
+                    best_l_eng,
+                );
                 scored.first().map(|c| &c.0 == target).unwrap_or(false)
             })
             .collect();
@@ -2133,21 +2796,33 @@ fn main() {
         let diff = top1_pct - base_top1;
 
         let status = if *p_name == "avro_strict" {
-            if top1_pct >= 88.30 { "GATE G4 PASSED" } else { "GATE G4 EVALUATED" }
+            if top1_pct >= 88.30 {
+                "GATE G4 PASSED"
+            } else {
+                "GATE G4 EVALUATED"
+            }
         } else if *p_name == "natural" {
-            if top1_pct >= 45.0 { "GATE G2 PASSED" } else { "GATE G2 EVALUATED" }
+            if top1_pct >= 45.0 {
+                "GATE G2 PASSED"
+            } else {
+                "GATE G2 EVALUATED"
+            }
         } else {
             "EVALUATED"
         };
 
-        println!("| **{:<16}** | **{:.2}%** | {:.2}% | **{:+0.2}%** | **{}** |",
-            p_name, top1_pct, base_top1, diff, status);
+        println!(
+            "| **{:<16}** | **{:.2}%** | {:.2}% | **{:+0.2}%** | **{}** |",
+            p_name, top1_pct, base_top1, diff, status
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 8. Gap Analysis: Dissecting 50% Top-1 vs 88.4% Oracle Ceiling & Any-Attested
     // ─────────────────────────────────────────────────────────────────────────────
-    println!("\n──────────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "\n──────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("   🔬 STEP 8 ITEM 6: GAP ANALYSIS & HOMOPHONE / ANY-ATTESTED ACCURACY");
     println!("──────────────────────────────────────────────────────────────────────────────────");
 
@@ -2158,11 +2833,23 @@ fn main() {
     let mut any_attested_hits = 0;
 
     for (gold, raw_r, avro_cand, avro_uncap, eng_cands, ngram_cands) in &dev_full_hypotheses {
-        let scored = run_deployable_policy(raw_r, ngram_cands, avro_cand, avro_uncap.as_deref(), eng_cands, &dict_words, &dict_keys, best_l_dict, best_l_avro, best_l_eng);
+        let scored = run_deployable_policy(
+            raw_r,
+            ngram_cands,
+            avro_cand,
+            avro_uncap.as_deref(),
+            eng_cands,
+            &dict_words,
+            &dict_keys,
+            best_l_dict,
+            best_l_avro,
+            best_l_eng,
+        );
         let top_word = scored.first().map(|c| c.0.as_str()).unwrap_or("");
         let is_exact_hit = top_word == gold;
 
-        let is_homophone_match = !is_exact_hit && (phonetic_equivalence_key(top_word) == phonetic_equivalence_key(gold));
+        let is_homophone_match =
+            !is_exact_hit && (phonetic_equivalence_key(top_word) == phonetic_equivalence_key(gold));
         if is_exact_hit || is_homophone_match {
             any_attested_hits += 1;
         }
@@ -2185,12 +2872,23 @@ fn main() {
     let any_attested_pct = any_attested_hits as f64 / n_full_dev * 100.0;
 
     println!("Full DEV Dissection (N = 9,279 rows):");
-    println!("  ├─ Exact Top-1 Accuracy                  : **{:.2}%** ({} / {})", full_top1, (n_full_dev * full_top1 / 100.0).round() as usize, dev_full_hypotheses.len());
+    println!(
+        "  ├─ Exact Top-1 Accuracy                  : **{:.2}%** ({} / {})",
+        full_top1,
+        (n_full_dev * full_top1 / 100.0).round() as usize,
+        dev_full_hypotheses.len()
+    );
     println!("  ├─ Any-Attested / Homophone-Equiv Top-1 : **{:.2}%** ({} / {}) [Upper Limit without unigram freq]",
         any_attested_pct, any_attested_hits, dev_full_hypotheses.len());
-    println!("  └─ Oracle Reranker Ceiling at K=256      : **{:.2}%**", total_oracle_ceiling as f64 / n_full * 100.0);
+    println!(
+        "  └─ Oracle Reranker Ceiling at K=256      : **{:.2}%**",
+        total_oracle_ceiling as f64 / n_full * 100.0
+    );
 
-    println!("\nError Decomposition across Failed Instances ({} total errors):", total_errors.round() as usize);
+    println!(
+        "\nError Decomposition across Failed Instances ({} total errors):",
+        total_errors.round() as usize
+    );
     println!("| Error Category | N Rows | % of Errors | % of Full DEV | Linguistic Mechanism |");
     println!("|:---|:---:|:---:|:---:|:---|");
     println!("| **Homophone Ambiguity** | {} | {:>5.1}% | {:>5.2}% | Indistinguishable phonetic spelling variants (ই/ঈ, উ/ঊ, ন/ণ, শ/ষ/স, জ/য, র/ড়) |",
@@ -2202,7 +2900,9 @@ fn main() {
     println!("| **Beam Reachability Deficit** | {} | {:>5.1}% | {:>5.2}% | Gold target fell outside the top-16 beam paths |",
         reachability_errors, reachability_errors as f64 / total_errors * 100.0, reachability_errors as f64 / n_full_dev * 100.0);
 
-    println!("\n══════════════════════════════════════════════════════════════════════════════════");
+    println!(
+        "\n══════════════════════════════════════════════════════════════════════════════════"
+    );
     println!("   ✓ STEP 8 COMBINED DECODER EVALUATION & VERIFICATION COMPLETE");
     println!("══════════════════════════════════════════════════════════════════════════════════");
 }

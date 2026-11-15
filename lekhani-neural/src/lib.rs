@@ -12,8 +12,7 @@ pub mod vocab;
 pub use model::{GruLayerWeights, MicroGruModel};
 pub use predictor::{compute_neural_alpha, NeuralCandidate, NeuralContextPredictor};
 pub use seq2seq::{
-    CharVocab, InferenceScratch, Seq2SeqGrad, Seq2SeqTransliterator,
-    BOS_ID, EOS_ID, PAD_ID, UNK_ID,
+    CharVocab, InferenceScratch, Seq2SeqGrad, Seq2SeqTransliterator, BOS_ID, EOS_ID, PAD_ID, UNK_ID,
 };
 pub use vocab::{
     BpeVocabulary, BOS_TOKEN, BOS_TOKEN_ID, EOS_TOKEN, EOS_TOKEN_ID, PAD_TOKEN, PAD_TOKEN_ID,

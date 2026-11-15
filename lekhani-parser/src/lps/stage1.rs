@@ -62,8 +62,16 @@ pub fn expand_stage1(tokens: &[Stage0Token]) -> Vec<Stage1Path> {
     for (idx, tok) in tokens.iter().enumerate() {
         let is_first = idx == 0;
         let is_last = idx + 1 == tokens.len();
-        let prev_tok = if idx > 0 { Some(&tokens[idx - 1]) } else { None };
-        let next_tok = if idx + 1 < tokens.len() { Some(&tokens[idx + 1]) } else { None };
+        let prev_tok = if idx > 0 {
+            Some(&tokens[idx - 1])
+        } else {
+            None
+        };
+        let next_tok = if idx + 1 < tokens.len() {
+            Some(&tokens[idx + 1])
+        } else {
+            None
+        };
 
         let mut next_paths = Vec::with_capacity(paths.len() * 2);
 
@@ -443,9 +451,10 @@ fn resolve_phonetic_token(
     }
 
     // 2. CONSONANTS
-    let is_prev_consonant = current_path.units.last().is_some_and(|u| {
-        matches!(u, PronunciationUnit::Consonant { .. })
-    });
+    let is_prev_consonant = current_path
+        .units
+        .last()
+        .is_some_and(|u| matches!(u, PronunciationUnit::Consonant { .. }));
 
     // Check S2: Consonant directly following consonant without INH/SPLIT branches into CLUSTER or SPLIT
 
@@ -548,7 +557,21 @@ fn resolve_phonetic_token(
                     if let TokenKind::Phonetic(ref p) = nt.kind {
                         matches!(
                             p.as_str(),
-                            "a" | "i" | "ii" | "u" | "uu" | "e" | "o" | "oo" | "oi" | "ou" | "ri" | "ae" | "k" | "kh" | "g" | "gh"
+                            "a" | "i"
+                                | "ii"
+                                | "u"
+                                | "uu"
+                                | "e"
+                                | "o"
+                                | "oo"
+                                | "oi"
+                                | "ou"
+                                | "ri"
+                                | "ae"
+                                | "k"
+                                | "kh"
+                                | "g"
+                                | "gh"
                         )
                     } else {
                         false
@@ -594,13 +617,21 @@ fn resolve_phonetic_token(
     };
 
     // If context is intervocalic r without lock, offer ড় as high-ranked variant (e.g. bari -> বাড়ি, বারি)
-    let is_intervocalic_r = tok == "r" && lock_count == 0 && !is_first && !is_last && !is_prev_consonant && next_tok.is_some_and(|nt| {
-        if let TokenKind::Phonetic(ref p) = nt.kind {
-            matches!(p.as_str(), "a" | "i" | "ii" | "u" | "uu" | "e" | "o" | "oo" | "oi" | "ou" | "ri" | "ae")
-        } else {
-            false
-        }
-    });
+    let is_intervocalic_r = tok == "r"
+        && lock_count == 0
+        && !is_first
+        && !is_last
+        && !is_prev_consonant
+        && next_tok.is_some_and(|nt| {
+            if let TokenKind::Phonetic(ref p) = nt.kind {
+                matches!(
+                    p.as_str(),
+                    "a" | "i" | "ii" | "u" | "uu" | "e" | "o" | "oo" | "oi" | "ou" | "ri" | "ae"
+                )
+            } else {
+                false
+            }
+        });
 
     let c_primary_str = c_primary.to_string();
     let c_variants_vec: Vec<String> = c_variants.iter().map(|s| s.to_string()).collect();

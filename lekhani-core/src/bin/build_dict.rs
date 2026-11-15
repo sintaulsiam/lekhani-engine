@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Build Hermetic Bengali Binary Dictionary (dictionary.bin)
 //!
 //! Strictly compiles from the canonical, committed root lexicon:
@@ -40,7 +41,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    println!("1. Reading and verifying SHA-256 of source lexicon: {:?}", dict_path);
+    println!(
+        "1. Reading and verifying SHA-256 of source lexicon: {:?}",
+        dict_path
+    );
     let raw_bytes = std::fs::read(&dict_path)?;
     let actual_hash = compute_sha256_hex(&raw_bytes);
     println!("   ├─ Expected SHA-256: {}", EXPECTED_DICT_JSON_SHA256);
@@ -89,7 +93,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("   ├─ Total distinct JSON keys       : {}", raw_map.len());
-    println!("   ├─ Total unique canonical words  : {}", unique_words.len());
+    println!(
+        "   ├─ Total unique canonical words  : {}",
+        unique_words.len()
+    );
     println!("   └─ Dropped empty/whitespace items : {}", dropped_empty);
 
     println!("\n3. Building and sorting PrefixTrie...");

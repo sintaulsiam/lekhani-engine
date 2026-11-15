@@ -26,11 +26,19 @@ pub enum LpsWarning {
 impl fmt::Display for LpsWarning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::W101InvalidLock(tok) => write!(f, "LPS-W101: Token '{}' has no marked lock variant", tok),
-            Self::W102JoinAtWordStart => write!(f, "LPS-W102: Join operator '+' at word start is invalid"),
-            Self::W103NoChandrabinduHost => write!(f, "LPS-W103: Chandrabindu '^' has no valid host"),
+            Self::W101InvalidLock(tok) => {
+                write!(f, "LPS-W101: Token '{}' has no marked lock variant", tok)
+            }
+            Self::W102JoinAtWordStart => {
+                write!(f, "LPS-W102: Join operator '+' at word start is invalid")
+            }
+            Self::W103NoChandrabinduHost => {
+                write!(f, "LPS-W103: Chandrabindu '^' has no valid host")
+            }
             Self::W104UnknownEscape(c) => write!(f, "LPS-W104: Unknown escape sequence '\\{}'", c),
-            Self::W105InvalidUnicodeEscape(s) => write!(f, "LPS-W105: Invalid unicode escape '\\u{{{}}}'", s),
+            Self::W105InvalidUnicodeEscape(s) => {
+                write!(f, "LPS-W105: Invalid unicode escape '\\u{{{}}}'", s)
+            }
             Self::W106EmptyEnglishRun => write!(f, "LPS-W106: Empty English lock '\\e' run"),
         }
     }
@@ -82,8 +90,7 @@ impl Stage0Token {
 /// Known multi-letter tokens sorted strictly longest-match first.
 pub const MULTI_LETTER_TOKENS: &[&str] = &[
     "chh", "ksh", // 3 letters
-    "kh", "gh", "ng", "ch", "jh", "ny", "th", "dh",
-    "ph", "bh", "sh", "rh", "ri", "oi", "ou", "ae",
+    "kh", "gh", "ng", "ch", "jh", "ny", "th", "dh", "ph", "bh", "sh", "rh", "ri", "oi", "ou", "ae",
     "ii", "uu", "oo", "gg", // 2 letters
 ];
 
@@ -168,26 +175,43 @@ pub fn tokenize_stage0(input: &str) -> Stage0Result {
                             if let Some(ch) = char::from_u32(cp) {
                                 tokens.push(Stage0Token::new(TokenKind::ExactChar(ch)));
                             } else {
-                                tokens.push(Stage0Token::new(TokenKind::Literal(format!("\\u{{{}}}", hex_str))));
-                                diagnostics.push(LpsWarning::W105InvalidUnicodeEscape(hex_str.to_string()));
+                                tokens.push(Stage0Token::new(TokenKind::Literal(format!(
+                                    "\\u{{{}}}",
+                                    hex_str
+                                ))));
+                                diagnostics.push(LpsWarning::W105InvalidUnicodeEscape(
+                                    hex_str.to_string(),
+                                ));
                             }
                         } else {
-                            tokens.push(Stage0Token::new(TokenKind::Literal(format!("\\u{{{}}}", hex_str))));
-                            diagnostics.push(LpsWarning::W105InvalidUnicodeEscape(hex_str.to_string()));
+                            tokens.push(Stage0Token::new(TokenKind::Literal(format!(
+                                "\\u{{{}}}",
+                                hex_str
+                            ))));
+                            diagnostics
+                                .push(LpsWarning::W105InvalidUnicodeEscape(hex_str.to_string()));
                         }
                         i += 1; // consume '}'
                     } else {
                         let rem = String::from_utf8_lossy(&bytes[hex_start..]).to_string();
-                        tokens.push(Stage0Token::new(TokenKind::Literal(format!("\\u{{{}}}", rem))));
+                        tokens.push(Stage0Token::new(TokenKind::Literal(format!(
+                            "\\u{{{}}}",
+                            rem
+                        ))));
                         diagnostics.push(LpsWarning::W105InvalidUnicodeEscape(rem));
                     }
                 }
                 b'\'' | b'+' | b'-' | b'^' | b'\\' => {
-                    tokens.push(Stage0Token::new(TokenKind::Literal((bytes[i] as char).to_string())));
+                    tokens.push(Stage0Token::new(TokenKind::Literal(
+                        (bytes[i] as char).to_string(),
+                    )));
                     i += 1;
                 }
                 other => {
-                    tokens.push(Stage0Token::new(TokenKind::Literal(format!("\\{}", other as char))));
+                    tokens.push(Stage0Token::new(TokenKind::Literal(format!(
+                        "\\{}",
+                        other as char
+                    ))));
                     diagnostics.push(LpsWarning::W104UnknownEscape(other as char));
                     i += 1;
                 }
@@ -269,7 +293,9 @@ pub fn tokenize_stage0(input: &str) -> Stage0Result {
 
         // 6. Whitespace or punctuation (preserves as literal or finishes word)
         if !b.is_ascii_alphabetic() {
-            tokens.push(Stage0Token::new(TokenKind::Literal((b as char).to_string())));
+            tokens.push(Stage0Token::new(TokenKind::Literal(
+                (b as char).to_string(),
+            )));
             i += 1;
             continue;
         }
@@ -321,7 +347,21 @@ pub fn tokenize_stage0(input: &str) -> Stage0Result {
 pub fn is_lockable_token(tok: &str) -> bool {
     matches!(
         tok,
-        "ng" | "j" | "t" | "th" | "d" | "dh" | "n" | "r" | "s" | "sh" | "h" | "y" | "o" | "oi" | "ou" | "ri"
+        "ng" | "j"
+            | "t"
+            | "th"
+            | "d"
+            | "dh"
+            | "n"
+            | "r"
+            | "s"
+            | "sh"
+            | "h"
+            | "y"
+            | "o"
+            | "oi"
+            | "ou"
+            | "ri"
     )
 }
 

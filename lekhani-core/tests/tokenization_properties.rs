@@ -7,8 +7,7 @@
 
 use lekhani_core::chars::canonicalize;
 use lekhani_core::tokenization::{
-    is_valid_translation_unit, normalize_roman, tokenize_bengali, tokenize_roman,
-    BengaliTokenKind,
+    is_valid_translation_unit, normalize_roman, tokenize_bengali, tokenize_roman, BengaliTokenKind,
 };
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -116,13 +115,25 @@ fn test_hard_constraints_on_translation_units() {
 
     // 7. Valid multi-token consonant cluster to conjunct mapping
     let t_conj_rsh = tokenize_bengali("র্ষ");
-    assert!(is_valid_translation_unit(&["r".to_string(), "sh".to_string()], &t_conj_rsh));
+    assert!(is_valid_translation_unit(
+        &["r".to_string(), "sh".to_string()],
+        &t_conj_rsh
+    ));
     let t_conj_mbh = tokenize_bengali("ম্ভ");
-    assert!(is_valid_translation_unit(&["m".to_string(), "bh".to_string()], &t_conj_mbh));
+    assert!(is_valid_translation_unit(
+        &["m".to_string(), "bh".to_string()],
+        &t_conj_mbh
+    ));
     let t_conj_rth = tokenize_bengali("র্থ");
-    assert!(is_valid_translation_unit(&["r".to_string(), "th".to_string()], &t_conj_rth));
+    assert!(is_valid_translation_unit(
+        &["r".to_string(), "th".to_string()],
+        &t_conj_rth
+    ));
     let t_conj_ddh = tokenize_bengali("দ্ধ");
-    assert!(is_valid_translation_unit(&["d".to_string(), "dh".to_string()], &t_conj_ddh));
+    assert!(is_valid_translation_unit(
+        &["d".to_string(), "dh".to_string()],
+        &t_conj_ddh
+    ));
 
     // 8. Conjunct atomicity: a conjunct is a single token with hasanta, never fragmented
     let t_conj = tokenize_bengali("ক্ষ");
@@ -296,9 +307,13 @@ fn test_roman_segmentation_lattice_offers_both_decomposed_and_digraph_paths() {
     // 1. Digraph 'ng' and 'bh': bhangon
     let paths_bhangon = roman_segmentation_lattice("bhangon");
     // Must contain greedy digraph path ["bh", "a", "ng", "o", "n"]
-    assert!(paths_bhangon.iter().any(|p| p == &["bh", "a", "ng", "o", "n"]));
+    assert!(paths_bhangon
+        .iter()
+        .any(|p| p == &["bh", "a", "ng", "o", "n"]));
     // Must also contain decomposed path allowing 'n' + 'g' ["bh", "a", "n", "g", "o", "n"]
-    assert!(paths_bhangon.iter().any(|p| p == &["bh", "a", "n", "g", "o", "n"]));
+    assert!(paths_bhangon
+        .iter()
+        .any(|p| p == &["bh", "a", "n", "g", "o", "n"]));
 
     // 2. Doubled consonant 'tt': kotto
     let paths_kotto = roman_segmentation_lattice("kotto");
@@ -319,31 +334,46 @@ fn test_shift_origin_and_cased_tokenization() {
     let cased_reconstructed: String = cands_manual_taka.join("");
     assert_eq!(cased_reconstructed, "Taka");
     let conv_manual = avro_parser.convert(&cased_reconstructed);
-    assert_eq!(conv_manual, "টাকা", "Manual shift on T must yield retroflex টাকা");
+    assert_eq!(
+        conv_manual, "টাকা",
+        "Manual shift on T must yield retroflex টাকা"
+    );
 
     // 2. Tumi with AutoCapitalize at sentence start:
     // Auto-capitalization must uncapitalize initial char to prevent accidental retroflex 'টুমি'
     let cands_auto_tumi = tokenize_roman_with_origin("Tumi", ShiftOrigin::AutoCapitalize);
     assert_eq!(cands_auto_tumi, vec!["t", "u", "m", "i"]);
     let conv_auto_tumi = avro_parser.convert(&cands_auto_tumi.join(""));
-    assert_eq!(conv_auto_tumi, "তুমি", "Auto-capitalized Tumi must yield dental তুমি");
+    assert_eq!(
+        conv_auto_tumi, "তুমি",
+        "Auto-capitalized Tumi must yield dental তুমি"
+    );
 
     // Contrast with manual shift Tumi:
     let cands_manual_tumi = tokenize_roman_with_origin("Tumi", ShiftOrigin::Manual);
     assert_eq!(cands_manual_tumi, vec!["T", "u", "m", "i"]);
     let conv_manual_tumi = avro_parser.convert(&cands_manual_tumi.join(""));
-    assert_eq!(conv_manual_tumi, "টুমি", "Explicit manual shift on Tumi yields retroflex টুমি");
+    assert_eq!(
+        conv_manual_tumi, "টুমি",
+        "Explicit manual shift on Tumi yields retroflex টুমি"
+    );
 
     let expected_daktar = "\u{09A6}\u{09BE}\u{0995}\u{09CD}\u{099F}\u{09BE}\u{09B0}";
     let cands_daktar_auto = tokenize_roman_with_origin("daKTar", ShiftOrigin::AutoCapitalize);
     assert_eq!(cands_daktar_auto, vec!["d", "a", "K", "T", "a", "r"]);
     let conv_daktar_auto = avro_parser.convert(&cands_daktar_auto.join(""));
-    assert_eq!(conv_daktar_auto, expected_daktar, "Mid-word K and T must preserve case and yield retroflex ক্ট");
+    assert_eq!(
+        conv_daktar_auto, expected_daktar,
+        "Mid-word K and T must preserve case and yield retroflex ক্ট"
+    );
 
     let cands_daktar_manual = tokenize_roman_with_origin("daKTar", ShiftOrigin::Manual);
     assert_eq!(cands_daktar_manual, vec!["d", "a", "K", "T", "a", "r"]);
     let conv_daktar_manual = avro_parser.convert(&cands_daktar_manual.join(""));
-    assert_eq!(conv_daktar_manual, expected_daktar, "Mid-word K and T must preserve case and yield retroflex ক্ট");
+    assert_eq!(
+        conv_daktar_manual, expected_daktar,
+        "Mid-word K and T must preserve case and yield retroflex ক্ট"
+    );
 
     // 4. Tokenizer keeps case information on digraphs and doubled consonants
     let cased_th = tokenize_roman_cased("Thik");
@@ -353,5 +383,3 @@ fn test_shift_origin_and_cased_tokenization() {
     let cased_kk = tokenize_roman_cased("biKkhat");
     assert_eq!(cased_kk, vec!["b", "i", "Kk", "h", "a", "t"]);
 }
-
-

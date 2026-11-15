@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Train a character-level GRU seq2seq transliterator on the Dakshina dataset.
 //!
 //! Usage:
@@ -10,8 +11,8 @@
 //! Training time on 88K pairs × 30 epochs: ~4 minutes.
 
 use lekhani_neural::seq2seq::{
-    gru_backward, CharVocab, CellGrad, GateBuf, InferenceScratch, S2SGruCell,
-    Seq2SeqGrad, Seq2SeqTransliterator, BOS_ID,
+    gru_backward, CellGrad, CharVocab, GateBuf, InferenceScratch, S2SGruCell, Seq2SeqGrad,
+    Seq2SeqTransliterator, BOS_ID,
 };
 use rayon::prelude::*;
 use std::{
@@ -58,15 +59,41 @@ fn parse_args() -> Config {
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
-            "--train" => { c.train_path = PathBuf::from(&args[i + 1]); i += 2; }
-            "--out"   => { c.out_path = PathBuf::from(&args[i + 1]); i += 2; }
-            "--emb"   => { c.emb_dim = args[i + 1].parse().unwrap_or(c.emb_dim); i += 2; }
-            "--hidden" => { c.hidden_dim = args[i + 1].parse().unwrap_or(c.hidden_dim); i += 2; }
-            "--epochs" => { c.epochs = args[i + 1].parse().unwrap_or(c.epochs); i += 2; }
-            "--lr"    => { c.lr = args[i + 1].parse().unwrap_or(c.lr); i += 2; }
-            "--batch" => { c.batch = args[i + 1].parse().unwrap_or(c.batch); i += 2; }
-            "--beam"  => { c.beam = args[i + 1].parse().unwrap_or(c.beam); i += 2; }
-            _ => { i += 1; }
+            "--train" => {
+                c.train_path = PathBuf::from(&args[i + 1]);
+                i += 2;
+            }
+            "--out" => {
+                c.out_path = PathBuf::from(&args[i + 1]);
+                i += 2;
+            }
+            "--emb" => {
+                c.emb_dim = args[i + 1].parse().unwrap_or(c.emb_dim);
+                i += 2;
+            }
+            "--hidden" => {
+                c.hidden_dim = args[i + 1].parse().unwrap_or(c.hidden_dim);
+                i += 2;
+            }
+            "--epochs" => {
+                c.epochs = args[i + 1].parse().unwrap_or(c.epochs);
+                i += 2;
+            }
+            "--lr" => {
+                c.lr = args[i + 1].parse().unwrap_or(c.lr);
+                i += 2;
+            }
+            "--batch" => {
+                c.batch = args[i + 1].parse().unwrap_or(c.batch);
+                i += 2;
+            }
+            "--beam" => {
+                c.beam = args[i + 1].parse().unwrap_or(c.beam);
+                i += 2;
+            }
+            _ => {
+                i += 1;
+            }
         }
     }
     c
@@ -86,10 +113,14 @@ fn load_tsv(path: &Path) -> Vec<(String, String)> {
     let mut pairs = Vec::new();
     for line in reader.lines().flatten() {
         let parts: Vec<&str> = line.split('\t').collect();
-        if parts.len() < 2 { continue; }
+        if parts.len() < 2 {
+            continue;
+        }
         let bn = lekhani_core::chars::canonicalize(parts[0].trim());
         let lat = parts[1].trim().to_ascii_lowercase();
-        if bn.is_empty() || lat.is_empty() { continue; }
+        if bn.is_empty() || lat.is_empty() {
+            continue;
+        }
         // Deduplicate by keeping first occurrence (TSV may repeat pairs with counts)
         pairs.push((lat, bn.to_string()));
     }
@@ -130,8 +161,12 @@ fn init_model(m: &mut Seq2SeqTransliterator, rng: &mut u64) {
     let in_d = ed + hd;
     // Embeddings: small uniform init
     let emb_std = 0.05;
-    for w in m.enc_emb.iter_mut() { *w = randn(rng) * emb_std; }
-    for w in m.dec_emb.iter_mut() { *w = randn(rng) * emb_std; }
+    for w in m.enc_emb.iter_mut() {
+        *w = randn(rng) * emb_std;
+    }
+    for w in m.dec_emb.iter_mut() {
+        *w = randn(rng) * emb_std;
+    }
     // Encoder GRU
     kaiming_init(&mut m.encoder.w_ir, ed, rng);
     kaiming_init(&mut m.encoder.w_iz, ed, rng);
@@ -217,10 +252,10 @@ fn apply_adam(params: &mut [f32], grads: &[f32], adam: &mut Adam, lr: f32, clip:
 fn apply_cell_adam(cell: &mut S2SGruCell, cg: &CellGrad, adam: &mut Adam, lr: f32, clip: f32) {
     apply_adam(&mut cell.w_ir, &cg.w_ir, adam, lr, clip);
     apply_adam(&mut cell.w_hr, &cg.w_hr, adam, lr, clip);
-    apply_adam(&mut cell.b_r,  &cg.b_r,  adam, lr, clip);
+    apply_adam(&mut cell.b_r, &cg.b_r, adam, lr, clip);
     apply_adam(&mut cell.w_iz, &cg.w_iz, adam, lr, clip);
     apply_adam(&mut cell.w_hz, &cg.w_hz, adam, lr, clip);
-    apply_adam(&mut cell.b_z,  &cg.b_z,  adam, lr, clip);
+    apply_adam(&mut cell.b_z, &cg.b_z, adam, lr, clip);
     apply_adam(&mut cell.w_in, &cg.w_in, adam, lr, clip);
     apply_adam(&mut cell.w_hn, &cg.w_hn, adam, lr, clip);
     apply_adam(&mut cell.b_in, &cg.b_in, adam, lr, clip);
@@ -230,18 +265,18 @@ fn apply_cell_adam(cell: &mut S2SGruCell, cg: &CellGrad, adam: &mut Adam, lr: f3
 // ─── Forward + Backward (single example) ─────────────────────────────────────
 
 struct FwdBufEnc {
-    h_states: Vec<Vec<f32>>,    // per step hidden state
-    x_embeds: Vec<Vec<f32>>,    // per step input embedding
-    gates:    Vec<GateBuf>,
+    h_states: Vec<Vec<f32>>, // per step hidden state
+    x_embeds: Vec<Vec<f32>>, // per step input embedding
+    gates: Vec<GateBuf>,
 }
 
 struct FwdBufDec {
     h_states: Vec<Vec<f32>>,
-    x_dec_in: Vec<Vec<f32>>,    // [emb || ctx] per step
-    ctx_vecs: Vec<Vec<f32>>,    // context vector per step
-    tgt_embs: Vec<Vec<f32>>,    // target embeddings per step
-    gates:    Vec<GateBuf>,
-    logits:   Vec<Vec<f32>>,
+    x_dec_in: Vec<Vec<f32>>, // [emb || ctx] per step
+    ctx_vecs: Vec<Vec<f32>>, // context vector per step
+    tgt_embs: Vec<Vec<f32>>, // target embeddings per step
+    gates: Vec<GateBuf>,
+    logits: Vec<Vec<f32>>,
     attn_scores: Vec<Vec<f32>>, // softmax attention per step
 }
 
@@ -325,13 +360,17 @@ fn forward(
             attn_sm[k] = (attn_raw[k] - max_a).exp();
             sum_e += attn_sm[k];
         }
-        for a in attn_sm.iter_mut() { *a /= sum_e.max(1e-9); }
+        for a in attn_sm.iter_mut() {
+            *a /= sum_e.max(1e-9);
+        }
 
         // Context
         let mut ctx = vec![0.0f32; hd];
         for (k, eh) in enc_states.iter().enumerate() {
             let a = attn_sm[k];
-            for j in 0..hd { ctx[j] += a * eh[j]; }
+            for j in 0..hd {
+                ctx[j] += a * eh[j];
+            }
         }
 
         // Decoder input = [tgt_emb || ctx]
@@ -342,13 +381,16 @@ fn forward(
         let h_prev = dec.h_states.last().unwrap().clone();
         let mut h_next = vec![0.0; hd];
         let mut gb = GateBuf::new(hd);
-        m.decoder.step(&dec_inp, &h_prev, &mut h_next, Some(&mut gb));
+        m.decoder
+            .step(&dec_inp, &h_prev, &mut h_next, Some(&mut gb));
 
         // Logits
         let mut logits = vec![0.0f32; tv];
         for v in 0..tv {
             let mut s = m.out_b[v];
-            for j in 0..hd { s += m.out_w[v * hd + j] * h_next[j]; }
+            for j in 0..hd {
+                s += m.out_w[v * hd + j] * h_next[j];
+            }
             logits[v] = s;
         }
 
@@ -400,7 +442,10 @@ fn backward(
     for t in (0..dec_steps).rev() {
         let gold = tgt[t + 1] as usize;
         // Softmax gradient
-        let max_l = dec.logits[t].iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max_l = dec.logits[t]
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let sum_exp: f32 = dec.logits[t].iter().map(|&l| (l - max_l).exp()).sum();
         let mut d_logits = vec![0.0f32; tv];
         for v in 0..tv {
@@ -420,7 +465,9 @@ fn backward(
             }
         }
         // Add accumulated d_dec_h
-        for j in 0..hd { d_h_out[j] += d_dec_h[j]; }
+        for j in 0..hd {
+            d_h_out[j] += d_dec_h[j];
+        }
 
         // Decoder GRU backward
         let h_prev = &dec.h_states[t];
@@ -452,7 +499,9 @@ fn backward(
         let attn = &dec.attn_scores[t];
         for k in 0..enc_len.min(attn.len()) {
             let a = attn[k];
-            for j in 0..hd { d_enc_h[k][j] += a * d_ctx[j]; }
+            for j in 0..hd {
+                d_enc_h[k][j] += a * d_ctx[j];
+            }
         }
 
         // Backprop through attention (simplified: just backprop to attn_w via q)
@@ -476,7 +525,9 @@ fn backward(
     // Backprop through encoder
     // d_enc_h also gets d_dec_h[0] (decoder init from final encoder state)
     if enc_len > 0 {
-        for j in 0..hd { d_enc_h[enc_len - 1][j] += d_dec_h[j]; }
+        for j in 0..hd {
+            d_enc_h[enc_len - 1][j] += d_dec_h[j];
+        }
     }
 
     let mut d_enc_h_in = vec![0.0f32; hd];
@@ -488,7 +539,9 @@ fn backward(
             // d_enc_h_in carries grad from next step's h_prev
         }
         // Add carry from inner gru_backward's d_h_prev
-        for j in 0..hd { d_h_with_carry[j] += d_enc_h_in[j]; }
+        for j in 0..hd {
+            d_h_with_carry[j] += d_enc_h_in[j];
+        }
 
         gru_backward(
             &m.encoder,
@@ -541,12 +594,24 @@ fn main() {
     // Build vocabularies
     let src_vocab = CharVocab::from_strings(pairs.iter().map(|(l, _)| l.as_str()));
     let tgt_vocab = CharVocab::from_strings(pairs.iter().map(|(_, b)| b.as_str()));
-    println!("   Latin vocab:   {} chars (+4 special = {})", src_vocab.chars.len(), src_vocab.size());
-    println!("   Bengali vocab: {} chars (+4 special = {})", tgt_vocab.chars.len(), tgt_vocab.size());
+    println!(
+        "   Latin vocab:   {} chars (+4 special = {})",
+        src_vocab.chars.len(),
+        src_vocab.size()
+    );
+    println!(
+        "   Bengali vocab: {} chars (+4 special = {})",
+        tgt_vocab.chars.len(),
+        tgt_vocab.size()
+    );
 
     // Build model
     let mut model = Seq2SeqTransliterator::new(src_vocab, tgt_vocab, cfg.emb_dim, cfg.hidden_dim);
-    println!("   Parameters: {} (~{:.1} KB)", model.param_count(), model.param_count() as f32 * 4.0 / 1024.0);
+    println!(
+        "   Parameters: {} (~{:.1} KB)",
+        model.param_count(),
+        model.param_count() as f32 * 4.0 / 1024.0
+    );
 
     let mut rng = 0x_dead_beef_cafe_u64;
     init_model(&mut model, &mut rng);
@@ -570,7 +635,11 @@ fn main() {
     let valid: Vec<usize> = (0..pairs.len())
         .filter(|&i| src_seqs[i].len() <= max_len && tgt_seqs[i].len() <= max_len + 2)
         .collect();
-    println!("   Training on {} pairs (max_len={}).", valid.len(), max_len);
+    println!(
+        "   Training on {} pairs (max_len={}).",
+        valid.len(),
+        max_len
+    );
 
     let mut lr = cfg.lr;
 
@@ -595,7 +664,14 @@ fn main() {
                     |(mut loss_acc, mut count_acc, mut grad_acc), &idx| {
                         let (loss, enc, dec) = forward(&model, &src_seqs[idx], &tgt_seqs[idx]);
                         if loss.is_finite() {
-                            backward(&model, &src_seqs[idx], &tgt_seqs[idx], &enc, &dec, &mut grad_acc);
+                            backward(
+                                &model,
+                                &src_seqs[idx],
+                                &tgt_seqs[idx],
+                                &enc,
+                                &dec,
+                                &mut grad_acc,
+                            );
                             loss_acc += loss;
                             count_acc += 1;
                         }
@@ -635,7 +711,12 @@ fn main() {
                 lr
             );
         } else {
-            println!("  Epoch {:2}/{}: loss={:.4}", epoch + 1, cfg.epochs, avg_loss);
+            println!(
+                "  Epoch {:2}/{}: loss={:.4}",
+                epoch + 1,
+                cfg.epochs,
+                avg_loss
+            );
         }
 
         lr *= cfg.lr_decay;
@@ -648,7 +729,9 @@ fn main() {
     }
     match model.save(&cfg.out_path) {
         Ok(()) => {
-            let size = std::fs::metadata(&cfg.out_path).map(|m| m.len()).unwrap_or(0);
+            let size = std::fs::metadata(&cfg.out_path)
+                .map(|m| m.len())
+                .unwrap_or(0);
             println!("✅ Saved ({:.1} KB)", size as f32 / 1024.0);
         }
         Err(e) => {

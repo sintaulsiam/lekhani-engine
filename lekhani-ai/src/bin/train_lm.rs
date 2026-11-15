@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Lekhani Language Model Training & Compilation CLI
 //!
 //! Trains quantized LLM3 language models from raw corpora with 4-gram support
@@ -117,7 +118,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[*] Verifying binary integrity via zero-copy roundtrip...");
     let loaded = TrainedLanguageModelData::from_binary(&binary_bytes)?;
     assert!(loaded.unigram_count() >= trained.unigram_count());
-    println!("[✓] Verification passed cleanly ({} unigrams)!", loaded.unigram_count());
+    println!(
+        "[✓] Verification passed cleanly ({} unigrams)!",
+        loaded.unigram_count()
+    );
 
     Ok(())
 }

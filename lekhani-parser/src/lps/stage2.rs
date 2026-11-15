@@ -145,15 +145,16 @@ pub fn realize_path(path: &Stage1Path) -> LpsCandidate {
                 i += 1;
             }
             PronunciationUnit::Consonant {
-                active,
-                variants,
-                ..
+                active, variants, ..
             } => {
                 let c_start_idx = out.chars().count();
 
                 // Check Reph: r + hasanta + Consonant (when r is followed by consonant without split)
                 if active == "র" && i + 1 < n {
-                    if let PronunciationUnit::Consonant { active: ref next_c, .. } = path.units[i + 1] {
+                    if let PronunciationUnit::Consonant {
+                        active: ref next_c, ..
+                    } = path.units[i + 1]
+                    {
                         if next_c != "র" && next_c != "ড়" && next_c != "ঢ়" {
                             // Render reph: র + ্ + C
                             out.push('র');
@@ -165,12 +166,16 @@ pub fn realize_path(path: &Stage1Path) -> LpsCandidate {
                 }
 
                 // Check forced hasanta (HAL) directly following
-                let forced_hasanta = i + 1 < n && matches!(path.units[i + 1], PronunciationUnit::HAL);
+                let forced_hasanta =
+                    i + 1 < n && matches!(path.units[i + 1], PronunciationUnit::HAL);
 
                 // Check licit cluster with next consonant
                 let mut form_cluster = false;
                 if !forced_hasanta && i + 1 < n {
-                    if let PronunciationUnit::Consonant { active: ref next_c, .. } = path.units[i + 1] {
+                    if let PronunciationUnit::Consonant {
+                        active: ref next_c, ..
+                    } = path.units[i + 1]
+                    {
                         if is_licit_cluster(active, next_c) {
                             form_cluster = true;
                         }

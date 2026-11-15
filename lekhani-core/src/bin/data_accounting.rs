@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 //! Pragyan Phase 1 Step 2: Data Accounting Tool
 //!
 //! Analyzes Dakshina train, dev, and test splits:
@@ -272,11 +273,17 @@ fn main() {
     );
     println!(
         "| Roman character length > 24 | {} | {} | {} | Max Roman is {} chars |",
-        results[0].roman_char_len_gt_24, results[1].roman_char_len_gt_24, results[2].roman_char_len_gt_24, results[0].max_roman_chars
+        results[0].roman_char_len_gt_24,
+        results[1].roman_char_len_gt_24,
+        results[2].roman_char_len_gt_24,
+        results[0].max_roman_chars
     );
     println!(
         "| Bengali character length > 24 | {} | {} | {} | Max Bengali is {} chars |",
-        results[0].bengali_char_len_gt_24, results[1].bengali_char_len_gt_24, results[2].bengali_char_len_gt_24, results[0].max_bn_chars
+        results[0].bengali_char_len_gt_24,
+        results[1].bengali_char_len_gt_24,
+        results[2].bengali_char_len_gt_24,
+        results[0].max_bn_chars
     );
     println!(
         "| **UTF-8 Byte Length > 24 (`bn.len() > 24`)** | **{}** | **{}** | **{}** | **The silent byte-vs-character truncation artifact!** |",
