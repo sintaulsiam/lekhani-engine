@@ -939,7 +939,7 @@ impl PhoneticSuggestion {
                     trie_opt,
                 );
                 let top_pragyan_score = pragyan_cands.first().map(|(_, s)| *s).unwrap_or(0.0);
-                for (cand, p_score) in pragyan_cands.into_iter().take(6) {
+                for (cand, p_score) in pragyan_cands.into_iter().take(4) {
                     let delta = ((p_score - top_pragyan_score) * 400.0).clamp(-3000.0, 0.0) as i32;
                     let boost = 5500 + delta;
                     if cand.ends_with('ও') && cand.chars().count() >= 4 {
