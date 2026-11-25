@@ -111,8 +111,8 @@ pub struct PhoneticSuggestion {
     pub config: PhoneticSuggestionConfig,
     pub neural_predictor: Option<Arc<lekhani_neural::NeuralContextPredictor>>,
     pub pragyan_engine: Option<Arc<crate::phonetic::pragyan::PragyanEngine>>,
-    /// Seq2Seq character-level transliterator safety net
-    pub seq2seq: Option<Arc<lekhani_neural::Seq2SeqTransliterator>>,
+    /// Seq2Seq character-level transliterator safety net (INT8 or F32)
+    pub seq2seq: Option<Arc<lekhani_neural::Seq2SeqModel>>,
     /// Pre-allocated inference buffers for seq2seq (avoids per-call heap allocation)
     seq2seq_scratch: Option<lekhani_neural::InferenceScratch>,
     /// Generation number mirroring database.generation. When they diverge the
@@ -167,8 +167,29 @@ fn probe_pragyan_engine() -> Option<Arc<crate::phonetic::pragyan::PragyanEngine>
     crate::phonetic::pragyan::PragyanEngine::probe()
 }
 
+fn probe_seq2seq_in_dir(
+    dir: &std::path::Path,
+) -> Option<(
+    Arc<lekhani_neural::Seq2SeqModel>,
+    lekhani_neural::InferenceScratch,
+)> {
+    for filename in [
+        "seq2seq_transliterator_int8.bin",
+        "seq2seq_transliterator.bin",
+    ] {
+        let p = dir.join(filename);
+        if p.exists() {
+            if let Ok(model) = lekhani_neural::Seq2SeqModel::load(&p) {
+                let scratch = model.create_scratch();
+                return Some((Arc::new(model), scratch));
+            }
+        }
+    }
+    None
+}
+
 fn probe_seq2seq() -> Option<(
-    Arc<lekhani_neural::Seq2SeqTransliterator>,
+    Arc<lekhani_neural::Seq2SeqModel>,
     lekhani_neural::InferenceScratch,
 )> {
     let mut candidate_dirs: Vec<std::path::PathBuf> = Vec::new();
@@ -183,12 +204,8 @@ fn probe_seq2seq() -> Option<(
         std::path::PathBuf::from("/usr/share/lekhani/dictionaries"),
     ]);
     for dir in &candidate_dirs {
-        let p = dir.join("seq2seq_transliterator.bin");
-        if p.exists() {
-            if let Ok(model) = lekhani_neural::Seq2SeqTransliterator::load(&p) {
-                let scratch = lekhani_neural::InferenceScratch::for_model(&model);
-                return Some((Arc::new(model), scratch));
-            }
+        if let Some(found) = probe_seq2seq_in_dir(dir) {
+            return Some(found);
         }
     }
     None
@@ -283,6 +300,17 @@ impl Default for PhoneticSuggestion {
 }
 
 impl PhoneticSuggestion {
+    /// Load or reload Seq2Seq weights (`seq2seq_transliterator_int8.bin` or `.bin`) from an explicit directory.
+    pub fn load_seq2seq_from_dir(&mut self, dir: &std::path::Path) -> bool {
+        if let Some((s2s, scratch)) = probe_seq2seq_in_dir(dir) {
+            self.seq2seq = Some(s2s);
+            self.seq2seq_scratch = Some(scratch);
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn new() -> Self {
         let lm = lekhani_ai::LanguageModel::new();
         let mut sugg = Self {
@@ -946,14 +974,22 @@ impl PhoneticSuggestion {
                     let trie = &self.database.trie;
                     let prefix_filter = |p: &str| trie.has_prefix(p);
                     let word_filter = |w: &str| trie.contains_exact(w);
-                    let s2s_cands = s2s.transliterate_constrained(
+                    let next_chars = |p: &str| Some(trie.get_next_chars(p));
+                    let s2s_cands = s2s.transliterate_constrained_with_next_chars(
                         middle,
                         2,
                         scratch,
                         Some(&prefix_filter),
                         Some(&word_filter),
+                        Some(&next_chars),
                     );
                     for (idx, cand) in s2s_cands.into_iter().enumerate() {
+                        // Guard: reject neural hallucinations that diverge > 2 grapheme edits or > 1 char length from phonetic parse
+                        if super::ranking::grapheme_edit_distance(&phonetic, &cand) > 2
+                            || cand.chars().count().abs_diff(phonetic.chars().count()) > 1
+                        {
+                            continue;
+                        }
                         let boost = 5500 - (idx as i32 * 250);
                         if cand.ends_with('ও') && cand.chars().count() >= 4 {
                             let stripped = &cand[..cand.len() - 'ও'.len_utf8()];

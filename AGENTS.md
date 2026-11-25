@@ -28,6 +28,11 @@ Welcome to **Lekhani Engine** (`lekhani-engine`). This document defines the engi
 - **`lekhani-neural`**: Pretrained Seq2Seq transliterator weights (`seq2seq_transliterator.bin`).
 - **`lekhani-core`**: The primary coordinator. Contains candidate generation (`suggestion.rs`), feature extraction and scoring (`ranking.rs`), morphological Sandhi compounding, and database lookup.
 
+### Cross-Platform Modularity & Platform Boundary Contract
+- **Single Source of Truth for Language Logic**: All transliteration rules, phonetic overrides, English proximity/LM autocorrect, fixed-layout state machines, and spatial N-best decoding belong in `lekhani-engine`—never duplicated in `lekhani-android` or `lekhani` desktop wrappers.
+- **Input Abstraction**: Support both deterministic hardware keystrokes (Desktop) and touch `(key, x, y)` spatial signals (Android) without polluting core parsing with OS-specific APIs.
+- **Explicit Asset & Profile Configuration**: Accept explicit model/dictionary directories (`EngineConfig` / `LEKHANI_MODELS_DIR` / `set_custom_models_dir`) rather than hardcoding OS paths; support `MobileCompact` (INT8 quantized models like `seq2seq_transliterator_int8.bin`, `< 55 MB` RSS) and `DesktopFull` profiles.
+
 ---
 
 ## 2. 🛡️ Inviolable Core Principles & Performance Budgets

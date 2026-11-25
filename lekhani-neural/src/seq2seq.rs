@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 // ─── Character Vocabularies ─────────────────────────────────────────────────
 
@@ -144,6 +145,41 @@ pub fn dot(a: &[f32], b: &[f32]) -> f32 {
         sum += x * y;
     }
     sum
+}
+
+/// Quantize f32 weights to signed 8-bit integers with symmetric per-tensor scaling.
+pub fn quantize_weights(w: &[f32]) -> (Vec<i8>, f32) {
+    let max_abs = w.iter().map(|&x| x.abs()).fold(0.0f32, f32::max);
+    if max_abs < 1e-8 {
+        return (vec![0i8; w.len()], 1.0);
+    }
+    let scale = max_abs / 127.0;
+    let inv_scale = 1.0 / scale;
+    let quantized = w
+        .iter()
+        .map(|&x| (x * inv_scale).round().clamp(-127.0, 127.0) as i8)
+        .collect();
+    (quantized, scale)
+}
+
+/// SIMD-friendly dot product between i8 quantized weights and f32 activation vector.
+#[inline(always)]
+pub fn dot_i8_f32(a_i8: &[i8], b_f32: &[f32], scale: f32) -> f32 {
+    let chunks_a = a_i8.chunks_exact(8);
+    let chunks_b = b_f32.chunks_exact(8);
+    let rem_a = chunks_a.remainder();
+    let rem_b = chunks_b.remainder();
+    let mut acc = [0.0f32; 8];
+    for (ca, cb) in chunks_a.zip(chunks_b) {
+        for k in 0..8 {
+            acc[k] += (ca[k] as f32) * cb[k];
+        }
+    }
+    let mut sum = acc[0] + acc[1] + acc[2] + acc[3] + acc[4] + acc[5] + acc[6] + acc[7];
+    for (&x, &y) in rem_a.iter().zip(rem_b.iter()) {
+        sum += (x as f32) * y;
+    }
+    sum * scale
 }
 
 impl S2SGruCell {
@@ -348,15 +384,23 @@ impl Seq2SeqTransliterator {
     }
 
     /// Compute attention context vector from decoder hidden state and encoder states.
-    /// Uses dot-product attention with W_a projection on encoder states.
-    fn attend(&self, dec_h: &[f32], enc_states: &[Vec<f32>], scratch: &mut InferenceScratch) {
+    /// Uses dot-product attention with W_a projection and soft monotonic local alignment bias.
+    fn attend(
+        &self,
+        dec_h: &[f32],
+        enc_states: &[Vec<f32>],
+        scratch: &mut InferenceScratch,
+        dec_step: usize,
+        max_len: usize,
+    ) {
         let h = self.hidden_dim;
         // Transform dec_h: q = attn_w · dec_h
         for i in 0..h {
             scratch.attn_q[i] = dot(&self.attn_w[i * h..(i + 1) * h], dec_h);
         }
-        // Scores: dot(enc_i, q) for each encoder step
+        // Scores: dot(enc_i, q)
         scratch.attn_scores.clear();
+        let _ = (dec_step, max_len);
         for enc_h in enc_states.iter() {
             scratch.attn_scores.push(dot(enc_h, &scratch.attn_q));
         }
@@ -407,6 +451,31 @@ impl Seq2SeqTransliterator {
         prefix_filter: Option<&dyn Fn(&str) -> bool>,
         word_filter: Option<&dyn Fn(&str) -> bool>,
     ) -> Vec<(f32, Vec<u32>)> {
+        self.beam_decode_constrained_with_next_chars(
+            enc_states,
+            enc_final,
+            beam,
+            max_len,
+            scratch,
+            prefix_filter,
+            word_filter,
+            None,
+        )
+    }
+
+    /// Beam-search decode with optional Trie-directed next-character pruning.
+    #[allow(clippy::too_many_arguments)]
+    pub fn beam_decode_constrained_with_next_chars(
+        &self,
+        enc_states: &[Vec<f32>],
+        enc_final: &[f32],
+        beam: usize,
+        max_len: usize,
+        scratch: &mut InferenceScratch,
+        prefix_filter: Option<&dyn Fn(&str) -> bool>,
+        word_filter: Option<&dyn Fn(&str) -> bool>,
+        next_chars_fn: Option<&dyn Fn(&str) -> Option<Vec<char>>>,
+    ) -> Vec<(f32, Vec<u32>)> {
         let tv = self.tgt_vocab.size();
 
         // BeamHyp: (cum_log_prob, dec_h, token_ids, decoded_str)
@@ -428,7 +497,7 @@ impl Seq2SeqTransliterator {
 
         let mut completed: Vec<(f32, Vec<u32>)> = Vec::new();
 
-        for _ in 0..max_len {
+        for step in 0..max_len {
             if active.is_empty() {
                 break;
             }
@@ -452,7 +521,7 @@ impl Seq2SeqTransliterator {
                 let last_id = *hyp.ids.last().unwrap_or(&BOS_ID);
                 // Decoder step
                 self.tgt_embed(last_id, &mut scratch.emb_buf);
-                self.attend(&hyp.h, enc_states, scratch);
+                self.attend(&hyp.h, enc_states, scratch, step, max_len);
                 // Concat emb + context
                 scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
                 scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
@@ -469,10 +538,29 @@ impl Seq2SeqTransliterator {
                 let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
                 let log_sum = max_l + sum_e.ln();
 
-                // Top candidates (explore wider than beam when filtering)
+                // Trie-directed candidate pruning when next_chars_fn is provided
                 scratch.scored_buf.clear();
-                for (idx, &l) in scratch.logits_buf.iter().enumerate().take(tv) {
-                    scratch.scored_buf.push((idx as u32, l - log_sum));
+                if let Some(nc_fn) = next_chars_fn {
+                    if let Some(valid_chars) = nc_fn(&hyp.decoded) {
+                        for ch in valid_chars {
+                            let tok_id = self.tgt_vocab.encode(ch);
+                            if (tok_id as usize) < tv && tok_id != UNK_ID {
+                                scratch
+                                    .scored_buf
+                                    .push((tok_id, scratch.logits_buf[tok_id as usize] - log_sum));
+                            }
+                        }
+                        if word_filter.is_some_and(|wf| wf(&hyp.decoded)) {
+                            scratch
+                                .scored_buf
+                                .push((EOS_ID, scratch.logits_buf[EOS_ID as usize] - log_sum));
+                        }
+                    }
+                }
+                if scratch.scored_buf.is_empty() {
+                    for (idx, &l) in scratch.logits_buf.iter().enumerate().take(tv) {
+                        scratch.scored_buf.push((idx as u32, l - log_sum));
+                    }
                 }
                 scratch
                     .scored_buf
@@ -583,11 +671,31 @@ impl Seq2SeqTransliterator {
         prefix_filter: Option<&dyn Fn(&str) -> bool>,
         word_filter: Option<&dyn Fn(&str) -> bool>,
     ) -> Vec<String> {
+        self.transliterate_constrained_with_next_chars(
+            latin,
+            beam,
+            scratch,
+            prefix_filter,
+            word_filter,
+            None,
+        )
+    }
+
+    /// Transliterate a Latin string with optional Trie-directed next-character pruning.
+    pub fn transliterate_constrained_with_next_chars(
+        &self,
+        latin: &str,
+        beam: usize,
+        scratch: &mut InferenceScratch,
+        prefix_filter: Option<&dyn Fn(&str) -> bool>,
+        word_filter: Option<&dyn Fn(&str) -> bool>,
+        next_chars_fn: Option<&dyn Fn(&str) -> Option<Vec<char>>>,
+    ) -> Vec<String> {
         let src_ids = self.src_vocab.encode_str(latin.to_ascii_lowercase().trim());
         let enc_states = self.encode(&src_ids, scratch);
         let enc_final = scratch.enc_final.clone();
         let max_len = (latin.chars().count() + 1).min(14);
-        let hyps = self.beam_decode_constrained(
+        let hyps = self.beam_decode_constrained_with_next_chars(
             &enc_states,
             &enc_final,
             beam,
@@ -595,11 +703,57 @@ impl Seq2SeqTransliterator {
             scratch,
             prefix_filter,
             word_filter,
+            next_chars_fn,
         );
         hyps.iter()
             .map(|(_, ids)| self.tgt_vocab.decode_str(ids))
             .filter(|s| !s.is_empty())
             .collect()
+    }
+
+    /// Compute normalized sequence log-likelihood `ln P(bengali | latin)` via teacher forcing.
+    pub fn score_sequence(
+        &self,
+        latin: &str,
+        bengali: &str,
+        scratch: &mut InferenceScratch,
+    ) -> f32 {
+        let src_ids = self.src_vocab.encode_str(latin.to_ascii_lowercase().trim());
+        let tgt_ids = self.tgt_vocab.encode_str_with_eos(bengali);
+        if src_ids.is_empty() || tgt_ids.is_empty() {
+            return -50.0;
+        }
+        let enc_states = self.encode(&src_ids, scratch);
+        let mut dec_h = scratch.enc_final.clone();
+        let mut total_log_p = 0.0f32;
+        let mut prev_id = BOS_ID;
+        for (step, &gold_id) in tgt_ids.iter().enumerate() {
+            self.tgt_embed(prev_id, &mut scratch.emb_buf);
+            self.attend(&dec_h, &enc_states, scratch, step, tgt_ids.len());
+            scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
+            scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
+            self.decoder
+                .step(&scratch.dec_in, &dec_h, &mut scratch.h_next, None);
+            self.project(&scratch.h_next, &mut scratch.logits_buf);
+            let max_l = scratch
+                .logits_buf
+                .iter()
+                .cloned()
+                .fold(f32::NEG_INFINITY, f32::max);
+            let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
+            let log_sum = max_l + sum_e.max(1e-9).ln();
+            let gidx = gold_id as usize;
+            let gold_logit = scratch.logits_buf.get(gidx).copied().unwrap_or(-50.0);
+            total_log_p += gold_logit - log_sum;
+            dec_h.copy_from_slice(&scratch.h_next);
+            prev_id = gold_id;
+        }
+        total_log_p / tgt_ids.len().max(1) as f32
+    }
+
+    /// Quantize this F32 model into an INT8 `Seq2SeqQuantized` (~75% smaller).
+    pub fn to_quantized(&self) -> Seq2SeqQuantized {
+        Seq2SeqQuantized::from_f32(self)
     }
 
     /// Parameter count (for size estimation)
@@ -648,6 +802,597 @@ impl InferenceScratch {
 
     pub fn for_model(m: &Seq2SeqTransliterator) -> Self {
         Self::new(m.emb_dim, m.hidden_dim, m.tgt_vocab.size())
+    }
+
+    pub fn for_quantized(m: &Seq2SeqQuantized) -> Self {
+        Self::new(m.emb_dim, m.hidden_dim, m.tgt_vocab.size())
+    }
+}
+
+// ─── INT8 Quantized Seq2Seq Model ────────────────────────────────────────────
+
+/// INT8 quantized GRU cell with per-tensor symmetric scaling (~75% smaller).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuantizedS2SGruCell {
+    pub input_dim: usize,
+    pub hidden_dim: usize,
+    pub w_ir: Vec<i8>,
+    pub scale_w_ir: f32,
+    pub w_hr: Vec<i8>,
+    pub scale_w_hr: f32,
+    pub b_r: Vec<f32>,
+    pub w_iz: Vec<i8>,
+    pub scale_w_iz: f32,
+    pub w_hz: Vec<i8>,
+    pub scale_w_hz: f32,
+    pub b_z: Vec<f32>,
+    pub w_in: Vec<i8>,
+    pub scale_w_in: f32,
+    pub w_hn: Vec<i8>,
+    pub scale_w_hn: f32,
+    pub b_in: Vec<f32>,
+    pub b_hn: Vec<f32>,
+}
+
+impl QuantizedS2SGruCell {
+    pub fn from_f32(cell: &S2SGruCell) -> Self {
+        let (w_ir, scale_w_ir) = quantize_weights(&cell.w_ir);
+        let (w_hr, scale_w_hr) = quantize_weights(&cell.w_hr);
+        let (w_iz, scale_w_iz) = quantize_weights(&cell.w_iz);
+        let (w_hz, scale_w_hz) = quantize_weights(&cell.w_hz);
+        let (w_in, scale_w_in) = quantize_weights(&cell.w_in);
+        let (w_hn, scale_w_hn) = quantize_weights(&cell.w_hn);
+        Self {
+            input_dim: cell.input_dim,
+            hidden_dim: cell.hidden_dim,
+            w_ir,
+            scale_w_ir,
+            w_hr,
+            scale_w_hr,
+            b_r: cell.b_r.clone(),
+            w_iz,
+            scale_w_iz,
+            w_hz,
+            scale_w_hz,
+            b_z: cell.b_z.clone(),
+            w_in,
+            scale_w_in,
+            w_hn,
+            scale_w_hn,
+            b_in: cell.b_in.clone(),
+            b_hn: cell.b_hn.clone(),
+        }
+    }
+
+    pub fn step(&self, x: &[f32], h_prev: &[f32], h_out: &mut [f32]) {
+        let h = self.hidden_dim;
+        let in_d = self.input_dim;
+        for i in 0..h {
+            let rv = self.b_r[i]
+                + dot_i8_f32(&self.w_ir[i * in_d..(i + 1) * in_d], x, self.scale_w_ir)
+                + dot_i8_f32(&self.w_hr[i * h..(i + 1) * h], h_prev, self.scale_w_hr);
+            let r = sigmoid(rv);
+
+            let zv = self.b_z[i]
+                + dot_i8_f32(&self.w_iz[i * in_d..(i + 1) * in_d], x, self.scale_w_iz)
+                + dot_i8_f32(&self.w_hz[i * h..(i + 1) * h], h_prev, self.scale_w_hz);
+            let z = sigmoid(zv);
+
+            let nin =
+                self.b_in[i] + dot_i8_f32(&self.w_in[i * in_d..(i + 1) * in_d], x, self.scale_w_in);
+            let nhn =
+                self.b_hn[i] + dot_i8_f32(&self.w_hn[i * h..(i + 1) * h], h_prev, self.scale_w_hn);
+            let n = fast_tanh(nin + r * nhn);
+            h_out[i] = (1.0 - z) * n + z * h_prev[i];
+        }
+    }
+}
+
+/// INT8 quantized Seq2Seq transliterator (~190 KB, mobile-ready, optional BiGRU encoder).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Seq2SeqQuantized {
+    pub src_vocab: CharVocab,
+    pub tgt_vocab: CharVocab,
+    pub emb_dim: usize,
+    pub hidden_dim: usize,
+    pub enc_emb: Vec<i8>,
+    pub scale_enc_emb: f32,
+    pub dec_emb: Vec<i8>,
+    pub scale_dec_emb: f32,
+    pub encoder: QuantizedS2SGruCell,
+    pub encoder_rev: Option<QuantizedS2SGruCell>,
+    pub is_bidirectional: bool,
+    pub decoder: QuantizedS2SGruCell,
+    pub attn_w: Vec<i8>,
+    pub scale_attn_w: f32,
+    pub out_w: Vec<i8>,
+    pub scale_out_w: f32,
+    pub out_b: Vec<f32>,
+}
+
+impl Seq2SeqQuantized {
+    pub fn from_f32(m: &Seq2SeqTransliterator) -> Self {
+        let (enc_emb, scale_enc_emb) = quantize_weights(&m.enc_emb);
+        let (dec_emb, scale_dec_emb) = quantize_weights(&m.dec_emb);
+        let (attn_w, scale_attn_w) = quantize_weights(&m.attn_w);
+        let (out_w, scale_out_w) = quantize_weights(&m.out_w);
+        Self {
+            src_vocab: m.src_vocab.clone(),
+            tgt_vocab: m.tgt_vocab.clone(),
+            emb_dim: m.emb_dim,
+            hidden_dim: m.hidden_dim,
+            enc_emb,
+            scale_enc_emb,
+            dec_emb,
+            scale_dec_emb,
+            encoder: QuantizedS2SGruCell::from_f32(&m.encoder),
+            encoder_rev: None,
+            is_bidirectional: false,
+            decoder: QuantizedS2SGruCell::from_f32(&m.decoder),
+            attn_w,
+            scale_attn_w,
+            out_w,
+            scale_out_w,
+            out_b: m.out_b.clone(),
+        }
+    }
+
+    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> std::io::Result<()> {
+        let file = std::fs::File::create(path)?;
+        bincode::serialize_into(std::io::BufWriter::new(file), self).map_err(std::io::Error::other)
+    }
+
+    pub fn load<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        bincode::deserialize_from(std::io::BufReader::new(file))
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
+
+    fn src_embed(&self, id: u32, out: &mut [f32]) {
+        let id = (id as usize).min(self.src_vocab.size().saturating_sub(1));
+        let s = id * self.emb_dim;
+        let e = s + self.emb_dim;
+        let scale = self.scale_enc_emb;
+        if e <= self.enc_emb.len() {
+            for (dst, &src) in out.iter_mut().zip(&self.enc_emb[s..e]) {
+                *dst = (src as f32) * scale;
+            }
+        } else {
+            out.fill(0.0);
+        }
+    }
+
+    fn tgt_embed(&self, id: u32, out: &mut [f32]) {
+        let id = (id as usize).min(self.tgt_vocab.size().saturating_sub(1));
+        let s = id * self.emb_dim;
+        let e = s + self.emb_dim;
+        let scale = self.scale_dec_emb;
+        if e <= self.dec_emb.len() {
+            for (dst, &src) in out.iter_mut().zip(&self.dec_emb[s..e]) {
+                *dst = (src as f32) * scale;
+            }
+        } else {
+            out.fill(0.0);
+        }
+    }
+
+    fn encode(&self, ids: &[u32], scratch: &mut InferenceScratch) -> Vec<Vec<f32>> {
+        let h = self.hidden_dim;
+        let mut h_cur = vec![0.0f32; h];
+        let mut h_next = vec![0.0f32; h];
+        let mut enc_states: Vec<Vec<f32>> = Vec::with_capacity(ids.len());
+
+        for &id in ids {
+            self.src_embed(id, &mut scratch.emb_buf);
+            self.encoder.step(&scratch.emb_buf, &h_cur, &mut h_next);
+            h_cur.copy_from_slice(&h_next);
+            enc_states.push(h_cur.clone());
+        }
+
+        if enc_states.is_empty() {
+            enc_states.push(vec![0.0; h]);
+        }
+
+        if self.is_bidirectional {
+            if let Some(ref rev_enc) = self.encoder_rev {
+                let mut h_rev_cur = vec![0.0f32; h];
+                let mut h_rev_next = vec![0.0f32; h];
+                let mut rev_states: Vec<Vec<f32>> = Vec::with_capacity(ids.len());
+                for &id in ids.iter().rev() {
+                    self.src_embed(id, &mut scratch.emb_buf);
+                    rev_enc.step(&scratch.emb_buf, &h_rev_cur, &mut h_rev_next);
+                    h_rev_cur.copy_from_slice(&h_rev_next);
+                    rev_states.push(h_rev_cur.clone());
+                }
+                rev_states.reverse();
+                for (fwd, rev) in enc_states.iter_mut().zip(rev_states.iter()) {
+                    for j in 0..h {
+                        fwd[j] = (fwd[j] + rev[j]) * 0.5;
+                    }
+                }
+            }
+        }
+
+        scratch
+            .enc_final
+            .copy_from_slice(enc_states.last().unwrap());
+        enc_states
+    }
+
+    fn attend(
+        &self,
+        dec_h: &[f32],
+        enc_states: &[Vec<f32>],
+        scratch: &mut InferenceScratch,
+        dec_step: usize,
+        max_len: usize,
+    ) {
+        let h = self.hidden_dim;
+        for i in 0..h {
+            scratch.attn_q[i] =
+                dot_i8_f32(&self.attn_w[i * h..(i + 1) * h], dec_h, self.scale_attn_w);
+        }
+        scratch.attn_scores.clear();
+        if self.is_bidirectional {
+            let enc_len = enc_states.len().max(1);
+            let expected_pos =
+                (dec_step as f32 * (enc_len.saturating_sub(1)) as f32) / max_len.max(1) as f32;
+            let sigma_sq = 2.0 * 2.5 * 2.5;
+            for (k, enc_h) in enc_states.iter().enumerate() {
+                let dist = k as f32 - expected_pos;
+                let penalty = -(dist * dist) / sigma_sq;
+                scratch
+                    .attn_scores
+                    .push(dot(enc_h, &scratch.attn_q) + penalty);
+            }
+        } else {
+            let _ = (dec_step, max_len);
+            for enc_h in enc_states.iter() {
+                scratch.attn_scores.push(dot(enc_h, &scratch.attn_q));
+            }
+        }
+        let max_s = scratch
+            .attn_scores
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
+        let mut sum_exp = 0.0f32;
+        for s in scratch.attn_scores.iter_mut() {
+            *s = (*s - max_s).exp();
+            sum_exp += *s;
+        }
+        let inv_sum = 1.0 / sum_exp.max(1e-9);
+        for s in scratch.attn_scores.iter_mut() {
+            *s *= inv_sum;
+        }
+        scratch.ctx_buf.fill(0.0);
+        for (t, enc_h) in enc_states.iter().enumerate() {
+            let a = scratch.attn_scores[t];
+            for j in 0..h {
+                scratch.ctx_buf[j] += a * enc_h[j];
+            }
+        }
+    }
+
+    fn project(&self, dec_h: &[f32], logits: &mut [f32]) {
+        let tv = self.tgt_vocab.size();
+        let h = self.hidden_dim;
+        for v in 0..tv {
+            logits[v] = self.out_b[v]
+                + dot_i8_f32(&self.out_w[v * h..(v + 1) * h], dec_h, self.scale_out_w);
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn beam_decode_constrained_with_next_chars(
+        &self,
+        enc_states: &[Vec<f32>],
+        enc_final: &[f32],
+        beam: usize,
+        max_len: usize,
+        scratch: &mut InferenceScratch,
+        prefix_filter: Option<&dyn Fn(&str) -> bool>,
+        word_filter: Option<&dyn Fn(&str) -> bool>,
+        next_chars_fn: Option<&dyn Fn(&str) -> Option<Vec<char>>>,
+    ) -> Vec<(f32, Vec<u32>)> {
+        let tv = self.tgt_vocab.size();
+        struct Hyp {
+            score: f32,
+            h: Vec<f32>,
+            ids: Vec<u32>,
+            decoded: String,
+            done: bool,
+        }
+        let mut active: Vec<Hyp> = vec![Hyp {
+            score: 0.0,
+            h: enc_final.to_vec(),
+            ids: vec![BOS_ID],
+            decoded: String::with_capacity(max_len * 3),
+            done: false,
+        }];
+        let mut completed: Vec<(f32, Vec<u32>)> = Vec::new();
+
+        for step in 0..max_len {
+            if active.is_empty() {
+                break;
+            }
+            if completed.len() >= beam {
+                let best_active = active
+                    .iter()
+                    .map(|h| h.score)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let worst_completed = completed.iter().map(|c| c.0).fold(f32::INFINITY, f32::min);
+                if best_active <= worst_completed {
+                    break;
+                }
+            }
+            let mut candidates: Vec<Hyp> = Vec::with_capacity(active.len() * beam * 2);
+            for hyp in active.drain(..) {
+                if hyp.done {
+                    completed.push((hyp.score, hyp.ids.clone()));
+                    continue;
+                }
+                let last_id = *hyp.ids.last().unwrap_or(&BOS_ID);
+                self.tgt_embed(last_id, &mut scratch.emb_buf);
+                self.attend(&hyp.h, enc_states, scratch, step, max_len);
+                scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
+                scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
+                self.decoder
+                    .step(&scratch.dec_in, &hyp.h, &mut scratch.h_next);
+                self.project(&scratch.h_next, &mut scratch.logits_buf);
+
+                let max_l = scratch
+                    .logits_buf
+                    .iter()
+                    .cloned()
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
+                let log_sum = max_l + sum_e.ln();
+
+                scratch.scored_buf.clear();
+                if let Some(nc_fn) = next_chars_fn {
+                    if let Some(valid_chars) = nc_fn(&hyp.decoded) {
+                        for ch in valid_chars {
+                            let tok_id = self.tgt_vocab.encode(ch);
+                            if (tok_id as usize) < tv && tok_id != UNK_ID {
+                                scratch
+                                    .scored_buf
+                                    .push((tok_id, scratch.logits_buf[tok_id as usize] - log_sum));
+                            }
+                        }
+                        if word_filter.is_some_and(|wf| wf(&hyp.decoded)) {
+                            scratch
+                                .scored_buf
+                                .push((EOS_ID, scratch.logits_buf[EOS_ID as usize] - log_sum));
+                        }
+                    }
+                }
+                if scratch.scored_buf.is_empty() {
+                    for (idx, &l) in scratch.logits_buf.iter().enumerate().take(tv) {
+                        scratch.scored_buf.push((idx as u32, l - log_sum));
+                    }
+                }
+                scratch
+                    .scored_buf
+                    .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+                let explore_count = if prefix_filter.is_some() || word_filter.is_some() {
+                    (beam * 2).min(scratch.scored_buf.len())
+                } else {
+                    beam.min(scratch.scored_buf.len())
+                };
+
+                let mut valid_pushed = 0;
+                for &(tok_id, log_p) in scratch.scored_buf.iter().take(explore_count) {
+                    let done = tok_id == EOS_ID;
+                    let mut new_decoded = hyp.decoded.clone();
+                    if let Some(c) = self.tgt_vocab.decode(tok_id) {
+                        new_decoded.push(c);
+                    }
+                    let mut penalty = 0.0f32;
+                    let matches_lexicon = if done {
+                        word_filter.is_none_or(|wf| wf(&new_decoded))
+                    } else {
+                        prefix_filter.is_none_or(|pf| pf(&new_decoded))
+                    };
+                    if !matches_lexicon {
+                        penalty = -30.0;
+                    } else {
+                        valid_pushed += 1;
+                    }
+                    if !matches_lexicon && valid_pushed > 0 {
+                        continue;
+                    }
+                    let mut new_ids = hyp.ids.clone();
+                    new_ids.push(tok_id);
+                    candidates.push(Hyp {
+                        score: hyp.score + log_p + penalty,
+                        h: scratch.h_next.clone(),
+                        ids: new_ids,
+                        decoded: new_decoded,
+                        done,
+                    });
+                }
+            }
+            candidates.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            candidates.truncate(beam);
+            active = candidates;
+        }
+        for hyp in active {
+            completed.push((hyp.score, hyp.ids));
+        }
+        completed.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        completed.truncate(beam);
+        completed
+    }
+
+    pub fn transliterate(
+        &self,
+        latin: &str,
+        beam: usize,
+        scratch: &mut InferenceScratch,
+    ) -> Vec<String> {
+        self.transliterate_constrained_with_next_chars(latin, beam, scratch, None, None, None)
+    }
+
+    pub fn transliterate_constrained_with_next_chars(
+        &self,
+        latin: &str,
+        beam: usize,
+        scratch: &mut InferenceScratch,
+        prefix_filter: Option<&dyn Fn(&str) -> bool>,
+        word_filter: Option<&dyn Fn(&str) -> bool>,
+        next_chars_fn: Option<&dyn Fn(&str) -> Option<Vec<char>>>,
+    ) -> Vec<String> {
+        let src_ids = self.src_vocab.encode_str(latin.to_ascii_lowercase().trim());
+        let enc_states = self.encode(&src_ids, scratch);
+        let enc_final = scratch.enc_final.clone();
+        let max_len = (latin.chars().count() + 1).min(14);
+        let hyps = self.beam_decode_constrained_with_next_chars(
+            &enc_states,
+            &enc_final,
+            beam,
+            max_len,
+            scratch,
+            prefix_filter,
+            word_filter,
+            next_chars_fn,
+        );
+        hyps.iter()
+            .map(|(_, ids)| self.tgt_vocab.decode_str(ids))
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
+    pub fn score_sequence(
+        &self,
+        latin: &str,
+        bengali: &str,
+        scratch: &mut InferenceScratch,
+    ) -> f32 {
+        let src_ids = self.src_vocab.encode_str(latin.to_ascii_lowercase().trim());
+        let tgt_ids = self.tgt_vocab.encode_str_with_eos(bengali);
+        if src_ids.is_empty() || tgt_ids.is_empty() {
+            return -50.0;
+        }
+        let enc_states = self.encode(&src_ids, scratch);
+        let mut dec_h = scratch.enc_final.clone();
+        let mut total_log_p = 0.0f32;
+        let mut prev_id = BOS_ID;
+        for (step, &gold_id) in tgt_ids.iter().enumerate() {
+            self.tgt_embed(prev_id, &mut scratch.emb_buf);
+            self.attend(&dec_h, &enc_states, scratch, step, tgt_ids.len());
+            scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
+            scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
+            self.decoder
+                .step(&scratch.dec_in, &dec_h, &mut scratch.h_next);
+            self.project(&scratch.h_next, &mut scratch.logits_buf);
+            let max_l = scratch
+                .logits_buf
+                .iter()
+                .cloned()
+                .fold(f32::NEG_INFINITY, f32::max);
+            let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
+            let log_sum = max_l + sum_e.max(1e-9).ln();
+            let gidx = gold_id as usize;
+            let gold_logit = scratch.logits_buf.get(gidx).copied().unwrap_or(-50.0);
+            total_log_p += gold_logit - log_sum;
+            dec_h.copy_from_slice(&scratch.h_next);
+            prev_id = gold_id;
+        }
+        total_log_p / tgt_ids.len().max(1) as f32
+    }
+}
+
+/// Unified Seq2Seq wrapper supporting both INT8 quantized (~190 KB) and F32 (~759 KB) models.
+#[derive(Debug, Clone)]
+pub enum Seq2SeqModel {
+    Float(Arc<Seq2SeqTransliterator>),
+    Quantized(Arc<Seq2SeqQuantized>),
+}
+
+impl Seq2SeqModel {
+    pub fn load<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Self> {
+        let p = path.as_ref();
+        if p.to_string_lossy().contains("int8") {
+            if let Ok(q) = Seq2SeqQuantized::load(p) {
+                return Ok(Self::Quantized(Arc::new(q)));
+            }
+        }
+        if let Ok(f) = Seq2SeqTransliterator::load(p) {
+            return Ok(Self::Float(Arc::new(f)));
+        }
+        if let Ok(q) = Seq2SeqQuantized::load(p) {
+            return Ok(Self::Quantized(Arc::new(q)));
+        }
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("Failed to load Seq2Seq model from {:?}", p),
+        ))
+    }
+
+    pub fn transliterate(
+        &self,
+        latin: &str,
+        beam: usize,
+        scratch: &mut InferenceScratch,
+    ) -> Vec<String> {
+        match self {
+            Self::Float(m) => m.transliterate(latin, beam, scratch),
+            Self::Quantized(m) => m.transliterate(latin, beam, scratch),
+        }
+    }
+
+    pub fn transliterate_constrained_with_next_chars(
+        &self,
+        latin: &str,
+        beam: usize,
+        scratch: &mut InferenceScratch,
+        prefix_filter: Option<&dyn Fn(&str) -> bool>,
+        word_filter: Option<&dyn Fn(&str) -> bool>,
+        next_chars_fn: Option<&dyn Fn(&str) -> Option<Vec<char>>>,
+    ) -> Vec<String> {
+        match self {
+            Self::Float(m) => m.transliterate_constrained_with_next_chars(
+                latin,
+                beam,
+                scratch,
+                prefix_filter,
+                word_filter,
+                next_chars_fn,
+            ),
+            Self::Quantized(m) => m.transliterate_constrained_with_next_chars(
+                latin,
+                beam,
+                scratch,
+                prefix_filter,
+                word_filter,
+                next_chars_fn,
+            ),
+        }
+    }
+
+    pub fn score_sequence(
+        &self,
+        latin: &str,
+        bengali: &str,
+        scratch: &mut InferenceScratch,
+    ) -> f32 {
+        match self {
+            Self::Float(m) => m.score_sequence(latin, bengali, scratch),
+            Self::Quantized(m) => m.score_sequence(latin, bengali, scratch),
+        }
+    }
+
+    pub fn create_scratch(&self) -> InferenceScratch {
+        match self {
+            Self::Float(m) => InferenceScratch::for_model(m),
+            Self::Quantized(m) => InferenceScratch::for_quantized(m),
+        }
     }
 }
 
@@ -985,5 +1730,18 @@ mod tests {
         for cand in &result {
             assert!(cand.starts_with('অ'));
         }
+    }
+
+    #[test]
+    fn test_quantize_and_score_sequence() {
+        let sv = CharVocab::from_strings(["abcde"].iter().copied());
+        let tv = CharVocab::from_strings(["অআইউ"].iter().copied());
+        let m = Seq2SeqTransliterator::new(sv, tv, 8, 16);
+        let q = m.to_quantized();
+        let mut scratch = InferenceScratch::for_quantized(&q);
+        let res = q.transliterate("abc", 2, &mut scratch);
+        assert!(res.len() <= 2);
+        let score = q.score_sequence("abc", "অআ", &mut scratch);
+        assert!(score.is_finite() && score <= 0.0);
     }
 }

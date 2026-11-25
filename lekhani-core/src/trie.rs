@@ -204,6 +204,37 @@ impl PrefixTrie {
         }
     }
 
+    /// Return all distinct immediate next characters following the given prefix in the trie.
+    /// Operates in O(log N + K) time using binary search on the sorted entries.
+    pub fn get_next_chars(&self, prefix: &str) -> Vec<char> {
+        if self.entries.is_empty() {
+            return Vec::new();
+        }
+        let prefix_len = prefix.len();
+        let start_idx = match self
+            .entries
+            .binary_search_by(|e| self.word_at(e).cmp(prefix))
+        {
+            Ok(idx) => idx,
+            Err(idx) => idx,
+        };
+        let mut next_chars = Vec::new();
+        let mut last_char = None;
+        for entry in &self.entries[start_idx..] {
+            let word = self.word_at(entry);
+            if !word.starts_with(prefix) {
+                break;
+            }
+            if let Some(ch) = word[prefix_len..].chars().next() {
+                if Some(ch) != last_char {
+                    last_char = Some(ch);
+                    next_chars.push(ch);
+                }
+            }
+        }
+        next_chars
+    }
+
     /// Zero-allocation lookup returning borrowed string slices and frequency weights
     pub fn find_prefix_entries<'a>(&'a self, prefix: &str, limit: usize) -> Vec<(&'a str, u32)> {
         if prefix.is_empty() || self.entries.is_empty() {
@@ -506,5 +537,20 @@ mod tests {
             res.is_err(),
             "PrefixTrie must reject entry extending past buffer bounds"
         );
+    }
+
+    #[test]
+    fn test_get_next_chars() {
+        let mut trie = PrefixTrie::new();
+        trie.insert_weighted("বাংলা".to_string(), 100);
+        trie.insert_weighted("বাংলাদেশ".to_string(), 100);
+        trie.insert_weighted("বাংলানিউজ".to_string(), 100);
+        trie.insert_weighted("বই".to_string(), 100);
+        trie.ensure_sorted();
+
+        let next = trie.get_next_chars("বাংলা");
+        assert!(next.contains(&'দ')); // from বাংলাদেশ
+        assert!(next.contains(&'ন')); // from বাংলানিউজ
+        assert!(!next.contains(&'ব'));
     }
 }
