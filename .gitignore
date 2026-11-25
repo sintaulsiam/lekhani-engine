@@ -20,6 +20,7 @@ __pycache__/
 data/corpus/*.txt
 data/corpus/*.raw
 data/corpus/*.tsv
+!data/corpus/llm_banglish_seed.tsv
 data/eval/train_alignments.tsv
 data/eval/*.bin
 
