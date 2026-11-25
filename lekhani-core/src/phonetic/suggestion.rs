@@ -2028,12 +2028,12 @@ impl PhoneticSuggestion {
 
             // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
             let mut valid_fuzzy_stems = Vec::new();
-            if !((is_primary_in_dict && raw_candidates.len() >= 5) || raw_candidates.len() >= 7) {
+            if !(middle.len() >= 4 && is_primary_in_dict && raw_candidates.len() >= 5) {
                 let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
                 let variant_limit = if is_primary_in_dict || raw_candidates.len() >= 5 {
-                    4
+                    6
                 } else {
-                    12
+                    14
                 };
                 let is_init_a = middle.starts_with('a') || middle.starts_with('A');
                 let is_init_o = middle.starts_with('o') || middle.starts_with('O');
