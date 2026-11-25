@@ -219,17 +219,21 @@ impl PrefixTrie {
             Err(idx) => idx,
         };
         let mut next_chars = Vec::new();
-        let mut last_char = None;
-        for entry in &self.entries[start_idx..] {
-            let word = self.word_at(entry);
+        let mut idx = start_idx;
+        while idx < self.entries.len() {
+            let word = self.word_at(&self.entries[idx]);
             if !word.starts_with(prefix) {
                 break;
             }
             if let Some(ch) = word[prefix_len..].chars().next() {
-                if Some(ch) != last_char {
-                    last_char = Some(ch);
-                    next_chars.push(ch);
-                }
+                next_chars.push(ch);
+                let next_byte_end = prefix_len + ch.len_utf8();
+                let target = &word[..next_byte_end];
+                let rel = self.entries[idx + 1..]
+                    .partition_point(|e| self.word_at(e).starts_with(target));
+                idx += 1 + rel;
+            } else {
+                idx += 1;
             }
         }
         next_chars

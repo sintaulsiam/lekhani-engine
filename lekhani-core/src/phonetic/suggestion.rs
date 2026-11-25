@@ -174,8 +174,8 @@ fn probe_seq2seq_in_dir(
     lekhani_neural::InferenceScratch,
 )> {
     for filename in [
-        "seq2seq_transliterator_int8.bin",
         "seq2seq_transliterator.bin",
+        "seq2seq_transliterator_int8.bin",
     ] {
         let p = dir.join(filename);
         if p.exists() {
@@ -966,20 +966,27 @@ impl PhoneticSuggestion {
             && allow_s2s
             && !self.database.trie.is_empty()
             && !primary_in_dict
+            && raw_candidates.len() <= 4
             && middle.len() >= 4
-            && middle.len() <= 14
+            && middle.len() <= 10
         {
             if let Some(ref s2s) = self.seq2seq {
                 if let Some(ref mut scratch) = self.seq2seq_scratch {
                     let trie = &self.database.trie;
-                    let prefix_filter = |p: &str| trie.has_prefix(p);
                     let word_filter = |w: &str| trie.contains_exact(w);
-                    let next_chars = |p: &str| Some(trie.get_next_chars(p));
+                    let root_chars = trie.get_next_chars("");
+                    let next_chars = |p: &str| {
+                        if p.is_empty() {
+                            Some(root_chars.clone())
+                        } else {
+                            Some(trie.get_next_chars(p))
+                        }
+                    };
                     let s2s_cands = s2s.transliterate_constrained_with_next_chars(
                         middle,
-                        2,
+                        1,
                         scratch,
-                        Some(&prefix_filter),
+                        None,
                         Some(&word_filter),
                         Some(&next_chars),
                     );
