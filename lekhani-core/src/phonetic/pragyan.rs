@@ -694,8 +694,12 @@ impl PragyanEngine {
         let mut ngram_cands =
             decode_beam_ngram_with_trie(&roman_tokens, &self.lm, self.config.beam_width, None);
         if let Some(t) = trie {
-            let trie_cands =
-                decode_beam_ngram_with_trie(&roman_tokens, &self.lm, self.config.beam_width, Some(t));
+            let trie_cands = decode_beam_ngram_with_trie(
+                &roman_tokens,
+                &self.lm,
+                self.config.beam_width.max(14),
+                Some(t),
+            );
             for (w, s) in trie_cands {
                 if !ngram_cands.iter().any(|(ew, _)| ew == &w) {
                     ngram_cands.push((w, s));

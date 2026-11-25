@@ -939,8 +939,8 @@ impl PhoneticSuggestion {
                     trie_opt,
                 );
                 let top_pragyan_score = pragyan_cands.first().map(|(_, s)| *s).unwrap_or(0.0);
-                for (cand, p_score) in pragyan_cands.into_iter().take(4) {
-                    let delta = ((p_score - top_pragyan_score) * 200.0).clamp(-1200.0, 0.0) as i32;
+                for (cand, p_score) in pragyan_cands.into_iter().take(6) {
+                    let delta = ((p_score - top_pragyan_score) * 400.0).clamp(-3000.0, 0.0) as i32;
                     let boost = 5500 + delta;
                     if cand.ends_with('ও') && cand.chars().count() >= 4 {
                         let stripped = &cand[..cand.len() - 'ও'.len_utf8()];
@@ -997,7 +997,9 @@ impl PhoneticSuggestion {
             && allow_s2s
             && !self.database.trie.is_empty()
             && !primary_in_dict
-            && raw_candidates.len() <= 2
+            && !raw_candidates
+                .iter()
+                .any(|c| self.database.is_exact_dictionary_word(&c.text))
             && middle.len() >= 4
             && middle.len() <= 10
         {
@@ -1013,7 +1015,7 @@ impl PhoneticSuggestion {
                             Some(trie.get_next_chars(p))
                         }
                     };
-                    let s2s_cands = s2s.transliterate_constrained_with_next_chars(
+                    let mut s2s_cands = s2s.transliterate_constrained_with_next_chars(
                         middle,
                         1,
                         scratch,
@@ -1021,6 +1023,9 @@ impl PhoneticSuggestion {
                         Some(&word_filter),
                         Some(&next_chars),
                     );
+                    if s2s_cands.is_empty() {
+                        s2s_cands = s2s.transliterate(middle, 1, scratch);
+                    }
                     for (idx, cand) in s2s_cands.into_iter().enumerate() {
                         if super::ranking::grapheme_edit_distance(&phonetic, &cand) > 2
                             || cand.chars().count().abs_diff(phonetic.chars().count()) > 1

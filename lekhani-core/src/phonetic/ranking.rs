@@ -117,17 +117,17 @@ pub struct RankWeights {
 impl Default for RankWeights {
     fn default() -> Self {
         Self {
-            is_in_dict: 2200.0,
-            normalized_freq: 2080.0,
-            is_high_freq: 2000.0,
-            lm_score: 4500.0,
-            is_exact_phonetic: 6000.0,
-            phonetic_similarity: 200.0,
-            avro_native_anchor: 2200.0,
-            length_penalty: 400.0,
-            source_weight: 3200.0,
+            is_in_dict: 400.0,
+            normalized_freq: 300.0,
+            is_high_freq: 600.0,
+            lm_score: 5500.0,
+            is_exact_phonetic: 3500.0,
+            phonetic_similarity: 300.0,
+            avro_native_anchor: 1200.0,
+            length_penalty: 250.0,
+            source_weight: 2000.0,
             clitic_alignment: 3500.0,
-            intent_modifier_boost: 4500.0,
+            intent_modifier_boost: 3500.0,
             user_bigram_prob: 3000.0,
             user_favored: 5000.0,
             // Extended weights — conservative but meaningful
@@ -312,6 +312,60 @@ impl<'a> CandidateContext<'a> {
     }
 }
 
+/// Detects clear phonetic distortions in beam/neural candidates so high-frequency false
+/// positives (e.g. dropped initial vowels, dropped terminal 'e', dropped 'য/্য', or spurious
+/// 'ি'/'ু') do not override faithful dictionary/inflected words.
+#[inline]
+fn has_phonetic_mismatch(ctx: &CandidateContext, cand_text: &str) -> bool {
+    let input_starts_vowel = ctx
+        .middle
+        .starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
+    let cand_starts_vowel = cand_text
+        .chars()
+        .next()
+        .is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
+    let dropped_initial_vowel =
+        input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
+
+    let input_starts_a_o = ctx.middle.starts_with(['a', 'A', 'o', 'O']);
+    let cand_starts_e = cand_text.starts_with('এ');
+    let input_starts_a = ctx.middle.starts_with(['a', 'A'])
+        && !ctx.middle.starts_with("aa")
+        && !ctx.middle.starts_with("Aa");
+    let cand_starts_o = cand_text.starts_with('ও');
+    let vowel_mismatch =
+        (input_starts_a_o && cand_starts_e) || (input_starts_a && cand_starts_o);
+
+    let input_ends_ey = ctx.middle.len() >= 5
+        && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
+    let dropped_ey_suffix = input_ends_ey
+        && !cand_text.ends_with('ে')
+        && !cand_text.ends_with('ই')
+        && !cand_text.ends_with('য়');
+    let dropped_ke_suffix = ctx.has_ke_suffix_candidate && !cand_text.ends_with("কে");
+
+    let input_has_i = ctx.middle.contains([
+        'i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}',
+    ]) || ctx.middle.contains("ee")
+        || ctx.middle.contains("EE");
+    let cand_has_i = cand_text.contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
+    let spurious_i = ctx.middle.len() >= 5 && !input_has_i && cand_has_i;
+
+    let input_has_u = ctx.middle.contains([
+        'u', 'U', 'w', 'W', '\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}',
+    ]) || ctx.middle.contains("oo")
+        || ctx.middle.contains("OO");
+    let cand_has_u = cand_text.contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
+    let spurious_u = ctx.middle.len() >= 5 && !input_has_u && cand_has_u;
+
+    dropped_initial_vowel
+        || dropped_ey_suffix
+        || dropped_ke_suffix
+        || vowel_mismatch
+        || spurious_i
+        || spurious_u
+}
+
 /// Extract a 20-dimensional normalized feature vector for a candidate hypothesis.
 /// Stack-allocated, zero heap allocations on the hot path.
 pub fn extract_candidate_features(
@@ -432,59 +486,7 @@ pub fn extract_candidate_features(
                 && !ctx.has_explicit_casing
                 && !ctx.has_backtick
             {
-                let input_starts_vowel = ctx
-                    .middle
-                    .starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
-                let cand_starts_vowel = cand
-                    .text
-                    .chars()
-                    .next()
-                    .is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
-                let dropped_initial_vowel =
-                    input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
-
-                let input_starts_a_o = ctx.middle.starts_with(['a', 'A', 'o', 'O']);
-                let cand_starts_e = cand.text.starts_with('এ');
-                let input_starts_a = ctx.middle.starts_with(['a', 'A'])
-                    && !ctx.middle.starts_with("aa")
-                    && !ctx.middle.starts_with("Aa");
-                let cand_starts_o = cand.text.starts_with('ও');
-                let vowel_mismatch =
-                    (input_starts_a_o && cand_starts_e) || (input_starts_a && cand_starts_o);
-
-                let input_ends_ey = ctx.middle.len() >= 5
-                    && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
-                let dropped_ey_suffix = input_ends_ey
-                    && !cand.text.ends_with('ে')
-                    && !cand.text.ends_with('ই')
-                    && !cand.text.ends_with('য়');
-                let dropped_ke_suffix = ctx.has_ke_suffix_candidate && !cand.text.ends_with("কে");
-
-                let input_has_i = ctx.middle.contains([
-                    'i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}',
-                ]) || ctx.middle.contains("ee")
-                    || ctx.middle.contains("EE");
-                let cand_has_i = cand
-                    .text
-                    .contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
-                let spurious_i = ctx.middle.len() >= 5 && !input_has_i && cand_has_i;
-
-                let input_has_u = ctx.middle.contains([
-                    'u', 'U', 'w', 'W', '\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}',
-                ]) || ctx.middle.contains("oo")
-                    || ctx.middle.contains("OO");
-                let cand_has_u = cand
-                    .text
-                    .contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
-                let spurious_u = ctx.middle.len() >= 5 && !input_has_u && cand_has_u;
-
-                if dropped_initial_vowel
-                    || dropped_ey_suffix
-                    || dropped_ke_suffix
-                    || vowel_mismatch
-                    || spurious_i
-                    || spurious_u
-                {
+                if has_phonetic_mismatch(ctx, &cand.text) {
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
@@ -521,59 +523,7 @@ pub fn extract_candidate_features(
                 && !ctx.has_explicit_casing
                 && !ctx.has_backtick
             {
-                let input_starts_vowel = ctx
-                    .middle
-                    .starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
-                let cand_starts_vowel = cand
-                    .text
-                    .chars()
-                    .next()
-                    .is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
-                let dropped_initial_vowel =
-                    input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
-
-                let input_starts_a_o = ctx.middle.starts_with(['a', 'A', 'o', 'O']);
-                let cand_starts_e = cand.text.starts_with('এ');
-                let input_starts_a = ctx.middle.starts_with(['a', 'A'])
-                    && !ctx.middle.starts_with("aa")
-                    && !ctx.middle.starts_with("Aa");
-                let cand_starts_o = cand.text.starts_with('ও');
-                let vowel_mismatch =
-                    (input_starts_a_o && cand_starts_e) || (input_starts_a && cand_starts_o);
-
-                let input_ends_ey = ctx.middle.len() >= 5
-                    && (ctx.middle.ends_with("ey") || ctx.middle.ends_with("Ey"));
-                let dropped_ey_suffix = input_ends_ey
-                    && !cand.text.ends_with('ে')
-                    && !cand.text.ends_with('ই')
-                    && !cand.text.ends_with('য়');
-                let dropped_ke_suffix = ctx.has_ke_suffix_candidate && !cand.text.ends_with("কে");
-
-                let input_has_i = ctx.middle.contains([
-                    'i', 'I', 'y', 'Y', '\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}',
-                ]) || ctx.middle.contains("ee")
-                    || ctx.middle.contains("EE");
-                let cand_has_i = cand
-                    .text
-                    .contains(['\u{09BF}', '\u{09C0}', '\u{0987}', '\u{0988}']);
-                let spurious_i = ctx.middle.len() >= 5 && !input_has_i && cand_has_i;
-
-                let input_has_u = ctx.middle.contains([
-                    'u', 'U', 'w', 'W', '\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}',
-                ]) || ctx.middle.contains("oo")
-                    || ctx.middle.contains("OO");
-                let cand_has_u = cand
-                    .text
-                    .contains(['\u{09C1}', '\u{09C2}', '\u{0989}', '\u{098A}']);
-                let spurious_u = ctx.middle.len() >= 5 && !input_has_u && cand_has_u;
-
-                if dropped_initial_vowel
-                    || dropped_ey_suffix
-                    || dropped_ke_suffix
-                    || vowel_mismatch
-                    || spurious_i
-                    || spurious_u
-                {
+                if has_phonetic_mismatch(ctx, &cand.text) {
                     f.source_weight = -0.60;
                     f.phonetic_similarity = -(dist as f32);
                     f.intent_modifier_boost -= 2.0;
@@ -912,8 +862,8 @@ mod tests {
             ..Default::default()
         };
         let score = weights.compute_score(&features);
-        // 2200 + 6000 + 2200 (anchor) + 0.8 * 4500 = 14000
-        assert_eq!(score, 14000);
+        // 400 + 3500 + 1200 (anchor) + 0.8 * 5500 = 9500
+        assert_eq!(score, 9500);
     }
 
     #[test]
