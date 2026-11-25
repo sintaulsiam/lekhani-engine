@@ -508,6 +508,52 @@ impl AnvayaAgreementEngine {
                 Some("দে")
             }
 
+            // Read (পড়-)
+            (
+                "porchen" | "porcho" | "porchis" | "পড়ছেন" | "পড়ছো" | "পড়ছিস",
+                HonorificRegister::FormalHonorific,
+            ) => Some("পড়ছেন"),
+            (
+                "porchen" | "porcho" | "porchis" | "পড়ছেন" | "পড়ছো" | "পড়ছিস",
+                HonorificRegister::Familiar,
+            ) => Some("পড়ছো"),
+            (
+                "porchen" | "porcho" | "porchis" | "পড়ছেন" | "পড়ছো" | "পড়ছিস",
+                HonorificRegister::Intimate,
+            ) => Some("পড়ছিস"),
+
+            // Write Perfect (লিখ-)
+            (
+                "likhechen" | "likhecho" | "likhechis" | "লিখেছেন" | "লিখেছো" | "লিখেছিস",
+                HonorificRegister::FormalHonorific,
+            ) => Some("লিখেছেন"),
+            (
+                "likhechen" | "likhecho" | "likhechis" | "লিখেছেন" | "লিখেছো" | "লিখেছিস",
+                HonorificRegister::Familiar,
+            ) => Some("লিখেছো"),
+            (
+                "likhechen" | "likhecho" | "likhechis" | "লিখেছেন" | "লিখেছো" | "লিখেছিস",
+                HonorificRegister::Intimate,
+            ) => Some("লিখেছিস"),
+
+            // Come Future (আস-)
+            (
+                "ashben" | "ashbe" | "ashbi" | "আসবেন" | "আসবে" | "আসবি",
+                HonorificRegister::FormalHonorific,
+            ) => Some("আসবেন"),
+            (
+                "ashben" | "ashbe" | "ashbi" | "আসবেন" | "আসবে" | "আসবি",
+                HonorificRegister::Familiar,
+            ) => Some("আসবে"),
+            (
+                "ashben" | "ashbe" | "ashbi" | "আসবেন" | "আসবে" | "আসবি",
+                HonorificRegister::Intimate,
+            ) => Some("আসবি"),
+
+            // Imperative Intimate stems (দেখ / কর)
+            ("dekh" | "দেখ", HonorificRegister::Intimate) => Some("দেখ"),
+            ("kor" | "কর", HonorificRegister::Intimate) => Some("কর"),
+
             _ => None,
         }
     }

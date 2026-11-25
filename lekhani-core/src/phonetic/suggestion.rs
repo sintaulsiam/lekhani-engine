@@ -987,7 +987,7 @@ impl PhoneticSuggestion {
             && allow_s2s
             && !self.database.trie.is_empty()
             && !primary_in_dict
-            && raw_candidates.len() <= 4
+            && raw_candidates.len() <= 2
             && middle.len() >= 4
             && middle.len() <= 10
         {
@@ -2714,6 +2714,7 @@ impl PhoneticSuggestion {
                     if !term.is_empty()
                         && !cand.text.is_ascii()
                         && cand.source != CandidateSource::EmojiKeyword
+                        && cand.source == CandidateSource::NeuralTransducer
                     {
                         Some(s2s.score_sequence(term, &cand.text, scratch))
                     } else {
@@ -3169,6 +3170,9 @@ impl PhoneticSuggestion {
         // ── BangalUni Intelligent Compound Lattice & Reranker Engine ───────────
         if !self.config.strict_avro_mode
             && !has_explicit_intent
+            && !is_code
+            && !is_tech_collocation
+            && !has_english_tech_passthrough
             && !self.is_reranking
             && pre.is_empty()
             && post.is_empty()
