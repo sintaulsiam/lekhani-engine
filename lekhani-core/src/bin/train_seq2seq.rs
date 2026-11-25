@@ -11,8 +11,8 @@
 //! Training time on 88K pairs × 30 epochs: ~4 minutes.
 
 use lekhani_neural::seq2seq::{
-    gru_backward, CellGrad, CharVocab, GateBuf, InferenceScratch, S2SGruCell, Seq2SeqGrad,
-    Seq2SeqQuantized, Seq2SeqTransliterator, BOS_ID,
+    gru_backward, quantize_weights, CellGrad, CharVocab, GateBuf, InferenceScratch,
+    QuantizedS2SGruCell, S2SGruCell, Seq2SeqGrad, Seq2SeqQuantized, Seq2SeqTransliterator, BOS_ID,
 };
 use rayon::prelude::*;
 use std::{
@@ -36,6 +36,7 @@ struct Config {
     eval_n: usize,
     augment: bool,
     quantize: bool,
+    bidirectional: bool,
 }
 
 impl Default for Config {
@@ -53,6 +54,7 @@ impl Default for Config {
             eval_n: 200,
             augment: false,
             quantize: false,
+            bidirectional: false,
         }
     }
 }
@@ -103,6 +105,10 @@ fn parse_args() -> Config {
                 c.quantize = true;
                 i += 1;
             }
+            "--bidirectional" => {
+                c.bidirectional = true;
+                i += 1;
+            }
             _ => {
                 i += 1;
             }
@@ -133,12 +139,21 @@ fn load_tsv(path: &Path) -> Vec<(String, String)> {
         if bn.is_empty() || lat.is_empty() {
             continue;
         }
-        // Deduplicate by keeping first occurrence (TSV may repeat pairs with counts)
-        pairs.push((lat, bn.to_string()));
+        let count: usize = parts
+            .get(2)
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(1);
+        let reps = if count >= 10 {
+            3
+        } else if count >= 3 {
+            2
+        } else {
+            1
+        };
+        for _ in 0..reps {
+            pairs.push((lat.clone(), bn.to_string()));
+        }
     }
-    // Deduplicate
-    pairs.sort_unstable();
-    pairs.dedup();
     pairs
 }
 
@@ -230,12 +245,31 @@ impl Adam {
     }
 }
 
-fn scatter_grads(m: &mut Seq2SeqTransliterator, g: &Seq2SeqGrad, adam: &mut Adam, lr: f32) {
+fn init_cell(cell: &mut S2SGruCell, in_dim: usize, hd: usize, rng: &mut u64) {
+    kaiming_init(&mut cell.w_ir, in_dim, rng);
+    kaiming_init(&mut cell.w_iz, in_dim, rng);
+    kaiming_init(&mut cell.w_in, in_dim, rng);
+    kaiming_init(&mut cell.w_hr, hd, rng);
+    kaiming_init(&mut cell.w_hz, hd, rng);
+    kaiming_init(&mut cell.w_hn, hd, rng);
+}
+
+fn scatter_grads(
+    m: &mut Seq2SeqTransliterator,
+    rev: Option<&mut S2SGruCell>,
+    g: &Seq2SeqGrad,
+    g_rev: Option<&CellGrad>,
+    adam: &mut Adam,
+    lr: f32,
+) {
     adam.begin_step();
     let clip = 5.0f32;
     apply_adam(&mut m.enc_emb, &g.enc_emb, adam, lr, clip);
     apply_adam(&mut m.dec_emb, &g.dec_emb, adam, lr, clip);
     apply_cell_adam(&mut m.encoder, &g.enc, adam, lr, clip);
+    if let (Some(r), Some(gr)) = (rev, g_rev) {
+        apply_cell_adam(r, gr, adam, lr, clip);
+    }
     apply_cell_adam(&mut m.decoder, &g.dec, adam, lr, clip);
     apply_adam(&mut m.attn_w, &g.attn_w, adam, lr, clip);
     apply_adam(&mut m.out_w, &g.out_w, adam, lr, clip);
@@ -292,18 +326,19 @@ struct FwdBufDec {
     attn_scores: Vec<Vec<f32>>, // softmax attention per step
 }
 
-/// Forward pass: returns (cross_entropy_loss, enc_buf, dec_buf)
+/// Forward pass: returns (cross_entropy_loss, enc_buf, rev_enc_buf, dec_buf)
 fn forward(
     m: &Seq2SeqTransliterator,
+    rev: Option<&S2SGruCell>,
     src: &[u32],
     tgt: &[u32], // includes BOS at start, EOS at end
-) -> (f32, FwdBufEnc, FwdBufDec) {
+) -> (f32, FwdBufEnc, Option<FwdBufEnc>, FwdBufDec) {
     let hd = m.hidden_dim;
     let ed = m.emb_dim;
     let tv = m.tgt_vocab.size();
     let in_d = ed + hd;
 
-    // ── Encoder ──────────────────────────────────────────────────────────────
+    // ── Encoder (Forward) ────────────────────────────────────────────────────
     let mut enc = FwdBufEnc {
         h_states: Vec::with_capacity(src.len() + 1),
         x_embeds: Vec::with_capacity(src.len()),
@@ -323,8 +358,42 @@ fn forward(
         enc.gates.push(gb);
     }
 
-    // Encoder hidden states as key/value matrix (skip h_0)
-    let enc_states: Vec<&Vec<f32>> = enc.h_states[1..].iter().collect();
+    // ── Encoder (Optional Backward for BiGRU) ────────────────────────────────
+    let enc_rev = rev.map(|rev_cell| {
+        let mut eb = FwdBufEnc {
+            h_states: Vec::with_capacity(src.len() + 1),
+            x_embeds: Vec::with_capacity(src.len()),
+            gates: Vec::with_capacity(src.len()),
+        };
+        eb.h_states.push(vec![0.0; hd]);
+        for &sid in src.iter().rev() {
+            let sid = (sid as usize).min(m.src_vocab.size().saturating_sub(1));
+            let s = sid * ed;
+            let emb = m.enc_emb[s..s + ed].to_vec();
+            let h_prev = eb.h_states.last().unwrap().clone();
+            let mut h_next = vec![0.0; hd];
+            let mut gb = GateBuf::new(hd);
+            rev_cell.step(&emb, &h_prev, &mut h_next, Some(&mut gb));
+            eb.x_embeds.push(emb);
+            eb.h_states.push(h_next);
+            eb.gates.push(gb);
+        }
+        eb
+    });
+
+    // Combined encoder states
+    let enc_len_raw = src.len();
+    let enc_states: Vec<Vec<f32>> = if let Some(ref er) = enc_rev {
+        (0..enc_len_raw)
+            .map(|k| {
+                let fwd = &enc.h_states[k + 1];
+                let rev_s = &er.h_states[enc_len_raw - k];
+                (0..hd).map(|j| 0.5 * (fwd[j] + rev_s[j])).collect()
+            })
+            .collect()
+    } else {
+        enc.h_states[1..].to_vec()
+    };
 
     // ── Decoder (teacher forcing) ──────────────────────────────────────────
     // tgt = [BOS, y1, y2, ..., EOS]
@@ -340,9 +409,12 @@ fn forward(
         attn_scores: Vec::with_capacity(dec_steps),
     };
     // init dec hidden = final encoder hidden
-    dec.h_states.push(enc.h_states.last().unwrap().clone());
+    dec.h_states
+        .push(enc_states.last().cloned().unwrap_or_else(|| vec![0.0; hd]));
 
     let mut loss = 0.0f32;
+    let max_dec_len = (src.len() + 1).min(14).max(1);
+    let is_bi = rev.is_some();
 
     for t in 0..dec_steps {
         let inp_id = tgt[t] as usize;
@@ -358,11 +430,21 @@ fn forward(
                 q[i] += m.attn_w[i * hd + j] * h_prev[j];
             }
         }
-        // Scores
+        // Scores (with monotonic Gaussian bias when bidirectional)
         let enc_len = enc_states.len().max(1);
         let mut attn_raw = vec![0.0f32; enc_len];
-        for (k, eh) in enc_states.iter().enumerate() {
-            attn_raw[k] = eh.iter().zip(q.iter()).map(|(&a, &b)| a * b).sum::<f32>();
+        if is_bi {
+            let expected_pos = (t as f32 * (enc_len.saturating_sub(1)) as f32) / max_dec_len as f32;
+            let sigma_sq = 2.0 * 2.5 * 2.5;
+            for (k, eh) in enc_states.iter().enumerate() {
+                let dist = k as f32 - expected_pos;
+                let penalty = -(dist * dist) / sigma_sq;
+                attn_raw[k] = eh.iter().zip(q.iter()).map(|(&a, &b)| a * b).sum::<f32>() + penalty;
+            }
+        } else {
+            for (k, eh) in enc_states.iter().enumerate() {
+                attn_raw[k] = eh.iter().zip(q.iter()).map(|(&a, &b)| a * b).sum::<f32>();
+            }
         }
         // Softmax
         let max_a = attn_raw.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
@@ -423,17 +505,20 @@ fn forward(
     }
 
     loss /= dec_steps.max(1) as f32;
-    (loss, enc, dec)
+    (loss, enc, enc_rev, dec)
 }
 
-/// Backward pass: accumulate gradients into `grad`
+/// Backward pass: accumulate gradients into `grad` (and optional `g_rev`)
 fn backward(
     m: &Seq2SeqTransliterator,
+    rev: Option<&S2SGruCell>,
     src: &[u32],
     tgt: &[u32],
     enc: &FwdBufEnc,
+    enc_rev: Option<&FwdBufEnc>,
     dec: &FwdBufDec,
     grad: &mut Seq2SeqGrad,
+    mut g_rev: Option<&mut CellGrad>,
 ) {
     let hd = m.hidden_dim;
     let ed = m.emb_dim;
@@ -542,15 +627,14 @@ fn backward(
         }
     }
 
+    let is_bi = rev.is_some() && enc_rev.is_some();
+    let enc_scale = if is_bi { 0.5 } else { 1.0 };
+
     let mut d_enc_h_in = vec![0.0f32; hd];
     let mut d_enc_x = vec![0.0f32; ed];
     for t in (0..enc_len).rev() {
         let d_h_cur = &d_enc_h[t];
-        let mut d_h_with_carry = d_h_cur.to_vec();
-        if t < enc_len - 1 {
-            // d_enc_h_in carries grad from next step's h_prev
-        }
-        // Add carry from inner gru_backward's d_h_prev
+        let mut d_h_with_carry: Vec<f32> = d_h_cur.iter().map(|&v| v * enc_scale).collect();
         for j in 0..hd {
             d_h_with_carry[j] += d_enc_h_in[j];
         }
@@ -566,25 +650,95 @@ fn backward(
             &mut d_enc_x,
         );
 
-        // Gradient for source embedding
         let sid = src[t] as usize;
         let emb_s = sid.min(m.src_vocab.size().saturating_sub(1)) * ed;
         for j in 0..ed {
             grad.enc_emb[emb_s + j] += d_enc_x[j];
         }
     }
+
+    if let (Some(rev_cell), Some(er), Some(gr)) = (rev, enc_rev, g_rev.as_deref_mut()) {
+        let mut d_rev_h_in = vec![0.0f32; hd];
+        let mut d_rev_x = vec![0.0f32; ed];
+        for t in (0..enc_len).rev() {
+            // rev step t processed src[enc_len - 1 - t]
+            let orig_k = enc_len - 1 - t;
+            let mut d_h_with_carry: Vec<f32> = d_enc_h[orig_k].iter().map(|&v| v * 0.5).collect();
+            for j in 0..hd {
+                d_h_with_carry[j] += d_rev_h_in[j];
+            }
+            gru_backward(
+                rev_cell,
+                &er.x_embeds[t],
+                &er.h_states[t],
+                &er.gates[t],
+                &d_h_with_carry,
+                gr,
+                &mut d_rev_h_in,
+                &mut d_rev_x,
+            );
+            let sid = src[orig_k] as usize;
+            let emb_s = sid.min(m.src_vocab.size().saturating_sub(1)) * ed;
+            for j in 0..ed {
+                grad.enc_emb[emb_s + j] += d_rev_x[j];
+            }
+        }
+    }
+}
+
+fn build_quantized(m: &Seq2SeqTransliterator, rev: Option<&S2SGruCell>) -> Seq2SeqQuantized {
+    let (enc_emb, scale_enc_emb) = quantize_weights(&m.enc_emb);
+    let (dec_emb, scale_dec_emb) = quantize_weights(&m.dec_emb);
+    let (attn_w, scale_attn_w) = quantize_weights(&m.attn_w);
+    let (out_w, scale_out_w) = quantize_weights(&m.out_w);
+    Seq2SeqQuantized {
+        src_vocab: m.src_vocab.clone(),
+        tgt_vocab: m.tgt_vocab.clone(),
+        emb_dim: m.emb_dim,
+        hidden_dim: m.hidden_dim,
+        enc_emb,
+        scale_enc_emb,
+        dec_emb,
+        scale_dec_emb,
+        encoder: QuantizedS2SGruCell::from_f32(&m.encoder),
+        encoder_rev: rev.map(QuantizedS2SGruCell::from_f32),
+        is_bidirectional: rev.is_some(),
+        decoder: QuantizedS2SGruCell::from_f32(&m.decoder),
+        attn_w,
+        scale_attn_w,
+        out_w,
+        scale_out_w,
+        out_b: m.out_b.clone(),
+    }
 }
 
 // ─── Evaluation ───────────────────────────────────────────────────────────────
 
-fn evaluate(m: &Seq2SeqTransliterator, pairs: &[(String, String)], n: usize, beam: usize) -> f32 {
+fn evaluate(
+    m: &Seq2SeqTransliterator,
+    rev: Option<&S2SGruCell>,
+    pairs: &[(String, String)],
+    n: usize,
+    beam: usize,
+) -> f32 {
     let eval_pairs: Vec<_> = pairs.iter().take(n).collect();
     let mut hits = 0usize;
-    let mut scratch = InferenceScratch::for_model(m);
-    for (lat, bn) in &eval_pairs {
-        let cands = m.transliterate(lat, beam, &mut scratch);
-        if cands.first().map(|s| s == bn).unwrap_or(false) {
-            hits += 1;
+    if rev.is_some() {
+        let q = build_quantized(m, rev);
+        let mut scratch = InferenceScratch::for_quantized(&q);
+        for (lat, bn) in &eval_pairs {
+            let cands = q.transliterate(lat, beam, &mut scratch);
+            if cands.first().map(|s| s == bn).unwrap_or(false) {
+                hits += 1;
+            }
+        }
+    } else {
+        let mut scratch = InferenceScratch::for_model(m);
+        for (lat, bn) in &eval_pairs {
+            let cands = m.transliterate(lat, beam, &mut scratch);
+            if cands.first().map(|s| s == bn).unwrap_or(false) {
+                hits += 1;
+            }
         }
     }
     hits as f32 / eval_pairs.len().max(1) as f32
@@ -647,6 +801,11 @@ fn augment_pairs(pairs: &[(String, String)], rng: &mut u64) -> Vec<(String, Stri
                     out.push((mutated, bn.clone()));
                 }
             }
+        } else if r == 5 && lat.starts_with('o') && lat.len() >= 4 {
+            // Dakshina natural inherent-'অ' written as 'a' (e.g. odhikarta -> adhikarta)
+            out.push((format!("a{}", &lat[1..]), bn.clone()));
+        } else if r == 6 && lat.contains("sh") {
+            out.push((lat.replacen("sh", "s", 1), bn.clone()));
         }
     }
     out
@@ -691,17 +850,32 @@ fn main() {
 
     // Build model
     let mut model = Seq2SeqTransliterator::new(src_vocab, tgt_vocab, cfg.emb_dim, cfg.hidden_dim);
-    println!(
-        "   Parameters: {} (~{:.1} KB)",
-        model.param_count(),
-        model.param_count() as f32 * 4.0 / 1024.0
-    );
+    let mut encoder_rev = if cfg.bidirectional {
+        Some(S2SGruCell::new_zeros(cfg.emb_dim, cfg.hidden_dim))
+    } else {
+        None
+    };
 
     let mut rng = 0x_dead_beef_cafe_u64;
     init_model(&mut model, &mut rng);
+    if let Some(ref mut rev) = encoder_rev {
+        init_cell(rev, cfg.emb_dim, cfg.hidden_dim, &mut rng);
+    }
+
+    let rev_params = if encoder_rev.is_some() {
+        3 * cfg.hidden_dim * cfg.emb_dim + 3 * cfg.hidden_dim * cfg.hidden_dim + 4 * cfg.hidden_dim
+    } else {
+        0
+    };
+    let n_params = model.param_count() + rev_params;
+    println!(
+        "   Parameters: {} (bidirectional={}, ~{:.1} KB F32)",
+        n_params,
+        cfg.bidirectional,
+        n_params as f32 * 4.0 / 1024.0
+    );
 
     // Adam state — size = total params
-    let n_params = model.param_count();
     let mut adam = Adam::new(n_params);
 
     // Pre-compute encoded pairs
@@ -741,33 +915,62 @@ fn main() {
         let mut count = 0usize;
         let batch = cfg.batch;
         for chunk in order.chunks(batch) {
-            let (batch_loss, batch_count, mut grad) = chunk
+            let (batch_loss, batch_count, mut grad, mut grad_rev) = chunk
                 .par_iter()
                 .fold(
-                    || (0.0f32, 0usize, Seq2SeqGrad::new_for(&model)),
-                    |(mut loss_acc, mut count_acc, mut grad_acc), &idx| {
-                        let (loss, enc, dec) = forward(&model, &src_seqs[idx], &tgt_seqs[idx]);
+                    || {
+                        (
+                            0.0f32,
+                            0usize,
+                            Seq2SeqGrad::new_for(&model),
+                            encoder_rev
+                                .as_ref()
+                                .map(|_| CellGrad::new(cfg.emb_dim, cfg.hidden_dim)),
+                        )
+                    },
+                    |(mut loss_acc, mut count_acc, mut grad_acc, mut rev_acc), &idx| {
+                        let (loss, enc, enc_rev_buf, dec) = forward(
+                            &model,
+                            encoder_rev.as_ref(),
+                            src_seqs[idx].as_slice(),
+                            tgt_seqs[idx].as_slice(),
+                        );
                         if loss.is_finite() {
                             backward(
                                 &model,
-                                &src_seqs[idx],
-                                &tgt_seqs[idx],
+                                encoder_rev.as_ref(),
+                                src_seqs[idx].as_slice(),
+                                tgt_seqs[idx].as_slice(),
                                 &enc,
+                                enc_rev_buf.as_ref(),
                                 &dec,
                                 &mut grad_acc,
+                                rev_acc.as_mut(),
                             );
                             loss_acc += loss;
                             count_acc += 1;
                         }
-                        (loss_acc, count_acc, grad_acc)
+                        (loss_acc, count_acc, grad_acc, rev_acc)
                     },
                 )
                 .reduce(
-                    || (0.0f32, 0usize, Seq2SeqGrad::new_for(&model)),
-                    |(mut l1, c1, mut g1), (l2, c2, g2)| {
+                    || {
+                        (
+                            0.0f32,
+                            0usize,
+                            Seq2SeqGrad::new_for(&model),
+                            encoder_rev
+                                .as_ref()
+                                .map(|_| CellGrad::new(cfg.emb_dim, cfg.hidden_dim)),
+                        )
+                    },
+                    |(mut l1, c1, mut g1, mut r1), (l2, c2, g2, r2)| {
                         l1 += l2;
                         g1.add(&g2);
-                        (l1, c1 + c2, g1)
+                        if let (Some(ref mut gr1), Some(ref gr2)) = (&mut r1, &r2) {
+                            gr1.add(gr2);
+                        }
+                        (l1, c1 + c2, g1, r1)
                     },
                 );
 
@@ -777,14 +980,24 @@ fn main() {
             // Scale gradients by batch size
             let bs = chunk.len().max(1) as f32;
             grad.scale(1.0 / bs);
+            if let Some(ref mut gr) = grad_rev {
+                gr.scale(1.0 / bs);
+            }
             // apply Adam per param group
-            scatter_grads(&mut model, &grad, &mut adam, lr);
+            scatter_grads(
+                &mut model,
+                encoder_rev.as_mut(),
+                &grad,
+                grad_rev.as_ref(),
+                &mut adam,
+                lr,
+            );
         }
 
         let avg_loss = total_loss / count.max(1) as f32;
 
         if (epoch + 1) % 5 == 0 || epoch == 0 {
-            let acc = evaluate(&model, &pairs, cfg.eval_n, cfg.beam);
+            let acc = evaluate(&model, encoder_rev.as_ref(), &pairs, cfg.eval_n, cfg.beam);
             println!(
                 "  Epoch {:2}/{}: loss={:.4}  train_top1@{}={:.2}%  lr={:.2e}",
                 epoch + 1,
@@ -827,14 +1040,15 @@ fn main() {
         let q_path = cfg
             .out_path
             .with_file_name("seq2seq_transliterator_int8.bin");
-        let q = Seq2SeqQuantized::from_f32(&model);
+        let q = build_quantized(&model, encoder_rev.as_ref());
         if let Err(e) = q.save(&q_path) {
             eprintln!("Quantized save failed: {}", e);
             std::process::exit(1);
         }
         let q_size = std::fs::metadata(&q_path).map(|m| m.len()).unwrap_or(0);
         println!(
-            "Saved quantized INT8 to {:?} ({:.1} KB)",
+            "Saved quantized INT8 (bidirectional={}) to {:?} ({:.1} KB)",
+            q.is_bidirectional,
             q_path,
             q_size as f32 / 1024.0
         );

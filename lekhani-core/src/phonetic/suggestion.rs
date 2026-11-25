@@ -174,8 +174,8 @@ fn probe_seq2seq_in_dir(
     lekhani_neural::InferenceScratch,
 )> {
     for filename in [
-        "seq2seq_transliterator.bin",
         "seq2seq_transliterator_int8.bin",
+        "seq2seq_transliterator.bin",
     ] {
         let p = dir.join(filename);
         if p.exists() {
@@ -952,6 +952,21 @@ impl PhoneticSuggestion {
                         &mut seen,
                     );
                 }
+            }
+        }
+
+        // 3a-2.5. O(1) Phonetic Skeleton Dictionary Recovery
+        if !self.config.strict_avro_mode && !is_code && middle.len() >= 4 {
+            let skel_matches = self.database.lookup_skeleton(middle);
+            for (idx, word) in skel_matches.iter().enumerate() {
+                let boost = 4600 - (idx as i32 * 150);
+                add_cand(
+                    word.clone(),
+                    CandidateSource::FuzzySoundLaw,
+                    boost,
+                    &mut raw_candidates,
+                    &mut seen,
+                );
             }
         }
 
@@ -2008,70 +2023,77 @@ impl PhoneticSuggestion {
             }
 
             // 10. Exact Fuzzy Spelling Variants & Sound Laws (Homophones / Orthographic variants & Juktoborno)
-            let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
             let mut valid_fuzzy_stems = Vec::new();
-            let variant_limit = if is_primary_in_dict { 8 } else { 16 };
-            let is_init_a = middle.starts_with('a') || middle.starts_with('A');
-            let is_init_o = middle.starts_with('o') || middle.starts_with('O');
+            if !((is_primary_in_dict && raw_candidates.len() >= 5) || raw_candidates.len() >= 7) {
+                let fuzzy_variants = super::fuzzy::generate_phonetic_variants(middle);
+                let variant_limit = if is_primary_in_dict || raw_candidates.len() >= 5 {
+                    4
+                } else {
+                    12
+                };
+                let is_init_a = middle.starts_with('a') || middle.starts_with('A');
+                let is_init_o = middle.starts_with('o') || middle.starts_with('O');
 
-            for variant in fuzzy_variants.iter().take(variant_limit) {
-                let var_phonetic = self.convert_phonetic(variant);
-                let mut cands_to_test = Vec::with_capacity(2);
-                cands_to_test.push(var_phonetic.clone());
+                for variant in fuzzy_variants.iter().take(variant_limit) {
+                    let var_phonetic = self.convert_phonetic(variant);
+                    let mut cands_to_test = Vec::with_capacity(2);
+                    cands_to_test.push(var_phonetic.clone());
 
-                if is_init_a || is_init_o {
-                    if var_phonetic.starts_with('আ') {
-                        cands_to_test.push(format!("অ{}", &var_phonetic['আ'.len_utf8()..]));
-                    } else if var_phonetic.starts_with('ও') {
-                        cands_to_test.push(format!("অ{}", &var_phonetic['ও'.len_utf8()..]));
+                    if is_init_a || is_init_o {
+                        if var_phonetic.starts_with('আ') {
+                            cands_to_test.push(format!("অ{}", &var_phonetic['আ'.len_utf8()..]));
+                        } else if var_phonetic.starts_with('ও') {
+                            cands_to_test.push(format!("অ{}", &var_phonetic['ও'.len_utf8()..]));
+                        }
                     }
-                }
 
-                for cand_text in cands_to_test {
-                    if self.database.is_exact_dictionary_word(&cand_text) {
-                        let len_diff = (cand_text.chars().count() as isize
-                            - phonetic.chars().count() as isize)
-                            .abs();
-                        if len_diff <= 3 {
-                            if !valid_fuzzy_stems.contains(&cand_text) {
-                                valid_fuzzy_stems.push(cand_text.clone());
+                    for cand_text in cands_to_test {
+                        if self.database.is_exact_dictionary_word(&cand_text) {
+                            let len_diff = (cand_text.chars().count() as isize
+                                - phonetic.chars().count() as isize)
+                                .abs();
+                            if len_diff <= 3 {
+                                if !valid_fuzzy_stems.contains(&cand_text) {
+                                    valid_fuzzy_stems.push(cand_text.clone());
+                                }
+                                add_cand(
+                                    cand_text,
+                                    CandidateSource::FuzzySoundLaw,
+                                    3200,
+                                    &mut raw_candidates,
+                                    &mut seen,
+                                );
                             }
+                        } else if middle.chars().count() <= 3
+                            && !cand_text.is_empty()
+                            && cand_text.chars().all(|c| c.is_bengali())
+                        {
                             add_cand(
                                 cand_text,
                                 CandidateSource::FuzzySoundLaw,
-                                3200,
+                                1800,
                                 &mut raw_candidates,
                                 &mut seen,
                             );
                         }
-                    } else if middle.chars().count() <= 3
-                        && !cand_text.is_empty()
-                        && cand_text.chars().all(|c| c.is_bengali())
-                    {
-                        add_cand(
-                            cand_text,
-                            CandidateSource::FuzzySoundLaw,
-                            1800,
-                            &mut raw_candidates,
-                            &mut seen,
-                        );
                     }
                 }
-            }
 
-            // 10b. Project "ধ্বনি-সেতু" (Dhvani-Setu) — Phonological Acoustic Recovery
-            if self.config.enable_banglish_shorthand {
-                for ac_variant in super::fuzzy::DhvaniSetuEngine::generate_acoustic_variants(middle)
-                {
-                    let ac_phonetic = self.convert_phonetic(&ac_variant);
-                    if self.database.is_exact_dictionary_word(&ac_phonetic) {
-                        add_cand(
-                            ac_phonetic,
-                            CandidateSource::FuzzySoundLaw,
-                            3100,
-                            &mut raw_candidates,
-                            &mut seen,
-                        );
+                // 10b. Project "ধ্বনি-সেতু" (Dhvani-Setu) — Phonological Acoustic Recovery
+                if self.config.enable_banglish_shorthand && raw_candidates.len() < 6 {
+                    for ac_variant in
+                        super::fuzzy::DhvaniSetuEngine::generate_acoustic_variants(middle)
+                    {
+                        let ac_phonetic = self.convert_phonetic(&ac_variant);
+                        if self.database.is_exact_dictionary_word(&ac_phonetic) {
+                            add_cand(
+                                ac_phonetic,
+                                CandidateSource::FuzzySoundLaw,
+                                3100,
+                                &mut raw_candidates,
+                                &mut seen,
+                            );
+                        }
                     }
                 }
             }
@@ -2333,9 +2355,18 @@ impl PhoneticSuggestion {
                 || w == "কোনো"
         };
 
+        let ends_in_geminate_o = middle.len() >= 4 && {
+            let b = middle.as_bytes();
+            let n = b.len();
+            b[n - 1] == b'o' && b[n - 2] == b[n - 3] && b[n - 2].is_ascii_alphabetic()
+        };
         let has_clitic_o_candidate = middle.ends_with('o')
             && !(middle.ends_with("yo") && raw_candidates.iter().any(|c| c.text.ends_with("্য")))
             && !(middle.ends_with("rjo") || middle.ends_with("rzo") || middle.ends_with("jo"))
+            && !(ends_in_geminate_o
+                && raw_candidates.iter().any(|c| {
+                    !is_clitic_o_word(&c.text) && self.database.is_exact_dictionary_word(&c.text)
+                }))
             && raw_candidates.iter().any(|c| {
                 is_clitic_o_word(&c.text)
                     && self.database.is_exact_dictionary_word(&c.text)

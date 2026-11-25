@@ -13,6 +13,7 @@ pub type PhoneticOverrideMap = HashMap<String, Vec<(String, f32)>>;
 #[derive(Debug, Clone)]
 pub struct PhoneticDatabase {
     pub trie: Arc<PrefixTrie>,
+    pub skeleton_index: Arc<HashMap<String, Vec<String>>>,
     pub suffix: Arc<HashMap<String, String>>,
     pub autocorrect: Arc<HashMap<String, String>>,
     pub shorthand: Arc<HashMap<String, String>>,
@@ -541,6 +542,121 @@ fn get_static_overrides() -> ZeroCopyOverrides {
         .clone()
 }
 
+/// Computes a canonical consonant + non-a/o vowel phonetic skeleton for a Bengali word.
+pub fn bengali_phonetic_skeleton(word: &str) -> String {
+    let mut out = String::with_capacity(word.len() / 2);
+    let mut last: Option<char> = None;
+    let mut push_ch = |ch: char| {
+        if last != Some(ch) {
+            out.push(ch);
+            last = Some(ch);
+        }
+    };
+    let mut prev_ch = '\0';
+    for ch in word.chars() {
+        match ch {
+            '\u{200C}' | '\u{200D}' | 'ঁ' | 'ঃ' | '্' | 'অ' | 'আ' | 'া' | 'ও' | 'ো' | 'য়' =>
+                {}
+            'ি' | 'ী' | 'ই' | 'ঈ' => push_ch('i'),
+            'ু' | 'ূ' | 'উ' | 'ঊ' => push_ch('u'),
+            'ে' | 'এ' | 'ৈ' | 'ঐ' => push_ch('e'),
+            'ক' | 'খ' => push_ch('k'),
+            'গ' | 'ঘ' => push_ch('g'),
+            'ঙ' | 'ং' | 'ণ' | 'ন' | 'ঞ' => push_ch('n'),
+            'চ' | 'ছ' => push_ch('c'),
+            'জ' | 'ঝ' => push_ch('j'),
+            'য' => {
+                if prev_ch != '্' {
+                    push_ch('j');
+                }
+            }
+            'ট' | 'ঠ' | 'ত' | 'থ' | 'ৎ' => push_ch('t'),
+            'ড' | 'ঢ' | 'দ' | 'ধ' | 'ড়' | 'ঢ়' => push_ch('d'),
+            'প' | 'ফ' => push_ch('p'),
+            'ব' | 'ভ' => push_ch('b'),
+            'ম' => push_ch('m'),
+            'র' | 'ঋ' | 'ৃ' => push_ch('r'),
+            'ল' => push_ch('l'),
+            'শ' | 'ষ' | 'স' => push_ch('s'),
+            'হ' => push_ch('h'),
+            _ => {}
+        }
+        prev_ch = ch;
+    }
+    out
+}
+
+/// Computes a matching canonical phonetic skeleton for a Latin transliteration input.
+pub fn latin_phonetic_skeleton(latin: &str) -> String {
+    let lower = latin.to_ascii_lowercase();
+    let bytes = lower.as_bytes();
+    let mut out = String::with_capacity(bytes.len());
+    let mut last: Option<char> = None;
+    let mut push_ch = |ch: char| {
+        if last != Some(ch) {
+            out.push(ch);
+            last = Some(ch);
+        }
+    };
+    let mut i = 0;
+    while i < bytes.len() {
+        if i + 1 < bytes.len() {
+            let pair = &bytes[i..i + 2];
+            let mapped = match pair {
+                b"kh" | b"ck" => Some('k'),
+                b"gh" => Some('g'),
+                b"ng" => Some('n'),
+                b"ch" => Some('c'),
+                b"jh" => Some('j'),
+                b"th" => Some('t'),
+                b"dh" => Some('d'),
+                b"ph" => Some('p'),
+                b"bh" => Some('b'),
+                b"sh" => Some('s'),
+                _ => None,
+            };
+            if let Some(m) = mapped {
+                push_ch(m);
+                i += 2;
+                continue;
+            }
+        }
+        match bytes[i] {
+            b'a' | b'o' | b'y' => {}
+            b'i' => push_ch('i'),
+            b'u' => push_ch('u'),
+            b'e' => push_ch('e'),
+            b'k' | b'q' => push_ch('k'),
+            b'c' => {
+                if i + 1 < bytes.len() && matches!(bytes[i + 1], b'e' | b'i' | b'y') {
+                    push_ch('s');
+                } else {
+                    push_ch('c');
+                }
+            }
+            b'g' => push_ch('g'),
+            b'n' => push_ch('n'),
+            b'j' | b'z' => push_ch('j'),
+            b't' => push_ch('t'),
+            b'd' => push_ch('d'),
+            b'p' | b'f' => push_ch('p'),
+            b'b' | b'v' | b'w' => push_ch('b'),
+            b'm' => push_ch('m'),
+            b'r' => push_ch('r'),
+            b'l' => push_ch('l'),
+            b's' => push_ch('s'),
+            b'h' => push_ch('h'),
+            b'x' => {
+                push_ch('k');
+                push_ch('s');
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    out
+}
+
 impl PhoneticDatabase {
     pub fn new() -> Self {
         let mut trie = PrefixTrie::new();
@@ -551,6 +667,7 @@ impl PhoneticDatabase {
 
         Self {
             trie: Arc::new(trie),
+            skeleton_index: Arc::new(HashMap::new()),
             suffix: get_static_suffix(),
             autocorrect: get_static_autocorrect(),
             shorthand: get_static_shorthand(),
@@ -594,6 +711,49 @@ impl PhoneticDatabase {
     #[inline]
     pub fn lookup_override(&self, input: &str) -> Option<OverrideEntry<'_>> {
         self.overrides.lookup(input)
+    }
+
+    /// Look up dictionary words matching the Latin phonetic skeleton in O(1).
+    #[inline]
+    pub fn lookup_skeleton(&self, latin: &str) -> &[String] {
+        let skel = latin_phonetic_skeleton(latin);
+        if skel.len() < 3 {
+            return &[];
+        }
+        self.skeleton_index
+            .get(&skel)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Rebuild the phonetic skeleton reverse index from the current `trie`.
+    pub fn rebuild_skeleton_index(&mut self) {
+        let mut buckets: HashMap<String, Vec<(&str, u32)>> =
+            HashMap::with_capacity(self.trie.len() / 2);
+        for (word, freq) in self.trie.iter_entries() {
+            let skel = bengali_phonetic_skeleton(word);
+            if skel.len() < 3 {
+                continue;
+            }
+            let list = buckets.entry(skel).or_default();
+            if list.len() < 6 {
+                list.push((word, freq));
+                if list.len() == 6 {
+                    list.sort_unstable_by_key(|a| std::cmp::Reverse(a.1));
+                }
+            } else if freq > list[5].1 {
+                list[5] = (word, freq);
+                list.sort_unstable_by_key(|a| std::cmp::Reverse(a.1));
+            }
+        }
+        let mut index = HashMap::with_capacity(buckets.len());
+        for (k, mut v) in buckets {
+            if v.len() < 6 {
+                v.sort_unstable_by_key(|a| std::cmp::Reverse(a.1));
+            }
+            index.insert(k, v.into_iter().map(|(w, _)| w.to_string()).collect());
+        }
+        self.skeleton_index = Arc::new(index);
     }
 
     /// Look up supervised overrides, falling back to agglutinative suffix peeling with Sandhi joining
@@ -744,6 +904,9 @@ impl PhoneticDatabase {
             trie.insert_weighted(word.to_string(), freq);
         }
         trie.ensure_sorted();
+
+        // Build O(1) phonetic skeleton reverse index (top 4 frequency-ranked words per skeleton)
+        self.rebuild_skeleton_index();
 
         // Warm-start ranking perceptron weights if pre-trained weights exist in dictionary directory
         let rank_weights_path = dir.join("rank_weights_v2.json");

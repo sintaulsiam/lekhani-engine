@@ -51,6 +51,12 @@ impl PrefixTrie {
         self.buffer.get(start..end).unwrap_or("")
     }
 
+    /// Iterate all `(word, freq)` pairs in the trie.
+    #[inline]
+    pub fn iter_entries(&self) -> impl Iterator<Item = (&str, u32)> + '_ {
+        self.entries.iter().map(|e| (self.word_at(e), e.freq))
+    }
+
     /// Total memory footprint of raw dictionary data in bytes
     pub fn memory_usage(&self) -> usize {
         self.buffer.capacity() + (self.entries.capacity() * std::mem::size_of::<TrieEntry>())
