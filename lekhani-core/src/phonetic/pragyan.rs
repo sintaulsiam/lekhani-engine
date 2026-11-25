@@ -231,6 +231,16 @@ pub fn decode_beam_ngram(
     lm: &JointUnitLM,
     beam_width: usize,
 ) -> Vec<(String, f64)> {
+    decode_beam_ngram_with_trie(roman_tokens, lm, beam_width, None)
+}
+
+/// Decodes Roman input tokens into ranked Bengali candidates using optional PrefixTrie pruning.
+pub fn decode_beam_ngram_with_trie(
+    roman_tokens: &[String],
+    lm: &JointUnitLM,
+    beam_width: usize,
+    trie: Option<&crate::trie::PrefixTrie>,
+) -> Vec<(String, f64)> {
     let m = roman_tokens.len();
     if m == 0 {
         return Vec::new();
@@ -280,11 +290,21 @@ pub fn decode_beam_ngram(
             for &(kr, matching) in &step_matches[cand.pos] {
                 for &u in matching {
                     let (_, ref b) = lm.vocab.id_to_unit[u as usize];
+                    let mut new_bn = cand.bengali.clone();
+                    new_bn.push_str(b);
+                    if let Some(t) = trie {
+                        let next_pos = cand.pos + kr;
+                        if next_pos < m {
+                            if !new_bn.is_empty() && !t.has_prefix(&new_bn) {
+                                continue;
+                            }
+                        } else if !t.contains_exact(&new_bn) {
+                            continue;
+                        }
+                    }
                     let trans_log = lm.score_log(u, &cand.history);
                     let mut new_hist = cand.history.clone();
                     new_hist.push(u);
-                    let mut new_bn = cand.bengali.clone();
-                    new_bn.push_str(b);
 
                     next_beam.push(BeamCandidate {
                         pos: cand.pos + kr,
@@ -299,11 +319,16 @@ pub fn decode_beam_ngram(
             if cand.consecutive_eps < 1 {
                 for &u in empty_r_units {
                     let (_, ref b) = lm.vocab.id_to_unit[u as usize];
+                    let mut new_bn = cand.bengali.clone();
+                    new_bn.push_str(b);
+                    if let Some(t) = trie {
+                        if !new_bn.is_empty() && !t.has_prefix(&new_bn) {
+                            continue;
+                        }
+                    }
                     let trans_log = lm.score_log(u, &cand.history);
                     let mut new_hist = cand.history.clone();
                     new_hist.push(u);
-                    let mut new_bn = cand.bengali.clone();
-                    new_bn.push_str(b);
 
                     next_beam.push(BeamCandidate {
                         pos: cand.pos,
@@ -631,6 +656,16 @@ impl PragyanEngine {
 
     /// Suggests ranked Bengali transliterations paired with their Pragyan policy scores.
     pub fn suggest_scored(&self, term: &str, origin: ShiftOrigin) -> Vec<(String, f64)> {
+        self.suggest_scored_with_trie(term, origin, None)
+    }
+
+    /// Suggests ranked Bengali transliterations with optional live PrefixTrie pruning.
+    pub fn suggest_scored_with_trie(
+        &self,
+        term: &str,
+        origin: ShiftOrigin,
+        trie: Option<&crate::trie::PrefixTrie>,
+    ) -> Vec<(String, f64)> {
         if term.is_empty() {
             return Vec::new();
         }
@@ -656,7 +691,22 @@ impl PragyanEngine {
 
         let lat_norm = normalize_roman(term);
         let roman_tokens = tokenize_roman_with_origin(&lat_norm, origin);
-        let ngram_cands = decode_beam_ngram(&roman_tokens, &self.lm, self.config.beam_width);
+        let mut ngram_cands =
+            decode_beam_ngram_with_trie(&roman_tokens, &self.lm, self.config.beam_width, None);
+        if let Some(t) = trie {
+            let trie_cands =
+                decode_beam_ngram_with_trie(&roman_tokens, &self.lm, self.config.beam_width, Some(t));
+            for (w, s) in trie_cands {
+                if !ngram_cands.iter().any(|(ew, _)| ew == &w) {
+                    ngram_cands.push((w, s));
+                }
+            }
+            ngram_cands.sort_by(|a, b| {
+                b.1.partial_cmp(&a.1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.0.cmp(&b.0))
+            });
+        }
 
         run_deployable_policy(
             term,

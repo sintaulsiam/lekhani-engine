@@ -38,33 +38,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("══════════════════════════════════════════════════════════════════\n");
 
     let test_path = Path::new("data/eval/bn.translit.sampled.test.tsv");
+    let dev_path = Path::new("data/eval/bn.translit.sampled.dev.tsv");
     let train_gold_path = Path::new("data/eval/bn.translit.sampled.train.tsv");
+    let llm_seed_path = Path::new("data/corpus/llm_banglish_seed.tsv");
     let vocab_path = Path::new("data/corpus/expanded_vocabulary.txt");
     let out_path = Path::new("data/corpus/combined_scaled_train.tsv");
 
-    // 1. Build Hermetic Split Quarantine from blind test set
-    println!("1. Building test-set quarantine table...");
+    // 1. Build Hermetic Split Quarantine from blind test & dev sets
+    println!("1. Building test + dev quarantine table...");
     let mut quarantine_set = HashSet::new();
-    if test_path.exists() {
-        let f = File::open(test_path)?;
-        let r = BufReader::new(f);
-        for line in r.lines().map_while(Result::ok) {
-            let parts: Vec<&str> = line.split('\t').collect();
-            if parts.len() >= 2 {
-                let bn = canonicalize(parts[0].trim());
-                let lat = parts[1].trim().to_ascii_lowercase();
-                if !bn.is_empty() && !lat.is_empty() {
-                    quarantine_set.insert((bn, lat));
+    for q_path in [test_path, dev_path] {
+        if q_path.exists() {
+            let f = File::open(q_path)?;
+            let r = BufReader::new(f);
+            for line in r.lines().map_while(Result::ok) {
+                let parts: Vec<&str> = line.split('\t').collect();
+                if parts.len() >= 2 {
+                    let bn = canonicalize(parts[0].trim());
+                    let lat = parts[1].trim().to_ascii_lowercase();
+                    if !bn.is_empty() && !lat.is_empty() {
+                        quarantine_set.insert((bn, lat));
+                    }
                 }
             }
         }
-        println!(
-            "   └─ Loaded {} test-set pairs into quarantine table.",
-            quarantine_set.len()
-        );
-    } else {
-        println!("   └─ ⚠️ Test file not found; running without test quarantine.");
     }
+    println!(
+        "   └─ Loaded {} test+dev pairs into quarantine table.",
+        quarantine_set.len()
+    );
 
     let mut output_pairs: HashSet<(String, String)> = HashSet::new();
 
@@ -96,6 +98,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     } else {
         println!("   └─ ⚠️ Gold train file not found!");
+    }
+
+    if llm_seed_path.exists() {
+        let f = File::open(llm_seed_path)?;
+        let r = BufReader::new(f);
+        let mut seed_count = 0usize;
+        for line in r.lines().map_while(Result::ok) {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() >= 2 {
+                let bn = canonicalize(parts[0].trim());
+                let lat = parts[1].trim().to_ascii_lowercase();
+                if is_valid_roman(&lat) && !bn.is_empty() && !quarantine_set.contains(&(bn.clone(), lat.clone())) {
+                    if output_pairs.insert((bn, lat)) {
+                        seed_count += 1;
+                    }
+                }
+            }
+        }
+        println!("   └─ Ingested {} curated LLM Banglish seed pairs.", seed_count);
     }
 
     // 3. Generate Synthetic Transliteration from Expanded Vocabulary

@@ -386,7 +386,13 @@ pub fn extract_candidate_features(
                 || cand.source == CandidateSource::Autocorrect
                 || cand.source == CandidateSource::Loanword
                 || cand.source == CandidateSource::PhoneticOverride;
-            f.is_exact_phonetic = if is_dict_equiv { 1.0 } else { 0.43 };
+            f.is_exact_phonetic = if is_dict_equiv {
+                1.0
+            } else if ctx.has_explicit_intent || ctx.has_backtick || ctx.has_explicit_casing {
+                0.43
+            } else {
+                0.15
+            };
             // Avro-native anchor: fires only when the Avro-native output is a real dict word.
             // Without the dict guard, ambiguous outputs like শবাই would incorrectly beat সবাই.
             if cand.text == ctx.phonetic && is_in_dict {

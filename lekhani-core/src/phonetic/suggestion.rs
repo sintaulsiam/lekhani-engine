@@ -928,8 +928,16 @@ impl PhoneticSuggestion {
         // 3a. Pragyan Statistical Phonetic Decoding (Mode 2: Smart Adaptive)
         if !self.config.strict_avro_mode && self.config.enable_pragyan && !is_code {
             if let Some(ref engine) = self.pragyan_engine {
-                let pragyan_cands =
-                    engine.suggest_scored(middle, crate::session::ShiftOrigin::AutoCapitalize);
+                let trie_opt = if !self.database.trie.is_empty() {
+                    Some(self.database.trie.as_ref())
+                } else {
+                    None
+                };
+                let pragyan_cands = engine.suggest_scored_with_trie(
+                    middle,
+                    crate::session::ShiftOrigin::AutoCapitalize,
+                    trie_opt,
+                );
                 let top_pragyan_score = pragyan_cands.first().map(|(_, s)| *s).unwrap_or(0.0);
                 for (cand, p_score) in pragyan_cands.into_iter().take(4) {
                     let delta = ((p_score - top_pragyan_score) * 200.0).clamp(-1200.0, 0.0) as i32;
@@ -1498,7 +1506,10 @@ impl PhoneticSuggestion {
                 .lookup_override(middle)
                 .and_then(|ovs| ovs.first().map(|(_, c)| c))
                 .unwrap_or(0.0);
-            if ov_conf >= 0.95 || !self.database.is_exact_dictionary_word(&phonetic) {
+            if is_contextual_override
+                || ov_conf >= 0.95
+                || !self.database.is_exact_dictionary_word(&phonetic)
+            {
                 Some(ov_pref.clone())
             } else {
                 None
@@ -2646,7 +2657,8 @@ impl PhoneticSuggestion {
                 }
             }
 
-            let lm_score = if prev.is_some() && cand.source != CandidateSource::EmojiKeyword {
+            let lm_score = if cand.source != CandidateSource::EmojiKeyword && !cand.text.is_ascii()
+            {
                 let direct_score = self
                     .ai_context
                     .lm()
@@ -2877,7 +2889,16 @@ impl PhoneticSuggestion {
                 // If concordant verb is in dictionary and typed_verb is not, promote concordant verb to Slot 0.
                 let typed_in_dict = self.database.is_exact_dictionary_word(typed_verb);
                 let conc_in_dict = self.database.is_exact_dictionary_word(conc);
-                if conc_in_dict && !typed_in_dict {
+                let typed_is_verb = lekhani_ai::AnvayaAgreementEngine::classify_verb_tier(typed_verb)
+                    != lekhani_ai::VerbConjugationTier::Neutral;
+                let conc_better_lm = if let Some(last_tok) = context.last() {
+                    let score_conc = self.ai_context.lm().score_candidate(None, Some(last_tok), conc);
+                    let score_typed = self.ai_context.lm().score_candidate(None, Some(last_tok), typed_verb);
+                    score_conc > score_typed + 0.3
+                } else {
+                    false
+                };
+                if conc_in_dict && (!typed_in_dict || !typed_is_verb || conc_better_lm) {
                     if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == conc) {
                         if pos != 0 {
                             let item = scored_candidates.remove(pos);
