@@ -957,9 +957,13 @@ impl PhoneticSuggestion {
 
         // 3a-2.5. O(1) Phonetic Skeleton Dictionary Recovery
         if !self.config.strict_avro_mode && !is_code && middle.len() >= 4 {
+            let max_ed = if phonetic.chars().count() >= 7 { 3 } else { 2 };
             let skel_matches = self.database.lookup_skeleton(middle);
             for (idx, word) in skel_matches.iter().enumerate() {
-                let boost = 4600 - (idx as i32 * 150);
+                if super::ranking::grapheme_edit_distance(&phonetic, word) > max_ed {
+                    continue;
+                }
+                let boost = 2800 - (idx as i32 * 120);
                 add_cand(
                     word.clone(),
                     CandidateSource::FuzzySoundLaw,
