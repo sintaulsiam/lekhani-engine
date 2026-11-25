@@ -623,6 +623,14 @@ impl PragyanEngine {
 
     /// Transliterates typed Roman term into ranked Bengali candidates.
     pub fn suggest(&self, term: &str, origin: ShiftOrigin) -> Vec<String> {
+        self.suggest_scored(term, origin)
+            .into_iter()
+            .map(|(w, _)| w)
+            .collect()
+    }
+
+    /// Suggests ranked Bengali transliterations paired with their Pragyan policy scores.
+    pub fn suggest_scored(&self, term: &str, origin: ShiftOrigin) -> Vec<(String, f64)> {
         if term.is_empty() {
             return Vec::new();
         }
@@ -637,10 +645,10 @@ impl PragyanEngine {
 
         // If Pragyan statistical decoding is disabled or strict avro intent is active:
         if !self.config.enabled || has_explicit_avro_intent(term) {
-            let mut list = vec![avro_cand];
+            let mut list = vec![(avro_cand, 0.0)];
             if let Some(uncap) = avro_uncap_cand {
-                if !list.contains(&uncap) {
-                    list.push(uncap);
+                if !list.iter().any(|(w, _)| w == &uncap) {
+                    list.push((uncap, -1.0));
                 }
             }
             return list;
@@ -650,7 +658,7 @@ impl PragyanEngine {
         let roman_tokens = tokenize_roman_with_origin(&lat_norm, origin);
         let ngram_cands = decode_beam_ngram(&roman_tokens, &self.lm, self.config.beam_width);
 
-        let ranked = run_deployable_policy(
+        run_deployable_policy(
             term,
             &ngram_cands,
             &avro_cand,
@@ -661,9 +669,7 @@ impl PragyanEngine {
             self.config.lambda_dict,
             self.config.lambda_avro,
             self.config.lambda_engine,
-        );
-
-        ranked.into_iter().map(|(w, _)| w).collect()
+        )
     }
 }
 

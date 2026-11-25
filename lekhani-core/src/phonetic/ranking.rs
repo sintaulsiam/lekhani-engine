@@ -368,6 +368,8 @@ pub fn extract_candidate_features(
     }
     if freq >= 8000 {
         f.is_high_freq += 1.0;
+    } else if freq >= 500 {
+        f.is_high_freq += ((freq as f32) / 8000.0).sqrt() * 0.5;
     }
 
     // 3. Phonetic Similarity & Length
@@ -651,7 +653,23 @@ pub fn extract_candidate_features(
                     } else if ctx.middle.chars().count() <= 2 && dist > 0 {
                         f.intent_modifier_boost -= 0.67;
                     }
-                    if (ctx.lm_score.is_some_and(|s| s > -1.5) || !ctx.is_primary_in_dict)
+                    let input_starts_vowel = ctx
+                        .middle
+                        .starts_with(['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U']);
+                    let cand_starts_vowel = cand
+                        .text
+                        .chars()
+                        .next()
+                        .is_some_and(|c| matches!(c, '\u{0985}'..='\u{0994}'));
+                    let dropped_initial_vowel =
+                        input_starts_vowel && ctx.middle.len() >= 4 && !cand_starts_vowel;
+                    if dropped_initial_vowel || dist >= 3 {
+                        f.is_high_freq = 0.0;
+                        if dropped_initial_vowel {
+                            f.intent_modifier_boost -= 1.5;
+                            f.normalized_freq *= 0.5;
+                        }
+                    } else if (ctx.lm_score.is_some_and(|s| s > -1.5) || !ctx.is_primary_in_dict)
                         && !ctx.has_explicit_casing
                         && !ctx.has_backtick
                     {

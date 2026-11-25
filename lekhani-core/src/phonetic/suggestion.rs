@@ -929,9 +929,11 @@ impl PhoneticSuggestion {
         if !self.config.strict_avro_mode && self.config.enable_pragyan && !is_code {
             if let Some(ref engine) = self.pragyan_engine {
                 let pragyan_cands =
-                    engine.suggest(middle, crate::session::ShiftOrigin::AutoCapitalize);
-                for (idx, cand) in pragyan_cands.into_iter().take(4).enumerate() {
-                    let boost = 5500 - (idx as i32 * 300);
+                    engine.suggest_scored(middle, crate::session::ShiftOrigin::AutoCapitalize);
+                let top_pragyan_score = pragyan_cands.first().map(|(_, s)| *s).unwrap_or(0.0);
+                for (cand, p_score) in pragyan_cands.into_iter().take(4) {
+                    let delta = ((p_score - top_pragyan_score) * 200.0).clamp(-1200.0, 0.0) as i32;
+                    let boost = 5500 + delta;
                     if cand.ends_with('ও') && cand.chars().count() >= 4 {
                         let stripped = &cand[..cand.len() - 'ও'.len_utf8()];
                         if self.database.is_exact_dictionary_word(stripped) {
