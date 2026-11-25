@@ -982,7 +982,6 @@ impl PhoneticSuggestion {
         let is_vowelless_shorthand =
             !middle.contains(['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U', 'y', 'Y']);
         let allow_s2s = self.config.enable_banglish_shorthand || !is_vowelless_shorthand;
-
         if !self.config.strict_avro_mode
             && !is_code
             && allow_s2s
@@ -995,11 +994,11 @@ impl PhoneticSuggestion {
             if let Some(ref s2s) = self.seq2seq {
                 if let Some(ref mut scratch) = self.seq2seq_scratch {
                     let trie = &self.database.trie;
+                    let root_chars = &self.database.root_next_chars;
                     let word_filter = |w: &str| trie.contains_exact(w);
-                    let root_chars = trie.get_next_chars("");
                     let next_chars = |p: &str| {
-                        if p.is_empty() {
-                            Some(root_chars.clone())
+                        if p.is_empty() && !root_chars.is_empty() {
+                            Some(root_chars.as_ref().clone())
                         } else {
                             Some(trie.get_next_chars(p))
                         }
@@ -1013,7 +1012,6 @@ impl PhoneticSuggestion {
                         Some(&next_chars),
                     );
                     for (idx, cand) in s2s_cands.into_iter().enumerate() {
-                        // Guard: reject neural hallucinations that diverge > 2 grapheme edits or > 1 char length from phonetic parse
                         if super::ranking::grapheme_edit_distance(&phonetic, &cand) > 2
                             || cand.chars().count().abs_diff(phonetic.chars().count()) > 1
                         {

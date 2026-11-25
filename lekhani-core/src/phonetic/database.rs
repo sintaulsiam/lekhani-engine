@@ -14,6 +14,7 @@ pub type PhoneticOverrideMap = HashMap<String, Vec<(String, f32)>>;
 pub struct PhoneticDatabase {
     pub trie: Arc<PrefixTrie>,
     pub skeleton_index: Arc<HashMap<String, Vec<String>>>,
+    pub root_next_chars: Arc<Vec<char>>,
     pub suffix: Arc<HashMap<String, String>>,
     pub autocorrect: Arc<HashMap<String, String>>,
     pub shorthand: Arc<HashMap<String, String>>,
@@ -668,6 +669,7 @@ impl PhoneticDatabase {
         Self {
             trie: Arc::new(trie),
             skeleton_index: Arc::new(HashMap::new()),
+            root_next_chars: Arc::new(Vec::new()),
             suffix: get_static_suffix(),
             autocorrect: get_static_autocorrect(),
             shorthand: get_static_shorthand(),
@@ -754,6 +756,7 @@ impl PhoneticDatabase {
             index.insert(k, v.into_iter().map(|(w, _)| w.to_string()).collect());
         }
         self.skeleton_index = Arc::new(index);
+        self.root_next_chars = Arc::new(self.trie.get_next_chars(""));
     }
 
     /// Look up supervised overrides, falling back to agglutinative suffix peeling with Sandhi joining
