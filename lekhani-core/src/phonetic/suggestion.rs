@@ -2417,6 +2417,7 @@ impl PhoneticSuggestion {
 
         let mut scored_candidates: Vec<(String, i32, RankFeatures)> =
             Vec::with_capacity(raw_candidates.len());
+        let mut s2s_scratch = self.seq2seq.as_ref().map(|m| m.create_scratch());
         let learner_guard = self.database.learner.try_read().ok();
         let weights = learner_guard
             .as_ref()
@@ -2665,13 +2666,35 @@ impl PhoneticSuggestion {
                 .as_ref()
                 .is_some_and(|l| l.learned_words.contains(&cand.text));
 
-            let cand_gru_log_prob = if !neural_predictions.is_empty() {
-                neural_predictions
-                    .iter()
-                    .find(|nc| nc.word == cand.text)
-                    .map(|nc| nc.log_prob)
-            } else {
-                None
+            let s2s_log_prob =
+                if let (Some(s2s), Some(scratch)) = (self.seq2seq.as_ref(), s2s_scratch.as_mut()) {
+                    if !term.is_empty()
+                        && !cand.text.is_ascii()
+                        && cand.source != CandidateSource::EmojiKeyword
+                    {
+                        Some(s2s.score_sequence(term, &cand.text, scratch))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+            let cand_gru_log_prob = match (
+                if !neural_predictions.is_empty() {
+                    neural_predictions
+                        .iter()
+                        .find(|nc| nc.word == cand.text)
+                        .map(|nc| nc.log_prob)
+                } else {
+                    None
+                },
+                s2s_log_prob,
+            ) {
+                (Some(g), Some(s)) => Some(0.5 * (g + s)),
+                (Some(g), None) => Some(g),
+                (None, Some(s)) => Some(s),
+                (None, None) => None,
             };
 
             let per_cand_ctx = CandidateContext {

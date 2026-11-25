@@ -12,7 +12,7 @@
 
 use lekhani_neural::seq2seq::{
     gru_backward, CellGrad, CharVocab, GateBuf, InferenceScratch, S2SGruCell, Seq2SeqGrad,
-    Seq2SeqTransliterator, BOS_ID,
+    Seq2SeqQuantized, Seq2SeqTransliterator, BOS_ID,
 };
 use rayon::prelude::*;
 use std::{
@@ -34,6 +34,8 @@ struct Config {
     batch: usize,
     beam: usize,
     eval_n: usize,
+    augment: bool,
+    quantize: bool,
 }
 
 impl Default for Config {
@@ -49,6 +51,8 @@ impl Default for Config {
             batch: 128,
             beam: 5,
             eval_n: 200,
+            augment: false,
+            quantize: false,
         }
     }
 }
@@ -90,6 +94,14 @@ fn parse_args() -> Config {
             "--beam" => {
                 c.beam = args[i + 1].parse().unwrap_or(c.beam);
                 i += 2;
+            }
+            "--augment" => {
+                c.augment = true;
+                i += 1;
+            }
+            "--quantize" => {
+                c.quantize = true;
+                i += 1;
             }
             _ => {
                 i += 1;
@@ -580,11 +592,83 @@ fn evaluate(m: &Seq2SeqTransliterator, pairs: &[(String, String)], n: usize, bea
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
+fn augment_pairs(pairs: &[(String, String)], rng: &mut u64) -> Vec<(String, String)> {
+    let mut out = Vec::with_capacity(pairs.len() * 2);
+    for (lat, bn) in pairs {
+        out.push((lat.clone(), bn.clone()));
+        if lat.len() < 4 {
+            continue;
+        }
+        let r = xorshift64(rng) % 10;
+        if r < 2 {
+            // Synthetic vowel drop (e.g. "kothay" -> "kothy", "amader" -> "amder")
+            let chars: Vec<char> = lat.chars().collect();
+            if let Some(pos) =
+                (1..chars.len() - 1).find(|&idx| matches!(chars[idx], 'a' | 'e' | 'i' | 'o' | 'u'))
+            {
+                let mut mutated = String::with_capacity(lat.len());
+                for (i, ch) in chars.iter().enumerate() {
+                    if i != pos {
+                        mutated.push(*ch);
+                    }
+                }
+                if mutated.len() >= 3 {
+                    out.push((mutated, bn.clone()));
+                }
+            }
+        } else if r < 4 {
+            // Digraph / phonetic variant (sh->s, kh->k, bh->v, ph->f, chh->ch)
+            let mutated = if lat.contains("sh") {
+                Some(lat.replacen("sh", "s", 1))
+            } else if lat.contains("kh") {
+                Some(lat.replacen("kh", "k", 1))
+            } else if lat.contains("bh") {
+                Some(lat.replacen("bh", "v", 1))
+            } else if lat.contains("ph") {
+                Some(lat.replacen("ph", "f", 1))
+            } else if lat.contains("chh") {
+                Some(lat.replacen("chh", "ch", 1))
+            } else {
+                None
+            };
+            if let Some(m) = mutated {
+                if m != *lat && m.len() >= 3 {
+                    out.push((m, bn.clone()));
+                }
+            }
+        } else if r == 4 {
+            // Adjacent character transposition typo
+            let mut chars: Vec<char> = lat.chars().collect();
+            if chars.len() >= 4 {
+                let idx = 1 + (xorshift64(rng) as usize % (chars.len() - 2));
+                chars.swap(idx, idx + 1);
+                let mutated: String = chars.into_iter().collect();
+                if mutated != *lat {
+                    out.push((mutated, bn.clone()));
+                }
+            }
+        }
+    }
+    out
+}
+
 fn main() {
     let cfg = parse_args();
 
-    println!("📚 Loading training data from {:?}...", cfg.train_path);
-    let pairs = load_tsv(&cfg.train_path);
+    println!("Loading training data from {:?}...", cfg.train_path);
+    let base_pairs = load_tsv(&cfg.train_path);
+    let mut aug_rng = 0x_cafe_babe_1234_u64;
+    let pairs = if cfg.augment {
+        let augmented = augment_pairs(&base_pairs, &mut aug_rng);
+        println!(
+            "   {} base pairs -> {} augmented pairs.",
+            base_pairs.len(),
+            augmented.len()
+        );
+        augmented
+    } else {
+        base_pairs
+    };
     println!("   {} unique (latin, bengali) pairs loaded.", pairs.len());
     if pairs.is_empty() {
         eprintln!("❌ No training pairs loaded. Check TSV path.");
@@ -732,11 +816,27 @@ fn main() {
             let size = std::fs::metadata(&cfg.out_path)
                 .map(|m| m.len())
                 .unwrap_or(0);
-            println!("✅ Saved ({:.1} KB)", size as f32 / 1024.0);
+            println!("Saved ({:.1} KB)", size as f32 / 1024.0);
         }
         Err(e) => {
-            eprintln!("❌ Save failed: {}", e);
+            eprintln!("Save failed: {}", e);
             std::process::exit(1);
         }
+    }
+    if cfg.quantize {
+        let q_path = cfg
+            .out_path
+            .with_file_name("seq2seq_transliterator_int8.bin");
+        let q = Seq2SeqQuantized::from_f32(&model);
+        if let Err(e) = q.save(&q_path) {
+            eprintln!("Quantized save failed: {}", e);
+            std::process::exit(1);
+        }
+        let q_size = std::fs::metadata(&q_path).map(|m| m.len()).unwrap_or(0);
+        println!(
+            "Saved quantized INT8 to {:?} ({:.1} KB)",
+            q_path,
+            q_size as f32 / 1024.0
+        );
     }
 }
