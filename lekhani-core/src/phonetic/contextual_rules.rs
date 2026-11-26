@@ -16,6 +16,79 @@ impl PromotionAuthority {
     }
 }
 
+/// Common Romanized initialisms/acronyms that produce unusable consonant conjuncts under
+/// literal Avro rules, paired with `(roman, bengali_base, ends_in_vowel)`.
+const ROMANIZED_ACRONYMS: &[(&str, &str, bool)] = &[
+    ("vc", "ভিসি", true),
+    ("dc", "ডিসি", true),
+    ("oc", "ওসি", true),
+    ("sp", "এসপি", true),
+    ("mp", "এমপি", true),
+    ("cm", "সিএম", true),
+    ("pm", "পিএম", true),
+    ("md", "এমডি", true),
+    ("dg", "ডিজি", true),
+    ("pc", "পিসি", true),
+    ("tv", "টিভি", true),
+    ("ac", "এসি", true),
+    ("cv", "সিভি", true),
+    ("fb", "এফবি", true),
+    ("otp", "ওটিপি", true),
+    ("icu", "আইসিইউ", true),
+    ("ngo", "এনজিও", true),
+    ("cctv", "সিসিটিভি", true),
+    ("bsc", "বিএসসি", true),
+    ("msc", "এমএসসি", true),
+    ("ssc", "এসএসসি", true),
+    ("hsc", "এইচএসসি", true),
+    ("bba", "বিবিএ", true),
+    ("mba", "এমবিএ", true),
+    ("cse", "সিএসই", true),
+    ("vip", "ভিআইপি", true),
+    ("dna", "ডিএনএ", true),
+    ("cpu", "সিপিইউ", true),
+    ("gpu", "জিপিইউ", true),
+    ("usb", "ইউএসবি", true),
+    ("bgb", "বিজিবি", true),
+    ("dmp", "ডিএমপি", true),
+    ("uno", "ইউএনও", true),
+    ("atm", "এটিএম", false),
+    ("pdf", "পিডিএফ", false),
+    ("hr", "এইচআর", false),
+];
+
+/// Resolves a Romanized acronym with an optional Bengali case/plural suffix
+/// (e.g., `vcr` -> `ভিসির`, `tvte` -> `টিভিতে`, `atmer` -> `এটিএমের`).
+pub fn resolve_acronym_with_suffix(middle: &str) -> Option<String> {
+    if middle.len() < 2 || middle.len() > 10 || !middle.is_ascii() {
+        return None;
+    }
+    let lower = middle.to_ascii_lowercase();
+    for &(abbr, base, ends_in_vowel) in ROMANIZED_ACRONYMS {
+        if let Some(rest) = lower.strip_prefix(abbr) {
+            let suffix = match rest {
+                "" => "",
+                "r" if ends_in_vowel => "র",
+                "er" if !ends_in_vowel => "ের",
+                "e" if !ends_in_vowel => "ে",
+                "ke" => "কে",
+                "te" => "তে",
+                "der" => "দের",
+                "ta" => "টা",
+                "ti" => "টি",
+                "gulo" => "গুলো",
+                "gulor" => "গুলোর",
+                _ => continue,
+            };
+            let mut out = String::with_capacity(base.len() + suffix.len());
+            out.push_str(base);
+            out.push_str(suffix);
+            return Some(out);
+        }
+    }
+    None
+}
+
 /// Zero-allocation contextual homophone and colloquial disambiguation applied to final candidates.
 #[inline(always)]
 pub fn apply_contextual_homophone_rules(
@@ -31,8 +104,17 @@ pub fn apply_contextual_homophone_rules(
         || has_explicit_intent
         || !pre.is_empty()
         || !post.is_empty()
-        || middle.len() > 7
     {
+        return;
+    }
+
+    if let Some(acronym) = resolve_acronym_with_suffix(middle) {
+        final_candidates.retain(|c| c != &acronym);
+        final_candidates.insert(0, acronym);
+        return;
+    }
+
+    if middle.len() > 7 {
         return;
     }
 
@@ -42,11 +124,7 @@ pub fn apply_contextual_homophone_rules(
             .any(|c| c.split_whitespace().any(|w| words.contains(&w)))
     };
 
-    let ctx_match: Option<&'static str> = if middle.eq_ignore_ascii_case("vc") {
-        Some("ভিসি")
-    } else if middle.eq_ignore_ascii_case("vcr") {
-        Some("ভিসির")
-    } else if context.is_empty() {
+    let ctx_match: Option<&'static str> = if context.is_empty() {
         if middle.eq_ignore_ascii_case("aib") {
             Some("আইব")
         } else if middle.eq_ignore_ascii_case("bolsi") {
@@ -87,5 +165,26 @@ pub fn apply_contextual_homophone_rules(
     if let Some(target) = ctx_match {
         final_candidates.retain(|c| c != target);
         final_candidates.insert(0, target.to_string());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_acronym_with_suffix() {
+        assert_eq!(resolve_acronym_with_suffix("vc").as_deref(), Some("ভিসি"));
+        assert_eq!(resolve_acronym_with_suffix("vcr").as_deref(), Some("ভিসির"));
+        assert_eq!(resolve_acronym_with_suffix("vcke").as_deref(), Some("ভিসিকে"));
+        assert_eq!(resolve_acronym_with_suffix("dcr").as_deref(), Some("ডিসির"));
+        assert_eq!(resolve_acronym_with_suffix("tvte").as_deref(), Some("টিভিতে"));
+        assert_eq!(resolve_acronym_with_suffix("tvgulo").as_deref(), Some("টিভিগুলো"));
+        assert_eq!(resolve_acronym_with_suffix("mpder").as_deref(), Some("এমপিদের"));
+        assert_eq!(resolve_acronym_with_suffix("atmer").as_deref(), Some("এটিএমের"));
+        assert_eq!(resolve_acronym_with_suffix("pdfte").as_deref(), Some("পিডিএফে".replace("ে", "তে").as_str()));
+        assert_eq!(resolve_acronym_with_suffix("pdfe").as_deref(), Some("পিডিএফে"));
+        assert_eq!(resolve_acronym_with_suffix("cctvr").as_deref(), Some("সিসিটিভির"));
+        assert_eq!(resolve_acronym_with_suffix("kotha"), None);
     }
 }
