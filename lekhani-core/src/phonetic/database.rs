@@ -1415,7 +1415,11 @@ impl PhoneticDatabase {
             variant_keys.push(lower.replace("awa", "aoya"));
         }
         if lower.contains("ere") && !lower.contains("eRe") {
-            variant_keys.push(lower.replace("ere", "eRe"));
+            let ere_fixed = lower.replace("ere", "eRe");
+            if ere_fixed.starts_with("ch") && !ere_fixed.starts_with("chh") {
+                variant_keys.push(format!("chh{}", &ere_fixed[2..]));
+            }
+            variant_keys.push(ere_fixed);
         }
         if lower.starts_with("shamn") {
             variant_keys.push(lower.replacen("shamn", "samn", 1));
