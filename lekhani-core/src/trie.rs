@@ -168,26 +168,25 @@ impl PrefixTrie {
     pub fn get_exact(&self, key: &str) -> Option<(&str, u32)> {
         if let Ok(idx) = self.entries.binary_search_by(|e| self.word_at(e).cmp(key)) {
             let entry = &self.entries[idx];
-            Some((self.word_at(entry), entry.freq))
-        } else {
-            None
+            return Some((self.word_at(entry), entry.freq));
         }
+        if let Some(nfd) = to_nfd_nukta(key) {
+            if let Ok(idx) = self.entries.binary_search_by(|e| self.word_at(e).cmp(&nfd)) {
+                let entry = &self.entries[idx];
+                return Some((self.word_at(entry), entry.freq));
+            }
+        }
+        None
     }
 
     /// Get frequency weight of a word (returns 0 if unindexed)
     pub fn get_frequency(&self, key: &str) -> u32 {
-        if let Ok(idx) = self.entries.binary_search_by(|e| self.word_at(e).cmp(key)) {
-            self.entries[idx].freq
-        } else {
-            0
-        }
+        self.get_exact(key).map(|(_, freq)| freq).unwrap_or(0)
     }
 
     /// Check if dictionary contains exact word
     pub fn contains_exact(&self, key: &str) -> bool {
-        self.entries
-            .binary_search_by(|e| self.word_at(e).cmp(key))
-            .is_ok()
+        self.get_exact(key).is_some()
     }
 
     /// Check if any word in dictionary starts with prefix in O(log N)
@@ -470,6 +469,23 @@ impl PrefixTrie {
         }
         self.insert_bulk_weighted(new_entries);
     }
+}
+
+#[inline]
+fn to_nfd_nukta(key: &str) -> Option<String> {
+    if !key.contains(['\u{09DC}', '\u{09DD}', '\u{09DF}']) {
+        return None;
+    }
+    let mut out = String::with_capacity(key.len() + 6);
+    for ch in key.chars() {
+        match ch {
+            '\u{09DC}' => out.push_str("\u{09A1}\u{09BC}"),
+            '\u{09DD}' => out.push_str("\u{09A2}\u{09BC}"),
+            '\u{09DF}' => out.push_str("\u{09AF}\u{09BC}"),
+            _ => out.push(ch),
+        }
+    }
+    Some(out)
 }
 
 #[cfg(test)]
