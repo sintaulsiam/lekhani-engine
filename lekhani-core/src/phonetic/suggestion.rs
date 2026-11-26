@@ -1481,6 +1481,8 @@ impl PhoneticSuggestion {
             .or(learner_fav.as_ref())
         {
             Some(fav.clone())
+        } else if is_contextual_override && preferred_override.is_some() {
+            preferred_override.clone()
         } else if is_tech_collocation
             && preferred_loanword
                 .as_ref()
@@ -2918,18 +2920,24 @@ impl PhoneticSuggestion {
         let is_explicit_o_ending = (middle.ends_with("bo")
             || (middle.ends_with("cho") && middle != "accho"))
             && !middle.contains('`');
+        let mut explicit_o_promoted = false;
         if is_explicit_o_ending {
             scored_candidates.retain(|(t, _, _)| !t.ends_with("বও") && !t.ends_with("ছও"));
             if middle.ends_with("cho") && preferred_override.is_none() {
+                let morph_analyzer = crate::morpheme::BengaliMorphAnalyzer::new();
                 if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| {
                     t.ends_with('ো')
                         && (self.database.is_exact_dictionary_word(t)
-                            || self.database.trie.contains_exact(t))
+                            || self.database.trie.contains_exact(t)
+                            || morph_analyzer
+                                .decompose(t)
+                                .is_some_and(|d| self.database.is_exact_dictionary_word(d.root)))
                 }) {
                     if pos > 0 {
                         let o_cand = scored_candidates.remove(pos);
                         scored_candidates.insert(0, o_cand);
                     }
+                    explicit_o_promoted = true;
                 }
             }
         }
@@ -2987,6 +2995,37 @@ impl PhoneticSuggestion {
                         }
                     }
                 }
+            }
+        }
+
+        // Reading-context disambiguation: "por*" after a reading noun ("বই", "পত্রিকা", etc.)
+        // means "পড়-" (to read), not "পর-" (to wear).
+        let mut reading_context_promoted = false;
+        if middle.starts_with("por")
+            && context.iter().any(|c| {
+                matches!(
+                    *c,
+                    "বই" | "পত্রিকা" | "খবর" | "গল্প" | "কবিতা" | "উপন্যাস" | "পড়া" | "ক্লাস" | "পাঠ"
+                )
+            })
+        {
+            let prefer_o = middle.ends_with("cho");
+            let pos = if prefer_o {
+                scored_candidates
+                    .iter()
+                    .position(|(t, _, _)| t.starts_with("পড়") && t.ends_with('ো'))
+                    .or_else(|| scored_candidates.iter().position(|(t, _, _)| t.starts_with("পড়")))
+            } else {
+                scored_candidates
+                    .iter()
+                    .position(|(t, _, _)| t.starts_with("পড়"))
+            };
+            if let Some(pos) = pos {
+                if pos > 0 {
+                    let read_cand = scored_candidates.remove(pos);
+                    scored_candidates.insert(0, read_cand);
+                }
+                reading_context_promoted = true;
             }
         }
 
@@ -3153,6 +3192,8 @@ impl PhoneticSuggestion {
             && !context.is_empty()
             && scored_candidates.len() >= 2
             && !is_contextual_override
+            && !reading_context_promoted
+            && !explicit_o_promoted
             && !has_english_tech_passthrough
         {
             let top_is_exact = scored_candidates[0].2.is_exact_phonetic > 0.5;
@@ -3277,6 +3318,9 @@ impl PhoneticSuggestion {
             && !is_code
             && !is_tech_collocation
             && !has_english_tech_passthrough
+            && !is_contextual_override
+            && !reading_context_promoted
+            && !explicit_o_promoted
             && !self.is_reranking
             && pre.is_empty()
             && post.is_empty()
