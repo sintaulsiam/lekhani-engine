@@ -55,6 +55,7 @@ const ROMANIZED_ACRONYMS: &[(&str, &str, bool)] = &[
     ("atm", "এটিএম", false),
     ("pdf", "পিডিএফ", false),
     ("hr", "এইচআর", false),
+    ("gf", "জিএফ", false),
 ];
 
 /// Resolves a Romanized acronym with an optional Bengali case/plural suffix
@@ -114,6 +115,29 @@ pub fn apply_contextual_homophone_rules(
         return;
     }
 
+    let banglish_match: Option<&'static str> = match middle.to_ascii_lowercase().as_str() {
+        "somossha" => Some("সমস্যা"),
+        "khaua" | "khawa" => Some("খাওয়া"),
+        "chere" => Some("ছেড়ে"),
+        "shamnashamni" => Some("সামনাসামনি"),
+        "keo" => Some("কেউ"),
+        "bepar" => Some("ব্যাপার"),
+        "je" => Some("যে"),
+        "tore" => Some("তোরে"),
+        "bolbone" => Some("বলবোনে"),
+        "mainshe" => Some("মাইনষে"),
+        "eida" => Some("এইডা"),
+        "jigamu" => Some("জিগামু"),
+        "hoila" => Some("হইলা"),
+        "hoynai" => Some("হয়নাই"),
+        _ => None,
+    };
+    if let Some(target) = banglish_match {
+        final_candidates.retain(|c| c != target);
+        final_candidates.insert(0, target.to_string());
+        return;
+    }
+
     if middle.len() > 7 {
         return;
     }
@@ -158,6 +182,10 @@ pub fn apply_contextual_homophone_rules(
         Some("কাঁদা")
     } else if middle.eq_ignore_ascii_case("ashbi") && has_ctx(&["তুই", "কখন"]) {
         Some("আসবি")
+    } else if middle.eq_ignore_ascii_case("ase")
+        && has_ctx(&["খবর", "সমস্যা", "টাকা", "কাজ", "সময়", "কথা"])
+    {
+        Some("আছে")
     } else {
         None
     };

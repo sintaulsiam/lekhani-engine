@@ -127,6 +127,16 @@ pub fn resolve_digit_unit_candidates(input: &str) -> Option<(String, Vec<String>
             ];
             (p, cands)
         }
+        "k" => {
+            let p = input.to_string();
+            let cands = vec![
+                p.clone(),
+                format!("{}কে", b_digits),
+                format!("{} হাজার", b_digits),
+                b_digits.clone(),
+            ];
+            (p, cands)
+        }
         "taka" => {
             let p = format!("{} টাকা", b_digits);
             let cands = vec![
