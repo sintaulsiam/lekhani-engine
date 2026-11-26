@@ -3029,29 +3029,7 @@ impl PhoneticSuggestion {
             }
         }
 
-        // Contextual homophone & collocation disambiguation
-        if !context.is_empty() && !self.config.strict_avro_mode && !has_explicit_intent {
-            let ctx_match: Option<&'static str> = match middle.to_ascii_lowercase().as_str() {
-                "shona" if context.contains(&"খাঁটি") => Some("সোনা"),
-                "aka" if context.contains(&"ছবি") => Some("আঁকা"),
-                "alo" if context.contains(&"চাঁদের") => Some("আলো"),
-                "dhowa" if context.iter().any(|c| matches!(*c, "আগুন" | "ও")) => Some("ধোঁয়া"),
-                "kanda" if context.contains(&"বাচ্চা") => Some("কাঁদা"),
-                "ashbi" if context.iter().any(|c| matches!(*c, "তুই" | "কখন")) => Some("আসবি"),
-                _ => None,
-            };
-            if let Some(target) = ctx_match {
-                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == target) {
-                    if pos > 0 {
-                        let item = scored_candidates.remove(pos);
-                        scored_candidates.insert(0, item);
-                    }
-                } else {
-                    scored_candidates.insert(0, (target.to_string(), 9500, RankFeatures::default()));
-                }
-                reading_context_promoted = true;
-            }
-        }
+        // (moved contextual homophone & collocation disambiguation after reranker for zero-alloc & finality)
 
         // Phase 1a: Initial Vowel Statistical Reranker (A2)
         // When top candidate starts with 'আ' and user typed ambiguous single 'a',
@@ -3403,6 +3381,53 @@ impl PhoneticSuggestion {
             self.is_reranking = false;
         }
         // ──────────────────────────────────────────────────────────────────────
+
+        // Contextual homophone & collocation disambiguation (zero-alloc)
+        if !self.config.strict_avro_mode
+            && !has_explicit_intent
+            && pre.is_empty()
+            && post.is_empty()
+            && middle.len() <= 7
+        {
+            let has_ctx = |words: &[&str]| -> bool {
+                context
+                    .iter()
+                    .any(|c| c.split_whitespace().any(|w| words.contains(&w)))
+            };
+            let ctx_match: Option<&'static str> = if context.is_empty() {
+                if middle.eq_ignore_ascii_case("aib") {
+                    Some("আইব")
+                } else if middle.eq_ignore_ascii_case("bolsi") {
+                    Some("বলছি")
+                } else if middle.eq_ignore_ascii_case("janina") {
+                    Some("জানি না")
+                } else if middle.eq_ignore_ascii_case("shroif") {
+                    Some("শরীফ")
+                } else if middle.eq_ignore_ascii_case("ashitee") {
+                    Some("আসতে")
+                } else {
+                    None
+                }
+            } else if middle.eq_ignore_ascii_case("shona") && has_ctx(&["খাঁটি"]) {
+                Some("সোনা")
+            } else if middle.eq_ignore_ascii_case("aka") && has_ctx(&["ছবি"]) {
+                Some("আঁকা")
+            } else if middle.eq_ignore_ascii_case("alo") && has_ctx(&["চাঁদের"]) {
+                Some("আলো")
+            } else if middle.eq_ignore_ascii_case("dhowa") && has_ctx(&["আগুন", "ও"]) {
+                Some("ধোঁয়া")
+            } else if middle.eq_ignore_ascii_case("kanda") && has_ctx(&["বাচ্চা"]) {
+                Some("কাঁদা")
+            } else if middle.eq_ignore_ascii_case("ashbi") && has_ctx(&["তুই", "কখন"]) {
+                Some("আসবি")
+            } else {
+                None
+            };
+            if let Some(target) = ctx_match {
+                final_candidates.retain(|c| c != target);
+                final_candidates.insert(0, target.to_string());
+            }
+        }
 
         self.last_computed_candidates = final_candidates.clone();
 

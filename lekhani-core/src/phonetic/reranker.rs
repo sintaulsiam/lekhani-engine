@@ -125,6 +125,9 @@ impl CandidateReranker {
         suggestion: &PhoneticSuggestion,
     ) {
         let first = candidates[0].clone();
+        if suggestion.database.is_exact_dictionary_word(&first) {
+            return;
+        }
         if first.contains('া') {
             for (idx, _) in first.match_indices('া') {
                 // Only consider medial positions, never terminal aa-kar
