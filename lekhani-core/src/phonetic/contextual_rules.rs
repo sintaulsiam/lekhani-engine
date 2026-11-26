@@ -42,7 +42,11 @@ pub fn apply_contextual_homophone_rules(
             .any(|c| c.split_whitespace().any(|w| words.contains(&w)))
     };
 
-    let ctx_match: Option<&'static str> = if context.is_empty() {
+    let ctx_match: Option<&'static str> = if middle.eq_ignore_ascii_case("vc") {
+        Some("ভিসি")
+    } else if middle.eq_ignore_ascii_case("vcr") {
+        Some("ভিসির")
+    } else if context.is_empty() {
         if middle.eq_ignore_ascii_case("aib") {
             Some("আইব")
         } else if middle.eq_ignore_ascii_case("bolsi") {
