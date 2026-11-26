@@ -1421,8 +1421,8 @@ impl PhoneticDatabase {
             }
             variant_keys.push(ere_fixed);
         }
-        if lower.starts_with("shamn") {
-            variant_keys.push(lower.replacen("shamn", "samn", 1));
+        if lower.contains("shamn") {
+            variant_keys.push(lower.replace("shamn", "samon"));
         }
 
         // 3. Resolve candidates and score by frequency
