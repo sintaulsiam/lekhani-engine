@@ -2195,15 +2195,21 @@ impl PhoneticSuggestion {
                 }
             }
 
-            // 12. Physical QWERTY Typo & Transposition Fallback (only when no dictionary match exists yet)
+            // 12. Physical QWERTY Typo & Transposition Fallback
+            // Only skip when the direct phonetic output is already a common dict word or Pragyan
+            // matched it with 0 grapheme edit distance (so QWERTY slips like bhslo -> ভালো still recover).
             let is_direct_dict = self.database.is_exact_dictionary_word(&phonetic)
                 && self.database.get_frequency(&phonetic) >= 1000;
-            let has_any_dict_match = is_direct_dict
-                || raw_candidates.iter().any(|c| {
-                    c.source != CandidateSource::TriePrefixAutocomplete
-                        && self.database.is_exact_dictionary_word(&c.text)
-                });
-            if !has_any_dict_match && middle.chars().count() >= 3 && middle.chars().count() <= 12 {
+            let has_exact_pragyan_match = raw_candidates.iter().any(|c| {
+                c.source == CandidateSource::PragyanBeam
+                    && super::ranking::grapheme_edit_distance(&phonetic, &c.text) == 0
+                    && self.database.is_exact_dictionary_word(&c.text)
+            });
+            if !is_direct_dict
+                && !has_exact_pragyan_match
+                && middle.chars().count() >= 3
+                && middle.chars().count() <= 12
+            {
                 let mut typo_matches: Vec<String> = Vec::new();
 
                 // 12a. Physical QWERTY key adjacency slips and adjacent transpositions
