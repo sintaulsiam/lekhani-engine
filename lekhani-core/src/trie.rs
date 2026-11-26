@@ -195,6 +195,17 @@ impl PrefixTrie {
         if prefix.is_empty() {
             return true;
         }
+        if self.has_prefix_raw(prefix) {
+            return true;
+        }
+        if let Some(nfd) = to_nfd_nukta(prefix) {
+            return self.has_prefix_raw(&nfd);
+        }
+        false
+    }
+
+    #[inline]
+    fn has_prefix_raw(&self, prefix: &str) -> bool {
         let start_idx = match self
             .entries
             .binary_search_by(|e| self.word_at(e).cmp(prefix))
@@ -250,25 +261,11 @@ impl PrefixTrie {
             return Vec::new();
         }
 
-        // Find starting index using binary search
-        let start_idx = match self
-            .entries
-            .binary_search_by(|e| self.word_at(e).cmp(prefix))
-        {
-            Ok(idx) => idx,
-            Err(idx) => idx,
-        };
-
         let mut matched: Vec<(&'a str, u32)> = Vec::with_capacity((limit * 3).max(8));
-        for entry in &self.entries[start_idx..] {
-            let word = self.word_at(entry);
-            if word.starts_with(prefix) {
-                matched.push((word, entry.freq));
-                if matched.len() >= (limit * 4).max(16) {
-                    break;
-                }
-            } else {
-                break;
+        self.collect_prefix_entries_raw(prefix, limit, &mut matched);
+        if matched.is_empty() {
+            if let Some(nfd) = to_nfd_nukta(prefix) {
+                self.collect_prefix_entries_raw(&nfd, limit, &mut matched);
             }
         }
 
@@ -280,6 +277,33 @@ impl PrefixTrie {
         });
 
         matched.into_iter().take(limit).collect()
+    }
+
+    fn collect_prefix_entries_raw<'a>(
+        &'a self,
+        prefix: &str,
+        limit: usize,
+        matched: &mut Vec<(&'a str, u32)>,
+    ) {
+        let start_idx = match self
+            .entries
+            .binary_search_by(|e| self.word_at(e).cmp(prefix))
+        {
+            Ok(idx) => idx,
+            Err(idx) => idx,
+        };
+
+        for entry in &self.entries[start_idx..] {
+            let word = self.word_at(entry);
+            if word.starts_with(prefix) {
+                matched.push((word, entry.freq));
+                if matched.len() >= (limit * 4).max(16) {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
     }
 
     /// Zero-allocation lookup returning borrowed string slices
