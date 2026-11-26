@@ -116,20 +116,10 @@ pub fn apply_contextual_homophone_rules(
     }
 
     let banglish_match: Option<&'static str> = match middle.to_ascii_lowercase().as_str() {
-        "somossha" => Some("সমস্যা"),
-        "khaua" | "khawa" => Some("খাওয়া"),
-        "chere" => Some("ছেড়ে"),
-        "shamnashamni" => Some("সামনাসামনি"),
         "keo" => Some("কেউ"),
         "bepar" => Some("ব্যাপার"),
         "je" => Some("যে"),
         "tore" => Some("তোরে"),
-        "bolbone" => Some("বলবোনে"),
-        "mainshe" => Some("মাইনষে"),
-        "eida" => Some("এইডা"),
-        "jigamu" => Some("জিগামু"),
-        "hoila" => Some("হইলা"),
-        "hoynai" => Some("হয়নাই"),
         _ => None,
     };
     if let Some(target) = banglish_match {

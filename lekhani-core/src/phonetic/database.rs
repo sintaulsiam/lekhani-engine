@@ -1403,6 +1403,24 @@ impl PhoneticDatabase {
             }
         }
 
+        // 15. General Banglish sound laws: 'ssh' -> 'sy'/'Shy', 'aua'/'awa' -> 'aoya', 'ere' -> 'eRe', 'shamn' -> 'samn'
+        if lower.contains("ssh") {
+            variant_keys.push(lower.replace("ssh", "sy"));
+            variant_keys.push(lower.replace("ssh", "Shy"));
+        }
+        if lower.contains("aua") {
+            variant_keys.push(lower.replace("aua", "aoya"));
+        }
+        if lower.contains("awa") {
+            variant_keys.push(lower.replace("awa", "aoya"));
+        }
+        if lower.contains("ere") && !lower.contains("eRe") {
+            variant_keys.push(lower.replace("ere", "eRe"));
+        }
+        if lower.starts_with("shamn") {
+            variant_keys.push(lower.replacen("shamn", "samn", 1));
+        }
+
         // 3. Resolve candidates and score by frequency
         let mut scored_cands: Vec<(String, u32)> = Vec::with_capacity(variant_keys.len());
         let mut seen = hashbrown::HashSet::new();
@@ -1728,20 +1746,6 @@ impl PhoneticDatabase {
             "brother" => Some(("ব্রাদার", "brother")),
             "sister" => Some(("সিস্টার", "sister")),
             "note" => Some(("নোট", "note")),
-            "judge" => Some(("জাজ", "judge")),
-            "fact" => Some(("ফ্যাক্ট", "fact")),
-            "person" => Some(("পারসন", "person")),
-            "friendly" => Some(("ফ্রেন্ডলি", "friendly")),
-            "instant" => Some(("ইনস্ট্যান্ট", "instant")),
-            "but" => Some(("বাট", "but")),
-            "invoice" => Some(("ইনভয়েস", "invoice")),
-            "ecommerce" | "e-commerce" => Some(("ই-কমার্স", "ecommerce")),
-            "allow" => Some(("অ্যালাউ", "allow")),
-            "netlify" => Some(("নেটলিফাই", "netlify")),
-            "head" => Some(("হেড", "head")),
-            "pelvis" => Some(("পেলভিস", "pelvis")),
-            "tilted" => Some(("টিল্টেড", "tilted")),
-            "foreward" | "forward" => Some(("ফরোয়ার্ড", "forward")),
             _ => None,
         }
     }
