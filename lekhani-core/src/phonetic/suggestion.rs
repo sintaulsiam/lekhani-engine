@@ -1279,7 +1279,21 @@ impl PhoneticSuggestion {
         if let Some(&last_ctx) = context.last() {
             let is_foreign_or_loan = (last_ctx.len() >= 2
                 && last_ctx.chars().all(|c| c.is_ascii_alphabetic()))
-                || PhoneticDatabase::get_bilingual_loanword(last_ctx).is_some();
+                || PhoneticDatabase::get_bilingual_loanword(last_ctx).is_some()
+                || matches!(
+                    last_ctx,
+                    "ইমেইল"
+                        | "মেইল"
+                        | "মেসেজ"
+                        | "ফাইল"
+                        | "লিংক"
+                        | "ফটো"
+                        | "ভিডিও"
+                        | "ওয়াইফাই"
+                        | "ব্লুটুথ"
+                        | "নেট"
+                        | "ডাটা"
+                );
             if is_foreign_or_loan {
                 let middle_lower = middle.to_lowercase();
                 if let Some(light_verb) = match middle_lower.as_str() {

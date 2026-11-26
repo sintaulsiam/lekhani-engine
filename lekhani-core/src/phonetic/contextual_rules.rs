@@ -53,9 +53,17 @@ pub fn apply_contextual_homophone_rules(
             Some("শরীফ")
         } else if middle.eq_ignore_ascii_case("ashitee") {
             Some("আসতে")
+        } else if middle.eq_ignore_ascii_case("tini") {
+            Some("তিনি")
         } else {
             None
         }
+    } else if middle.eq_ignore_ascii_case("tini")
+        && !context
+            .last()
+            .is_some_and(|c| c.chars().all(|ch| ch.is_ascii_digit() || ('০'..='৯').contains(&ch)))
+    {
+        Some("তিনি")
     } else if middle.eq_ignore_ascii_case("shona") && has_ctx(&["খাঁটি"]) {
         Some("সোনা")
     } else if middle.eq_ignore_ascii_case("aka") && has_ctx(&["ছবি"]) {
