@@ -24,10 +24,16 @@ impl CandidateReranker {
             return;
         }
 
-        let lower = input.to_ascii_lowercase();
+        let lower_owned;
+        let lower: &str = if input.bytes().any(|b| b.is_ascii_uppercase()) {
+            lower_owned = input.to_ascii_lowercase();
+            &lower_owned
+        } else {
+            input
+        };
 
         // Supervised phonetic override has absolute authority; never demote or disrupt it
-        if suggestion.database.lookup_override(&lower).is_some()
+        if suggestion.database.lookup_override(lower).is_some()
             || suggestion.database.lookup_override(input).is_some()
             || lekhani_parser::has_explicit_avro_intent(input)
         {
@@ -35,37 +41,37 @@ impl CandidateReranker {
         }
 
         // 1. Initial Vowel Reranker (আ- vs অ-)
-        Self::rerank_initial_vowel(&lower, candidates, suggestion);
+        Self::rerank_initial_vowel(lower, candidates, suggestion);
 
         // 2. Medial Inherent Vowel Reranker (অক্ষারকে -> অক্ষরকে)
-        Self::rerank_medial_inherent_vowel(&lower, candidates, suggestion);
+        Self::rerank_medial_inherent_vowel(lower, candidates, suggestion);
 
         // 3. Clitic Particle Reranker (অঞ্চল + ও -> অঞ্চলও)
-        Self::rerank_clitic_particles(&lower, candidates, suggestion);
+        Self::rerank_clitic_particles(lower, candidates, suggestion);
 
         // 4. Tatsama Retroflex Nasal Conjuncts (ন্দ -> ণ্ড)
-        Self::rerank_retroflex_nasal(&lower, candidates, suggestion);
+        Self::rerank_retroflex_nasal(lower, candidates, suggestion);
 
         // 5. English Loanword Initial 'au' -> 'অ' (auxford -> অক্সফোর্ড)
-        Self::rerank_loanword_au(&lower, candidates, suggestion);
+        Self::rerank_loanword_au(lower, candidates, suggestion);
 
         // 6. De-gemination of Double Consonant Typing Noise (oppohoron -> অপহরন / অপহরণ)
-        Self::rerank_degemination(&lower, candidates, suggestion);
+        Self::rerank_degemination(lower, candidates, suggestion);
 
         // 7. Terminal Inflectional Suffixes (-ey -> -ে, independent এর -> ের)
-        Self::rerank_terminal_inflections(&lower, candidates, suggestion);
+        Self::rerank_terminal_inflections(lower, candidates, suggestion);
 
         // 8. Sanskrit/Indic 'v' / 'w' -> 'ব' (avatar -> abatar -> অবতার, vidya -> বিদ্যা)
-        Self::rerank_indic_v_w(&lower, candidates, suggestion);
+        Self::rerank_indic_v_w(lower, candidates, suggestion);
 
         // 9. Participial Adjectives (-ito/-ita -> -িত, e.g. atyacharita -> অত্যাচারিত, adhito -> অধীত)
-        Self::rerank_participial_it(&lower, candidates, suggestion);
+        Self::rerank_participial_it(lower, candidates, suggestion);
 
         // 10. Modern Standard Orthography (হ্রস্ব ু vs দীর্ঘ ূ normalization)
-        Self::rerank_standard_orthography(&lower, candidates, suggestion);
+        Self::rerank_standard_orthography(lower, candidates, suggestion);
 
         // 11. Dictionary Word Preference over Non-Dictionary Candidates
-        Self::rerank_dictionary_preference(&lower, candidates, suggestion);
+        Self::rerank_dictionary_preference(lower, candidates, suggestion);
     }
 
     /// Fix 1: Initial Vowel Reranker
@@ -124,11 +130,8 @@ impl CandidateReranker {
         candidates: &mut Vec<String>,
         suggestion: &PhoneticSuggestion,
     ) {
-        let first = candidates[0].clone();
-        if suggestion.database.is_exact_dictionary_word(&first) {
-            return;
-        }
-        if first.contains('া') {
+        if candidates[0].contains('া') {
+            let first = candidates[0].clone();
             for (idx, _) in first.match_indices('া') {
                 // Only consider medial positions, never terminal aa-kar
                 if idx >= first.len() - 'া'.len_utf8() {
@@ -138,7 +141,9 @@ impl CandidateReranker {
                 alt.remove(idx);
                 let freq_alt = suggestion.database.get_frequency(&alt);
                 let freq_orig = suggestion.database.get_frequency(&first);
-                if freq_alt > (freq_orig.max(50) * 5) {
+                if freq_alt > (freq_orig.max(50) * 5)
+                    && !suggestion.database.is_exact_dictionary_word(&first)
+                {
                     candidates.retain(|c| c != &alt);
                     candidates.insert(0, alt);
                     break;
@@ -157,11 +162,6 @@ impl CandidateReranker {
         suggestion: &PhoneticSuggestion,
     ) {
         if candidates.is_empty() {
-            return;
-        }
-
-        // Supervised phonetic override has absolute authority; never demote it for pseudo-clitics
-        if suggestion.database.lookup_override(input).is_some() {
             return;
         }
 
@@ -319,19 +319,48 @@ impl CandidateReranker {
                     candidates.insert(0, first_alt.clone());
                 }
             }
+        } else if candidates.len() >= 2
+            && input.ends_with('e')
+            && !input.ends_with("ee")
+            && !input.ends_with("ie")
+            && input.len() >= 4
+            && !candidates[0].ends_with('ে')
+        {
+            // A2. Terminal -e locative preservation (e.g. abosare -> অবসর vs অবসরে)
+            let stem = candidates[0].as_str();
+            if let Some(rel_pos) = candidates[1..].iter().position(|c| {
+                c.strip_suffix('ে') == Some(stem)
+                    && (suggestion.database.is_exact_dictionary_word(c)
+                        || suggestion.database.trie.contains_exact(c))
+            }) {
+                let item = candidates.remove(rel_pos + 1);
+                candidates.insert(0, item);
+            }
+        }
+
+        // A3. Negation prefix 'অন-' preservation when 'an-'/'on-' input truncated to 'অ-' (e.g. anadhikar -> অধিকার vs অনধিকার)
+        if candidates.len() >= 2
+            && (input.starts_with("an") || input.starts_with("on"))
+            && input.len() >= 6
+            && !candidates[0].starts_with("অন")
+        {
+            if let Some(tail) = candidates[0].strip_prefix('অ') {
+                if let Some(rel_pos) = candidates[1..].iter().position(|c| {
+                    c.strip_prefix("অন") == Some(tail)
+                        && (suggestion.database.is_exact_dictionary_word(c)
+                            || suggestion.database.trie.contains_exact(c))
+                }) {
+                    let item = candidates.remove(rel_pos + 1);
+                    candidates.insert(0, item);
+                }
+            }
         }
 
         // B. Dependent Genitive 'ের' vs Independent 'এর'
         // In Avro, consonant + er often yields '...এর' (e.g. 'অত্যাচারএর'). Fix to 'অত্যাচারের'.
-        let first = candidates[0].clone();
-        if first.ends_with("এর") && first.chars().count() >= 3 {
-            // Replace terminal 'এর' with 'ের'
-            let mut chars: Vec<char> = first.chars().collect();
-            let len = chars.len();
-            if len >= 2 && chars[len - 2] == 'এ' && chars[len - 1] == 'র' {
-                chars[len - 2] = 'ে';
-                chars[len - 1] = 'র';
-                let alt: String = chars.into_iter().collect();
+        if let Some(stem) = candidates[0].strip_suffix("এর") {
+            if stem.chars().count() >= 1 {
+                let alt = format!("{}ের", stem);
                 if suggestion.database.is_exact_dictionary_word(&alt)
                     || suggestion.database.trie.contains_exact(&alt)
                 {
@@ -510,11 +539,6 @@ impl CandidateReranker {
         suggestion: &PhoneticSuggestion,
     ) {
         if candidates.is_empty() {
-            return;
-        }
-
-        // Supervised phonetic override has absolute authority; never demote it
-        if suggestion.database.lookup_override(input).is_some() {
             return;
         }
 
