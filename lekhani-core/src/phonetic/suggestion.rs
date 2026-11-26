@@ -2731,6 +2731,12 @@ impl PhoneticSuggestion {
                 None
             };
 
+            // Demote unattested low-band dictionary.json entries (e.g. freq=90 typos like অতিতেও/অবশরে)
+            // when they are completely absent from the corpus LM.
+            if freq > 0 && freq <= 150 && lm_score.is_some_and(|s| s <= -5.9) {
+                freq = 1;
+            }
+
             // Context-conditioned LM score using 3-word context (fourgram) for extended feature.
             let context_lm_score = if prev.is_some()
                 && self.config.ai_profile == AiProfile::Balanced
