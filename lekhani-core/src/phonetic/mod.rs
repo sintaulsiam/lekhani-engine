@@ -2,6 +2,7 @@
 
 pub mod code_shield;
 pub mod compound;
+pub mod contextual_rules;
 pub mod database;
 pub mod fuzzy;
 pub mod learner;
@@ -14,6 +15,7 @@ pub mod reduplication;
 pub mod reranker;
 pub mod segmenter;
 pub mod suggestion;
+pub mod text_utils;
 
 pub use compound::CompoundSplitter;
 pub use database::PhoneticDatabase;
