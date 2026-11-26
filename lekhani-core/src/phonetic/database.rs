@@ -1377,8 +1377,8 @@ impl PhoneticDatabase {
             variant_keys.push(lower.replace("nch", "n`ch"));
         }
 
-        // 14. Rri-kar ('ri' -> 'rri'), Murdhonya 'shn' -> 'SN', and 'cura'/'chura' -> 'cURa'
-        // e.g. 'krishnocura' / 'krishnochura' / 'krishnachura' -> 'krriSNocURa' -> 'কৃষ্ণচূড়া'
+        // 14. Rri-kar ('ri' -> 'rri'), Murdhonya 'shn' -> 'ShN', and 'cura'/'chura' -> 'cURa'
+        // e.g. 'krishnocura' / 'krishnochura' / 'krishnachura' -> 'krriShNocURa' -> 'কৃষ্ণচূড়া'
         if lower.contains("ri")
             || lower.contains("shn")
             || lower.contains("cura")
@@ -1390,16 +1390,16 @@ impl PhoneticDatabase {
                 variant_keys.push(base.clone());
             }
             if base.contains("shn") {
-                base = base.replace("shn", "SN");
+                base = base.replace("shn", "ShN");
                 variant_keys.push(base.clone());
             }
             if base.contains("cura") {
                 variant_keys.push(base.replace("cura", "cURa"));
-                variant_keys.push(base.replace("SNacura", "SNocURa"));
+                variant_keys.push(base.replace("ShNacura", "ShNocURa"));
             }
             if base.contains("chura") {
                 variant_keys.push(base.replace("chura", "cURa"));
-                variant_keys.push(base.replace("SNachura", "SNocURa"));
+                variant_keys.push(base.replace("ShNachura", "ShNocURa"));
             }
         }
 
