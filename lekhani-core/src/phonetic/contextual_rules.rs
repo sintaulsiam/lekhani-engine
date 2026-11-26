@@ -116,6 +116,7 @@ pub fn apply_contextual_homophone_rules(
     }
 
     let banglish_match: Option<&'static str> = match middle.to_ascii_lowercase().as_str() {
+        "chere" => Some("ছেড়ে"),
         "keo" => Some("কেউ"),
         "bepar" => Some("ব্যাপার"),
         "je" => Some("যে"),
