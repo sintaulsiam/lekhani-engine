@@ -1377,6 +1377,32 @@ impl PhoneticDatabase {
             variant_keys.push(lower.replace("nch", "n`ch"));
         }
 
+        // 14. Rri-kar ('ri' -> 'rri'), Murdhonya 'shn' -> 'SN', and 'cura'/'chura' -> 'cURa'
+        // e.g. 'krishnocura' / 'krishnochura' / 'krishnachura' -> 'krriSNocURa' -> 'কৃষ্ণচূড়া'
+        if lower.contains("ri")
+            || lower.contains("shn")
+            || lower.contains("cura")
+            || lower.contains("chura")
+        {
+            let mut base = lower.clone();
+            if base.contains("ri") && !base.contains("rri") {
+                base = base.replacen("ri", "rri", 1);
+                variant_keys.push(base.clone());
+            }
+            if base.contains("shn") {
+                base = base.replace("shn", "SN");
+                variant_keys.push(base.clone());
+            }
+            if base.contains("cura") {
+                variant_keys.push(base.replace("cura", "cURa"));
+                variant_keys.push(base.replace("SNacura", "SNocURa"));
+            }
+            if base.contains("chura") {
+                variant_keys.push(base.replace("chura", "cURa"));
+                variant_keys.push(base.replace("SNachura", "SNocURa"));
+            }
+        }
+
         // 3. Resolve candidates and score by frequency
         let mut scored_cands: Vec<(String, u32)> = Vec::with_capacity(variant_keys.len());
         let mut seen = hashbrown::HashSet::new();
