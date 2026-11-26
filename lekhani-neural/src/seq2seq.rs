@@ -718,37 +718,59 @@ impl Seq2SeqTransliterator {
         bengali: &str,
         scratch: &mut InferenceScratch,
     ) -> f32 {
+        self.score_sequences_batch(latin, &[bengali], scratch)[0]
+    }
+
+    /// Scores multiple Bengali candidate strings against a single Latin input while running
+    /// the bidirectional encoder only once.
+    pub fn score_sequences_batch(
+        &self,
+        latin: &str,
+        targets: &[&str],
+        scratch: &mut InferenceScratch,
+    ) -> Vec<f32> {
         let src_ids = self.src_vocab.encode_str(latin.to_ascii_lowercase().trim());
-        let tgt_ids = self.tgt_vocab.encode_str_with_eos(bengali);
-        if src_ids.is_empty() || tgt_ids.is_empty() {
-            return -50.0;
+        if src_ids.is_empty() {
+            return vec![-50.0; targets.len()];
         }
         let enc_states = self.encode(&src_ids, scratch);
-        let mut dec_h = scratch.enc_final.clone();
-        let mut total_log_p = 0.0f32;
-        let mut prev_id = BOS_ID;
-        for (step, &gold_id) in tgt_ids.iter().enumerate() {
-            self.tgt_embed(prev_id, &mut scratch.emb_buf);
-            self.attend(&dec_h, &enc_states, scratch, step, tgt_ids.len());
-            scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
-            scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
-            self.decoder
-                .step(&scratch.dec_in, &dec_h, &mut scratch.h_next, None);
-            self.project(&scratch.h_next, &mut scratch.logits_buf);
-            let max_l = scratch
-                .logits_buf
-                .iter()
-                .cloned()
-                .fold(f32::NEG_INFINITY, f32::max);
-            let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
-            let log_sum = max_l + sum_e.max(1e-9).ln();
-            let gidx = gold_id as usize;
-            let gold_logit = scratch.logits_buf.get(gidx).copied().unwrap_or(-50.0);
-            total_log_p += gold_logit - log_sum;
-            dec_h.copy_from_slice(&scratch.h_next);
-            prev_id = gold_id;
+        let enc_final = scratch.enc_final.clone();
+        let mut out = Vec::with_capacity(targets.len());
+        let mut dec_h = Vec::with_capacity(enc_final.len());
+        for &bengali in targets {
+            let tgt_ids = self.tgt_vocab.encode_str_with_eos(bengali);
+            if tgt_ids.is_empty() {
+                out.push(-50.0);
+                continue;
+            }
+            dec_h.clear();
+            dec_h.extend_from_slice(&enc_final);
+            let mut total_log_p = 0.0f32;
+            let mut prev_id = BOS_ID;
+            for (step, &gold_id) in tgt_ids.iter().enumerate() {
+                self.tgt_embed(prev_id, &mut scratch.emb_buf);
+                self.attend(&dec_h, &enc_states, scratch, step, tgt_ids.len());
+                scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
+                scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
+                self.decoder
+                    .step(&scratch.dec_in, &dec_h, &mut scratch.h_next, None);
+                self.project(&scratch.h_next, &mut scratch.logits_buf);
+                let max_l = scratch
+                    .logits_buf
+                    .iter()
+                    .cloned()
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
+                let log_sum = max_l + sum_e.max(1e-9).ln();
+                let gidx = gold_id as usize;
+                let gold_logit = scratch.logits_buf.get(gidx).copied().unwrap_or(-50.0);
+                total_log_p += gold_logit - log_sum;
+                dec_h.copy_from_slice(&scratch.h_next);
+                prev_id = gold_id;
+            }
+            out.push(total_log_p / tgt_ids.len().max(1) as f32);
         }
-        total_log_p / tgt_ids.len().max(1) as f32
+        out
     }
 
     /// Quantize this F32 model into an INT8 `Seq2SeqQuantized` (~75% smaller).
@@ -1274,37 +1296,59 @@ impl Seq2SeqQuantized {
         bengali: &str,
         scratch: &mut InferenceScratch,
     ) -> f32 {
+        self.score_sequences_batch(latin, &[bengali], scratch)[0]
+    }
+
+    /// Scores multiple Bengali candidate strings against a single Latin input while running
+    /// the quantized bidirectional encoder only once.
+    pub fn score_sequences_batch(
+        &self,
+        latin: &str,
+        targets: &[&str],
+        scratch: &mut InferenceScratch,
+    ) -> Vec<f32> {
         let src_ids = self.src_vocab.encode_str(latin.to_ascii_lowercase().trim());
-        let tgt_ids = self.tgt_vocab.encode_str_with_eos(bengali);
-        if src_ids.is_empty() || tgt_ids.is_empty() {
-            return -50.0;
+        if src_ids.is_empty() {
+            return vec![-50.0; targets.len()];
         }
         let enc_states = self.encode(&src_ids, scratch);
-        let mut dec_h = scratch.enc_final.clone();
-        let mut total_log_p = 0.0f32;
-        let mut prev_id = BOS_ID;
-        for (step, &gold_id) in tgt_ids.iter().enumerate() {
-            self.tgt_embed(prev_id, &mut scratch.emb_buf);
-            self.attend(&dec_h, &enc_states, scratch, step, tgt_ids.len());
-            scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
-            scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
-            self.decoder
-                .step(&scratch.dec_in, &dec_h, &mut scratch.h_next);
-            self.project(&scratch.h_next, &mut scratch.logits_buf);
-            let max_l = scratch
-                .logits_buf
-                .iter()
-                .cloned()
-                .fold(f32::NEG_INFINITY, f32::max);
-            let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
-            let log_sum = max_l + sum_e.max(1e-9).ln();
-            let gidx = gold_id as usize;
-            let gold_logit = scratch.logits_buf.get(gidx).copied().unwrap_or(-50.0);
-            total_log_p += gold_logit - log_sum;
-            dec_h.copy_from_slice(&scratch.h_next);
-            prev_id = gold_id;
+        let enc_final = scratch.enc_final.clone();
+        let mut out = Vec::with_capacity(targets.len());
+        let mut dec_h = Vec::with_capacity(enc_final.len());
+        for &bengali in targets {
+            let tgt_ids = self.tgt_vocab.encode_str_with_eos(bengali);
+            if tgt_ids.is_empty() {
+                out.push(-50.0);
+                continue;
+            }
+            dec_h.clear();
+            dec_h.extend_from_slice(&enc_final);
+            let mut total_log_p = 0.0f32;
+            let mut prev_id = BOS_ID;
+            for (step, &gold_id) in tgt_ids.iter().enumerate() {
+                self.tgt_embed(prev_id, &mut scratch.emb_buf);
+                self.attend(&dec_h, &enc_states, scratch, step, tgt_ids.len());
+                scratch.dec_in[..self.emb_dim].copy_from_slice(&scratch.emb_buf);
+                scratch.dec_in[self.emb_dim..].copy_from_slice(&scratch.ctx_buf);
+                self.decoder
+                    .step(&scratch.dec_in, &dec_h, &mut scratch.h_next);
+                self.project(&scratch.h_next, &mut scratch.logits_buf);
+                let max_l = scratch
+                    .logits_buf
+                    .iter()
+                    .cloned()
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let sum_e: f32 = scratch.logits_buf.iter().map(|&l| (l - max_l).exp()).sum();
+                let log_sum = max_l + sum_e.max(1e-9).ln();
+                let gidx = gold_id as usize;
+                let gold_logit = scratch.logits_buf.get(gidx).copied().unwrap_or(-50.0);
+                total_log_p += gold_logit - log_sum;
+                dec_h.copy_from_slice(&scratch.h_next);
+                prev_id = gold_id;
+            }
+            out.push(total_log_p / tgt_ids.len().max(1) as f32);
         }
-        total_log_p / tgt_ids.len().max(1) as f32
+        out
     }
 }
 
@@ -1385,6 +1429,18 @@ impl Seq2SeqModel {
         match self {
             Self::Float(m) => m.score_sequence(latin, bengali, scratch),
             Self::Quantized(m) => m.score_sequence(latin, bengali, scratch),
+        }
+    }
+
+    pub fn score_sequences_batch(
+        &self,
+        latin: &str,
+        targets: &[&str],
+        scratch: &mut InferenceScratch,
+    ) -> Vec<f32> {
+        match self {
+            Self::Float(m) => m.score_sequences_batch(latin, targets, scratch),
+            Self::Quantized(m) => m.score_sequences_batch(latin, targets, scratch),
         }
     }
 

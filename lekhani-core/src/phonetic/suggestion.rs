@@ -2623,7 +2623,55 @@ impl PhoneticSuggestion {
                     && self.database.trie.contains_exact(&c.text)
             });
 
-        for cand in &raw_candidates {
+        let s2s_batch_scores: Vec<(usize, f32)> =
+            if let (Some(s2s), Some(scratch)) = (self.seq2seq.as_ref(), s2s_scratch.as_mut()) {
+                if !self.config.strict_avro_mode
+                    && !has_explicit_intent
+                    && !is_primary_in_dict
+                    && term.len() >= 4
+                    && term.len() <= 10
+                    && raw_candidates.len() >= 2
+                {
+                    let mut batch_indices: Vec<usize> = Vec::with_capacity(2);
+                    let mut batch_targets: Vec<&str> = Vec::with_capacity(2);
+                    for (idx, c) in raw_candidates.iter().enumerate() {
+                        if !c.text.is_ascii()
+                            && !c.text.contains(' ')
+                            && !matches!(
+                                c.source,
+                                CandidateSource::EmojiKeyword
+                                    | CandidateSource::CodeShield
+                                    | CandidateSource::SegmentedLattice
+                                    | CandidateSource::TriePrefixAutocomplete
+                                    | CandidateSource::TypoFallback
+                            )
+                            && c.text.chars().count() <= 12
+                        {
+                            batch_indices.push(idx);
+                            batch_targets.push(&c.text);
+                            if batch_indices.len() == 2 {
+                                break;
+                            }
+                        }
+                    }
+                    if batch_targets.len() >= 2
+                        || batch_indices.iter().any(|&i| {
+                            raw_candidates[i].source == CandidateSource::NeuralTransducer
+                        })
+                    {
+                        let scores = s2s.score_sequences_batch(term, &batch_targets, scratch);
+                        batch_indices.into_iter().zip(scores).collect()
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            };
+
+        for (cand_idx, cand) in raw_candidates.iter().enumerate() {
             if cand.source == CandidateSource::CodeShield {
                 scored_candidates.push((cand.text.clone(), 60000, RankFeatures::default()));
                 continue;
@@ -2728,20 +2776,10 @@ impl PhoneticSuggestion {
                 .as_ref()
                 .is_some_and(|l| l.learned_words.contains(&cand.text));
 
-            let s2s_log_prob =
-                if let (Some(s2s), Some(scratch)) = (self.seq2seq.as_ref(), s2s_scratch.as_mut()) {
-                    if !term.is_empty()
-                        && !cand.text.is_ascii()
-                        && cand.source != CandidateSource::EmojiKeyword
-                        && cand.source == CandidateSource::NeuralTransducer
-                    {
-                        Some(s2s.score_sequence(term, &cand.text, scratch))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
+            let s2s_log_prob = s2s_batch_scores
+                .iter()
+                .find(|&&(i, _)| i == cand_idx)
+                .map(|&(_, s)| s);
 
             let cand_gru_log_prob = match (
                 if !neural_predictions.is_empty() {

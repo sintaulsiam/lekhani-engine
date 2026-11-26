@@ -132,7 +132,7 @@ impl Default for RankWeights {
             user_favored: 5000.0,
             // Extended weights — conservative but meaningful
             context_lm_score: 1800.0,
-            gru_log_prob: 1200.0,
+            gru_log_prob: 3500.0,
             neural_alpha: 0.0,      // meta-feature, zero weight for now
             morpheme_depth: -400.0, // deeper suffix chains less likely primary candidates
             is_named_entity: 1500.0,
