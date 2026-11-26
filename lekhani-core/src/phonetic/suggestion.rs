@@ -3199,15 +3199,23 @@ impl PhoneticSuggestion {
             && !has_english_tech_passthrough
         {
             let top_is_exact = scored_candidates[0].2.is_exact_phonetic > 0.5;
+            let top_is_exact_dict =
+                top_is_exact && scored_candidates[0].2.is_in_dict > 0.5;
+            let top_text = &scored_candidates[0].0;
             let rerank_limit = scored_candidates.len().min(8);
             let mut top_texts: Vec<String> = scored_candidates[..rerank_limit]
                 .iter()
-                .filter(|(_, _, f)| {
-                    !top_is_exact
-                        || f.is_exact_phonetic > 0.5
-                        || (f.is_in_dict > 0.5
-                            && f.source_weight >= 0.0
-                            && f.phonetic_similarity >= -1.0)
+                .filter(|(t, _, f)| {
+                    if top_is_exact_dict {
+                        f.is_exact_phonetic > 0.5
+                            || lekhani_ai::are_bengali_homophones(top_text, t)
+                    } else {
+                        !top_is_exact
+                            || f.is_exact_phonetic > 0.5
+                            || (f.is_in_dict > 0.5
+                                && f.source_weight >= 0.0
+                                && f.phonetic_similarity >= -1.0)
+                    }
                 })
                 .map(|(t, _, _)| t.clone())
                 .collect();
