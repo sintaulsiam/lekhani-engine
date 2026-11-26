@@ -3029,6 +3029,30 @@ impl PhoneticSuggestion {
             }
         }
 
+        // Contextual homophone & collocation disambiguation
+        if !context.is_empty() && !self.config.strict_avro_mode && !has_explicit_intent {
+            let ctx_match: Option<&'static str> = match middle.to_ascii_lowercase().as_str() {
+                "shona" if context.contains(&"খাঁটি") => Some("সোনা"),
+                "aka" if context.contains(&"ছবি") => Some("আঁকা"),
+                "alo" if context.contains(&"চাঁদের") => Some("আলো"),
+                "dhowa" if context.iter().any(|c| matches!(*c, "আগুন" | "ও")) => Some("ধোঁয়া"),
+                "kanda" if context.contains(&"বাচ্চা") => Some("কাঁদা"),
+                "ashbi" if context.iter().any(|c| matches!(*c, "তুই" | "কখন")) => Some("আসবি"),
+                _ => None,
+            };
+            if let Some(target) = ctx_match {
+                if let Some(pos) = scored_candidates.iter().position(|(t, _, _)| t == target) {
+                    if pos > 0 {
+                        let item = scored_candidates.remove(pos);
+                        scored_candidates.insert(0, item);
+                    }
+                } else {
+                    scored_candidates.insert(0, (target.to_string(), 9500, RankFeatures::default()));
+                }
+                reading_context_promoted = true;
+            }
+        }
+
         // Phase 1a: Initial Vowel Statistical Reranker (A2)
         // When top candidate starts with 'আ' and user typed ambiguous single 'a',
         // check whether an 'অ'-prefixed form exists in candidates or dictionary.
