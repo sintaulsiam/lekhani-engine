@@ -697,7 +697,7 @@ impl PragyanEngine {
             let trie_cands = decode_beam_ngram_with_trie(
                 &roman_tokens,
                 &self.lm,
-                self.config.beam_width.max(14),
+                self.config.beam_width.max(18),
                 Some(t),
             );
             for (w, s) in trie_cands {

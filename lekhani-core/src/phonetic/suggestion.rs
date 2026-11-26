@@ -2195,10 +2195,15 @@ impl PhoneticSuggestion {
                 }
             }
 
-            // 12. Physical QWERTY Typo & Transposition Fallback
+            // 12. Physical QWERTY Typo & Transposition Fallback (only when no dictionary match exists yet)
             let is_direct_dict = self.database.is_exact_dictionary_word(&phonetic)
                 && self.database.get_frequency(&phonetic) >= 1000;
-            if !is_direct_dict && middle.chars().count() >= 3 && middle.chars().count() <= 12 {
+            let has_any_dict_match = is_direct_dict
+                || raw_candidates.iter().any(|c| {
+                    c.source != CandidateSource::TriePrefixAutocomplete
+                        && self.database.is_exact_dictionary_word(&c.text)
+                });
+            if !has_any_dict_match && middle.chars().count() >= 3 && middle.chars().count() <= 12 {
                 let mut typo_matches: Vec<String> = Vec::new();
 
                 // 12a. Physical QWERTY key adjacency slips and adjacent transpositions
@@ -2731,10 +2736,31 @@ impl PhoneticSuggestion {
                 None
             };
 
-            // Demote unattested low-band dictionary.json entries (e.g. freq=90 typos like অতিতেও/অবশরে)
-            // when they are completely absent from the corpus LM.
-            if freq > 0 && freq <= 150 && lm_score.is_some_and(|s| s <= -5.9) {
-                freq = 1;
+            // Replace noisy dictionary.json frequencies with real corpus LM unigram signal:
+            // - Unattested low-band entries (freq <= 150, lm <= -5.9) are demoted to 1.
+            // - Attested corpus words use corpus unigram log-prob to derive clean frequency,
+            //   preventing stale dictionary.json counts (e.g. আসব: 9500) from overriding context/phonetics.
+            let corpus_uni = if cand.source != CandidateSource::EmojiKeyword && !cand.text.is_ascii()
+            {
+                let u = if prev.is_none() && prev_prev.is_none() {
+                    lm_score.unwrap_or(-6.0)
+                } else {
+                    self.ai_context.lm().score_candidate(None, None, &cand.text)
+                };
+                Some(u)
+            } else {
+                None
+            };
+            if let Some(u) = corpus_uni {
+                if u <= -5.9 {
+                    if freq > 0 && freq <= 150 {
+                        freq = 1;
+                    }
+                } else {
+                    // Map log10 unigram [-5.9, -1.5] -> [10, 65535]
+                    let scaled = ((u + 6.0).clamp(0.0, 4.8) / 4.8) * 16.0;
+                    freq = (2.0_f32.powf(scaled) as u32).clamp(10, 65535);
+                }
             }
 
             // Context-conditioned LM score using 3-word context (fourgram) for extended feature.
